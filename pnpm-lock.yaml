@@ -11,9 +11,6 @@ importers:
       '@tanstack/vue-table':
         specifier: ^8.20.0
         version: 8.21.3(vue@3.5.25(typescript@5.9.3))
-      stripe:
-        specifier: ^14.0.0
-        version: 14.25.0
     devDependencies:
       '@types/node':
         specifier: ^20.10.0
@@ -30,6 +27,9 @@ importers:
       postcss:
         specifier: ^8.4.32
         version: 8.5.6
+      stripe:
+        specifier: ^17.0.0
+        version: 17.7.0
       tailwindcss:
         specifier: ^3.3.6
         version: 3.4.18
@@ -1427,8 +1427,8 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
-  stripe@14.25.0:
-    resolution: {integrity: sha512-wQS3GNMofCXwH8TSje8E1SE8zr6ODiGtHQgPtO95p9Mb4FhKC9jvXR2NUTpZ9ZINlckJcFidCmaTFV4P6vsb9g==}
+  stripe@17.7.0:
+    resolution: {integrity: sha512-aT2BU9KkizY9SATf14WhhYVv2uOapBWX0OFWF4xvcj1mPaNotlSc2CsxpS4DS46ZueSppmCF5BX1sNYBtwBvfw==}
     engines: {node: '>=12.*'}
 
   sucrase@3.35.1:
@@ -2890,7 +2890,7 @@ snapshots:
 
   strip-json-comments@3.1.1: {}
 
-  stripe@14.25.0:
+  stripe@17.7.0:
     dependencies:
       '@types/node': 20.19.25
       qs: 6.14.0
