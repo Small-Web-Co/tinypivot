@@ -1,6 +1,6 @@
 {
   "name": "tinypivot",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A powerful Excel-like data grid and pivot table component for Vue 3 by Small Web, LLC",
   "type": "module",
   "main": "./dist/tinypivot.umd.cjs",
@@ -25,11 +25,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "build:lib": "vue-tsc && vite build --mode lib",
+    "build:lib": "vite build --mode lib",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "demo": "vite --config vite.demo.config.ts",
-    "build:demo": "vite build --config vite.demo.config.ts"
+    "build:demo": "vite build --config vite.demo.config.ts",
+    "release": "vite build --mode lib && git add -A && git commit -m \"chore: release v$(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\") && git push origin master --tags && pnpm publish --access public --no-git-checks"
   },
   "peerDependencies": {
     "vue": "^3.3.0"

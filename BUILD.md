@@ -3,93 +3,57 @@
 ## Local Development
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Run demo locally
-pnpm demo
-
-## Release Workflow
-
-### 1. Update Version & Build
-
-```bash
-# Update version in package.json (e.g., 1.0.0 → 1.0.1)
-# Then build the library
-pnpm vite build --mode lib
+pnpm install    # Install dependencies
+pnpm demo       # Run demo locally
 ```
 
-### 2. Commit Your Changes
+## Quick Release (One Command!)
 
 ```bash
+# 1. Update version in package.json
+# 2. Run:
+pnpm release
+```
+
+This single command will:
+- Build the library
+- Commit all changes
+- Create git tag
+- Push to GitHub
+- Publish to npm
+
+## Manual Release Steps
+
+If you need more control:
+
+```bash
+# 1. Update version in package.json (e.g., 1.0.2 → 1.0.3)
+
+# 2. Build
+pnpm build:lib
+
+# 3. Commit, tag, push
 git add -A
-git commit -m "feat: description of changes"
+git commit -m "chore: release v1.0.3"
+git tag v1.0.3
+git push origin master --tags
+
+# 4. Publish to npm
+pnpm publish --access public --no-git-checks
 ```
 
-### 3. Tag the Release
+## Create GitHub Release (Optional)
+
+After publishing, create a release with changelog:
 
 ```bash
-# Create a version tag
-git tag v1.0.1
-
-# Push commits and tags to GitHub
-git push origin master
-git push origin --tags
-```
-
-### 4. Create GitHub Release
-
-Go to: https://github.com/Small-Web-Co/tinypivot/releases/new
-
-Select your tag and add changelog notes:
-
-```markdown
-## What's Changed
+gh release create v1.0.3 --title "v1.0.3" --notes "## What's Changed
 - Feature 1
-- Feature 2
-- Bug fix 1
+- Bug fix 1"
 ```
 
-Or via GitHub CLI:
-```bash
-gh release create v1.0.1 --title "v1.0.1" --notes "## What's Changed
-- Feature 1
-- Feature 2"
-```
+Or go to: https://github.com/Small-Web-Co/tinypivot/releases/new
 
-### 5. Publish to npm
+## Demo Deployment
 
-```bash
-# Login if needed
-npm login
-
-# Publish
-pnpm publish --access public
-
-OR ALL TOGETHER:
-git add .gitignore BUILD.md
-git commit -m "chore: add build guide, update gitignore"
-git push origin master
-pnpm publish --access public
-
-```
-
-### 6. Demo Deployment
-
-The demo auto-deploys to Vercel on push to `master`.
-
-Manual deploy:
-```bash
-vercel --prod
-```
-
-## Quick Release Checklist
-
-- [ ] Update version in `package.json`
-- [ ] Build: `pnpm vite build --mode lib`
-- [ ] Commit changes
-- [ ] Tag: `git tag vX.X.X`
-- [ ] Push: `git push origin master --tags`
-- [ ] Create GitHub release with changelog
-- [ ] Publish: `pnpm publish --access public`
-
+Auto-deploys to Vercel on push to `master`.
