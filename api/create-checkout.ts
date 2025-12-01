@@ -18,16 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
-
-  // Debug: Log which mode we're in
-  const isTestMode = process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')
-  console.log('🔑 Stripe mode:', isTestMode ? 'TEST' : 'LIVE')
-  console.log('💰 Price IDs:', {
-    single: process.env.STRIPE_PRICE_SINGLE?.substring(0, 20) + '...',
-    unlimited: process.env.STRIPE_PRICE_UNLIMITED?.substring(0, 20) + '...',
-    team: process.env.STRIPE_PRICE_TEAM?.substring(0, 20) + '...',
-  })
-
+  
   // Check environment variables
   if (!process.env.STRIPE_SECRET_KEY) {
     console.error('Missing STRIPE_SECRET_KEY')

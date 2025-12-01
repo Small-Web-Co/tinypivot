@@ -3,11 +3,138 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Primary Meta Tags -->
   <title>TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3</title>
-  <meta name="description" content="A powerful Excel-like data grid and pivot table component for Vue 3. Freemium model with Pro features for advanced pivot table functionality.">
+  <meta name="title" content="TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3">
+  <meta name="description" content="A powerful, lightweight Excel-like data grid and pivot table component for Vue 3. Features sorting, filtering, aggregations, and drag-and-drop pivot configuration. Free tier available.">
+  <meta name="keywords" content="vue data grid, vue 3 table, pivot table vue, excel vue component, vue spreadsheet, datagrid vue, vue table component, data visualization vue, vue pivot, tanstack vue">
+  <meta name="author" content="Small Web, LLC">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://tiny-pivot.com/">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://tiny-pivot.com/">
+  <meta property="og:title" content="TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3">
+  <meta property="og:description" content="A powerful, lightweight Excel-like data grid and pivot table component for Vue 3. Features sorting, filtering, aggregations, and drag-and-drop pivot configuration.">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="TinyPivot">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://tiny-pivot.com/">
+  <meta name="twitter:title" content="TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3">
+  <meta name="twitter:description" content="A powerful, lightweight Excel-like data grid and pivot table component for Vue 3. Free tier + Pro features for pivot tables.">
+  <meta name="twitter:creator" content="@bricevallieres">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#10b981">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "TinyPivot",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Web",
+    "offers": [
+      {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "name": "Free Tier",
+        "description": "Data grid with sorting, filtering, and keyboard navigation"
+      },
+      {
+        "@type": "Offer",
+        "price": "49",
+        "priceCurrency": "USD",
+        "name": "Single Project License",
+        "description": "Lifetime license for 1 developer, 1 project with pivot table features"
+      },
+      {
+        "@type": "Offer",
+        "price": "149",
+        "priceCurrency": "USD",
+        "name": "Unlimited Projects License",
+        "description": "Lifetime license for 1 developer, unlimited projects"
+      },
+      {
+        "@type": "Offer",
+        "price": "399",
+        "priceCurrency": "USD",
+        "name": "Team License",
+        "description": "Lifetime license for up to 10 developers"
+      }
+    ],
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "5",
+      "ratingCount": "1"
+    },
+    "description": "A powerful Excel-like data grid and pivot table component for Vue 3 with filtering, sorting, and drag-and-drop pivot configuration.",
+    "url": "https://tiny-pivot.com",
+    "downloadUrl": "https://www.npmjs.com/package/tinypivot",
+    "softwareVersion": "1.0.5",
+    "author": {
+      "@type": "Organization",
+      "name": "Small Web, LLC",
+      "url": "https://thesmallweb.co"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Small Web, LLC"
+    }
+  }
+  </script>
+
+  <!-- FAQ Schema for common questions -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is TinyPivot?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "TinyPivot is a Vue 3 component library that provides an Excel-like data grid and pivot table functionality. It includes features like column filtering, sorting, keyboard navigation, and cell selection in the free tier, with advanced pivot table features available in the Pro version."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is TinyPivot free to use?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, TinyPivot offers a free tier with core data grid features including sorting, filtering, keyboard navigation, and cell selection. Pro features like pivot tables and aggregations require a one-time license purchase starting at $49."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does TinyPivot work with Vue 3?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, TinyPivot is built specifically for Vue 3 and requires Vue 3.3.0 or higher. It's written in TypeScript and provides full type definitions."
+        }
+      }
+    ]
+  }
+  </script>
+  
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
   <style>
     * {
       margin: 0;
@@ -33,4 +160,3 @@
   <script type="module" src="/main.ts"></script>
 </body>
 </html>
-

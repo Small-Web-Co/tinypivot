@@ -1,0 +1,11 @@
+# TinyPivot robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://tiny-pivot.com/sitemap.xml
+
+# Block checkout/transactional pages from indexing
+Disallow: /success
+Disallow: /api/
+
