@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   root: 'demo',
-  base: '/vue-pivot-grid/', // GitHub Pages base path - update with your repo name
+  base: '/', // Root path for Vercel hosting
   build: {
     outDir: '../dist-demo',
     emptyOutDir: true,

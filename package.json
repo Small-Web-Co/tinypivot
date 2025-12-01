@@ -33,7 +33,8 @@
     "vue": "^3.3.0"
   },
   "dependencies": {
-    "@tanstack/vue-table": "^8.20.0"
+    "@tanstack/vue-table": "^8.20.0",
+    "stripe": "^14.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -63,13 +64,13 @@
   ],
   "author": "Your Name",
   "license": "SEE LICENSE IN LICENSE.md",
-  "homepage": "https://github.com/yourusername/vue-pivot-grid",
+  "homepage": "https://github.com/Small-Web-Co/vue-pivot-grid",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/vue-pivot-grid.git"
+    "url": "https://github.com/Small-Web-Co/vue-pivot-grid.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/vue-pivot-grid/issues"
+    "url": "https://github.com/Small-Web-Co/vue-pivot-grid/issues"
   },
   "packageManager": "pnpm@9.0.0+sha512.b4106707c7225b1748b61595953ccbebff97b54ad05d002aa3635f633b9c53cd666f7ce9b8bc44704f1fa048b9a49b55371ab2d9e9d667d1efe2ef1514bcd513"
 }
