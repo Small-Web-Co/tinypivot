@@ -1,8 +1,8 @@
-# Vue Pivot Grid License
+# TinyPivot License
 
 ## Free Tier (MIT License)
 
-Copyright (c) 2024 Vue Pivot Grid
+Copyright (c) 2024 TinyPivot
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of the Free Tier features of this software and associated documentation files
@@ -45,12 +45,12 @@ The following features require a Pro license:
 - **Team License (up to 10 devs)**: $399 one-time payment
 
 ### How to Purchase:
-Visit https://vue-pivot-grid.dev/pricing to purchase a license.
+Visit https://tiny-pivot.com/pricing to purchase a license.
 
 After purchase, you'll receive a license key to unlock Pro features:
 
 ```typescript
-import { VuePivotGrid, setLicenseKey } from 'vue-pivot-grid'
+import { DataGrid, setLicenseKey } from 'tinypivot'
 
 setLicenseKey('YOUR_LICENSE_KEY')
 ```
@@ -64,7 +64,7 @@ setLicenseKey('YOUR_LICENSE_KEY')
 
 ## Terms
 
-1. **No Removal of Attribution**: Free tier users must keep the "Powered by Vue Pivot Grid" 
+1. **No Removal of Attribution**: Free tier users must keep the "Powered by TinyPivot" 
    watermark visible. Pro license removes this requirement.
 
 2. **No Redistribution**: You may not redistribute this library as part of another 
@@ -74,5 +74,5 @@ setLicenseKey('YOUR_LICENSE_KEY')
 
 ---
 
-For questions about licensing, contact: license@vue-pivot-grid.dev
+For questions about licensing, contact: license@tiny-pivot.com
 

@@ -2,10 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "pnpm build:demo",
   "outputDirectory": "dist-demo",
-  "framework": null,
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
+  "installCommand": "pnpm install",
+  "devCommand": "vite --config vite.demo.config.ts --port $PORT",
   "headers": [
     {
       "source": "/api/(.*)",
@@ -17,4 +15,3 @@
     }
   ]
 }
-

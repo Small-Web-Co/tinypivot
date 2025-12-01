@@ -35,6 +35,9 @@ coverage
 # Misc
 *.tgz
 .env
+.env.local
 .env.*
 !.env.example
 
+.vercel
+.env*.local

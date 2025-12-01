@@ -1,5 +1,5 @@
 /**
- * Vue Pivot Grid - Type Definitions
+ * TinyPivot - Type Definitions
  */
 
 // Grid Types

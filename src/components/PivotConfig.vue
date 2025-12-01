@@ -299,8 +299,8 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
     <!-- Pro Badge / Watermark -->
     <div v-if="showWatermark" class="vpg-watermark">
-      <a href="https://vue-pivot-grid.dev" target="_blank" rel="noopener">
-        Vue Pivot Grid
+      <a href="https://tiny-pivot.com" target="_blank" rel="noopener">
+        TinyPivot
       </a>
     </div>
   </div>

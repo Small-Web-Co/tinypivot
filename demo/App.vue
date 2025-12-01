@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { DataGrid, setLicenseKey } from 'vue-pivot-grid'
+import { DataGrid, setLicenseKey } from 'tinypivot'
 
 // Sample data
 const sampleData = ref([
@@ -25,9 +25,9 @@ const sampleData = ref([
 // Pricing
 const selectedPlan = ref<'single' | 'unlimited' | 'team'>('single')
 const plans = [
-  { id: 'single', name: 'Single Project', price: 49, description: 'Perfect for a single application' },
-  { id: 'unlimited', name: 'Unlimited Projects', price: 149, description: 'Use in all your projects' },
-  { id: 'team', name: 'Team License', price: 399, description: 'For teams up to 10 developers' },
+  { id: 'single', name: 'Single Project', price: 49, description: 'Lifetime license for 1 developer, 1 project. Includes updates.' },
+  { id: 'unlimited', name: 'Unlimited Projects', price: 149, description: 'Lifetime license for 1 developer, unlimited projects. Includes updates.' },
+  { id: 'team', name: 'Team License', price: 399, description: 'Lifetime license for up to 10 developers, unlimited projects. Includes updates.' },
 ] as const
 
 const isCheckingOut = ref(false)
@@ -37,22 +37,37 @@ async function buyNow() {
   
   isCheckingOut.value = true
   try {
+    console.log('Starting checkout for plan:', selectedPlan.value)
+    
     const response = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan: selectedPlan.value }),
     })
     
+    console.log('Response status:', response.status)
+    
+    // Check if response is ok
+    if (!response.ok) {
+      const text = await response.text()
+      console.error('API error response:', text)
+      alert(`API Error (${response.status}): ${text || 'Unknown error'}`)
+      return
+    }
+    
     const data = await response.json()
+    console.log('API response:', data)
     
     if (data.url) {
       window.location.href = data.url
+    } else if (data.error) {
+      alert(`Error: ${data.error}`)
     } else {
       alert('Failed to create checkout session. Please try again.')
     }
   } catch (error) {
     console.error('Checkout error:', error)
-    alert('Failed to create checkout session. Please try again.')
+    alert(`Checkout error: ${error instanceof Error ? error.message : 'Unknown error'}`)
   } finally {
     isCheckingOut.value = false
   }
@@ -87,13 +102,14 @@ const activeSection = ref('hero')
           <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
-          <span>Vue Pivot Grid</span>
+          <span>TinyPivot</span>
         </div>
         <div class="nav-links">
           <a href="#features">Features</a>
+          <a href="#quickstart">Quick Start</a>
           <a href="#demo">Demo</a>
           <a href="#pricing">Pricing</a>
-          <a href="https://github.com/Small-Web-Co/vue-pivot-grid" target="_blank" class="nav-github">
+          <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank" class="nav-github">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
             </svg>
@@ -125,7 +141,7 @@ const activeSection = ref('hero')
           </a>
         </div>
         <div class="hero-install">
-          <code>pnpm add vue-pivot-grid</code>
+          <code>pnpm add tinypivot</code>
           <button class="copy-btn" title="Copy to clipboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -211,6 +227,119 @@ const activeSection = ref('hero')
       </div>
     </section>
 
+    <!-- Quick Start Section -->
+    <section id="quickstart" class="quickstart">
+      <div class="section-header">
+        <div class="badge badge-glow">Dead Simple Integration</div>
+        <h2>Up and Running in <span class="gradient-text">30 Seconds</span></h2>
+        <p>No complex configuration. No boilerplate. Just install, import, and go.</p>
+      </div>
+
+      <div class="steps-container">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Install</h3>
+            <p>One package, zero dependencies</p>
+            <div class="code-block">
+              <code>pnpm add tinypivot</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-connector">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Import</h3>
+            <p>Just two lines of setup</p>
+            <div class="code-block code-block-multi">
+              <pre><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'tinypivot'</span>
+<span class="code-keyword">import</span> <span class="code-string">'tinypivot/style.css'</span></code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-connector">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>Use</h3>
+            <p>Pass your data, done.</p>
+            <div class="code-block code-block-multi">
+              <pre><code><span class="code-tag">&lt;DataGrid</span> <span class="code-attr">:data</span>=<span class="code-string">"yourData"</span> <span class="code-tag">/&gt;</span></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-showcase">
+        <div class="example-header">
+          <span class="example-dot"></span>
+          <span class="example-dot"></span>
+          <span class="example-dot"></span>
+          <span class="example-title">App.vue</span>
+        </div>
+        <div class="example-code">
+          <pre><code><span class="code-tag">&lt;script setup lang="ts"&gt;</span>
+<span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'tinypivot'</span>
+<span class="code-keyword">import</span> <span class="code-string">'tinypivot/style.css'</span>
+
+<span class="code-keyword">const</span> data = [
+  { id: <span class="code-number">1</span>, region: <span class="code-string">'North'</span>, product: <span class="code-string">'Widget A'</span>, sales: <span class="code-number">12500</span> },
+  { id: <span class="code-number">2</span>, region: <span class="code-string">'South'</span>, product: <span class="code-string">'Widget B'</span>, sales: <span class="code-number">8300</span> },
+  { id: <span class="code-number">3</span>, region: <span class="code-string">'East'</span>, product: <span class="code-string">'Widget A'</span>, sales: <span class="code-number">15200</span> },
+]
+<span class="code-tag">&lt;/script&gt;</span>
+
+<span class="code-tag">&lt;template&gt;</span>
+  <span class="code-tag">&lt;DataGrid</span> <span class="code-attr">:data</span>=<span class="code-string">"data"</span> <span class="code-tag">/&gt;</span>
+<span class="code-tag">&lt;/template&gt;</span></code></pre>
+        </div>
+      </div>
+
+      <div class="api-preview">
+        <h3>That's it. Seriously.</h3>
+        <p>But when you need more control, we've got you covered:</p>
+        <div class="props-grid">
+          <div class="prop-item">
+            <code>:data</code>
+            <span>Your array of objects</span>
+          </div>
+          <div class="prop-item">
+            <code>:loading</code>
+            <span>Show loading state</span>
+          </div>
+          <div class="prop-item">
+            <code>:row-height</code>
+            <span>Customize row height</span>
+          </div>
+          <div class="prop-item">
+            <code>:font-size</code>
+            <span>'xs' | 'sm' | 'base'</span>
+          </div>
+          <div class="prop-item">
+            <code>:show-pivot</code>
+            <span>Toggle pivot button</span>
+          </div>
+          <div class="prop-item">
+            <code>@cell-click</code>
+            <span>Cell click event</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Demo Section -->
     <section id="demo" class="demo">
       <div class="section-header">
@@ -238,7 +367,7 @@ const activeSection = ref('hero')
     <section id="pricing" class="pricing">
       <div class="section-header">
         <h2>Simple Pricing</h2>
-        <p>One-time payment, lifetime license with 1 year of updates</p>
+        <p>One-time payment, lifetime license with free updates</p>
       </div>
 
       <div class="pricing-cards">
@@ -258,7 +387,7 @@ const activeSection = ref('hero')
               {{ f.name }}
             </li>
           </ul>
-          <a href="https://github.com/Small-Web-Co/vue-pivot-grid" class="btn btn-outline">
+          <a href="https://github.com/Small-Web-Co/tinypivot" class="btn btn-outline">
             Get Started
           </a>
         </div>
@@ -284,6 +413,7 @@ const activeSection = ref('hero')
               {{ plan.name }}
             </button>
           </div>
+          <p class="plan-description">{{ plans.find(p => p.id === selectedPlan)?.description }}</p>
           
           <ul class="pricing-features">
             <li v-for="f in features" :key="f.name">
@@ -309,9 +439,9 @@ const activeSection = ref('hero')
     <!-- CTA Section -->
     <section class="cta">
       <h2>Ready to supercharge your Vue app?</h2>
-      <p>Join hundreds of developers using Vue Pivot Grid</p>
+      <p>Join hundreds of developers using TinyPivot</p>
       <div class="cta-actions">
-        <code>pnpm add vue-pivot-grid</code>
+        <code>pnpm add tinypivot</code>
       </div>
     </section>
 
@@ -323,7 +453,7 @@ const activeSection = ref('hero')
             <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            <span>Vue Pivot Grid</span>
+            <span>TinyPivot</span>
           </div>
           <p>Excel-like data grid & pivot table for Vue 3</p>
         </div>
@@ -342,14 +472,14 @@ const activeSection = ref('hero')
           </div>
           <div class="footer-col">
             <h4>Connect</h4>
-            <a href="https://github.com/Small-Web-Co/vue-pivot-grid">GitHub</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot">GitHub</a>
             <a href="#">Twitter</a>
             <a href="#">Discord</a>
           </div>
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2024 Vue Pivot Grid. All rights reserved.</p>
+        <p>&copy; 2024 TinyPivot. All rights reserved.</p>
       </div>
     </footer>
   </div>
@@ -678,6 +808,223 @@ const activeSection = ref('hero')
   color: #a78bfa;
 }
 
+/* Quick Start */
+.quickstart {
+  padding: 6rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.quickstart::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse 60% 40% at 50% 20%, rgba(16, 185, 129, 0.08), transparent);
+  pointer-events: none;
+}
+
+.badge-glow {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.2); }
+}
+
+.steps-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 4rem;
+  flex-wrap: wrap;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 240px;
+}
+
+.step-number {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-radius: 50%;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+.step-content {
+  text-align: center;
+}
+
+.step-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.step-content p {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+}
+
+.step-connector {
+  display: flex;
+  align-items: center;
+  padding-top: 1rem;
+  color: #334155;
+}
+
+.step-connector svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.code-block {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+}
+
+.code-block code {
+  color: #10b981;
+}
+
+.code-block-multi {
+  text-align: left;
+}
+
+.code-block-multi pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.example-showcase {
+  max-width: 700px;
+  margin: 0 auto 4rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.example-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.example-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: #374151;
+}
+
+.example-dot:nth-child(1) { background: #ef4444; }
+.example-dot:nth-child(2) { background: #f59e0b; }
+.example-dot:nth-child(3) { background: #22c55e; }
+
+.example-title {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.example-code {
+  padding: 1.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.example-code pre {
+  margin: 0;
+}
+
+.example-code code {
+  color: #e2e8f0;
+}
+
+.code-keyword { color: #c678dd; }
+.code-string { color: #98c379; }
+.code-number { color: #d19a66; }
+.code-tag { color: #61afef; }
+.code-attr { color: #d19a66; }
+
+.api-preview {
+  text-align: center;
+}
+
+.api-preview h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.api-preview > p {
+  color: #64748b;
+  margin-bottom: 2rem;
+}
+
+.props-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.prop-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.prop-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.prop-item code {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #10b981;
+}
+
+.prop-item span {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
 /* Demo */
 .demo {
   padding: 6rem 2rem;
@@ -718,23 +1065,27 @@ const activeSection = ref('hero')
 
 /* Pricing */
 .pricing {
-  padding: 6rem 2rem;
-  max-width: 1000px;
+  padding: 4rem 2rem;
+  max-width: 900px;
   margin: 0 auto;
+}
+
+.pricing .section-header {
+  margin-bottom: 2rem;
 }
 
 .pricing-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
 }
 
 .pricing-card {
   position: relative;
-  padding: 2.5rem;
+  padding: 1.5rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1.5rem;
+  border-radius: 1rem;
 }
 
 .pricing-card.pricing-pro {
@@ -744,13 +1095,13 @@ const activeSection = ref('hero')
 
 .pricing-popular {
   position: absolute;
-  top: -0.75rem;
+  top: -0.625rem;
   left: 50%;
   transform: translateX(-50%);
-  padding: 0.375rem 1rem;
+  padding: 0.25rem 0.75rem;
   background: linear-gradient(135deg, #8b5cf6, #10b981);
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: white;
   white-space: nowrap;
@@ -758,49 +1109,49 @@ const activeSection = ref('hero')
 
 .pricing-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .pricing-header h3 {
-  font-size: 1.5rem;
+  font-size: 1.125rem;
   font-weight: 600;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .pricing-price {
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.375rem;
 }
 
 .pricing-price .price {
-  font-size: 3rem;
+  font-size: 2rem;
   font-weight: 700;
 }
 
 .pricing-price .period {
   color: #64748b;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
 }
 
 .plan-selector {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-  padding: 0.25rem;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.1875rem;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
 }
 
 .plan-btn {
   flex: 1;
-  padding: 0.5rem;
+  padding: 0.375rem 0.25rem;
   background: transparent;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   color: #94a3b8;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -815,28 +1166,43 @@ const activeSection = ref('hero')
   color: white;
 }
 
+.plan-description {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #a78bfa;
+  margin-bottom: 1rem;
+  min-height: 2rem;
+}
+
 .pricing-features {
   list-style: none;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 0.5rem;
 }
 
 .pricing-features li {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.625rem 0;
-  font-size: 0.9375rem;
+  gap: 0.375rem;
+  padding: 0.25rem 0;
+  font-size: 0.75rem;
   color: #cbd5e1;
 }
 
 .pricing-features svg {
   color: #10b981;
   flex-shrink: 0;
+  width: 12px;
+  height: 12px;
 }
 
 .pricing-card .btn {
   width: 100%;
   justify-content: center;
+  padding: 0.625rem 1rem;
+  font-size: 0.8125rem;
 }
 
 /* CTA */
@@ -938,7 +1304,35 @@ const activeSection = ref('hero')
     flex-direction: column;
   }
   
+  .steps-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .step {
+    max-width: 100%;
+    width: 100%;
+  }
+  
+  .step-connector {
+    transform: rotate(90deg);
+    padding: 0.5rem 0;
+  }
+  
+  .example-code {
+    font-size: 0.75rem;
+    padding: 1rem;
+  }
+  
+  .props-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
   .pricing-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .pricing-features {
     grid-template-columns: 1fr;
   }
   
@@ -949,6 +1343,16 @@ const activeSection = ref('hero')
   
   .footer-links {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .props-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .nav-links a:not(.nav-github) {
+    display: none;
   }
 }
 </style>

@@ -7,12 +7,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
-      'vue-pivot-grid/style.css': resolve(__dirname, 'src/style.css'),
-      'vue-pivot-grid': resolve(__dirname, 'src/index.ts'),
+      'tinypivot/style.css': resolve(__dirname, 'src/style.css'),
+      'tinypivot': resolve(__dirname, 'src/index.ts'),
     },
   },
   root: 'demo',
-  base: '/', // Root path for Vercel hosting
+  base: '/',
   build: {
     outDir: '../dist-demo',
     emptyOutDir: true,

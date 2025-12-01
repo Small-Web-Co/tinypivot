@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Vue Pivot Grid - Main DataGrid Component
+ * TinyPivot - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -778,10 +778,10 @@ function handleContainerClick(event: MouseEvent) {
         <div v-if="isDemo" class="vpg-demo-banner">
           <span class="vpg-demo-badge">DEMO</span>
           <span>Pro features enabled</span>
-          <a href="https://vue-pivot-grid.dev/pricing" target="_blank" rel="noopener">Get License →</a>
+          <a href="https://tiny-pivot.com/pricing" target="_blank" rel="noopener">Get License →</a>
         </div>
         <span v-else-if="showWatermark" class="vpg-watermark-inline">
-          <a href="https://vue-pivot-grid.dev" target="_blank" rel="noopener">Vue Pivot Grid</a>
+          <a href="https://tiny-pivot.com" target="_blank" rel="noopener">TinyPivot</a>
         </span>
       </div>
     </div>

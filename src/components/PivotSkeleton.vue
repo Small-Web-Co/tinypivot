@@ -254,7 +254,7 @@ const dataColWidth = ref(80)
         </svg>
         <h3>Pro Feature</h3>
         <p>Pivot Table functionality requires a Pro license.</p>
-        <a href="https://vue-pivot-grid.dev/pricing" target="_blank" class="vpg-pro-link">
+        <a href="https://tiny-pivot.com/pricing" target="_blank" class="vpg-pro-link">
           Get Pro License →
         </a>
       </div>
@@ -462,13 +462,13 @@ const dataColWidth = ref(80)
       <template v-if="isDemo">
         <span class="vpg-demo-badge">DEMO</span>
         <span>Pro features unlocked for evaluation</span>
-        <a href="https://vue-pivot-grid.dev/pricing" target="_blank" rel="noopener" class="vpg-get-pro">
+        <a href="https://tiny-pivot.com/pricing" target="_blank" rel="noopener" class="vpg-get-pro">
           Get Pro License →
         </a>
       </template>
       <template v-else>
-        <a href="https://vue-pivot-grid.dev" target="_blank" rel="noopener">
-          Powered by Vue Pivot Grid
+        <a href="https://tiny-pivot.com" target="_blank" rel="noopener">
+          Powered by TinyPivot
         </a>
       </template>
     </div>

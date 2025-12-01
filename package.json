@@ -1,16 +1,16 @@
 {
-  "name": "vue-pivot-grid",
+  "name": "tinypivot",
   "version": "1.0.0",
-  "description": "A powerful Excel-like data grid and pivot table component for Vue 3",
+  "description": "A powerful Excel-like data grid and pivot table component for Vue 3 by Small Web, LLC",
   "type": "module",
-  "main": "./dist/vue-pivot-grid.umd.cjs",
-  "module": "./dist/vue-pivot-grid.js",
+  "main": "./dist/tinypivot.umd.cjs",
+  "module": "./dist/tinypivot.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/vue-pivot-grid.js",
-      "require": "./dist/vue-pivot-grid.umd.cjs"
+      "import": "./dist/tinypivot.js",
+      "require": "./dist/tinypivot.umd.cjs"
     },
     "./style.css": "./dist/style.css"
   },
@@ -33,10 +33,11 @@
     "vue": "^3.3.0"
   },
   "dependencies": {
-    "@tanstack/vue-table": "^8.20.0",
-    "stripe": "^14.0.0"
+    "@tanstack/vue-table": "^8.20.0"
   },
   "devDependencies": {
+    "@vercel/node": "^3.0.0",
+    "stripe": "^17.0.0",
     "@types/node": "^20.10.0",
     "@vitejs/plugin-vue": "^4.5.0",
     "autoprefixer": "^10.4.16",
@@ -62,15 +63,15 @@
     "sorting",
     "aggregation"
   ],
-  "author": "Your Name",
+  "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
-  "homepage": "https://github.com/Small-Web-Co/vue-pivot-grid",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Small-Web-Co/vue-pivot-grid.git"
+    "url": "https://github.com/Small-Web-Co/tinypivot.git"
   },
   "bugs": {
-    "url": "https://github.com/Small-Web-Co/vue-pivot-grid/issues"
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
   },
   "packageManager": "pnpm@9.0.0+sha512.b4106707c7225b1748b61595953ccbebff97b54ad05d002aa3635f633b9c53cd666f7ce9b8bc44704f1fa048b9a49b55371ab2d9e9d667d1efe2ef1514bcd513"
 }

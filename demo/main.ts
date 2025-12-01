@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { enableDemoMode } from 'vue-pivot-grid'
+import { enableDemoMode } from 'tinypivot'
 import App from './App.vue'
 import '../src/style.css'
 

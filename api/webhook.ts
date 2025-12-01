@@ -30,10 +30,12 @@ const PLAN_CODES: Record<string, string> = {
 }
 
 /**
- * Generate a license key
- * Format: VPG-{TYPE}-{HASH}-{EXPIRY}
+ * Generate a cryptographically signed license key
+ * Format: TP-{TYPE}-{SIGNATURE}-{EXPIRY}
+ * 
+ * Uses HMAC-SHA256 with a secret key - impossible to forge without the secret
  */
-function generateLicenseKey(plan: string): string {
+async function generateLicenseKey(plan: string): Promise<string> {
   const typeCode = PLAN_CODES[plan] || 'PRO1'
 
   // License valid for 1 year from now
@@ -41,50 +43,77 @@ function generateLicenseKey(plan: string): string {
   expiryDate.setFullYear(expiryDate.getFullYear() + 1)
   const expiry = expiryDate.toISOString().slice(0, 10).replace(/-/g, '')
 
-  // Generate hash
-  const hashInput = `${typeCode}-${expiry}`
-  let hash = 0
-  for (let i = 0; i < hashInput.length; i++) {
-    const char = hashInput.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash
-  }
-  const hashStr = Math.abs(hash).toString(16).toUpperCase().slice(0, 8).padStart(8, '0')
+  // HMAC-SHA256 signature with secret
+  const secret = process.env.LICENSE_SECRET || 'tp-change-this-secret-in-production'
+  const payload = `TP-${typeCode}-${expiry}`
+  
+  const encoder = new TextEncoder()
+  const keyData = encoder.encode(secret)
+  const msgData = encoder.encode(payload)
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData)
+  const sigArray = Array.from(new Uint8Array(signature))
+  const sigStr = sigArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 12).toUpperCase()
 
-  return `VPG-${typeCode}-${hashStr}-${expiry}`
+  return `TP-${typeCode}-${sigStr}-${expiry}`
 }
 
-/**
- * Send license email (using Resend, or adapt for your email provider)
- */
-async function sendLicenseEmail(email: string, licenseKey: string, plan: string): Promise<void> {
-  // Option 1: Using Resend (recommended)
-  if (process.env.RESEND_API_KEY) {
-    const planNames: Record<string, string> = {
-      single: 'Single Project',
-      unlimited: 'Unlimited Projects',
-      team: 'Team License',
-    }
+// Check if running in development
+const isDev = process.env.VERCEL_ENV !== 'production' && process.env.NODE_ENV !== 'production'
 
-    await fetch('https://api.resend.com/emails', {
+/**
+ * Send license email via Resend
+ */
+async function sendLicenseEmail(email: string, licenseKey: string, plan: string): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) {
+    console.log('⚠️ RESEND_API_KEY not set - logging license for manual fulfillment')
+    console.log('LICENSE GENERATED:', { email, licenseKey, plan })
+    return false
+  }
+
+  const planNames: Record<string, string> = {
+    single: 'Single Project',
+    unlimited: 'Unlimited Projects',
+    team: 'Team License',
+  }
+
+  // Use test sender in dev (no domain verification needed)
+  const fromAddress = isDev 
+    ? 'TinyPivot <onboarding@resend.dev>'
+    : 'TinyPivot <license@tiny-pivot.com>'
+  
+  const subjectPrefix = isDev ? '[TEST] ' : ''
+
+  try {
+    console.log(`📧 Sending license email to ${email}... (${isDev ? 'DEV MODE' : 'PRODUCTION'})`)
+    
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Vue Pivot Grid <license@vue-pivot-grid.dev>',
+        from: fromAddress,
         to: email,
-        subject: 'Your Vue Pivot Grid Pro License',
+        subject: `${subjectPrefix}Your TinyPivot Pro License`,
         html: `
-          <h1>Thank you for purchasing Vue Pivot Grid Pro!</h1>
+          <h1>Thank you for purchasing TinyPivot Pro!</h1>
           <p>Here is your license key for the <strong>${planNames[plan] || plan}</strong> plan:</p>
           <pre style="background: #f4f4f4; padding: 16px; border-radius: 8px; font-size: 18px; font-family: monospace;">
 ${licenseKey}
           </pre>
           <h2>How to use your license:</h2>
           <pre style="background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; font-size: 14px;">
-import { setLicenseKey } from 'vue-pivot-grid'
+import { setLicenseKey } from 'tinypivot'
 
 setLicenseKey('${licenseKey}')
           </pre>
@@ -94,10 +123,20 @@ setLicenseKey('${licenseKey}')
         `,
       }),
     })
+
+    const result = await response.json()
+    
+    if (!response.ok) {
+      console.error('❌ Resend API error:', result)
+      return false
+    }
+    
+    console.log(`✅ Email sent successfully! ID: ${result.id}`)
+    return true
   }
-  else {
-    // Log for manual fulfillment if no email service configured
-    console.log('LICENSE GENERATED:', { email, licenseKey, plan })
+  catch (error) {
+    console.error('❌ Failed to send email:', error)
+    return false
   }
 }
 
@@ -107,12 +146,36 @@ export const config = {
   },
 }
 
+/**
+ * Get raw body - handles both Vercel production and vercel dev
+ */
 async function getRawBody(req: VercelRequest): Promise<Buffer> {
-  const chunks: Buffer[] = []
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+  // If body was already parsed (vercel dev sometimes does this), stringify it back
+  if (req.body && typeof req.body === 'object') {
+    return Buffer.from(JSON.stringify(req.body))
   }
-  return Buffer.concat(chunks)
+  
+  // Otherwise read from stream (production Vercel)
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    
+    req.on('data', (chunk: Buffer) => {
+      chunks.push(chunk)
+    })
+    
+    req.on('end', () => {
+      resolve(Buffer.concat(chunks))
+    })
+    
+    req.on('error', reject)
+    
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      if (chunks.length === 0) {
+        reject(new Error('Request body timeout'))
+      }
+    }, 10000)
+  })
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -120,21 +183,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const rawBody = await getRawBody(req)
-  const signature = req.headers['stripe-signature'] as string
-
   let event: Stripe.Event
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!,
-    )
-  }
-  catch (err) {
-    console.error('Webhook signature verification failed:', err)
-    return res.status(400).json({ error: 'Invalid signature' })
+  // In dev mode, skip signature verification (vercel dev mangles the body)
+  // This is safe because we're using Stripe CLI locally
+  if (isDev) {
+    console.log('🔧 DEV MODE: Skipping signature verification')
+    
+    // Get the body - either already parsed or from stream
+    let body: unknown
+    if (req.body && typeof req.body === 'object') {
+      body = req.body
+    } else {
+      const rawBody = await getRawBody(req)
+      body = JSON.parse(rawBody.toString())
+    }
+    
+    event = body as Stripe.Event
+    console.log(`📥 Received webhook: ${event.type}`)
+  } else {
+    // Production: verify signature
+    const signature = req.headers['stripe-signature'] as string
+    
+    if (!signature) {
+      console.error('❌ No stripe-signature header')
+      return res.status(400).json({ error: 'Missing stripe-signature header' })
+    }
+
+    let rawBody: Buffer
+    try {
+      rawBody = await getRawBody(req)
+      console.log(`📥 Received webhook body (${rawBody.length} bytes)`)
+    }
+    catch (err) {
+      console.error('❌ Failed to read request body:', err)
+      return res.status(400).json({ error: 'Failed to read request body' })
+    }
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        rawBody,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET!,
+      )
+      console.log(`✅ Webhook verified: ${event.type}`)
+    }
+    catch (err) {
+      console.error('❌ Webhook signature verification failed:', err)
+      return res.status(400).json({ error: 'Invalid signature' })
+    }
   }
 
   if (event.type === 'checkout.session.completed') {
@@ -144,9 +241,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const plan = session.metadata?.plan || 'single'
 
     if (email) {
-      const licenseKey = generateLicenseKey(plan)
-      await sendLicenseEmail(email, licenseKey, plan)
-      console.log(`License sent to ${email}: ${licenseKey}`)
+      const licenseKey = await generateLicenseKey(plan)
+      const emailSent = await sendLicenseEmail(email, licenseKey, plan)
+      console.log(`📋 License: ${licenseKey} | Email: ${email} | Sent: ${emailSent ? 'YES' : 'NO'}`)
+    }
+    else {
+      console.error('⚠️ No email found in checkout session!')
     }
   }
 

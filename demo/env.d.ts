@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
-declare module 'vue-pivot-grid' {
+declare module 'tinypivot' {
   export * from '../src/index'
 }
 
-declare module 'vue-pivot-grid/style.css' {}
+declare module 'tinypivot/style.css' {}
 

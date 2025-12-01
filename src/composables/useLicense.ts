@@ -1,5 +1,5 @@
 /**
- * License Management for Vue Pivot Grid
+ * License Management for TinyPivot
  * Handles license validation and feature gating
  */
 import { computed, ref } from 'vue'
@@ -20,74 +20,99 @@ const licenseInfo = ref<LicenseInfo>({
   },
 })
 
+// Cached validation result
+let validationPromise: Promise<LicenseInfo> | null = null
+
 /**
- * Simple hash function for license validation
+ * HMAC-SHA256 based license signature verification
+ * Must match the server-side generation algorithm
  */
-function hashCode(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash
+async function verifySignature(typeCode: string, signature: string, expiry: string): Promise<boolean> {
+  // The secret must be configured before license validation can work
+  // Use configureLicenseSecret() or build-time replacement
+  const secret = (globalThis as Record<string, unknown>).__TP_LICENSE_SECRET__ as string
+  
+  if (!secret) {
+    console.warn('[TinyPivot] License secret not configured. Call configureLicenseSecret() first.')
+    return false
   }
-  return Math.abs(hash)
+  
+  const payload = `TP-${typeCode}-${expiry}`
+  
+  try {
+    const encoder = new TextEncoder()
+    const keyData = encoder.encode(secret)
+    const msgData = encoder.encode(payload)
+    
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+    
+    const sig = await crypto.subtle.sign('HMAC', cryptoKey, msgData)
+    const sigArray = Array.from(new Uint8Array(sig))
+    const expectedSig = sigArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 12).toUpperCase()
+    
+    return signature === expectedSig
+  }
+  catch {
+    // Fallback for environments without crypto.subtle (SSR, older browsers)
+    return false
+  }
+}
+
+const FREE_LICENSE: LicenseInfo = {
+  type: 'free',
+  isValid: true,
+  features: {
+    pivot: false,
+    advancedAggregations: false,
+    percentageMode: false,
+    sessionPersistence: false,
+    noWatermark: false,
+  },
+}
+
+const INVALID_LICENSE: LicenseInfo = {
+  type: 'free',
+  isValid: false,
+  features: {
+    pivot: false,
+    advancedAggregations: false,
+    percentageMode: false,
+    sessionPersistence: false,
+    noWatermark: false,
+  },
 }
 
 /**
  * Validate a license key and extract info
  */
-function validateLicenseKey(key: string): LicenseInfo {
+async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   // Free tier - no key needed
   if (!key || key === '') {
-    return {
-      type: 'free',
-      isValid: true,
-      features: {
-        pivot: false,
-        advancedAggregations: false,
-        percentageMode: false,
-        sessionPersistence: false,
-        noWatermark: false,
-      },
-    }
+    return FREE_LICENSE
   }
 
-  // License key format: VPG-{TYPE}-{HASH}-{EXPIRY}
-  // Example: VPG-PRO1-A1B2C3D4-20251231
+  // License key format: TP-{TYPE}-{SIGNATURE}-{EXPIRY}
+  // Example: TP-PRO1-A1B2C3D4E5F6-20251231
   const parts = key.split('-')
 
-  if (parts.length !== 4 || parts[0] !== 'VPG') {
-    return {
-      type: 'free',
-      isValid: false,
-      features: {
-        pivot: false,
-        advancedAggregations: false,
-        percentageMode: false,
-        sessionPersistence: false,
-        noWatermark: false,
-      },
-    }
+  if (parts.length !== 4 || parts[0] !== 'TP') {
+    return INVALID_LICENSE
   }
 
   const typeCode = parts[1]
-  const hash = parts[2]
+  const signature = parts[2]
   const expiryStr = parts[3]
 
-  // Validate hash (simple check - in production use proper crypto)
-  const expectedHash = hashCode(`${typeCode}-${expiryStr}`).toString(16).toUpperCase().slice(0, 8)
-  if (hash !== expectedHash) {
-    return {
-      type: 'free',
-      isValid: false,
-      features: {
-        pivot: false,
-        advancedAggregations: false,
-        percentageMode: false,
-        sessionPersistence: false,
-        noWatermark: false,
-      },
-    }
+  // Verify cryptographic signature
+  const isValidSignature = await verifySignature(typeCode, signature, expiryStr)
+  if (!isValidSignature) {
+    return INVALID_LICENSE
   }
 
   // Parse expiry date
@@ -97,18 +122,7 @@ function validateLicenseKey(key: string): LicenseInfo {
   const expiresAt = new Date(year, month, day)
 
   if (expiresAt < new Date()) {
-    return {
-      type: 'free',
-      isValid: false,
-      expiresAt,
-      features: {
-        pivot: false,
-        advancedAggregations: false,
-        percentageMode: false,
-        sessionPersistence: false,
-        noWatermark: false,
-      },
-    }
+    return { ...INVALID_LICENSE, expiresAt }
   }
 
   // Determine license type
@@ -136,16 +150,21 @@ function validateLicenseKey(key: string): LicenseInfo {
 
 /**
  * Set the license key for the library
+ * Returns a promise that resolves when validation is complete
  */
-export function setLicenseKey(key: string): void {
+export async function setLicenseKey(key: string): Promise<void> {
   licenseKey.value = key
-  licenseInfo.value = validateLicenseKey(key)
+  
+  // Start validation
+  validationPromise = validateLicenseKey(key)
+  licenseInfo.value = await validationPromise
+  validationPromise = null
 
   if (!licenseInfo.value.isValid) {
-    console.warn('[Vue Pivot Grid] Invalid or expired license key. Running in free mode.')
+    console.warn('[TinyPivot] Invalid or expired license key. Running in free mode.')
   }
   else if (licenseInfo.value.type !== 'free') {
-    console.info(`[Vue Pivot Grid] Pro license activated (${licenseInfo.value.type})`)
+    console.info(`[TinyPivot] Pro license activated (${licenseInfo.value.type})`)
   }
 }
 
@@ -166,7 +185,7 @@ export function enableDemoMode(): void {
       noWatermark: false, // Still show watermark in demo
     },
   }
-  console.info('[Vue Pivot Grid] Demo mode enabled - all Pro features unlocked for evaluation')
+  console.info('[TinyPivot] Demo mode enabled - all Pro features unlocked for evaluation')
 }
 
 /**
@@ -198,8 +217,8 @@ export function useLicense() {
   function requirePro(feature: string): boolean {
     if (!isPro.value) {
       console.warn(
-        `[Vue Pivot Grid] "${feature}" requires a Pro license. ` +
-        `Visit https://vue-pivot-grid.dev/pricing to upgrade.`,
+        `[TinyPivot] "${feature}" requires a Pro license. ` +
+        `Visit https://tiny-pivot.com/pricing to upgrade.`,
       )
       return false
     }
@@ -219,11 +238,10 @@ export function useLicense() {
 }
 
 /**
- * Generate a license key (for internal/admin use)
+ * Configure the license secret (for SSR/build-time injection)
+ * Call this before setLicenseKey if you need to set a custom secret
  */
-export function generateLicenseKey(type: 'PRO1' | 'PROU' | 'PROT', expiryDate: Date): string {
-  const expiry = expiryDate.toISOString().slice(0, 10).replace(/-/g, '')
-  const hash = hashCode(`${type}-${expiry}`).toString(16).toUpperCase().slice(0, 8)
-  return `VPG-${type}-${hash}-${expiry}`
+export function configureLicenseSecret(secret: string): void {
+  (globalThis as Record<string, unknown>).__TP_LICENSE_SECRET__ = secret
 }
 

@@ -1,5 +1,5 @@
 /**
- * Vue Pivot Grid
+ * TinyPivot
  * A powerful Excel-like data grid and pivot table component for Vue 3
  *
  * @packageDocumentation
@@ -14,7 +14,7 @@ export {
   usePivotTable,
   useLicense,
   setLicenseKey,
-  generateLicenseKey,
+  configureLicenseSecret,
   enableDemoMode,
   getColumnUniqueValues,
   formatCellValue,
@@ -49,6 +49,6 @@ export type {
   SelectionChangeEvent,
 } from './types'
 
-// Styles - import in your app: import 'vue-pivot-grid/style.css'
+// Styles - import in your app: import 'tinypivot/style.css'
 import './style.css'
 
