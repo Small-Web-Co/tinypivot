@@ -2,7 +2,7 @@
 
 A powerful Excel-like data grid and pivot table component for Vue 3.
 
-**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/pricing)**
+**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
 
 ## Features
 
@@ -157,7 +157,7 @@ enableDemoMode()
 | Unlimited Projects | $149 | All your projects |
 | Team License | $399 | Up to 10 developers |
 
-**[Purchase at tiny-pivot.com/pricing](https://tiny-pivot.com/pricing)**
+**[Purchase at tiny-pivot.com/#pricing](https://tiny-pivot.com/#pricing)**
 
 ## Styling
 

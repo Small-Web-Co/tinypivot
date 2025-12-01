@@ -1,6 +1,6 @@
 {
   "name": "tinypivot",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A powerful Excel-like data grid and pivot table component for Vue 3 by Small Web, LLC",
   "type": "module",
   "main": "./dist/tinypivot.umd.cjs",
@@ -30,7 +30,9 @@
     "type-check": "vue-tsc --noEmit",
     "demo": "vite --config vite.demo.config.ts",
     "build:demo": "vite build --config vite.demo.config.ts",
-    "release": "vite build --mode lib && git add -A && git commit -m \"chore: release v$(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\") && git push origin master --tags && pnpm publish --access public --no-git-checks"
+    "release": "npm version patch --no-git-tag-version && pnpm build:lib && git add -A && git commit -m \"release: v$(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\") && git push origin master --tags && pnpm publish --access public --no-git-checks",
+    "release:minor": "npm version minor --no-git-tag-version && pnpm build:lib && git add -A && git commit -m \"release: v$(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\") && git push origin master --tags && pnpm publish --access public --no-git-checks",
+    "release:major": "npm version major --no-git-tag-version && pnpm build:lib && git add -A && git commit -m \"release: v$(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\") && git push origin master --tags && pnpm publish --access public --no-git-checks"
   },
   "peerDependencies": {
     "vue": "^3.3.0"

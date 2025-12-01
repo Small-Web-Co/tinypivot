@@ -10,44 +10,25 @@ pnpm demo       # Run demo locally
 ## Quick Release (One Command!)
 
 ```bash
-# 1. Update version in package.json
-# 2. Run:
-pnpm release
+pnpm release          # Patch: 1.0.4 → 1.0.5
+pnpm release:minor    # Minor: 1.0.4 → 1.1.0
+pnpm release:major    # Major: 1.0.4 → 2.0.0
 ```
 
-This single command will:
-- Build the library
-- Commit all changes
-- Create git tag
-- Push to GitHub
-- Publish to npm
-
-## Manual Release Steps
-
-If you need more control:
-
-```bash
-# 1. Update version in package.json (e.g., 1.0.2 → 1.0.3)
-
-# 2. Build
-pnpm build:lib
-
-# 3. Commit, tag, push
-git add -A
-git commit -m "chore: release v1.0.3"
-git tag v1.0.3
-git push origin master --tags
-
-# 4. Publish to npm
-pnpm publish --access public --no-git-checks
-```
+Each command will automatically:
+1. Bump the version in package.json
+2. Build the library
+3. Commit all changes
+4. Create git tag
+5. Push to GitHub
+6. Publish to npm
 
 ## Create GitHub Release (Optional)
 
 After publishing, create a release with changelog:
 
 ```bash
-gh release create v1.0.3 --title "v1.0.3" --notes "## What's Changed
+gh release create v1.0.5 --title "v1.0.5" --notes "## What's Changed
 - Feature 1
 - Bug fix 1"
 ```
