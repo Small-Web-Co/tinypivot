@@ -218,7 +218,7 @@ export function useLicense() {
     if (!isPro.value) {
       console.warn(
         `[TinyPivot] "${feature}" requires a Pro license. ` +
-        `Visit https://tiny-pivot.com/pricing to upgrade.`,
+        `Visit https://tiny-pivot.com/#pricing to upgrade.`,
       )
       return false
     }

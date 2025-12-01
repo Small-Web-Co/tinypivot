@@ -69,6 +69,13 @@ npm login
 
 # Publish
 pnpm publish --access public
+
+OR ALL TOGETHER:
+git add .gitignore BUILD.md
+git commit -m "chore: add build guide, update gitignore"
+git push origin master
+pnpm publish --access public
+
 ```
 
 ### 6. Demo Deployment

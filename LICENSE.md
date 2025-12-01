@@ -45,7 +45,7 @@ The following features require a Pro license:
 - **Team License (up to 10 devs)**: $399 one-time payment
 
 ### How to Purchase:
-Visit https://tiny-pivot.com/pricing to purchase a license.
+Visit https://tiny-pivot.com/#pricing to purchase a license.
 
 After purchase, you'll receive a license key to unlock Pro features:
 
