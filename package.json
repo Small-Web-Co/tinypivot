@@ -1,6 +1,6 @@
 {
   "name": "tinypivot",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A powerful Excel-like data grid and pivot table component for Vue 3 by Small Web, LLC",
   "type": "module",
   "main": "./dist/tinypivot.umd.cjs",
@@ -15,7 +15,9 @@
     "./style.css": "./dist/style.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE.md"
   ],
   "sideEffects": [
     "*.css"

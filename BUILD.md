@@ -9,10 +9,6 @@ pnpm install
 # Run demo locally
 pnpm demo
 
-# Build library
-pnpm vite build --mode lib
-```
-
 ## Release Workflow
 
 ### 1. Update Version & Build
@@ -26,7 +22,7 @@ pnpm vite build --mode lib
 ### 2. Commit Your Changes
 
 ```bash
-git add .
+git add -A
 git commit -m "feat: description of changes"
 ```
 
