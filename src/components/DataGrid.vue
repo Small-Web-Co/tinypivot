@@ -778,7 +778,7 @@ function handleContainerClick(event: MouseEvent) {
         <div v-if="isDemo" class="vpg-demo-banner">
           <span class="vpg-demo-badge">DEMO</span>
           <span>Pro features enabled</span>
-          <a href="https://tiny-pivot.com/pricing" target="_blank" rel="noopener">Get License →</a>
+          <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener">Get License →</a>
         </div>
         <span v-else-if="showWatermark" class="vpg-watermark-inline">
           <a href="https://tiny-pivot.com" target="_blank" rel="noopener">TinyPivot</a>

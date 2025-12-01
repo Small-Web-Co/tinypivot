@@ -136,7 +136,7 @@ const activeSection = ref('hero')
             </svg>
             Try Demo
           </a>
-          <a href="#pricing" class="btn btn-secondary">
+          <a href="https://www.tiny-pivot.com/#pricing" class="btn btn-secondary">
             Get Pro License
           </a>
         </div>
@@ -466,15 +466,13 @@ const activeSection = ref('hero')
           </div>
           <div class="footer-col">
             <h4>Resources</h4>
-            <a href="#">Documentation</a>
-            <a href="#">Changelog</a>
-            <a href="#">License</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot#readme" target="_blank">Documentation</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot/releases" target="_blank">Changelog</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot/blob/main/LICENSE" target="_blank">License</a>
           </div>
           <div class="footer-col">
             <h4>Connect</h4>
-            <a href="https://github.com/Small-Web-Co/tinypivot">GitHub</a>
-            <a href="#">Twitter</a>
-            <a href="#">Discord</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank">GitHub</a>
           </div>
         </div>
       </div>
