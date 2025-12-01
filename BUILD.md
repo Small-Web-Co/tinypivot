@@ -37,7 +37,7 @@ git commit -m "feat: description of changes"
 git tag v1.0.1
 
 # Push commits and tags to GitHub
-git push origin main
+git push origin master
 git push origin --tags
 ```
 
@@ -66,6 +66,7 @@ gh release create v1.0.1 --title "v1.0.1" --notes "## What's Changed
 ```bash
 # Login if needed
 npm login
+acct is smallwebco
 
 # Publish
 pnpm publish --access public
@@ -73,7 +74,7 @@ pnpm publish --access public
 
 ### 6. Demo Deployment
 
-The demo auto-deploys to Vercel on push to `main`.
+The demo auto-deploys to Vercel on push to `master`.
 
 Manual deploy:
 ```bash
@@ -86,7 +87,7 @@ vercel --prod
 - [ ] Build: `pnpm vite build --mode lib`
 - [ ] Commit changes
 - [ ] Tag: `git tag vX.X.X`
-- [ ] Push: `git push origin main --tags`
+- [ ] Push: `git push origin master --tags`
 - [ ] Create GitHub release with changelog
 - [ ] Publish: `pnpm publish --access public`
 
