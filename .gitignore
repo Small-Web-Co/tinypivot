@@ -41,3 +41,5 @@ coverage
 
 .vercel
 .env*.local
+
+BUILD.md

@@ -66,7 +66,6 @@ gh release create v1.0.1 --title "v1.0.1" --notes "## What's Changed
 ```bash
 # Login if needed
 npm login
-acct is smallwebco
 
 # Publish
 pnpm publish --access public
