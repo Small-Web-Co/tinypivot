@@ -16,14 +16,7 @@ export default defineConfig({
   build: {
     outDir: '../dist-demo',
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'demo/index.html'),
-        success: resolve(__dirname, 'demo/success.html'),
-      },
-    },
   },
-  publicDir: 'public',
   server: {
     port: 3000,
     open: true,

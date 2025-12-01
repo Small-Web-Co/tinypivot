@@ -2,25 +2,45 @@
 import { ref, computed } from 'vue'
 import { DataGrid, setLicenseKey } from 'tinypivot'
 
-// Sample data
-const sampleData = ref([
-  { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150, quarter: 'Q1', year: 2024 },
-  { id: 2, region: 'North', product: 'Widget B', sales: 8300, units: 95, quarter: 'Q1', year: 2024 },
-  { id: 3, region: 'South', product: 'Widget A', sales: 15200, units: 180, quarter: 'Q1', year: 2024 },
-  { id: 4, region: 'South', product: 'Widget B', sales: 9800, units: 110, quarter: 'Q1', year: 2024 },
-  { id: 5, region: 'East', product: 'Widget A', sales: 11000, units: 130, quarter: 'Q1', year: 2024 },
-  { id: 6, region: 'East', product: 'Widget B', sales: 7500, units: 85, quarter: 'Q1', year: 2024 },
-  { id: 7, region: 'West', product: 'Widget A', sales: 13800, units: 165, quarter: 'Q1', year: 2024 },
-  { id: 8, region: 'West', product: 'Widget B', sales: 8900, units: 100, quarter: 'Q1', year: 2024 },
-  { id: 9, region: 'North', product: 'Widget A', sales: 14200, units: 170, quarter: 'Q2', year: 2024 },
-  { id: 10, region: 'North', product: 'Widget B', sales: 9100, units: 105, quarter: 'Q2', year: 2024 },
-  { id: 11, region: 'South', product: 'Widget A', sales: 16500, units: 195, quarter: 'Q2', year: 2024 },
-  { id: 12, region: 'South', product: 'Widget B', sales: 10500, units: 120, quarter: 'Q2', year: 2024 },
-  { id: 13, region: 'East', product: 'Widget A', sales: 12300, units: 145, quarter: 'Q2', year: 2024 },
-  { id: 14, region: 'East', product: 'Widget B', sales: 8200, units: 92, quarter: 'Q2', year: 2024 },
-  { id: 15, region: 'West', product: 'Widget A', sales: 15100, units: 180, quarter: 'Q2', year: 2024 },
-  { id: 16, region: 'West', product: 'Widget B', sales: 9600, units: 108, quarter: 'Q2', year: 2024 },
-])
+// Generate large sample dataset (10,000 rows)
+function generateSampleData(count: number) {
+  const regions = ['North', 'South', 'East', 'West', 'Central', 'Northeast', 'Southeast', 'Northwest', 'Southwest']
+  const products = ['Widget A', 'Widget B', 'Widget C', 'Gadget X', 'Gadget Y', 'Device Pro', 'Device Lite', 'Tool Plus']
+  const categories = ['Electronics', 'Hardware', 'Software', 'Services', 'Accessories']
+  const quarters = ['Q1', 'Q2', 'Q3', 'Q4']
+  const years = [2022, 2023, 2024]
+  const salesReps = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack']
+  const statuses = ['Completed', 'Pending', 'Processing', 'Shipped', 'Delivered']
+
+  const data = []
+  for (let i = 1; i <= count; i++) {
+    const basePrice = Math.floor(Math.random() * 500) + 50
+    const units = Math.floor(Math.random() * 200) + 10
+    data.push({
+      id: i,
+      region: regions[Math.floor(Math.random() * regions.length)],
+      product: products[Math.floor(Math.random() * products.length)],
+      category: categories[Math.floor(Math.random() * categories.length)],
+      sales: basePrice * units,
+      units,
+      price: basePrice,
+      quarter: quarters[Math.floor(Math.random() * quarters.length)],
+      year: years[Math.floor(Math.random() * years.length)],
+      rep: salesReps[Math.floor(Math.random() * salesReps.length)],
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      margin: Math.round((Math.random() * 30 + 10) * 100) / 100,
+    })
+  }
+  return data
+}
+
+const sampleData = ref(generateSampleData(10000))
+
+// Theme toggle
+const demoTheme = ref<'light' | 'dark'>('dark')
+function toggleDemoTheme() {
+  demoTheme.value = demoTheme.value === 'dark' ? 'light' : 'dark'
+}
 
 // Pricing
 const selectedPlan = ref<'single' | 'unlimited' | 'team'>('single')
@@ -73,20 +93,13 @@ async function buyNow() {
   }
 }
 
-// Features comparison
-const features = [
-  { name: 'Data Grid Display', free: true, pro: true },
-  { name: 'Column Sorting', free: true, pro: true },
-  { name: 'Column Filtering', free: true, pro: true },
-  { name: 'Keyboard Navigation', free: true, pro: true },
-  { name: 'Cell Selection & Copy', free: true, pro: true },
-  { name: 'Auto Column Widths', free: true, pro: true },
-  { name: 'Pivot Table', free: false, pro: true },
-  { name: 'Advanced Aggregations', free: false, pro: true },
-  { name: 'Row/Column Totals', free: false, pro: true },
-  { name: 'Percentage Mode', free: false, pro: true },
-  { name: 'Config Persistence', free: false, pro: true },
-  { name: 'No Watermark', free: false, pro: true },
+// Features comparison - compact version
+const freeFeatures = [
+  'Data Grid', 'Sorting', 'Filtering', 'Search', 'Export CSV',
+  'Pagination', 'Column Resize', 'Clipboard', 'Dark Mode', 'Keyboard Nav'
+]
+const proFeatures = [
+  'Pivot Table', 'Aggregations', 'Row/Col Totals', 'No Watermark'
 ]
 
 // Active section for navigation
@@ -166,62 +179,84 @@ const activeSection = ref('hero')
             </svg>
           </div>
           <h3>Excel-like Grid</h3>
-          <p>Familiar spreadsheet experience with column filtering, sorting, and smart number formatting.</p>
+          <p>Column filtering, sorting, and smart number formatting</p>
           <span class="feature-badge free">Free</span>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon feature-icon-violet">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <h3>Smart Filtering</h3>
-          <p>Multi-select column filters with search, just like Excel's AutoFilter feature.</p>
+          <h3>Global Search</h3>
+          <p>Search across all columns with Ctrl+F shortcut</p>
           <span class="feature-badge free">Free</span>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon feature-icon-emerald">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
           </div>
-          <h3>Pivot Table</h3>
-          <p>Drag-and-drop pivot table with multiple aggregation functions and totals.</p>
-          <span class="feature-badge pro">Pro</span>
+          <h3>CSV Export</h3>
+          <p>One-click export to CSV with custom filename</p>
+          <span class="feature-badge free">Free</span>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon feature-icon-amber">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <h3>Aggregations</h3>
-          <p>Sum, Count, Average, Min, Max, and Count Distinct aggregation functions.</p>
-          <span class="feature-badge pro">Pro</span>
+          <h3>Pagination</h3>
+          <p>Page through large datasets with configurable size</p>
+          <span class="feature-badge free">Free</span>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon feature-icon-pink">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+              <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </div>
-          <h3>Selection Stats</h3>
-          <p>Select multiple cells and see sum, average, and count in the status bar.</p>
+          <h3>Clipboard</h3>
+          <p>Copy selected cells with Ctrl+C keyboard shortcut</p>
           <span class="feature-badge free">Free</span>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon feature-icon-cyan">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
             </svg>
           </div>
-          <h3>License System</h3>
-          <p>Simple license key validation - no network calls, just add your key and go.</p>
+          <h3>Dark Mode</h3>
+          <p>Light, dark, or auto theme based on system</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-indigo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+            </svg>
+          </div>
+          <h3>Pivot Table</h3>
+          <p>Drag-and-drop pivot with aggregations</p>
+          <span class="feature-badge pro">Pro</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-rose">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h3>Aggregations</h3>
+          <p>Sum, Count, Avg, Min, Max, Count Distinct</p>
           <span class="feature-badge pro">Pro</span>
         </div>
       </div>
@@ -295,46 +330,70 @@ const activeSection = ref('hero')
 <span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'tinypivot'</span>
 <span class="code-keyword">import</span> <span class="code-string">'tinypivot/style.css'</span>
 
-<span class="code-keyword">const</span> data = [
-  { id: <span class="code-number">1</span>, region: <span class="code-string">'North'</span>, product: <span class="code-string">'Widget A'</span>, sales: <span class="code-number">12500</span> },
-  { id: <span class="code-number">2</span>, region: <span class="code-string">'South'</span>, product: <span class="code-string">'Widget B'</span>, sales: <span class="code-number">8300</span> },
-  { id: <span class="code-number">3</span>, region: <span class="code-string">'East'</span>, product: <span class="code-string">'Widget A'</span>, sales: <span class="code-number">15200</span> },
-]
+<span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
 <span class="code-tag">&lt;/script&gt;</span>
 
 <span class="code-tag">&lt;template&gt;</span>
-  <span class="code-tag">&lt;DataGrid</span> <span class="code-attr">:data</span>=<span class="code-string">"data"</span> <span class="code-tag">/&gt;</span>
+  <span class="code-tag">&lt;DataGrid</span>
+    <span class="code-attr">:data</span>=<span class="code-string">"data"</span>
+    <span class="code-attr">:enable-search</span>=<span class="code-string">"true"</span>
+    <span class="code-attr">:enable-export</span>=<span class="code-string">"true"</span>
+    <span class="code-attr">:enable-pagination</span>=<span class="code-string">"true"</span>
+    <span class="code-attr">:page-size</span>=<span class="code-string">"100"</span>
+    <span class="code-attr">theme</span>=<span class="code-string">"light"</span>
+  <span class="code-tag">/&gt;</span>
 <span class="code-tag">&lt;/template&gt;</span></code></pre>
         </div>
       </div>
 
       <div class="api-preview">
-        <h3>That's it. Seriously.</h3>
-        <p>But when you need more control, we've got you covered:</p>
-        <div class="props-grid">
-          <div class="prop-item">
-            <code>:data</code>
-            <span>Your array of objects</span>
+        <h3>Full control when you need it</h3>
+        <p>All features are toggled via simple props:</p>
+        <div class="props-table">
+          <div class="props-row props-header">
+            <span>Prop</span>
+            <span>Default</span>
+            <span>Description</span>
           </div>
-          <div class="prop-item">
-            <code>:loading</code>
-            <span>Show loading state</span>
+          <div class="props-row">
+            <code>:enable-search</code>
+            <span>true</span>
+            <span>Global search across all columns</span>
           </div>
-          <div class="prop-item">
-            <code>:row-height</code>
-            <span>Customize row height</span>
+          <div class="props-row">
+            <code>:enable-export</code>
+            <span>true</span>
+            <span>CSV export button in toolbar</span>
           </div>
-          <div class="prop-item">
-            <code>:font-size</code>
-            <span>'xs' | 'sm' | 'base'</span>
+          <div class="props-row">
+            <code>:enable-pagination</code>
+            <span>false</span>
+            <span>Paginate large datasets</span>
           </div>
-          <div class="prop-item">
+          <div class="props-row">
+            <code>:page-size</code>
+            <span>50</span>
+            <span>Rows per page</span>
+          </div>
+          <div class="props-row">
+            <code>:enable-column-resize</code>
+            <span>true</span>
+            <span>Drag column edges to resize</span>
+          </div>
+          <div class="props-row">
+            <code>:enable-clipboard</code>
+            <span>true</span>
+            <span>Ctrl+C copies selected cells</span>
+          </div>
+          <div class="props-row">
+            <code>:theme</code>
+            <span>"light"</span>
+            <span>"light" | "dark" | "auto"</span>
+          </div>
+          <div class="props-row">
             <code>:show-pivot</code>
-            <span>Toggle pivot button</span>
-          </div>
-          <div class="prop-item">
-            <code>@cell-click</code>
-            <span>Cell click event</span>
+            <span>true</span>
+            <span>Show pivot table toggle (Pro)</span>
           </div>
         </div>
       </div>
@@ -347,11 +406,32 @@ const activeSection = ref('hero')
         <p>Try the grid and pivot table with sample data</p>
       </div>
       
-      <div class="demo-container">
+      <div class="demo-controls">
+        <button class="demo-theme-toggle" @click="toggleDemoTheme">
+          <svg v-if="demoTheme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+          {{ demoTheme === 'dark' ? 'Light Mode' : 'Dark Mode' }}
+        </button>
+      </div>
+      
+      <div class="demo-container" :class="{ 'demo-light': demoTheme === 'light' }">
         <DataGrid
           :data="sampleData"
           :show-pivot="true"
           font-size="sm"
+          :enable-export="true"
+          :enable-search="true"
+          :enable-pagination="true"
+          :page-size="1000"
+          :enable-column-resize="true"
+          :enable-clipboard="true"
+          :theme="demoTheme"
+          :striped-rows="true"
+          export-filename="tinypivot-demo.csv"
         />
       </div>
 
@@ -380,11 +460,11 @@ const activeSection = ref('hero')
             </div>
           </div>
           <ul class="pricing-features">
-            <li v-for="f in features.filter(x => x.free)" :key="f.name">
+            <li v-for="f in freeFeatures" :key="f">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M5 13l4 4L19 7" />
               </svg>
-              {{ f.name }}
+              {{ f }}
             </li>
           </ul>
           <a href="https://github.com/Small-Web-Co/tinypivot" class="btn btn-outline">
@@ -416,11 +496,11 @@ const activeSection = ref('hero')
           <p class="plan-description">{{ plans.find(p => p.id === selectedPlan)?.description }}</p>
           
           <ul class="pricing-features">
-            <li v-for="f in features" :key="f.name">
+            <li v-for="f in [...freeFeatures, ...proFeatures]" :key="f">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M5 13l4 4L19 7" />
               </svg>
-              {{ f.name }}
+              {{ f }}
             </li>
           </ul>
           <button 
@@ -724,45 +804,45 @@ const activeSection = ref('hero')
 
 /* Features */
 .features {
-  padding: 6rem 2rem;
+  padding: 4rem 2rem;
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
 }
 
 .feature-card {
   position: relative;
-  padding: 2rem;
+  padding: 1.25rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   transition: all 0.3s;
 }
 
 .feature-card:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-4px);
+  transform: translateY(-2px);
 }
 
 .feature-icon {
-  width: 3rem;
-  height: 3rem;
+  width: 2.25rem;
+  height: 2.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.75rem;
-  margin-bottom: 1.25rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .feature-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .feature-icon-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
@@ -771,26 +851,28 @@ const activeSection = ref('hero')
 .feature-icon-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
 .feature-icon-pink { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
 .feature-icon-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+.feature-icon-indigo { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
+.feature-icon-rose { background: rgba(244, 63, 94, 0.15); color: #f43f5e; }
 
 .feature-card h3 {
-  font-size: 1.25rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.375rem;
 }
 
 .feature-card p {
   color: #94a3b8;
-  font-size: 0.9375rem;
-  line-height: 1.6;
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 
 .feature-badge {
   position: absolute;
-  top: 1.25rem;
-  right: 1.25rem;
-  padding: 0.25rem 0.625rem;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.125rem 0.5rem;
   border-radius: 9999px;
-  font-size: 0.6875rem;
+  font-size: 0.5625rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -985,42 +1067,54 @@ const activeSection = ref('hero')
 
 .api-preview > p {
   color: #64748b;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
-.props-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
-  max-width: 800px;
+.props-table {
+  max-width: 700px;
   margin: 0 auto;
-}
-
-.prop-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 1rem;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.5rem;
-  transition: all 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
 
-.prop-item:hover {
+.props-row {
+  display: grid;
+  grid-template-columns: 180px 80px 1fr;
+  gap: 1rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.8125rem;
+  align-items: center;
+}
+
+.props-row:last-child {
+  border-bottom: none;
+}
+
+.props-row.props-header {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(16, 185, 129, 0.3);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
 }
 
-.prop-item code {
-  font-size: 0.875rem;
-  font-weight: 500;
+.props-row code {
   color: #10b981;
+  font-size: 0.75rem;
 }
 
-.prop-item span {
-  font-size: 0.75rem;
+.props-row span:nth-child(2) {
   color: #64748b;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.props-row span:nth-child(3) {
+  color: #cbd5e1;
 }
 
 /* Demo */
@@ -1030,11 +1124,42 @@ const activeSection = ref('hero')
   margin: 0 auto;
 }
 
+.demo-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.demo-theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.demo-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 .demo-container {
-  background: white;
+  background: #1e293b;
   border-radius: 1rem;
   overflow: hidden;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.demo-container.demo-light {
+  background: white;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
 .demo-note {
@@ -1344,9 +1469,30 @@ const activeSection = ref('hero')
   }
 }
 
-@media (max-width: 480px) {
-  .props-grid {
+@media (max-width: 1024px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .features-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .props-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+  
+  .props-row.props-header {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .props-table {
+    font-size: 0.75rem;
   }
   
   .nav-links a:not(.nav-github) {

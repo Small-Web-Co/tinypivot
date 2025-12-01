@@ -6,22 +6,21 @@ A powerful Excel-like data grid and pivot table component for Vue 3.
 
 ## Features
 
-### Free Tier
-- 📊 Excel-like data grid with auto-sizing columns
-- 🔍 Column filtering with multi-select dropdowns
-- ↕️ Column sorting (click headers)
-- ⌨️ Keyboard navigation
-- 📋 Cell selection & copy to clipboard
-- 🎨 Row striping and hover states
-- 📱 Responsive design
-
-### Pro License
-- 🔄 **Pivot Table** - Drag-and-drop configuration
-- 📈 **Aggregations** - Sum, Count, Average, Min, Max, Count Distinct
-- ➕ **Totals** - Row and column totals
-- 📊 **Percentage Mode** - View as % of row, column, or grand total
-- 💾 **Persistence** - Auto-save pivot configuration
-- ✨ **No Watermark** - Remove "Powered by TinyPivot" branding
+| Feature | Free | Pro |
+|---------|:----:|:---:|
+| Excel-like data grid | ✅ | ✅ |
+| Column filtering & sorting | ✅ | ✅ |
+| Global search | ✅ | ✅ |
+| CSV export | ✅ | ✅ |
+| Pagination | ✅ | ✅ |
+| Column resizing | ✅ | ✅ |
+| Clipboard (Ctrl+C) | ✅ | ✅ |
+| Dark mode | ✅ | ✅ |
+| Keyboard navigation | ✅ | ✅ |
+| Pivot table | ❌ | ✅ |
+| Aggregations (Sum, Avg, etc.) | ❌ | ✅ |
+| Row/column totals | ❌ | ✅ |
+| No watermark | ❌ | ✅ |
 
 ## Installation
 
@@ -45,7 +44,17 @@ const data = [
 </script>
 
 <template>
-  <DataGrid :data="data" />
+  <DataGrid
+    :data="data"
+    :enable-export="true"
+    :enable-search="true"
+    :enable-pagination="true"
+    :page-size="100"
+    :enable-column-resize="true"
+    :enable-clipboard="true"
+    theme="light"
+    export-filename="my-data.csv"
+  />
 </template>
 ```
 
@@ -53,12 +62,19 @@ const data = [
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `data` | `Record<string, unknown>[]` | **required** | Array of data objects to display |
-| `loading` | `boolean` | `false` | Show loading state |
-| `rowHeight` | `number` | `36` | Height of each row in pixels |
-| `headerHeight` | `number` | `40` | Height of header row in pixels |
+| `data` | `Record<string, unknown>[]` | **required** | Array of data objects |
+| `loading` | `boolean` | `false` | Show loading spinner |
 | `fontSize` | `'xs' \| 'sm' \| 'base'` | `'xs'` | Font size preset |
-| `showPivot` | `boolean` | `true` | Show pivot table toggle button (Pro) |
+| `showPivot` | `boolean` | `true` | Show pivot toggle (Pro) |
+| `enableExport` | `boolean` | `true` | Show CSV export button |
+| `enableSearch` | `boolean` | `true` | Show global search |
+| `enablePagination` | `boolean` | `false` | Enable pagination |
+| `pageSize` | `number` | `50` | Rows per page |
+| `enableColumnResize` | `boolean` | `true` | Drag to resize columns |
+| `enableClipboard` | `boolean` | `true` | Ctrl+C to copy cells |
+| `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme |
+| `stripedRows` | `boolean` | `true` | Alternating row colors |
+| `exportFilename` | `string` | `'data-export.csv'` | CSV filename |
 
 ## Data Shape
 
@@ -90,35 +106,32 @@ const badData = [
 
 ## Events
 
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `@cell-click` | `{ row, col, value, rowData }` | Cell clicked |
+| `@selection-change` | `{ cells, values }` | Selection changed |
+| `@export` | `{ rowCount, filename }` | CSV exported |
+| `@copy` | `{ text, cellCount }` | Cells copied |
+
 ```vue
-<script setup lang="ts">
-import { DataGrid } from 'tinypivot'
-
-function handleCellClick(payload: {
-  row: number
-  col: number
-  value: unknown
-  rowData: Record<string, unknown>
-}) {
-  console.log('Clicked:', payload)
-}
-
-function handleSelectionChange(payload: {
-  cells: Array<{ row: number; col: number }>
-  values: unknown[]
-}) {
-  console.log('Selected:', payload.values)
-}
-</script>
-
 <template>
   <DataGrid
     :data="data"
-    @cell-click="handleCellClick"
-    @selection-change="handleSelectionChange"
+    @cell-click="({ rowData }) => console.log(rowData)"
+    @export="({ rowCount }) => console.log(`Exported ${rowCount} rows`)"
   />
 </template>
 ```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+C` / `Cmd+C` | Copy selected cells |
+| `Ctrl+F` / `Cmd+F` | Focus search input |
+| `Arrow keys` | Navigate cells |
+| `Shift+Arrow` | Extend selection |
+| `Escape` | Clear selection/search |
 
 ## Pro License
 

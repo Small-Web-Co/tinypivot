@@ -7,6 +7,12 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useExcelGrid } from '../composables/useExcelGrid'
 import { usePivotTable } from '../composables/usePivotTable'
 import { useLicense } from '../composables/useLicense'
+import {
+  exportToCSV,
+  exportPivotToCSV,
+  copyToClipboard,
+  formatSelectionForClipboard,
+} from '../composables/useGridFeatures'
 import ColumnFilter from './ColumnFilter.vue'
 import PivotConfig from './PivotConfig.vue'
 import PivotSkeleton from './PivotSkeleton.vue'
@@ -18,23 +24,83 @@ const props = withDefaults(defineProps<{
   headerHeight?: number
   fontSize?: 'xs' | 'sm' | 'base'
   showPivot?: boolean
+  // Feature props
+  enableExport?: boolean
+  enableSearch?: boolean
+  enablePagination?: boolean
+  pageSize?: number
+  enableColumnResize?: boolean
+  enableClipboard?: boolean
+  theme?: 'light' | 'dark' | 'auto'
+  stripedRows?: boolean
+  exportFilename?: string
+  enableVerticalResize?: boolean
+  initialHeight?: number
+  minHeight?: number
+  maxHeight?: number
 }>(), {
   loading: false,
   rowHeight: 36,
   headerHeight: 40,
   fontSize: 'xs',
   showPivot: true,
+  // Feature defaults
+  enableExport: true,
+  enableSearch: true,
+  enablePagination: false,
+  pageSize: 50,
+  enableColumnResize: true,
+  enableClipboard: true,
+  theme: 'light',
+  stripedRows: true,
+  exportFilename: 'data-export.csv',
+  enableVerticalResize: true,
+  initialHeight: 600,
+  minHeight: 300,
+  maxHeight: 1200,
 })
 
 const emit = defineEmits<{
   (e: 'cellClick', payload: { row: number, col: number, value: unknown, rowData: Record<string, unknown> }): void
   (e: 'selectionChange', payload: { cells: Array<{ row: number, col: number }>, values: unknown[] }): void
+  (e: 'export', payload: { rowCount: number, filename: string }): void
+  (e: 'copy', payload: { text: string, cellCount: number }): void
 }>()
 
 const { showWatermark, canUsePivot, isDemo } = useLicense()
 
+// Theme handling
+const currentTheme = computed(() => {
+  if (props.theme === 'auto') {
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+  return props.theme
+})
+
 // Font size state
 const currentFontSize = ref(props.fontSize)
+
+// Global search state
+const globalSearchTerm = ref('')
+const showSearchInput = ref(false)
+
+// Pagination state
+const currentPage = ref(1)
+
+// Column resize state
+const resizingColumnId = ref<string | null>(null)
+const resizeStartX = ref(0)
+const resizeStartWidth = ref(0)
+
+// Vertical resize state
+const gridHeight = ref(props.initialHeight)
+const isResizingVertically = ref(false)
+const verticalResizeStartY = ref(0)
+const verticalResizeStartHeight = ref(0)
+
+// Clipboard toast state
+const showCopyToast = ref(false)
+const copyToastMessage = ref('')
 const fontSizeOptions = [
   { value: 'xs', label: 'S' },
   { value: 'sm', label: 'M' },
@@ -56,9 +122,26 @@ const {
   toggleSort,
   getSortDirection,
   columnFilters,
+  activeFilters,
 } = useExcelGrid({ data: dataRef })
 
-// Pivot table composable
+// Filtered data for pivot table (respects column filters)
+const filteredDataForPivot = computed(() => {
+  const filteredRows = table.getFilteredRowModel().rows
+  return filteredRows.map(row => row.original)
+})
+
+// Active filters info for display - use activeFilters from useExcelGrid
+const activeFilterInfo = computed(() => {
+  if (activeFilters.value.length === 0) return null
+  return activeFilters.value.map(f => ({
+    column: f.column,
+    valueCount: f.values?.length || 0,
+    values: f.values || [],
+  }))
+})
+
+// Pivot table composable - uses filtered data
 const {
   rowFields: pivotRowFields,
   columnFields: pivotColumnFields,
@@ -77,7 +160,195 @@ const {
   updateValueFieldAggregation,
   clearConfig: clearPivotConfig,
   autoSuggestConfig,
-} = usePivotTable(dataRef)
+} = usePivotTable(filteredDataForPivot)
+
+// Filtered data based on global search
+const searchFilteredData = computed(() => {
+  if (!globalSearchTerm.value.trim() || !props.enableSearch) {
+    return rows.value
+  }
+  const term = globalSearchTerm.value.toLowerCase().trim()
+  return rows.value.filter((row) => {
+    for (const col of columnKeys.value) {
+      const value = row.original[col]
+      if (value === null || value === undefined) continue
+      if (String(value).toLowerCase().includes(term)) {
+        return true
+      }
+    }
+    return false
+  })
+})
+
+// Paginated rows
+const totalSearchedRows = computed(() => searchFilteredData.value.length)
+const totalPages = computed(() => {
+  if (!props.enablePagination) return 1
+  return Math.max(1, Math.ceil(totalSearchedRows.value / props.pageSize))
+})
+
+const paginatedRows = computed(() => {
+  if (!props.enablePagination) return searchFilteredData.value
+  const start = (currentPage.value - 1) * props.pageSize
+  const end = start + props.pageSize
+  return searchFilteredData.value.slice(start, end)
+})
+
+const paginationStart = computed(() => {
+  if (totalSearchedRows.value === 0) return 0
+  return (currentPage.value - 1) * props.pageSize + 1
+})
+
+const paginationEnd = computed(() =>
+  Math.min(currentPage.value * props.pageSize, totalSearchedRows.value),
+)
+
+// Pagination methods
+function goToPage(page: number) {
+  currentPage.value = Math.max(1, Math.min(page, totalPages.value))
+}
+
+function nextPage() {
+  if (currentPage.value < totalPages.value) currentPage.value++
+}
+
+function prevPage() {
+  if (currentPage.value > 1) currentPage.value--
+}
+
+// Export functionality
+function handleExport() {
+  if (viewMode.value === 'pivot') {
+    handlePivotExport()
+    return
+  }
+
+  const dataToExport = props.enableSearch && globalSearchTerm.value.trim()
+    ? searchFilteredData.value.map(row => row.original)
+    : rows.value.map(row => row.original)
+  
+  exportToCSV(dataToExport, columnKeys.value, {
+    filename: props.exportFilename,
+    includeHeaders: true,
+  })
+  
+  emit('export', { rowCount: dataToExport.length, filename: props.exportFilename })
+}
+
+function handlePivotExport() {
+  if (!pivotResult.value) return
+
+  const pivotFilename = props.exportFilename.replace('.csv', '-pivot.csv')
+  
+  exportPivotToCSV(
+    {
+      headers: pivotResult.value.headers,
+      rowHeaders: pivotResult.value.rowHeaders,
+      data: pivotResult.value.data,
+      rowTotals: pivotResult.value.rowTotals,
+      columnTotals: pivotResult.value.columnTotals,
+      grandTotal: pivotResult.value.grandTotal,
+      showRowTotals: pivotShowRowTotals.value,
+      showColumnTotals: pivotShowColumnTotals.value,
+    },
+    pivotRowFields.value,
+    pivotColumnFields.value,
+    pivotValueFields.value,
+    { filename: pivotFilename },
+  )
+
+  const rowCount = pivotResult.value.rowHeaders.length
+  emit('export', { rowCount, filename: pivotFilename })
+}
+
+// Column resize methods
+function startColumnResize(columnId: string, event: MouseEvent) {
+  if (!props.enableColumnResize) return
+  event.preventDefault()
+  event.stopPropagation()
+  
+  resizingColumnId.value = columnId
+  resizeStartX.value = event.clientX
+  resizeStartWidth.value = columnWidths.value[columnId] || MIN_COL_WIDTH
+  
+  document.addEventListener('mousemove', handleResizeMove)
+  document.addEventListener('mouseup', handleResizeEnd)
+}
+
+function handleResizeMove(event: MouseEvent) {
+  if (!resizingColumnId.value) return
+  const diff = event.clientX - resizeStartX.value
+  const newWidth = Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, resizeStartWidth.value + diff))
+  columnWidths.value = {
+    ...columnWidths.value,
+    [resizingColumnId.value]: newWidth,
+  }
+}
+
+function handleResizeEnd() {
+  resizingColumnId.value = null
+  document.removeEventListener('mousemove', handleResizeMove)
+  document.removeEventListener('mouseup', handleResizeEnd)
+}
+
+// Vertical resize methods
+function startVerticalResize(event: MouseEvent) {
+  if (!props.enableVerticalResize) return
+  event.preventDefault()
+  
+  isResizingVertically.value = true
+  verticalResizeStartY.value = event.clientY
+  verticalResizeStartHeight.value = gridHeight.value
+  
+  document.addEventListener('mousemove', handleVerticalResizeMove)
+  document.addEventListener('mouseup', handleVerticalResizeEnd)
+}
+
+function handleVerticalResizeMove(event: MouseEvent) {
+  if (!isResizingVertically.value) return
+  const diff = event.clientY - verticalResizeStartY.value
+  const newHeight = Math.max(
+    props.minHeight,
+    Math.min(props.maxHeight, verticalResizeStartHeight.value + diff),
+  )
+  gridHeight.value = newHeight
+}
+
+function handleVerticalResizeEnd() {
+  isResizingVertically.value = false
+  document.removeEventListener('mousemove', handleVerticalResizeMove)
+  document.removeEventListener('mouseup', handleVerticalResizeEnd)
+}
+
+// Clipboard methods
+function copySelectionToClipboard() {
+  if (!selectionBounds.value || !props.enableClipboard) return
+  
+  const text = formatSelectionForClipboard(
+    rows.value.map(r => r.original),
+    columnKeys.value,
+    selectionBounds.value,
+  )
+  
+  copyToClipboard(
+    text,
+    () => {
+      const cellCount = 
+        (selectionBounds.value!.maxRow - selectionBounds.value!.minRow + 1) *
+        (selectionBounds.value!.maxCol - selectionBounds.value!.minCol + 1)
+      copyToastMessage.value = `Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`
+      showCopyToast.value = true
+      setTimeout(() => { showCopyToast.value = false }, 2000)
+      emit('copy', { text, cellCount })
+    },
+    (err) => {
+      copyToastMessage.value = 'Copy failed'
+      showCopyToast.value = true
+      setTimeout(() => { showCopyToast.value = false }, 2000)
+      console.error('Copy failed:', err)
+    },
+  )
+}
 
 // View mode
 const viewMode = ref<'grid' | 'pivot'>('grid')
@@ -307,13 +578,32 @@ function formatStatValue(value: number | null): string {
 }
 
 function handleKeydown(event: KeyboardEvent) {
+  // Handle Ctrl+C / Cmd+C for clipboard
+  if ((event.ctrlKey || event.metaKey) && event.key === 'c' && selectionBounds.value) {
+    event.preventDefault()
+    copySelectionToClipboard()
+    return
+  }
+
+  // Handle Ctrl+F / Cmd+F for search
+  if ((event.ctrlKey || event.metaKey) && event.key === 'f' && props.enableSearch) {
+    event.preventDefault()
+    showSearchInput.value = true
+    nextTick(() => {
+      const input = document.querySelector('.vpg-search-input') as HTMLInputElement
+      input?.focus()
+    })
+    return
+  }
+
   if (!selectedCell.value)
     return
   if (activeFilterColumn.value)
     return
 
   const { row, col } = selectedCell.value
-  const maxRow = rows.value.length - 1
+  const displayRows = paginatedRows.value
+  const maxRow = displayRows.length - 1
   const maxCol = columnKeys.value.length - 1
 
   function updateSelection(newRow: number, newCol: number) {
@@ -356,6 +646,8 @@ function handleKeydown(event: KeyboardEvent) {
       selectedCell.value = null
       selectionStart.value = null
       selectionEnd.value = null
+      showSearchInput.value = false
+      globalSearchTerm.value = ''
       break
   }
 }
@@ -498,7 +790,28 @@ function handleContainerClick(event: MouseEvent) {
 </script>
 
 <template>
-  <div class="vpg-data-grid" :class="`vpg-font-${currentFontSize}`" @click="handleContainerClick">
+  <div
+    class="vpg-data-grid"
+    :class="[
+      `vpg-font-${currentFontSize}`,
+      `vpg-theme-${currentTheme}`,
+      { 'vpg-striped': stripedRows },
+      { 'vpg-resizing': resizingColumnId },
+      { 'vpg-resizing-vertical': isResizingVertically },
+    ]"
+    :style="{ height: `${gridHeight}px` }"
+    @click="handleContainerClick"
+  >
+    <!-- Copy Toast -->
+    <Transition name="vpg-toast">
+      <div v-if="showCopyToast" class="vpg-toast">
+        <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        {{ copyToastMessage }}
+      </div>
+    </Transition>
+
     <!-- Toolbar -->
     <div class="vpg-toolbar">
       <div class="vpg-toolbar-left">
@@ -528,6 +841,41 @@ function handleContainerClick(event: MouseEvent) {
 
         <!-- Grid mode controls -->
         <template v-if="viewMode === 'grid'">
+          <!-- Search input -->
+          <div v-if="enableSearch" class="vpg-search-container">
+            <button
+              v-if="!showSearchInput"
+              class="vpg-icon-btn"
+              title="Search (Ctrl+F)"
+              @click="showSearchInput = true"
+            >
+              <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+            <div v-else class="vpg-search-box">
+              <svg class="vpg-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                v-model="globalSearchTerm"
+                type="text"
+                class="vpg-search-input"
+                placeholder="Search all columns..."
+                @keydown.escape="showSearchInput = false; globalSearchTerm = ''"
+              >
+              <button
+                v-if="globalSearchTerm"
+                class="vpg-search-clear"
+                @click="globalSearchTerm = ''"
+              >
+                <svg class="vpg-icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
           <div class="vpg-font-size-control">
             <span class="vpg-label">Size:</span>
             <div class="vpg-font-size-toggle">
@@ -548,6 +896,10 @@ function handleContainerClick(event: MouseEvent) {
               <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
             </svg>
             <span>{{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}</span>
+          </div>
+
+          <div v-if="globalSearchTerm" class="vpg-search-info">
+            <span>{{ totalSearchedRows }} match{{ totalSearchedRows !== 1 ? 'es' : '' }}</span>
           </div>
         </template>
 
@@ -579,6 +931,31 @@ function handleContainerClick(event: MouseEvent) {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
           Clear Filters
+        </button>
+
+        <!-- Copy button -->
+        <button
+          v-if="enableClipboard && selectionBounds && viewMode === 'grid'"
+          class="vpg-icon-btn"
+          title="Copy selection (Ctrl+C)"
+          @click="copySelectionToClipboard"
+        >
+          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        </button>
+
+        <!-- Export button -->
+        <button
+          v-if="enableExport && (viewMode === 'grid' || (viewMode === 'pivot' && pivotIsConfigured))"
+          class="vpg-export-btn"
+          :title="viewMode === 'pivot' ? 'Export Pivot to CSV' : 'Export to CSV'"
+          @click="handleExport"
+        >
+          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export{{ viewMode === 'pivot' ? ' Pivot' : '' }}
         </button>
       </div>
     </div>
@@ -651,13 +1028,19 @@ function handleContainerClick(event: MouseEvent) {
                       </span>
                     </div>
                   </div>
+                  <!-- Column resize handle -->
+                  <div
+                    v-if="enableColumnResize"
+                    class="vpg-resize-handle"
+                    @mousedown="startColumnResize(colId, $event)"
+                  />
                 </th>
               </tr>
             </thead>
 
             <tbody ref="tableBodyRef">
               <tr
-                v-for="(row, rowIndex) in rows"
+                v-for="(row, rowIndex) in paginatedRows"
                 :key="row.id"
                 class="vpg-row"
               >
@@ -720,6 +1103,9 @@ function handleContainerClick(event: MouseEvent) {
             :dragging-field="draggingField"
             :pivot-result="pivotResult"
             :font-size="currentFontSize"
+            :active-filters="activeFilterInfo"
+            :total-row-count="totalRowCount"
+            :filtered-row-count="filteredRowCount"
             @add-row-field="addRowField"
             @remove-row-field="removeRowField"
             @add-column-field="addColumnField"
@@ -738,11 +1124,19 @@ function handleContainerClick(event: MouseEvent) {
     <div class="vpg-footer">
       <div class="vpg-footer-left">
         <template v-if="viewMode === 'grid'">
-          <template v-if="filteredRowCount === totalRowCount">
+          <template v-if="enablePagination">
+            <span>{{ paginationStart.toLocaleString() }}-{{ paginationEnd.toLocaleString() }}</span>
+            <span class="vpg-separator">of</span>
+            <span>{{ totalSearchedRows.toLocaleString() }}</span>
+            <span v-if="totalSearchedRows !== totalRowCount" class="vpg-filtered-note">
+              ({{ totalRowCount.toLocaleString() }} total)
+            </span>
+          </template>
+          <template v-else-if="filteredRowCount === totalRowCount && totalSearchedRows === totalRowCount">
             <span>{{ totalRowCount.toLocaleString() }} records</span>
           </template>
           <template v-else>
-            <span class="vpg-filtered-count">{{ filteredRowCount.toLocaleString() }}</span>
+            <span class="vpg-filtered-count">{{ totalSearchedRows.toLocaleString() }}</span>
             <span class="vpg-separator">of</span>
             <span>{{ totalRowCount.toLocaleString() }}</span>
             <span class="vpg-separator">records</span>
@@ -753,6 +1147,49 @@ function handleContainerClick(event: MouseEvent) {
           <span class="vpg-separator">•</span>
           <span>{{ totalRowCount.toLocaleString() }} source records</span>
         </template>
+      </div>
+
+      <!-- Pagination controls -->
+      <div v-if="enablePagination && viewMode === 'grid' && totalPages > 1" class="vpg-pagination">
+        <button
+          class="vpg-page-btn"
+          :disabled="currentPage === 1"
+          @click="currentPage = 1"
+        >
+          <svg class="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
+        </button>
+        <button
+          class="vpg-page-btn"
+          :disabled="currentPage === 1"
+          @click="prevPage"
+        >
+          <svg class="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span class="vpg-page-info">
+          Page {{ currentPage }} of {{ totalPages }}
+        </span>
+        <button
+          class="vpg-page-btn"
+          :disabled="currentPage === totalPages"
+          @click="nextPage"
+        >
+          <svg class="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        <button
+          class="vpg-page-btn"
+          :disabled="currentPage === totalPages"
+          @click="currentPage = totalPages"
+        >
+          <svg class="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
       <div v-if="viewMode === 'grid' && selectionStats && selectionStats.count > 1" class="vpg-selection-stats">
@@ -783,6 +1220,19 @@ function handleContainerClick(event: MouseEvent) {
         <span v-else-if="showWatermark" class="vpg-watermark-inline">
           <a href="https://tiny-pivot.com" target="_blank" rel="noopener">TinyPivot</a>
         </span>
+      </div>
+    </div>
+
+    <!-- Vertical Resize Handle -->
+    <div
+      v-if="enableVerticalResize"
+      class="vpg-vertical-resize-handle"
+      @mousedown="startVerticalResize"
+    >
+      <div class="vpg-resize-grip">
+        <span></span>
+        <span></span>
+        <span></span>
       </div>
     </div>
 
@@ -824,9 +1274,7 @@ function handleContainerClick(event: MouseEvent) {
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   margin-bottom: 1.5rem;
-  min-height: 600px;
-  height: calc(100vh - 300px);
-  max-height: 900px;
+  position: relative;
 }
 
 .vpg-icon {
@@ -1440,6 +1888,496 @@ function handleContainerClick(event: MouseEvent) {
 
 .vpg-grid-container::-webkit-scrollbar-corner {
   background: rgba(241, 245, 249, 0.5);
+}
+
+/* Toast notification */
+.vpg-toast {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #10b981;
+  color: white;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  z-index: 100;
+}
+
+.vpg-toast-enter-active,
+.vpg-toast-leave-active {
+  transition: all 0.2s ease;
+}
+
+.vpg-toast-enter-from,
+.vpg-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-0.5rem);
+}
+
+/* Search */
+.vpg-search-container {
+  display: flex;
+  align-items: center;
+}
+
+.vpg-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-icon-btn:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.vpg-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  background: #f8fafc;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+}
+
+.vpg-search-box:focus-within {
+  background: white;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+
+.vpg-search-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.vpg-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  color: #334155;
+  width: 200px;
+}
+
+.vpg-search-input:focus {
+  outline: none;
+}
+
+.vpg-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.vpg-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.vpg-search-clear:hover {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.vpg-search-info {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Export button */
+.vpg-export-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-export-btn:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+/* Column resize handle */
+.vpg-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.vpg-resize-handle:hover {
+  background: rgba(79, 70, 229, 0.3);
+}
+
+.vpg-header-cell {
+  position: relative;
+}
+
+.vpg-data-grid.vpg-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.vpg-data-grid.vpg-resizing .vpg-resize-handle {
+  background: rgba(79, 70, 229, 0.3);
+}
+
+/* Vertical resize handle */
+.vpg-vertical-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.vpg-vertical-resize-handle:hover {
+  background: rgba(79, 70, 229, 0.1);
+}
+
+.vpg-vertical-resize-handle:hover .vpg-resize-grip span {
+  background: rgba(79, 70, 229, 0.6);
+}
+
+.vpg-resize-grip {
+  display: flex;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.vpg-resize-grip span {
+  width: 16px;
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 1px;
+  transition: background 0.15s;
+}
+
+.vpg-data-grid.vpg-resizing-vertical {
+  cursor: row-resize;
+  user-select: none;
+}
+
+.vpg-data-grid.vpg-resizing-vertical .vpg-vertical-resize-handle {
+  background: rgba(79, 70, 229, 0.15);
+}
+
+.vpg-data-grid.vpg-resizing-vertical .vpg-resize-grip span {
+  background: rgba(79, 70, 229, 0.8);
+}
+
+/* Pagination */
+.vpg-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.vpg-page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-page-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.vpg-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vpg-page-info {
+  font-size: 0.75rem;
+  color: #64748b;
+  padding: 0 0.5rem;
+}
+
+.vpg-filtered-note {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-left: 0.25rem;
+}
+
+/* Dark theme */
+.vpg-data-grid.vpg-theme-dark {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-toolbar {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-view-toggle {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-view-btn {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-view-btn:hover {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-view-btn.active {
+  background: #6366f1;
+  color: white;
+}
+
+.vpg-theme-dark .vpg-view-btn.vpg-pivot-btn.active {
+  background: #10b981;
+}
+
+.vpg-theme-dark .vpg-label {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-font-size-toggle {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-font-size-btn {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-font-size-btn:hover {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-grid-container {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.vpg-theme-dark .vpg-header-cell {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-header-cell:hover {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-header-text {
+  color: #e2e8f0;
+}
+
+.vpg-theme-dark .vpg-dropdown-arrow {
+  color: #64748b;
+}
+
+.vpg-theme-dark .vpg-dropdown-arrow:hover {
+  background: #475569;
+  color: #e2e8f0;
+}
+
+.vpg-theme-dark .vpg-row:nth-child(odd) {
+  background: #1e293b;
+}
+
+.vpg-theme-dark .vpg-row:nth-child(even) {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.vpg-theme-dark .vpg-row:hover {
+  background: rgba(51, 65, 85, 0.5);
+}
+
+.vpg-theme-dark .vpg-cell {
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-cell.vpg-selected {
+  background: rgba(99, 102, 241, 0.3);
+  outline-color: #818cf8;
+}
+
+.vpg-theme-dark .vpg-footer {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-footer-left {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-selection-stats {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.vpg-theme-dark .vpg-stat-label {
+  color: #a5b4fc;
+}
+
+.vpg-theme-dark .vpg-stat-value {
+  color: #e0e7ff;
+}
+
+.vpg-theme-dark .vpg-stat-divider {
+  color: rgba(99, 102, 241, 0.4);
+}
+
+.vpg-theme-dark .vpg-search-box {
+  background: #334155;
+  border-color: transparent;
+}
+
+.vpg-theme-dark .vpg-search-box:focus-within {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+.vpg-theme-dark .vpg-search-input {
+  color: #e2e8f0;
+}
+
+.vpg-theme-dark .vpg-search-clear {
+  background: #334155;
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-search-clear:hover {
+  background: #475569;
+  color: #e2e8f0;
+}
+
+.vpg-theme-dark .vpg-clear-filters {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.vpg-theme-dark .vpg-clear-filters:hover {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-page-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.vpg-theme-dark .vpg-page-btn:hover:not(:disabled) {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-export-btn {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.vpg-theme-dark .vpg-export-btn:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.vpg-theme-dark .vpg-config-toggle {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-config-toggle:hover {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-config-toggle.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.vpg-theme-dark .vpg-pivot-status {
+  color: #34d399;
+}
+
+.vpg-theme-dark .vpg-watermark-inline a {
+  color: #64748b;
+}
+
+.vpg-theme-dark .vpg-watermark-inline a:hover {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-resize-grip span {
+  background: #475569;
+}
+
+.vpg-theme-dark .vpg-vertical-resize-handle:hover .vpg-resize-grip span {
+  background: rgba(129, 140, 248, 0.6);
+}
+
+.vpg-theme-dark.vpg-resizing-vertical .vpg-resize-grip span {
+  background: rgba(129, 140, 248, 0.8);
+}
+
+/* Striped rows (toggleable) */
+.vpg-data-grid:not(.vpg-striped) .vpg-row:nth-child(even) {
+  background: inherit;
+}
+
+.vpg-theme-dark:not(.vpg-striped) .vpg-row:nth-child(odd),
+.vpg-theme-dark:not(.vpg-striped) .vpg-row:nth-child(even) {
+  background: #1e293b;
 }
 </style>
 

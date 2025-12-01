@@ -68,6 +68,23 @@ export interface DataGridProps {
   headerHeight?: number
   fontSize?: 'xs' | 'sm' | 'base'
   licenseKey?: string
+  // Feature toggles
+  showPivot?: boolean
+  enableExport?: boolean
+  enableSearch?: boolean
+  enablePagination?: boolean
+  pageSize?: number
+  enableRowSelection?: boolean
+  enableColumnResize?: boolean
+  enableClipboard?: boolean
+  theme?: 'light' | 'dark' | 'auto'
+  stripedRows?: boolean
+  exportFilename?: string
+  // Vertical resize
+  enableVerticalResize?: boolean
+  initialHeight?: number
+  minHeight?: number
+  maxHeight?: number
 }
 
 export interface PivotTableProps {
@@ -117,5 +134,32 @@ export interface CellClickEvent {
 export interface SelectionChangeEvent {
   cells: Array<{ row: number, col: number }>
   values: unknown[]
+}
+
+export interface RowSelectionChangeEvent {
+  selectedIndices: number[]
+  selectedRows: Record<string, unknown>[]
+}
+
+export interface ExportEvent {
+  rowCount: number
+  filename: string
+}
+
+export interface CopyEvent {
+  text: string
+  cellCount: number
+}
+
+// Feature composables types
+export interface PaginationOptions {
+  pageSize?: number
+  currentPage?: number
+}
+
+export interface ExportOptions {
+  filename?: string
+  includeHeaders?: boolean
+  delimiter?: string
 }
 

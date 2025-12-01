@@ -7,6 +7,12 @@ import { computed, ref } from 'vue'
 import type { AggregationFunction, PivotResult, PivotValueField } from '../types'
 import { useLicense } from '../composables/useLicense'
 
+interface ActiveFilter {
+  column: string
+  valueCount: number
+  values: string[]
+}
+
 const props = defineProps<{
   rowFields: string[]
   columnFields: string[]
@@ -15,6 +21,9 @@ const props = defineProps<{
   draggingField: string | null
   pivotResult: PivotResult | null
   fontSize?: 'xs' | 'sm' | 'base'
+  activeFilters?: ActiveFilter[] | null
+  totalRowCount?: number
+  filteredRowCount?: number
 }>()
 
 const emit = defineEmits<{
@@ -33,6 +42,10 @@ const { showWatermark, canUsePivot, isDemo } = useLicense()
 
 // Drag state
 const dragOverArea = ref<'row' | 'column' | 'value' | null>(null)
+
+// Reorder drag state
+const reorderDragSource = ref<{ zone: 'row' | 'column', index: number } | null>(null)
+const reorderDropTarget = ref<{ zone: 'row' | 'column', index: number } | null>(null)
 
 // Aggregation labels
 const aggregationLabels: Record<AggregationFunction, string> = {
@@ -67,6 +80,32 @@ const fontSizeOptions = [
   { value: 'sm', label: 'M' },
   { value: 'base', label: 'L' },
 ] as const
+
+// Filter status
+const hasActiveFilters = computed(() => props.activeFilters && props.activeFilters.length > 0)
+const filterSummary = computed(() => {
+  if (!props.activeFilters || props.activeFilters.length === 0) return ''
+  const columns = props.activeFilters.map(f => f.column).join(', ')
+  return columns
+})
+
+// Detailed filter tooltip
+const filterTooltipDetails = computed(() => {
+  if (!props.activeFilters || props.activeFilters.length === 0) return []
+  return props.activeFilters.map(f => {
+    const maxDisplay = 5
+    const displayValues = f.values.slice(0, maxDisplay)
+    const remaining = f.values.length - maxDisplay
+    return {
+      column: f.column,
+      values: displayValues,
+      remaining: remaining > 0 ? remaining : 0,
+    }
+  })
+})
+
+// Show/hide tooltip
+const showFilterTooltip = ref(false)
 
 // Sorting
 type SortDirection = 'asc' | 'desc'
@@ -179,28 +218,100 @@ function handleDrop(area: 'row' | 'column' | 'value', event: DragEvent) {
   event.preventDefault()
   const field = event.dataTransfer?.getData('text/plain')
 
-  if (field) {
-    if (props.rowFields.includes(field))
-      emit('removeRowField', field)
-    if (props.columnFields.includes(field))
-      emit('removeColumnField', field)
-    const existingValue = props.valueFields.find(v => v.field === field)
-    if (existingValue)
-      emit('removeValueField', field, existingValue.aggregation)
+  // Skip if this is a reorder operation (handled by chip drop)
+  if (!field || field.startsWith('reorder:')) {
+    dragOverArea.value = null
+    return
+  }
 
-    switch (area) {
-      case 'row':
-        emit('addRowField', field)
-        break
-      case 'column':
-        emit('addColumnField', field)
-        break
-      case 'value':
-        emit('addValueField', field, 'sum')
-        break
-    }
+  if (props.rowFields.includes(field))
+    emit('removeRowField', field)
+  if (props.columnFields.includes(field))
+    emit('removeColumnField', field)
+  const existingValue = props.valueFields.find(v => v.field === field)
+  if (existingValue)
+    emit('removeValueField', field, existingValue.aggregation)
+
+  switch (area) {
+    case 'row':
+      emit('addRowField', field)
+      break
+    case 'column':
+      emit('addColumnField', field)
+      break
+    case 'value':
+      emit('addValueField', field, 'sum')
+      break
   }
   dragOverArea.value = null
+}
+
+// Reorder handlers for chips within zones
+function handleChipDragStart(zone: 'row' | 'column', index: number, event: DragEvent) {
+  reorderDragSource.value = { zone, index }
+  event.dataTransfer!.effectAllowed = 'move'
+  event.dataTransfer!.setData('text/plain', `reorder:${zone}:${index}`)
+  // Add a slight delay to ensure visual feedback
+  requestAnimationFrame(() => {
+    dragOverArea.value = null
+  })
+}
+
+function handleChipDragEnd() {
+  reorderDragSource.value = null
+  reorderDropTarget.value = null
+}
+
+function handleChipDragOver(zone: 'row' | 'column', index: number, event: DragEvent) {
+  event.preventDefault()
+  // Only handle reorder within same zone
+  if (reorderDragSource.value && reorderDragSource.value.zone === zone) {
+    event.dataTransfer!.dropEffect = 'move'
+    reorderDropTarget.value = { zone, index }
+  }
+}
+
+function handleChipDragLeave() {
+  reorderDropTarget.value = null
+}
+
+function handleChipDrop(zone: 'row' | 'column', targetIndex: number, event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  if (!reorderDragSource.value || reorderDragSource.value.zone !== zone) {
+    return
+  }
+  
+  const sourceIndex = reorderDragSource.value.index
+  if (sourceIndex === targetIndex) {
+    reorderDragSource.value = null
+    reorderDropTarget.value = null
+    return
+  }
+  
+  // Create reordered array
+  const fields = zone === 'row' ? [...props.rowFields] : [...props.columnFields]
+  const [movedField] = fields.splice(sourceIndex, 1)
+  fields.splice(targetIndex, 0, movedField)
+  
+  // Emit reorder event
+  if (zone === 'row') {
+    emit('reorderRowFields', fields)
+  } else {
+    emit('reorderColumnFields', fields)
+  }
+  
+  reorderDragSource.value = null
+  reorderDropTarget.value = null
+}
+
+function isChipDragSource(zone: 'row' | 'column', index: number): boolean {
+  return reorderDragSource.value?.zone === zone && reorderDragSource.value?.index === index
+}
+
+function isChipDropTarget(zone: 'row' | 'column', index: number): boolean {
+  return reorderDropTarget.value?.zone === zone && reorderDropTarget.value?.index === index
 }
 
 // Column width
@@ -226,6 +337,43 @@ const dataColWidth = ref(80)
       </div>
 
       <div class="vpg-header-right">
+        <!-- Filter indicator with tooltip -->
+        <div
+          v-if="hasActiveFilters"
+          class="vpg-filter-indicator"
+          @mouseenter="showFilterTooltip = true"
+          @mouseleave="showFilterTooltip = false"
+        >
+          <svg class="vpg-filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+          <span class="vpg-filter-text">
+            Filtered: <strong>{{ filterSummary }}</strong>
+            <span v-if="filteredRowCount !== undefined && totalRowCount !== undefined" class="vpg-filter-count">
+              ({{ filteredRowCount.toLocaleString() }} of {{ totalRowCount.toLocaleString() }} rows)
+            </span>
+          </span>
+
+          <!-- Tooltip -->
+          <div v-if="showFilterTooltip" class="vpg-filter-tooltip">
+            <div class="vpg-tooltip-header">Active Filters</div>
+            <div v-for="filter in filterTooltipDetails" :key="filter.column" class="vpg-tooltip-filter">
+              <div class="vpg-tooltip-column">{{ filter.column }}</div>
+              <div class="vpg-tooltip-values">
+                <span v-for="(val, idx) in filter.values" :key="idx" class="vpg-tooltip-value">
+                  {{ val }}
+                </span>
+                <span v-if="filter.remaining > 0" class="vpg-tooltip-more">
+                  +{{ filter.remaining }} more
+                </span>
+              </div>
+            </div>
+            <div v-if="filteredRowCount !== undefined && totalRowCount !== undefined" class="vpg-tooltip-summary">
+              Showing {{ filteredRowCount.toLocaleString() }} of {{ totalRowCount.toLocaleString() }} rows
+            </div>
+          </div>
+        </div>
+
         <div v-if="isConfigured" class="vpg-config-summary">
           <span class="vpg-summary-badge vpg-rows">{{ rowFields.length }} row{{ rowFields.length !== 1 ? 's' : '' }}</span>
           <span class="vpg-summary-badge vpg-cols">{{ columnFields.length }} col{{ columnFields.length !== 1 ? 's' : '' }}</span>
@@ -278,10 +426,21 @@ const dataColWidth = ref(80)
           </div>
           <div class="vpg-zone-chips">
             <div
-              v-for="field in rowFields"
+              v-for="(field, idx) in rowFields"
               :key="field"
               class="vpg-mini-chip vpg-row-chip"
+              :class="{
+                'vpg-chip-dragging': isChipDragSource('row', idx),
+                'vpg-chip-drop-target': isChipDropTarget('row', idx),
+              }"
+              draggable="true"
+              @dragstart="handleChipDragStart('row', idx, $event)"
+              @dragend="handleChipDragEnd"
+              @dragover="handleChipDragOver('row', idx, $event)"
+              @dragleave="handleChipDragLeave"
+              @drop="handleChipDrop('row', idx, $event)"
             >
+              <span class="vpg-drag-handle">⋮⋮</span>
               <span class="vpg-mini-name">{{ field }}</span>
               <button class="vpg-mini-remove" @click.stop="emit('removeRowField', field)">×</button>
             </div>
@@ -303,10 +462,21 @@ const dataColWidth = ref(80)
           </div>
           <div class="vpg-zone-chips">
             <div
-              v-for="field in columnFields"
+              v-for="(field, idx) in columnFields"
               :key="field"
               class="vpg-mini-chip vpg-column-chip"
+              :class="{
+                'vpg-chip-dragging': isChipDragSource('column', idx),
+                'vpg-chip-drop-target': isChipDropTarget('column', idx),
+              }"
+              draggable="true"
+              @dragstart="handleChipDragStart('column', idx, $event)"
+              @dragend="handleChipDragEnd"
+              @dragover="handleChipDragOver('column', idx, $event)"
+              @dragleave="handleChipDragLeave"
+              @drop="handleChipDrop('column', idx, $event)"
             >
+              <span class="vpg-drag-handle">⋮⋮</span>
               <span class="vpg-mini-name">{{ field }}</span>
               <button class="vpg-mini-remove" @click.stop="emit('removeColumnField', field)">×</button>
             </div>
@@ -395,7 +565,11 @@ const dataColWidth = ref(80)
                   </span>
                 </div>
               </th>
-              <th v-if="pivotResult.rowTotals.length > 0 && levelIdx === columnHeaderCells.length - 1" class="vpg-total-header">
+              <th
+                v-if="pivotResult.rowTotals.length > 0 && levelIdx === 0"
+                class="vpg-total-header"
+                :rowspan="columnHeaderCells.length"
+              >
                 Total
               </th>
             </tr>
@@ -550,6 +724,122 @@ const dataColWidth = ref(80)
 .vpg-summary-badge.vpg-vals {
   background: #d1fae5;
   color: #059669;
+}
+
+/* Filter indicator */
+.vpg-filter-indicator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  color: #92400e;
+  box-shadow: 0 1px 2px rgba(245, 158, 11, 0.15);
+  cursor: help;
+}
+
+.vpg-filter-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  color: #d97706;
+}
+
+.vpg-filter-text {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.vpg-filter-text strong {
+  font-weight: 600;
+  color: #78350f;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vpg-filter-count {
+  color: #a16207;
+  font-size: 0.625rem;
+}
+
+/* Filter tooltip */
+.vpg-filter-tooltip {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 220px;
+  max-width: 320px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.vpg-tooltip-header {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #475569;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.vpg-tooltip-filter {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.vpg-tooltip-filter:last-of-type {
+  border-bottom: none;
+}
+
+.vpg-tooltip-column {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.375rem;
+}
+
+.vpg-tooltip-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.vpg-tooltip-value {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 0.25rem;
+  border: 1px solid #fde68a;
+}
+
+.vpg-tooltip-more {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.vpg-tooltip-summary {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.625rem;
+  color: #64748b;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
 }
 
 .vpg-font-size-toggle {
@@ -761,6 +1051,35 @@ const dataColWidth = ref(80)
   font-weight: 500;
   max-width: 100%;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  cursor: grab;
+  transition: all 0.15s ease;
+}
+
+.vpg-mini-chip:active {
+  cursor: grabbing;
+}
+
+.vpg-drag-handle {
+  opacity: 0.3;
+  font-size: 0.625rem;
+  letter-spacing: -0.1em;
+  margin-right: 0.125rem;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.vpg-mini-chip:hover .vpg-drag-handle {
+  opacity: 0.6;
+}
+
+.vpg-mini-chip.vpg-chip-dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.vpg-mini-chip.vpg-chip-drop-target {
+  transform: translateX(4px);
+  box-shadow: -3px 0 0 0 currentColor, 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .vpg-mini-chip.vpg-row-chip {
@@ -955,15 +1274,17 @@ const dataColWidth = ref(80)
   font-weight: 700;
   color: #92400e;
   border-bottom: 1px solid #cbd5e1;
+  border-left: 2px solid #f59e0b;
   background: #fde68a;
+  vertical-align: middle;
 }
 
 .vpg-data-row:hover {
-  background: rgba(236, 253, 245, 0.3);
+  background: #ecfdf5;
 }
 
 .vpg-data-row:nth-child(even) {
-  background: rgba(248, 250, 252, 0.5);
+  background: #f8fafc;
 }
 
 .vpg-row-header-cell {
@@ -982,7 +1303,7 @@ const dataColWidth = ref(80)
 }
 
 .vpg-data-row:nth-child(even) .vpg-row-header-cell {
-  background: rgba(248, 250, 252, 0.5);
+  background: #f8fafc;
 }
 
 .vpg-row-value + .vpg-row-value::before {
@@ -1016,7 +1337,7 @@ const dataColWidth = ref(80)
 }
 
 .vpg-data-cell.vpg-total-cell {
-  background: rgba(254, 243, 199, 0.6);
+  background: #fef3c7;
   font-weight: 600;
   color: #92400e;
 }
@@ -1028,7 +1349,7 @@ const dataColWidth = ref(80)
 }
 
 .vpg-totals-row {
-  background: rgba(254, 243, 199, 0.4);
+  background: #fef9e7;
 }
 
 .vpg-total-label {
@@ -1145,6 +1466,299 @@ const dataColWidth = ref(80)
 
 .vpg-table-container::-webkit-scrollbar-corner {
   background: #f1f5f9;
+}
+
+</style>
+
+<style>
+/* Dark Mode - PivotSkeleton */
+.vpg-theme-dark .vpg-pivot-skeleton {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-skeleton-header {
+  background: linear-gradient(to right, rgba(16, 185, 129, 0.15), rgba(20, 184, 166, 0.1)) !important;
+  border-color: #334155 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-skeleton-title {
+  color: #6ee7b7 !important;
+}
+
+/* Config bar (drop zones container) */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-config-bar {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-drop-zones {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-drop-zone {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-drop-zone:hover {
+  border-color: #64748b !important;
+  background: #334155 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-drop-zone.vpg-zone-active {
+  border-color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.2) !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-zone-label {
+  color: #94a3b8 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-zone-row .vpg-zone-label { color: #a5b4fc !important; }
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-zone-column .vpg-zone-label { color: #c4b5fd !important; }
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-zone-value .vpg-zone-label { color: #6ee7b7 !important; }
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-zone-hint {
+  color: #64748b !important;
+}
+
+/* Mini chips in drop zones */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-mini-chip.vpg-row-chip {
+  background: #312e81 !important;
+  color: #a5b4fc !important;
+  border-color: #4338ca !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-mini-chip.vpg-column-chip {
+  background: #4c1d95 !important;
+  color: #c4b5fd !important;
+  border-color: #7c3aed !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-mini-chip.vpg-value-chip {
+  background: #064e3b !important;
+  color: #6ee7b7 !important;
+  border-color: #10b981 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-drag-handle {
+  opacity: 0.4;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-mini-chip:hover .vpg-drag-handle {
+  opacity: 0.7;
+}
+
+/* Font size toggle (S M L) */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-font-size-toggle {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-font-size-btn {
+  color: #94a3b8 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-font-size-btn:hover {
+  background: #334155 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-font-size-btn.active {
+  background: #10b981 !important;
+  color: white !important;
+}
+
+/* Summary badges (1 row, 1 col, 1 val) */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-summary-badge.vpg-rows {
+  background: rgba(99, 102, 241, 0.2) !important;
+  color: #a5b4fc !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-summary-badge.vpg-cols {
+  background: rgba(139, 92, 246, 0.2) !important;
+  color: #c4b5fd !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-summary-badge.vpg-vals {
+  background: rgba(16, 185, 129, 0.2) !important;
+  color: #6ee7b7 !important;
+}
+
+/* Filter indicator - dark mode */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-filter-indicator {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.25) 100%) !important;
+  border-color: #d97706 !important;
+  color: #fbbf24 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-filter-icon {
+  color: #fbbf24 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-filter-text strong {
+  color: #fcd34d !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-filter-count {
+  color: #fbbf24 !important;
+}
+
+/* Filter tooltip - dark mode */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-filter-tooltip {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-tooltip-header {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-tooltip-filter {
+  border-color: #334155 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-tooltip-column {
+  color: #e2e8f0 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-tooltip-value {
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-tooltip-more {
+  color: #94a3b8 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-tooltip-summary {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-table-container {
+  background: #1e293b;
+}
+
+.vpg-theme-dark .vpg-pivot-table {
+  background: #1e293b;
+}
+
+.vpg-theme-dark .vpg-pivot-table thead {
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+}
+
+.vpg-theme-dark .vpg-column-header-row {
+  background: #0f172a !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-column-header-cell,
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-corner-cell,
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-row-header-label {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-row-header-label:hover,
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-column-header-cell:hover {
+  background: #1e293b !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-row-header-cell {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:nth-child(even) .vpg-row-header-cell,
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:nth-child(even) .vpg-data-cell {
+  background: #0f172a;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:hover .vpg-row-header-cell,
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:hover .vpg-data-cell {
+  background: #334155;
+}
+
+/* Total header column */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-total-header {
+  background: #451a03 !important;
+  color: #fbbf24 !important;
+  border-color: #334155 !important;
+}
+
+/* Total cells in rows - consistent color */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell.vpg-total-cell {
+  background: #451a03 !important;
+  color: #fbbf24 !important;
+}
+
+/* Grand total cell */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell.vpg-grand-total-cell {
+  background: #451a03 !important;
+  color: #fbbf24 !important;
+}
+
+/* Totals row - consistent color */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-totals-row {
+  background: transparent !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-totals-row .vpg-row-header-cell,
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-totals-row .vpg-data-cell {
+  background: #451a03 !important;
+}
+
+/* Total label */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-total-label {
+  background: #451a03 !important;
+  color: #fbbf24 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-empty-state {
+  background: #0f172a;
+  color: #64748b;
+}
+
+.vpg-theme-dark .vpg-skeleton-footer {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-demo-bar {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar-corner {
+  background: #0f172a;
 }
 </style>
 
