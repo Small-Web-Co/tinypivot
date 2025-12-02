@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { DataGrid, enableDemoMode } from 'tinypivot'
+import { Analytics } from '@vercel/analytics/nuxt'
 
 // Enable demo mode for the live demo (secret via env var)
 const demoSecret = import.meta.env.VITE_DEMO_SECRET as string

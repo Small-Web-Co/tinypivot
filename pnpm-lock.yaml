@@ -11,6 +11,9 @@ importers:
       '@tanstack/vue-table':
         specifier: ^8.20.0
         version: 8.21.3(vue@3.5.25(typescript@5.3.3))
+      '@vercel/analytics':
+        specifier: ^1.6.1
+        version: 1.6.1(react@18.3.1)(vue@3.5.25(typescript@5.3.3))
     devDependencies:
       '@types/node':
         specifier: ^20.10.0
@@ -703,6 +706,32 @@ packages:
 
   '@types/react@18.3.27':
     resolution: {integrity: sha512-cisd7gxkzjBKU2GgdYrTdtQx1SORymWyaAFhaxQPK9bYO9ot3Y5OikQRvY0VYQtvwjeQnizCINJAenh/V7MK2w==}
+
+  '@vercel/analytics@1.6.1':
+    resolution: {integrity: sha512-oH9He/bEM+6oKlv3chWuOOcp8Y6fo6/PSro8hEkgCW3pu9/OiCXiUpRUogDh3Fs3LH2sosDrx8CxeOLBEE+afg==}
+    peerDependencies:
+      '@remix-run/react': ^2
+      '@sveltejs/kit': ^1 || ^2
+      next: '>= 13'
+      react: ^18 || ^19 || ^19.0.0-rc
+      svelte: '>= 4'
+      vue: ^3
+      vue-router: ^4
+    peerDependenciesMeta:
+      '@remix-run/react':
+        optional: true
+      '@sveltejs/kit':
+        optional: true
+      next:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+      vue-router:
+        optional: true
 
   '@vercel/build-utils@8.7.0':
     resolution: {integrity: sha512-ofZX+ABiW76u5khIyYyH5xK5KSuiAteqRu5hz2k1a2WHLwF7VpeBg8gdFR+HwbVnNkHtkMA64ya5Dd/lNoABkw==}
@@ -2387,6 +2416,11 @@ snapshots:
     dependencies:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
+
+  '@vercel/analytics@1.6.1(react@18.3.1)(vue@3.5.25(typescript@5.3.3))':
+    optionalDependencies:
+      react: 18.3.1
+      vue: 3.5.25(typescript@5.3.3)
 
   '@vercel/build-utils@8.7.0': {}
 
