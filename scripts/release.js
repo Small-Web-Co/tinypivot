@@ -65,23 +65,53 @@ function getCommitsSinceTag(tag) {
 }
 
 function getChangedFiles(tag) {
-  const range = tag ? `${tag}..HEAD` : 'HEAD'
+  const files = new Set()
+  
   try {
-    const diff = runQuiet(`git diff --name-only ${range}`)
-    if (!diff) return []
-    return diff.split('\n').filter(f => f.length > 0)
+    // Get committed changes since tag
+    if (tag) {
+      const committed = runQuiet(`git diff --name-only ${tag}..HEAD`)
+      if (committed) committed.split('\n').forEach(f => f && files.add(f))
+    }
+    
+    // Get staged changes (not yet committed)
+    const staged = runQuiet('git diff --cached --name-only')
+    if (staged) staged.split('\n').forEach(f => f && files.add(f))
+    
+    // Get unstaged changes in working directory
+    const unstaged = runQuiet('git diff --name-only')
+    if (unstaged) unstaged.split('\n').forEach(f => f && files.add(f))
+    
   } catch {
-    return []
+    // Ignore errors
   }
+  
+  return Array.from(files)
 }
 
 function getDiffContent(tag) {
-  const range = tag ? `${tag}..HEAD` : 'HEAD'
+  const diffs = []
+  
   try {
-    return runQuiet(`git diff ${range}`)
+    // Get committed changes since tag
+    if (tag) {
+      const committed = runQuiet(`git diff ${tag}..HEAD`)
+      if (committed) diffs.push(committed)
+    }
+    
+    // Get staged changes
+    const staged = runQuiet('git diff --cached')
+    if (staged) diffs.push(staged)
+    
+    // Get unstaged changes
+    const unstaged = runQuiet('git diff')
+    if (unstaged) diffs.push(unstaged)
+    
   } catch {
-    return ''
+    // Ignore errors
   }
+  
+  return diffs.join('\n')
 }
 
 // Extract meaningful feature changes from the diff
@@ -437,16 +467,35 @@ async function main() {
   console.log(`📝 Generating changelog since ${previousTag || 'beginning'}...`)
   
   const commits = getCommitsSinceTag(previousTag)
+  const nonReleaseCommits = commits.filter(c => !c.message.toLowerCase().startsWith('release:'))
+  console.log(`   Found ${commits.length} commits (${nonReleaseCommits.length} non-release)`)
+  
   const categories = categorizeCommits(commits)
   
   const changedFiles = getChangedFiles(previousTag)
+  const sourceFiles = changedFiles.filter(f => !f.includes('dist/') && !f.includes('node_modules/') && !f.includes('pnpm-lock'))
+  console.log(`   Found ${changedFiles.length} changed files (${sourceFiles.length} source files)`)
+  
+  if (sourceFiles.length > 0 && sourceFiles.length <= 20) {
+    console.log(`   Files: ${sourceFiles.join(', ')}`)
+  }
+  
   const fileChanges = analyzeFileChanges(changedFiles)
   
   // Analyze diff for feature extraction
   console.log('🔍 Analyzing code changes...')
   const diffContent = getDiffContent(previousTag)
+  console.log(`   Diff size: ${diffContent.length} characters`)
+  
   const features = extractFeatures(diffContent)
   const featureSummary = generateFeatureSummary(features)
+  
+  if (featureSummary.length > 0) {
+    console.log(`   Detected features:`)
+    featureSummary.forEach(s => console.log(`     - ${s}`))
+  } else {
+    console.log(`   No specific features detected from diff`)
+  }
   
   const changelog = generateChangelog(categories, fileChanges, featureSummary, previousTag, newVersion)
   
