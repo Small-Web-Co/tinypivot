@@ -125,6 +125,7 @@ function copyInstallCommand() {
 </script>
 
 <template>
+  <Analytics />
   <div class="landing-page">
     <!-- Navigation -->
     <nav class="nav">
