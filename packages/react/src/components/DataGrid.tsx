@@ -211,6 +211,11 @@ export function DataGrid({
     return searchFilteredData.slice(start, end)
   }, [enablePagination, searchFilteredData, currentPage, pageSize])
 
+  // Reset to page 1 when filters or search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [columnFilters, globalSearchTerm])
+
   // Selection bounds
   const selectionBounds = useMemo(() => {
     if (!selectionStart || !selectionEnd) return null

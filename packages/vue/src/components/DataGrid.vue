@@ -217,6 +217,11 @@ function prevPage() {
   if (currentPage.value > 1) currentPage.value--
 }
 
+// Reset to page 1 when filters or search changes
+watch([columnFilters, globalSearchTerm], () => {
+  currentPage.value = 1
+})
+
 // Export functionality
 function handleExport() {
   if (viewMode.value === 'pivot') {

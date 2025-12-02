@@ -156,9 +156,10 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
     (columnId: string, values: string[]) => {
       const column = table.getColumn(columnId)
       if (column) {
+        // Let the table's onColumnFiltersChange handler update the state
+        // Do NOT manually call setColumnFilters after - it causes a race condition
+        // where the stale state overwrites the pending update
         column.setFilterValue(values.length === 0 ? undefined : values)
-        // Force sync columnFilters state with table state
-        setColumnFilters(table.getState().columnFilters)
       }
     },
     [table]
