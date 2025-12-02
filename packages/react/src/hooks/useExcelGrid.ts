@@ -157,6 +157,8 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
       const column = table.getColumn(columnId)
       if (column) {
         column.setFilterValue(values.length === 0 ? undefined : values)
+        // Force sync columnFilters state with table state
+        setColumnFilters(table.getState().columnFilters)
       }
     },
     [table]
@@ -166,6 +168,8 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   const clearAllFilters = useCallback(() => {
     table.resetColumnFilters()
     setGlobalFilter('')
+    // Force sync columnFilters state
+    setColumnFilters([])
   }, [table])
 
   // Get filter values for a specific column

@@ -1463,6 +1463,28 @@
 .vpg-mini-chip.vpg-column-chip { background: white; color: #7c3aed; border: 1px solid #ddd6fe; }
 .vpg-mini-chip.vpg-value-chip { background: white; color: #059669; border: 1px solid #a7f3d0; }
 
+.vpg-mini-chip.vpg-chip-dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.vpg-mini-chip.vpg-chip-drop-target {
+  transform: translateX(4px);
+  box-shadow: -3px 0 0 0 currentColor, 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.vpg-drag-handle {
+  opacity: 0.3;
+  font-size: 0.625rem;
+  letter-spacing: -0.1em;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.vpg-mini-chip:hover .vpg-drag-handle {
+  opacity: 0.6;
+}
+
 .vpg-mini-name {
   overflow: hidden;
   text-overflow: ellipsis;

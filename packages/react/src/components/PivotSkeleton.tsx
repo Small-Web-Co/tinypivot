@@ -52,11 +52,17 @@ export function PivotSkeleton({
   onRemoveColumnField,
   onAddValueField,
   onRemoveValueField,
+  onReorderRowFields,
+  onReorderColumnFields,
 }: PivotSkeletonProps) {
   const { showWatermark, canUsePivot, isDemo } = useLicense()
 
   // Drag state
   const [dragOverArea, setDragOverArea] = useState<'row' | 'column' | 'value' | null>(null)
+  
+  // Reorder drag state
+  const [reorderDragSource, setReorderDragSource] = useState<{ zone: 'row' | 'column'; index: number } | null>(null)
+  const [reorderDropTarget, setReorderDropTarget] = useState<{ zone: 'row' | 'column'; index: number } | null>(null)
 
   // Sorting
   type SortTarget = 'row' | number
@@ -192,6 +198,89 @@ export function PivotSkeleton({
     [rowFields, columnFields, valueFields, onAddRowField, onRemoveRowField, onAddColumnField, onRemoveColumnField, onAddValueField, onRemoveValueField]
   )
 
+  // Reorder handlers for chips within zones
+  const handleChipDragStart = useCallback(
+    (zone: 'row' | 'column', index: number, event: React.DragEvent) => {
+      setReorderDragSource({ zone, index })
+      event.dataTransfer!.effectAllowed = 'move'
+      event.dataTransfer!.setData('text/plain', `reorder:${zone}:${index}`)
+      // Clear any zone drag-over state
+      requestAnimationFrame(() => {
+        setDragOverArea(null)
+      })
+    },
+    []
+  )
+
+  const handleChipDragEnd = useCallback(() => {
+    setReorderDragSource(null)
+    setReorderDropTarget(null)
+  }, [])
+
+  const handleChipDragOver = useCallback(
+    (zone: 'row' | 'column', index: number, event: React.DragEvent) => {
+      event.preventDefault()
+      // Only handle reorder within same zone
+      if (reorderDragSource && reorderDragSource.zone === zone) {
+        event.dataTransfer!.dropEffect = 'move'
+        setReorderDropTarget({ zone, index })
+      }
+    },
+    [reorderDragSource]
+  )
+
+  const handleChipDragLeave = useCallback(() => {
+    setReorderDropTarget(null)
+  }, [])
+
+  const handleChipDrop = useCallback(
+    (zone: 'row' | 'column', targetIndex: number, event: React.DragEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+
+      if (!reorderDragSource || reorderDragSource.zone !== zone) {
+        return
+      }
+
+      const sourceIndex = reorderDragSource.index
+      if (sourceIndex === targetIndex) {
+        setReorderDragSource(null)
+        setReorderDropTarget(null)
+        return
+      }
+
+      // Create reordered array
+      const fields = zone === 'row' ? [...rowFields] : [...columnFields]
+      const [movedField] = fields.splice(sourceIndex, 1)
+      fields.splice(targetIndex, 0, movedField)
+
+      // Emit reorder event
+      if (zone === 'row') {
+        onReorderRowFields(fields)
+      } else {
+        onReorderColumnFields(fields)
+      }
+
+      setReorderDragSource(null)
+      setReorderDropTarget(null)
+    },
+    [reorderDragSource, rowFields, columnFields, onReorderRowFields, onReorderColumnFields]
+  )
+
+  const isChipDragSource = useCallback(
+    (zone: 'row' | 'column', index: number): boolean => {
+      return reorderDragSource?.zone === zone && reorderDragSource?.index === index
+    },
+    [reorderDragSource]
+  )
+
+  const isChipDropTarget = useCallback(
+    (zone: 'row' | 'column', index: number): boolean => {
+      return reorderDropTarget?.zone === zone && reorderDropTarget?.index === index
+    },
+    [reorderDropTarget]
+  )
+
   const currentFontSize = fontSize
 
   return (
@@ -290,12 +379,22 @@ export function PivotSkeleton({
                 <span className="vpg-zone-label">Rows</span>
               </div>
               <div className="vpg-zone-chips">
-                {rowFields.map(field => (
-                  <div key={field} className="vpg-mini-chip vpg-row-chip">
+                {rowFields.map((field, idx) => (
+                  <div
+                    key={field}
+                    className={`vpg-mini-chip vpg-row-chip ${isChipDragSource('row', idx) ? 'vpg-chip-dragging' : ''} ${isChipDropTarget('row', idx) ? 'vpg-chip-drop-target' : ''}`}
+                    draggable
+                    onDragStart={e => handleChipDragStart('row', idx, e)}
+                    onDragEnd={handleChipDragEnd}
+                    onDragOver={e => handleChipDragOver('row', idx, e)}
+                    onDragLeave={handleChipDragLeave}
+                    onDrop={e => handleChipDrop('row', idx, e)}
+                  >
+                    <span className="vpg-drag-handle">⋮⋮</span>
                     <span className="vpg-mini-name">{field}</span>
                     <button
                       className="vpg-mini-remove"
-                      onClick={() => onRemoveRowField(field)}
+                      onClick={e => { e.stopPropagation(); onRemoveRowField(field) }}
                     >
                       ×
                     </button>
@@ -317,12 +416,22 @@ export function PivotSkeleton({
                 <span className="vpg-zone-label">Columns</span>
               </div>
               <div className="vpg-zone-chips">
-                {columnFields.map(field => (
-                  <div key={field} className="vpg-mini-chip vpg-column-chip">
+                {columnFields.map((field, idx) => (
+                  <div
+                    key={field}
+                    className={`vpg-mini-chip vpg-column-chip ${isChipDragSource('column', idx) ? 'vpg-chip-dragging' : ''} ${isChipDropTarget('column', idx) ? 'vpg-chip-drop-target' : ''}`}
+                    draggable
+                    onDragStart={e => handleChipDragStart('column', idx, e)}
+                    onDragEnd={handleChipDragEnd}
+                    onDragOver={e => handleChipDragOver('column', idx, e)}
+                    onDragLeave={handleChipDragLeave}
+                    onDrop={e => handleChipDrop('column', idx, e)}
+                  >
+                    <span className="vpg-drag-handle">⋮⋮</span>
                     <span className="vpg-mini-name">{field}</span>
                     <button
                       className="vpg-mini-remove"
-                      onClick={() => onRemoveColumnField(field)}
+                      onClick={e => { e.stopPropagation(); onRemoveColumnField(field) }}
                     >
                       ×
                     </button>
