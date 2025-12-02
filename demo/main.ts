@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { enableDemoMode } from 'tinypivot'
+import { inject } from '@vercel/analytics'
 import App from './App.vue'
 import '../src/style.css'
 
@@ -9,6 +10,9 @@ const demoSecret = import.meta.env.VITE_DEMO_SECRET as string
 if (demoSecret) {
   enableDemoMode(demoSecret)
 }
+
+// Initialize Vercel Analytics
+inject()
 
 createApp(App).mount('#app')
 

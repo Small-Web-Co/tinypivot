@@ -1590,15 +1590,15 @@ function handleContainerClick(event: MouseEvent) {
 }
 
 .vpg-header-cell.vpg-has-filter {
-  background: rgba(238, 242, 255, 0.7);
+  background: #eef2ff;
 }
 
 .vpg-header-cell.vpg-is-sorted {
-  background: rgba(239, 246, 255, 0.7);
+  background: #eff6ff;
 }
 
 .vpg-header-cell.vpg-has-filter.vpg-is-sorted {
-  background: rgba(237, 233, 254, 0.7);
+  background: #ede9fe;
 }
 
 .vpg-header-cell.vpg-is-active {
