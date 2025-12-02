@@ -139,7 +139,7 @@ export function DataGrid({
   const filteredDataForPivot = useMemo(() => {
     const filteredRows = table.getFilteredRowModel().rows
     return filteredRows.map(row => row.original)
-  }, [table])
+  }, [table, columnFilters])
 
   // Pivot table composable
   const {
@@ -176,8 +176,8 @@ export function DataGrid({
     }))
   }, [activeFilters])
 
-  // Rows
-  const rows = useMemo(() => table.getRowModel().rows, [table])
+  // Rows - depends on columnFilters to recompute when filters change
+  const rows = useMemo(() => table.getFilteredRowModel().rows, [table, columnFilters])
 
   // Filtered data based on global search
   const searchFilteredData = useMemo(() => {
