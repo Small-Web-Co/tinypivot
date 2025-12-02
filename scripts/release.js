@@ -237,38 +237,44 @@ function analyzeFileChanges(files) {
     vue: { components: [], composables: [], styles: [], other: [] },
     react: { components: [], hooks: [], styles: [], other: [] },
     demo: [],
+    scripts: [],
     config: [],
-    docs: []
+    docs: [],
+    other: []
   }
 
   for (const file of files) {
     // Skip dist, node_modules, lock files
     if (file.includes('dist/') || file.includes('node_modules/') || file.includes('pnpm-lock')) continue
     
-    if (file.startsWith('packages/core/')) {
-      const name = file.replace('packages/core/', '')
+    if (file.startsWith('packages/core/src/')) {
+      const name = file.replace('packages/core/src/', '')
       if (name.includes('types/')) changes.core.types.push(name)
       else if (name.includes('utils/')) changes.core.utils.push(name)
       else if (name.includes('pivot/')) changes.core.hooks.push(name)
       else changes.core.other.push(name)
-    } else if (file.startsWith('packages/vue/')) {
-      const name = file.replace('packages/vue/', '')
+    } else if (file.startsWith('packages/vue/src/')) {
+      const name = file.replace('packages/vue/src/', '')
       if (name.includes('components/')) changes.vue.components.push(name)
       else if (name.includes('composables/')) changes.vue.composables.push(name)
       else if (name.includes('.css')) changes.vue.styles.push(name)
       else changes.vue.other.push(name)
-    } else if (file.startsWith('packages/react/')) {
-      const name = file.replace('packages/react/', '')
+    } else if (file.startsWith('packages/react/src/')) {
+      const name = file.replace('packages/react/src/', '')
       if (name.includes('components/')) changes.react.components.push(name)
       else if (name.includes('hooks/')) changes.react.hooks.push(name)
       else if (name.includes('.css')) changes.react.styles.push(name)
       else changes.react.other.push(name)
     } else if (file.startsWith('demo/')) {
       changes.demo.push(file)
+    } else if (file.startsWith('scripts/')) {
+      changes.scripts.push(file)
     } else if (file.endsWith('.md') || file.endsWith('.txt')) {
       changes.docs.push(file)
-    } else if (file.includes('config') || file.endsWith('.json') || file.endsWith('.js') || file.endsWith('.ts')) {
+    } else if (file.includes('config') || file.endsWith('.json')) {
       changes.config.push(file)
+    } else {
+      changes.other.push(file)
     }
   }
 
@@ -283,6 +289,7 @@ function generateFileChangeSummary(changes) {
   if (changes.core.types.length) coreChanges.push(`Types (${changes.core.types.length} files)`)
   if (changes.core.hooks.length) coreChanges.push(`Pivot logic (${changes.core.hooks.length} files)`)
   if (changes.core.utils.length) coreChanges.push(`Utilities (${changes.core.utils.length} files)`)
+  if (changes.core.other.length) coreChanges.push(`Other (${changes.core.other.length} files)`)
   if (coreChanges.length) {
     sections.push(`- **Core**: ${coreChanges.join(', ')}`)
   }
@@ -292,6 +299,7 @@ function generateFileChangeSummary(changes) {
   if (changes.vue.components.length) vueChanges.push(`${changes.vue.components.length} components`)
   if (changes.vue.composables.length) vueChanges.push(`${changes.vue.composables.length} composables`)
   if (changes.vue.styles.length) vueChanges.push(`styles`)
+  if (changes.vue.other.length) vueChanges.push(`${changes.vue.other.length} other`)
   if (vueChanges.length) {
     sections.push(`- **Vue**: ${vueChanges.join(', ')}`)
   }
@@ -301,6 +309,7 @@ function generateFileChangeSummary(changes) {
   if (changes.react.components.length) reactChanges.push(`${changes.react.components.length} components`)
   if (changes.react.hooks.length) reactChanges.push(`${changes.react.hooks.length} hooks`)
   if (changes.react.styles.length) reactChanges.push(`styles`)
+  if (changes.react.other.length) reactChanges.push(`${changes.react.other.length} other`)
   if (reactChanges.length) {
     sections.push(`- **React**: ${reactChanges.join(', ')}`)
   }
@@ -308,6 +317,24 @@ function generateFileChangeSummary(changes) {
   // Demo changes
   if (changes.demo.length) {
     sections.push(`- **Demo**: ${changes.demo.length} files updated`)
+  }
+
+  // Scripts changes
+  if (changes.scripts.length) {
+    const scriptNames = changes.scripts.map(f => f.replace('scripts/', '')).join(', ')
+    sections.push(`- **Scripts**: ${scriptNames}`)
+  }
+
+  // Config changes
+  if (changes.config.length) {
+    const configNames = changes.config.slice(0, 5).join(', ')
+    const extra = changes.config.length > 5 ? ` (+${changes.config.length - 5} more)` : ''
+    sections.push(`- **Config**: ${configNames}${extra}`)
+  }
+
+  // Docs changes
+  if (changes.docs.length) {
+    sections.push(`- **Docs**: ${changes.docs.length} files`)
   }
 
   return sections.join('\n')
@@ -391,20 +418,15 @@ function generateChangelog(categories, fileChanges, featureSummary, previousTag,
     }
   }
 
-  // If no commit changes and no feature summary, show file-based summary
+  // Always show file-based summary if we have any file changes
   const fileSummary = generateFileChangeSummary(fileChanges)
-  if (!hasCommitChanges && featureSummary.length === 0 && fileSummary) {
-    sections.push('### 📦 Package Updates\n')
-    sections.push(fileSummary)
-    sections.push('')
-  } else if (fileSummary && featureSummary.length === 0) {
-    // Also add file summary if we have commits but no feature highlights
+  if (fileSummary) {
     sections.push('### 📦 Files Changed\n')
     sections.push(fileSummary)
     sections.push('')
   }
 
-  // Fallback if still nothing
+  // Fallback only if absolutely nothing was detected
   if (sections.length === 0) {
     sections.push('- Internal improvements and maintenance')
     sections.push('')
