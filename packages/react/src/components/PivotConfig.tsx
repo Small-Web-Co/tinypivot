@@ -92,9 +92,8 @@ export function PivotConfig({
 
   // Convert calculated fields to virtual FieldStats for display
   const calculatedFieldsAsStats = useMemo((): ExtendedFieldStats[] => {
-    console.log('[PivotConfig] calculatedFields prop:', calculatedFields)
     if (!calculatedFields) return []
-    const stats = calculatedFields.map(calc => ({
+    return calculatedFields.map(calc => ({
       field: `calc:${calc.id}`,
       type: 'number' as const,
       uniqueCount: 0,
@@ -104,19 +103,13 @@ export function PivotConfig({
       calcName: calc.name,
       calcFormula: calc.formula,
     }))
-    console.log('[PivotConfig] calculatedFieldsAsStats:', stats)
-    return stats
   }, [calculatedFields])
 
   // Combined available fields (data fields + calculated fields)
-  const allAvailableFields = useMemo((): ExtendedFieldStats[] => {
-    const all = [
-      ...availableFields.map(f => ({ ...f, isCalculated: false })),
-      ...calculatedFieldsAsStats,
-    ]
-    console.log('[PivotConfig] allAvailableFields:', all.length, 'items, calc fields:', calculatedFieldsAsStats.length)
-    return all
-  }, [availableFields, calculatedFieldsAsStats])
+  const allAvailableFields = useMemo((): ExtendedFieldStats[] => [
+    ...availableFields.map(f => ({ ...f, isCalculated: false })),
+    ...calculatedFieldsAsStats,
+  ], [availableFields, calculatedFieldsAsStats])
 
   // Assigned fields
   const assignedFields = useMemo(() => {
@@ -223,14 +216,9 @@ export function PivotConfig({
   }, [])
 
   const handleSaveCalcField = useCallback((field: CalculatedField) => {
-    console.log('[PivotConfig] handleSaveCalcField called with:', field)
-    console.log('[PivotConfig] editingCalcField:', editingCalcField)
-    console.log('[PivotConfig] onAddCalculatedField exists:', !!onAddCalculatedField)
     if (editingCalcField && onUpdateCalculatedField) {
-      console.log('[PivotConfig] Calling onUpdateCalculatedField')
       onUpdateCalculatedField(field)
     } else if (onAddCalculatedField) {
-      console.log('[PivotConfig] Calling onAddCalculatedField')
       onAddCalculatedField(field)
     }
     setShowCalcModal(false)

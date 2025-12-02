@@ -1104,6 +1104,7 @@ export function DataGrid({
               rowFields={pivotRowFields}
               columnFields={pivotColumnFields}
               valueFields={pivotValueFields}
+              calculatedFields={pivotCalculatedFields}
               isConfigured={pivotIsConfigured}
               draggingField={draggingField}
               pivotResult={pivotResult}

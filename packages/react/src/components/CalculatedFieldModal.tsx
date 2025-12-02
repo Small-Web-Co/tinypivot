@@ -75,17 +75,12 @@ export function CalculatedFieldModal({
 
   // Save calculated field
   const handleSave = useCallback(() => {
-    console.log('[CalculatedFieldModal] handleSave called')
-    console.log('[CalculatedFieldModal] name:', name, 'formula:', formula)
-    console.log('[CalculatedFieldModal] availableFields:', availableFields)
-    
     if (!name.trim()) {
       setError('Name is required')
       return
     }
 
     const validationResult = validateSimpleFormula(formula, availableFields)
-    console.log('[CalculatedFieldModal] validationResult:', validationResult)
     if (validationResult) {
       setError(validationResult)
       return
@@ -99,7 +94,6 @@ export function CalculatedFieldModal({
       decimals,
     }
 
-    console.log('[CalculatedFieldModal] Calling onSave with:', field)
     onSave(field)
     onClose()
   }, [name, formula, formatAs, decimals, existingField, availableFields, onSave, onClose])

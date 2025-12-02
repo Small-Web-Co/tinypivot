@@ -3,7 +3,7 @@
  * Visual layout for pivot configuration and results
  */
 import React, { useState, useMemo, useCallback } from 'react'
-import type { AggregationFunction, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, CalculatedField, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
 import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { useLicense } from '../hooks/useLicense'
 
@@ -17,6 +17,7 @@ interface PivotSkeletonProps {
   rowFields: string[]
   columnFields: string[]
   valueFields: PivotValueField[]
+  calculatedFields?: CalculatedField[]
   isConfigured: boolean
   draggingField: string | null
   pivotResult: PivotResult | null
@@ -39,6 +40,7 @@ export function PivotSkeleton({
   rowFields,
   columnFields,
   valueFields,
+  calculatedFields,
   isConfigured,
   draggingField,
   pivotResult,
@@ -56,6 +58,21 @@ export function PivotSkeleton({
   onReorderColumnFields,
 }: PivotSkeletonProps) {
   const { showWatermark, canUsePivot, isDemo } = useLicense()
+
+  // Helper to get display name for value fields (resolves calc IDs to names)
+  const getValueFieldDisplayName = useCallback((field: string): string => {
+    if (field.startsWith('calc:')) {
+      const calcId = field.replace('calc:', '')
+      const calcField = calculatedFields?.find(c => c.id === calcId)
+      return calcField?.name || field
+    }
+    return field
+  }, [calculatedFields])
+
+  // Helper to check if field is a calculated field
+  const isCalculatedField = useCallback((field: string): boolean => {
+    return field.startsWith('calc:')
+  }, [])
 
   // Drag state
   const [dragOverArea, setDragOverArea] = useState<'row' | 'column' | 'value' | null>(null)
@@ -115,7 +132,7 @@ export function PivotSkeleton({
     if (!pivotResult || pivotResult.headers.length === 0) {
       return [
         valueFields.map(vf => ({
-          label: `${vf.field} (${getAggregationLabel(vf.aggregation)})`,
+          label: `${getValueFieldDisplayName(vf.field)} (${getAggregationLabel(vf.aggregation)})`,
           colspan: 1,
         })),
       ]
@@ -503,10 +520,10 @@ export function PivotSkeleton({
                 {valueFields.map(vf => (
                   <div
                     key={`${vf.field}-${vf.aggregation}`}
-                    className="vpg-mini-chip vpg-value-chip"
+                    className={`vpg-mini-chip vpg-value-chip${isCalculatedField(vf.field) ? ' vpg-calc-chip' : ''}`}
                   >
-                    <span className="vpg-agg-symbol">{getAggregationSymbol(vf.aggregation)}</span>
-                    <span className="vpg-mini-name">{vf.field}</span>
+                    <span className="vpg-agg-symbol">{isCalculatedField(vf.field) ? 'ƒ' : getAggregationSymbol(vf.aggregation)}</span>
+                    <span className="vpg-mini-name">{getValueFieldDisplayName(vf.field)}</span>
                     <button
                       className="vpg-mini-remove"
                       onClick={() => onRemoveValueField(vf.field, vf.aggregation)}
