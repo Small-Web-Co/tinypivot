@@ -175,11 +175,26 @@ export function DataGrid({
   // Active filters info for display
   const activeFilterInfo = useMemo(() => {
     if (activeFilters.length === 0) return null
-    return activeFilters.map(f => ({
-      column: f.column,
-      valueCount: f.values?.length || 0,
-      values: f.values || [],
-    }))
+    return activeFilters.map(f => {
+      if (f.type === 'range' && f.range) {
+        // Format range filter display
+        const parts = []
+        if (f.range.min !== null) parts.push(`≥ ${f.range.min}`)
+        if (f.range.max !== null) parts.push(`≤ ${f.range.max}`)
+        return {
+          column: f.column,
+          valueCount: 1,
+          displayText: parts.join(' and '),
+          isRange: true,
+        }
+      }
+      return {
+        column: f.column,
+        valueCount: f.values?.length || 0,
+        values: f.values || [],
+        isRange: false,
+      }
+    })
   }, [activeFilters])
 
   // Rows - depends on columnFilters to recompute when filters change

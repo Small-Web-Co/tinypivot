@@ -11,7 +11,9 @@ import { useLicense } from '../composables/useLicense'
 interface ActiveFilter {
   column: string
   valueCount: number
-  values: string[]
+  values?: string[]
+  displayText?: string
+  isRange?: boolean
 }
 
 const props = defineProps<{
@@ -86,13 +88,26 @@ const filterSummary = computed(() => {
 const filterTooltipDetails = computed(() => {
   if (!props.activeFilters || props.activeFilters.length === 0) return []
   return props.activeFilters.map(f => {
+    // Handle range filters
+    if (f.isRange && f.displayText) {
+      return {
+        column: f.column,
+        displayText: f.displayText,
+        isRange: true,
+        values: [],
+        remaining: 0,
+      }
+    }
+    // Handle value filters
+    const values = f.values || []
     const maxDisplay = 5
-    const displayValues = f.values.slice(0, maxDisplay)
-    const remaining = f.values.length - maxDisplay
+    const displayValues = values.slice(0, maxDisplay)
+    const remaining = values.length - maxDisplay
     return {
       column: f.column,
       values: displayValues,
       remaining: remaining > 0 ? remaining : 0,
+      isRange: false,
     }
   })
 })
@@ -503,12 +518,19 @@ const dataColWidth = ref(80)
             <div v-for="filter in filterTooltipDetails" :key="filter.column" class="vpg-tooltip-filter">
               <div class="vpg-tooltip-column">{{ filter.column }}</div>
               <div class="vpg-tooltip-values">
-                <span v-for="(val, idx) in filter.values" :key="idx" class="vpg-tooltip-value">
-                  {{ val }}
-                </span>
-                <span v-if="filter.remaining > 0" class="vpg-tooltip-more">
-                  +{{ filter.remaining }} more
-                </span>
+                <!-- Range filter display -->
+                <template v-if="filter.isRange">
+                  <span class="vpg-tooltip-value vpg-range-value">{{ filter.displayText }}</span>
+                </template>
+                <!-- Value filter display -->
+                <template v-else>
+                  <span v-for="(val, idx) in filter.values" :key="idx" class="vpg-tooltip-value">
+                    {{ val }}
+                  </span>
+                  <span v-if="filter.remaining > 0" class="vpg-tooltip-more">
+                    +{{ filter.remaining }} more
+                  </span>
+                </template>
               </div>
             </div>
             <div v-if="filteredRowCount !== undefined && totalRowCount !== undefined" class="vpg-tooltip-summary">

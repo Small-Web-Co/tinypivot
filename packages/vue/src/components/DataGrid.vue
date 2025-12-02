@@ -139,11 +139,26 @@ const filteredDataForPivot = computed(() => {
 // Active filters info for display - use activeFilters from useExcelGrid
 const activeFilterInfo = computed(() => {
   if (activeFilters.value.length === 0) return null
-  return activeFilters.value.map(f => ({
-    column: f.column,
-    valueCount: f.values?.length || 0,
-    values: f.values || [],
-  }))
+  return activeFilters.value.map(f => {
+    if (f.type === 'range' && f.range) {
+      // Format range filter display
+      const parts = []
+      if (f.range.min !== null) parts.push(`≥ ${f.range.min}`)
+      if (f.range.max !== null) parts.push(`≤ ${f.range.max}`)
+      return {
+        column: f.column,
+        valueCount: 1,
+        displayText: parts.join(' and '),
+        isRange: true,
+      }
+    }
+    return {
+      column: f.column,
+      valueCount: f.values?.length || 0,
+      values: f.values || [],
+      isRange: false,
+    }
+  })
 })
 
 // Pivot table composable - uses filtered data

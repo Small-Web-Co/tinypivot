@@ -115,7 +115,7 @@ function getDiffContent(tag) {
 }
 
 // Extract meaningful feature changes from the diff
-function extractFeatures(diffContent) {
+function extractFeatures(diffContent, changedFiles) {
   const features = {
     newComponents: new Set(),
     newHooks: new Set(),
@@ -126,11 +126,43 @@ function extractFeatures(diffContent) {
     uiChanges: new Set()
   }
 
+  // Detect new components from NEW files (most reliable method)
+  for (const file of changedFiles) {
+    // New Vue component files
+    if (file.includes('components/') && file.endsWith('.vue')) {
+      const componentName = file.split('/').pop().replace('.vue', '')
+      if (componentName && /^[A-Z]/.test(componentName)) {
+        features.newComponents.add(componentName)
+      }
+    }
+    // New React component files
+    if (file.includes('components/') && file.endsWith('.tsx')) {
+      const componentName = file.split('/').pop().replace('.tsx', '')
+      if (componentName && /^[A-Z]/.test(componentName) && componentName !== 'index') {
+        features.newComponents.add(componentName)
+      }
+    }
+    // New hooks/composables
+    if ((file.includes('hooks/') || file.includes('composables/')) && (file.endsWith('.ts') || file.endsWith('.tsx'))) {
+      const hookName = file.split('/').pop().replace(/\.(ts|tsx)$/, '')
+      if (hookName && hookName.startsWith('use')) {
+        features.newHooks.add(hookName)
+      }
+    }
+  }
+
   const lines = diffContent.split('\n')
   let currentFile = ''
+  let isNewFile = false
 
   for (const line of lines) {
-    // Track current file
+    // Track current file and if it's new
+    if (line.startsWith('diff --git')) {
+      isNewFile = false
+    }
+    if (line.startsWith('new file mode')) {
+      isNewFile = true
+    }
     if (line.startsWith('+++ b/')) {
       currentFile = line.replace('+++ b/', '')
       continue
@@ -143,10 +175,16 @@ function extractFeatures(diffContent) {
     // Skip empty lines, imports, comments
     if (!added || added.startsWith('import ') || added.startsWith('//') || added.startsWith('*')) continue
 
-    // New React/Vue component definitions
-    const componentMatch = added.match(/(?:export\s+)?(?:const|function)\s+([A-Z][a-zA-Z0-9]+)\s*[=:(]/)
+    // React component definitions (export function ComponentName)
+    const componentMatch = added.match(/export\s+(?:default\s+)?function\s+([A-Z][a-zA-Z0-9]+)/)
     if (componentMatch && !componentMatch[1].match(/^(React|Vue|Props|Type|Interface)/)) {
       features.newComponents.add(componentMatch[1])
+    }
+
+    // React arrow function components (export const ComponentName = )
+    const arrowComponentMatch = added.match(/export\s+(?:default\s+)?const\s+([A-Z][a-zA-Z0-9]+)\s*[=:]/)
+    if (arrowComponentMatch && !arrowComponentMatch[1].match(/^(React|Vue|Props|Type|Interface)/)) {
+      features.newComponents.add(arrowComponentMatch[1])
     }
 
     // New hooks (React) or composables (Vue)
@@ -161,10 +199,19 @@ function extractFeatures(diffContent) {
       features.newTypes.add(typeMatch[1])
     }
 
-    // New props in interfaces (looking for property definitions)
-    const propMatch = added.match(/^\s*([a-z][a-zA-Z0-9]+)\??:\s*/)
-    if (propMatch && currentFile.includes('types')) {
+    // Props in type files or component interfaces
+    const isTypeFile = currentFile.includes('types') || currentFile.includes('Props')
+    const propMatch = added.match(/^\s*([a-z][a-zA-Z0-9]+)\??:\s*(?:string|number|boolean|any|\[|{|Record|Array)/)
+    if (propMatch && isTypeFile) {
       features.newProps.add(propMatch[1])
+    }
+
+    // Vue defineProps - extract prop names
+    if (added.includes('defineProps<{') || (currentFile.endsWith('.vue') && added.match(/^\s+[a-z][a-zA-Z0-9]+\??:/))) {
+      const vuePropMatch = added.match(/^\s+([a-z][a-zA-Z0-9]+)\??:/)
+      if (vuePropMatch) {
+        features.newProps.add(vuePropMatch[1])
+      }
     }
 
     // New CSS classes (significant ones, not utilities)
@@ -173,18 +220,19 @@ function extractFeatures(diffContent) {
       features.newCssClasses.add(cssClassMatch[1])
     }
 
-    // New exports
+    // New exports from index files
     const exportMatch = added.match(/export\s+\{\s*([^}]+)\s*\}/)
     if (exportMatch) {
       exportMatch[1].split(',').forEach(e => {
         const name = e.trim().split(' ')[0]
-        if (name && name.length > 2) features.newExports.add(name)
+        if (name && name.length > 2 && /^[A-Z]/.test(name)) {
+          features.newComponents.add(name)
+        }
       })
     }
 
     // UI-related changes (detecting specific patterns)
     if (added.includes('className=') || added.includes(':class=') || added.includes('class="')) {
-      // Extract meaningful class names that indicate features
       const uiMatch = added.match(/(?:filter|modal|dropdown|tooltip|skeleton|grid|pivot|column|row|header|footer|toolbar)/i)
       if (uiMatch) {
         features.uiChanges.add(uiMatch[0].toLowerCase())
@@ -509,7 +557,7 @@ async function main() {
   const diffContent = getDiffContent(previousTag)
   console.log(`   Diff size: ${diffContent.length} characters`)
   
-  const features = extractFeatures(diffContent)
+  const features = extractFeatures(diffContent, changedFiles)
   const featureSummary = generateFeatureSummary(features)
   
   if (featureSummary.length > 0) {

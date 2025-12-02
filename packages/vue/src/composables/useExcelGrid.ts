@@ -143,12 +143,29 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   const filteredRowCount = computed(() => table.getFilteredRowModel().rows.length)
   const totalRowCount = computed(() => data.value.length)
 
-  // Active filters
+  // Active filters (handles both array values and numeric ranges)
   const activeFilters = computed(() => {
-    return columnFilters.value.map(f => ({
-      column: f.id,
-      values: f.value as string[],
-    }))
+    return columnFilters.value.map(f => {
+      const filterValue = f.value as ColumnFilterValue | undefined
+      
+      // Handle numeric range
+      if (filterValue && isNumericRange(filterValue)) {
+        return {
+          column: f.id,
+          type: 'range' as const,
+          range: filterValue,
+          values: [] as string[],
+        }
+      }
+      
+      // Handle value array
+      return {
+        column: f.id,
+        type: 'values' as const,
+        values: Array.isArray(filterValue) ? filterValue : [],
+        range: null as NumericRange | null,
+      }
+    })
   })
 
   // Check if column has active filter (handles both array and numeric range)
