@@ -2,7 +2,7 @@
  * Excel-like Grid Hook for React
  * Provides Excel-like filtering, sorting, and data manipulation functionality
  */
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -60,6 +60,11 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   // Column statistics cache
   const [columnStatsCache, setColumnStatsCache] = useState<Record<string, ColumnStats>>({})
 
+  const dataSignature = useMemo(
+    () => `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    [data]
+  )
+
   // Compute columns from data
   const columnKeys = useMemo(() => {
     if (data.length === 0) return []
@@ -69,7 +74,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   // Get column stats (memoized)
   const getColumnStats = useCallback(
     (columnKey: string): ColumnStats => {
-      const cacheKey = `${columnKey}-${data.length}`
+      const cacheKey = `${columnKey}-${dataSignature}`
       if (!columnStatsCache[cacheKey]) {
         const stats = getColumnUniqueValues(data, columnKey)
         setColumnStatsCache(prev => ({ ...prev, [cacheKey]: stats }))
@@ -77,13 +82,17 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
       }
       return columnStatsCache[cacheKey]
     },
-    [data, columnStatsCache]
+    [data, columnStatsCache, dataSignature]
   )
 
   // Clear stats cache
   const clearStatsCache = useCallback(() => {
     setColumnStatsCache({})
   }, [])
+
+  useEffect(() => {
+    clearStatsCache()
+  }, [dataSignature, clearStatsCache])
 
   // Create column definitions dynamically
   const columnDefs = useMemo<ColumnDef<T, unknown>[]>(() => {

@@ -229,6 +229,7 @@
   width: 200px;
 }
 
+.vpg-search-input:focus { outline: none; border: none; box-shadow: none; }
 .vpg-search-input::placeholder { color: #94a3b8; }
 
 .vpg-search-clear {
