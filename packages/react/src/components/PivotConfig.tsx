@@ -5,7 +5,6 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import type { AggregationFunction, PivotValueField, FieldStats, CalculatedField } from '@smallwebco/tinypivot-core'
 import { AGGREGATION_OPTIONS, getAggregationSymbol } from '@smallwebco/tinypivot-core'
-import { useLicense } from '../hooks/useLicense'
 import { CalculatedFieldModal } from './CalculatedFieldModal'
 
 // Extended field stats for calculated fields
@@ -79,7 +78,6 @@ export function PivotConfig({
   onRemoveCalculatedField,
   onUpdateCalculatedField,
 }: PivotConfigProps) {
-  const { showWatermark } = useLicense()
   const [fieldSearch, setFieldSearch] = useState('')
   const [showCalcModal, setShowCalcModal] = useState(false)
   const [editingCalcField, setEditingCalcField] = useState<CalculatedField | null>(null)
@@ -465,15 +463,6 @@ export function PivotConfig({
           <span>+ Calc</span>
         </button>
       </div>
-
-      {/* Watermark */}
-      {showWatermark && (
-        <div className="vpg-watermark">
-          <a href="https://tiny-pivot.com" target="_blank" rel="noopener noreferrer">
-            TinyPivot
-          </a>
-        </div>
-      )}
 
       {/* Calculated Field Modal */}
       <CalculatedFieldModal

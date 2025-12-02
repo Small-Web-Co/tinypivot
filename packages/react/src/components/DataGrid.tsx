@@ -148,6 +148,7 @@ export function DataGrid({
     valueFields: pivotValueFields,
     showRowTotals: pivotShowRowTotals,
     showColumnTotals: pivotShowColumnTotals,
+    calculatedFields: pivotCalculatedFields,
     availableFields: pivotAvailableFields,
     isConfigured: pivotIsConfigured,
     pivotResult,
@@ -164,6 +165,8 @@ export function DataGrid({
     setShowColumnTotals: setPivotShowColumnTotals,
     setRowFields,
     setColumnFields,
+    addCalculatedField,
+    removeCalculatedField,
   } = usePivotTable(filteredDataForPivot)
 
   // Active filters info for display
@@ -1075,6 +1078,7 @@ export function DataGrid({
                 valueFields={pivotValueFields}
                 showRowTotals={pivotShowRowTotals}
                 showColumnTotals={pivotShowColumnTotals}
+                calculatedFields={pivotCalculatedFields}
                 onShowRowTotalsChange={setPivotShowRowTotals}
                 onShowColumnTotalsChange={setPivotShowColumnTotals}
                 onClearConfig={clearPivotConfig}
@@ -1088,6 +1092,9 @@ export function DataGrid({
                 onRemoveColumnField={removeColumnField}
                 onAddValueField={addValueField}
                 onRemoveValueField={removeValueField}
+                onAddCalculatedField={addCalculatedField}
+                onRemoveCalculatedField={removeCalculatedField}
+                onUpdateCalculatedField={addCalculatedField}
               />
             </div>
           )}
