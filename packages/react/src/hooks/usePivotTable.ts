@@ -264,7 +264,9 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
 
   // Calculated field management
   const addCalculatedField = useCallback((field: CalculatedField) => {
+    console.log('[usePivotTable] addCalculatedField called with:', field)
     setCalculatedFields(prev => {
+      console.log('[usePivotTable] Previous calculatedFields:', prev)
       const existing = prev.findIndex(f => f.id === field.id)
       let updated: CalculatedField[]
       if (existing >= 0) {
@@ -272,6 +274,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
       } else {
         updated = [...prev, field]
       }
+      console.log('[usePivotTable] Updated calculatedFields:', updated)
       saveCalculatedFields(updated)
       return updated
     })
