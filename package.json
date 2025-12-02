@@ -1,6 +1,6 @@
 {
   "name": "tinypivot-monorepo",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "description": "TinyPivot Monorepo - Excel-like data grid and pivot table components for Vue 3 and React",
   "type": "module",
