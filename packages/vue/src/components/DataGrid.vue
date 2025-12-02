@@ -1731,12 +1731,13 @@ function handleContainerClick(event: MouseEvent) {
   border-right: none;
 }
 
+.vpg-cell:hover {
+  box-shadow: inset 0 0 0 2px rgba(129, 140, 248, 0.4);
+}
+
 .vpg-cell.vpg-selected {
   background: rgba(224, 231, 255, 0.8);
-  outline: 2px solid #818cf8;
-  outline-offset: -2px;
-  position: relative;
-  z-index: 1;
+  box-shadow: inset 0 0 0 2px #818cf8;
 }
 
 .vpg-cell.vpg-is-number {
@@ -1839,33 +1840,33 @@ function handleContainerClick(event: MouseEvent) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  background: #eef2ff;
-  border-radius: 0.375rem;
-  border: 1px solid #c7d2fe;
+  padding: 0.125rem 0.5rem;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 0.25rem;
+  border: 1px solid rgba(99, 102, 241, 0.15);
 }
 
 .vpg-stat {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.25rem;
 }
 
 .vpg-stat-label {
-  font-size: 0.75rem;
-  color: #4f46e5;
-  font-weight: 500;
+  font-size: 0.6875rem;
+  color: #64748b;
+  font-weight: 400;
 }
 
 .vpg-stat-value {
-  font-size: 0.75rem;
-  color: #1e1b4b;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  color: #6366f1;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .vpg-stat-divider {
-  color: #c7d2fe;
+  color: #cbd5e1;
 }
 
 .vpg-watermark-inline a {
@@ -2292,9 +2293,13 @@ function handleContainerClick(event: MouseEvent) {
   border-color: #334155;
 }
 
+.vpg-theme-dark .vpg-cell:hover {
+  box-shadow: inset 0 0 0 2px rgba(129, 140, 248, 0.5);
+}
+
 .vpg-theme-dark .vpg-cell.vpg-selected {
   background: rgba(99, 102, 241, 0.3);
-  outline-color: #818cf8;
+  box-shadow: inset 0 0 0 2px #818cf8;
 }
 
 .vpg-theme-dark .vpg-footer {
@@ -2307,20 +2312,20 @@ function handleContainerClick(event: MouseEvent) {
 }
 
 .vpg-theme-dark .vpg-selection-stats {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.2);
 }
 
 .vpg-theme-dark .vpg-stat-label {
-  color: #a5b4fc;
+  color: #94a3b8;
 }
 
 .vpg-theme-dark .vpg-stat-value {
-  color: #e0e7ff;
+  color: #a5b4fc;
 }
 
 .vpg-theme-dark .vpg-stat-divider {
-  color: rgba(99, 102, 241, 0.4);
+  color: #475569;
 }
 
 .vpg-theme-dark .vpg-search-box {

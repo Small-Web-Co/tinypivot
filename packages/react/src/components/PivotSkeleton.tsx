@@ -2,7 +2,7 @@
  * Pivot Table Skeleton + Data Display for React
  * Visual layout for pivot configuration and results
  */
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import type { AggregationFunction, CalculatedField, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
 import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { useLicense } from '../hooks/useLicense'
@@ -95,6 +95,67 @@ export function PivotSkeleton({
     }
   }, [sortTarget])
 
+  // Selection state for cell selection and copy
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null)
+  const [selectionStart, setSelectionStart] = useState<{ row: number; col: number } | null>(null)
+  const [selectionEnd, setSelectionEnd] = useState<{ row: number; col: number } | null>(null)
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [showCopyToast, setShowCopyToast] = useState(false)
+  const [copyToastMessage, setCopyToastMessage] = useState('')
+
+  const selectionBounds = useMemo(() => {
+    if (!selectionStart || !selectionEnd) return null
+    return {
+      minRow: Math.min(selectionStart.row, selectionEnd.row),
+      maxRow: Math.max(selectionStart.row, selectionEnd.row),
+      minCol: Math.min(selectionStart.col, selectionEnd.col),
+      maxCol: Math.max(selectionStart.col, selectionEnd.col),
+    }
+  }, [selectionStart, selectionEnd])
+
+  const handleCellMouseDown = useCallback(
+    (rowIndex: number, colIndex: number, event: React.MouseEvent) => {
+      event.preventDefault()
+      
+      if (event.shiftKey && selectedCell) {
+        setSelectionEnd({ row: rowIndex, col: colIndex })
+      } else {
+        setSelectedCell({ row: rowIndex, col: colIndex })
+        setSelectionStart({ row: rowIndex, col: colIndex })
+        setSelectionEnd({ row: rowIndex, col: colIndex })
+        setIsSelecting(true)
+      }
+    },
+    [selectedCell]
+  )
+
+  const handleCellMouseEnter = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      if (isSelecting) {
+        setSelectionEnd({ row: rowIndex, col: colIndex })
+      }
+    },
+    [isSelecting]
+  )
+
+  const isCellSelected = useCallback(
+    (rowIndex: number, colIndex: number): boolean => {
+      if (!selectionBounds) {
+        return selectedCell?.row === rowIndex && selectedCell?.col === colIndex
+      }
+      const { minRow, maxRow, minCol, maxCol } = selectionBounds
+      return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
+    },
+    [selectionBounds, selectedCell]
+  )
+
+  // Mouse up handler
+  useEffect(() => {
+    const handleMouseUp = () => setIsSelecting(false)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => document.removeEventListener('mouseup', handleMouseUp)
+  }, [])
+
   // Sorted row indices
   const sortedRowIndices = useMemo(() => {
     if (!pivotResult) return []
@@ -126,6 +187,99 @@ export function PivotSkeleton({
 
     return indices
   }, [pivotResult, sortTarget, sortDirection])
+
+  // Copy selection to clipboard
+  const copySelectionToClipboard = useCallback(() => {
+    if (!selectionBounds || !pivotResult) return
+    
+    const { minRow, maxRow, minCol, maxCol } = selectionBounds
+    const lines: string[] = []
+    
+    for (let r = minRow; r <= maxRow; r++) {
+      const sortedIdx = sortedRowIndices[r]
+      if (sortedIdx === undefined) continue
+      
+      const rowValues: string[] = []
+      for (let c = minCol; c <= maxCol; c++) {
+        const cell = pivotResult.data[sortedIdx]?.[c]
+        rowValues.push(cell?.formattedValue ?? '')
+      }
+      lines.push(rowValues.join('\t'))
+    }
+    
+    const text = lines.join('\n')
+    
+    navigator.clipboard.writeText(text).then(() => {
+      const cellCount = (maxRow - minRow + 1) * (maxCol - minCol + 1)
+      setCopyToastMessage(`Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`)
+      setShowCopyToast(true)
+      setTimeout(() => setShowCopyToast(false), 2000)
+    }).catch(err => {
+      console.error('Copy failed:', err)
+    })
+  }, [selectionBounds, pivotResult, sortedRowIndices])
+
+  // Keyboard handler for copy
+  useEffect(() => {
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (!selectionBounds) return
+      
+      if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+        event.preventDefault()
+        copySelectionToClipboard()
+        return
+      }
+      
+      if (event.key === 'Escape') {
+        setSelectedCell(null)
+        setSelectionStart(null)
+        setSelectionEnd(null)
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeydown)
+    return () => document.removeEventListener('keydown', handleKeydown)
+  }, [selectionBounds, copySelectionToClipboard])
+
+  // Selection statistics for footer
+  const selectionStats = useMemo(() => {
+    if (!selectionBounds || !pivotResult) return null
+    
+    const { minRow, maxRow, minCol, maxCol } = selectionBounds
+    const values: number[] = []
+    let count = 0
+    
+    for (let r = minRow; r <= maxRow; r++) {
+      const sortedIdx = sortedRowIndices[r]
+      if (sortedIdx === undefined) continue
+      
+      for (let c = minCol; c <= maxCol; c++) {
+        const cell = pivotResult.data[sortedIdx]?.[c]
+        count++
+        if (cell?.value !== null && cell?.value !== undefined && typeof cell.value === 'number') {
+          values.push(cell.value)
+        }
+      }
+    }
+    
+    if (count <= 1) return null
+    
+    const sum = values.reduce((a, b) => a + b, 0)
+    const avg = values.length > 0 ? sum / values.length : 0
+    
+    return {
+      count,
+      numericCount: values.length,
+      sum,
+      avg,
+    }
+  }, [selectionBounds, pivotResult, sortedRowIndices])
+
+  const formatStatValue = useCallback((val: number): string => {
+    if (Math.abs(val) >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`
+    if (Math.abs(val) >= 1_000) return `${(val / 1_000).toFixed(2)}K`
+    return val.toFixed(2)
+  }, [])
 
   // Column headers
   const columnHeaderCells = useMemo(() => {
@@ -320,6 +474,16 @@ export function PivotSkeleton({
     <div
       className={`vpg-pivot-skeleton vpg-font-${currentFontSize} ${draggingField ? 'vpg-is-dragging' : ''}`}
     >
+      {/* Copy Toast */}
+      {showCopyToast && (
+        <div className="vpg-toast">
+          <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          {copyToastMessage}
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="vpg-skeleton-header">
         <div className="vpg-skeleton-title">
@@ -635,14 +799,19 @@ export function PivotSkeleton({
                         ))}
                       </th>
 
-                      {pivotResult.data[sortedIdx].map((cell, colIdx) => (
-                        <td
-                          key={colIdx}
-                          className={`vpg-data-cell ${cell.value === null ? 'vpg-is-null' : ''}`}
-                        >
-                          {cell.formattedValue}
-                        </td>
-                      ))}
+                      {pivotResult.data[sortedIdx].map((cell, colIdx) => {
+                        const displayRowIdx = sortedRowIndices.indexOf(sortedIdx)
+                        return (
+                          <td
+                            key={colIdx}
+                            className={`vpg-data-cell ${isCellSelected(displayRowIdx, colIdx) ? 'selected' : ''} ${cell.value === null ? 'vpg-is-null' : ''}`}
+                            onMouseDown={e => handleCellMouseDown(displayRowIdx, colIdx, e)}
+                            onMouseEnter={() => handleCellMouseEnter(displayRowIdx, colIdx)}
+                          >
+                            {cell.formattedValue}
+                          </td>
+                        )
+                      })}
 
                       {pivotResult.rowTotals[sortedIdx] && (
                         <td className="vpg-data-cell vpg-total-cell">
@@ -675,9 +844,32 @@ export function PivotSkeleton({
           {/* Footer */}
           {isConfigured && pivotResult && (
             <div className="vpg-skeleton-footer">
-              <span>
+              <span className="vpg-footer-info">
                 {pivotResult.rowHeaders.length} rows × {pivotResult.data[0]?.length || 0} columns
               </span>
+              
+              {selectionStats && selectionStats.count > 1 && (
+                <div className="vpg-selection-stats">
+                  <span className="vpg-stat">
+                    <span className="vpg-stat-label">Count:</span>
+                    <span className="vpg-stat-value">{selectionStats.count}</span>
+                  </span>
+                  {selectionStats.numericCount > 0 && (
+                    <>
+                      <span className="vpg-stat-divider">|</span>
+                      <span className="vpg-stat">
+                        <span className="vpg-stat-label">Sum:</span>
+                        <span className="vpg-stat-value">{formatStatValue(selectionStats.sum)}</span>
+                      </span>
+                      <span className="vpg-stat-divider">|</span>
+                      <span className="vpg-stat">
+                        <span className="vpg-stat-label">Avg:</span>
+                        <span className="vpg-stat-value">{formatStatValue(selectionStats.avg)}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </>

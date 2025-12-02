@@ -3,7 +3,7 @@
  * Pivot Table Skeleton + Data Display
  * Visual layout for pivot configuration and results
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import type { AggregationFunction, PivotResult, PivotValueField, CalculatedField } from '@smallwebco/tinypivot-core'
 import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { useLicense } from '../composables/useLicense'
@@ -189,14 +189,152 @@ const columnHeaderCells = computed(() => {
   return result
 })
 
-// Selection for copy support
+// Selection for copy support with drag
 const selectedCell = ref<{ row: number, col: number } | null>(null)
-function handleCellClick(rowIndex: number, colIndex: number) {
-  selectedCell.value = { row: rowIndex, col: colIndex }
+const selectionStart = ref<{ row: number, col: number } | null>(null)
+const selectionEnd = ref<{ row: number, col: number } | null>(null)
+const isSelecting = ref(false)
+const showCopyToast = ref(false)
+const copyToastMessage = ref('')
+
+const selectionBounds = computed(() => {
+  if (!selectionStart.value || !selectionEnd.value) return null
+  return {
+    minRow: Math.min(selectionStart.value.row, selectionEnd.value.row),
+    maxRow: Math.max(selectionStart.value.row, selectionEnd.value.row),
+    minCol: Math.min(selectionStart.value.col, selectionEnd.value.col),
+    maxCol: Math.max(selectionStart.value.col, selectionEnd.value.col),
+  }
+})
+
+function handleCellMouseDown(rowIndex: number, colIndex: number, event: MouseEvent) {
+  event.preventDefault()
+  
+  if (event.shiftKey && selectedCell.value) {
+    selectionEnd.value = { row: rowIndex, col: colIndex }
+  } else {
+    selectedCell.value = { row: rowIndex, col: colIndex }
+    selectionStart.value = { row: rowIndex, col: colIndex }
+    selectionEnd.value = { row: rowIndex, col: colIndex }
+    isSelecting.value = true
+  }
 }
+
+function handleCellMouseEnter(rowIndex: number, colIndex: number) {
+  if (isSelecting.value) {
+    selectionEnd.value = { row: rowIndex, col: colIndex }
+  }
+}
+
+function handleMouseUp() {
+  isSelecting.value = false
+}
+
 function isCellSelected(rowIndex: number, colIndex: number): boolean {
-  return selectedCell.value?.row === rowIndex && selectedCell.value?.col === colIndex
+  if (!selectionBounds.value) {
+    return selectedCell.value?.row === rowIndex && selectedCell.value?.col === colIndex
+  }
+  const { minRow, maxRow, minCol, maxCol } = selectionBounds.value
+  return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
 }
+
+function copySelectionToClipboard() {
+  if (!selectionBounds.value || !props.pivotResult) return
+  
+  const { minRow, maxRow, minCol, maxCol } = selectionBounds.value
+  const lines: string[] = []
+  
+  for (let r = minRow; r <= maxRow; r++) {
+    const sortedIdx = sortedRowIndices.value[r]
+    if (sortedIdx === undefined) continue
+    
+    const rowValues: string[] = []
+    for (let c = minCol; c <= maxCol; c++) {
+      const cell = props.pivotResult.data[sortedIdx]?.[c]
+      rowValues.push(cell?.formattedValue ?? '')
+    }
+    lines.push(rowValues.join('\t'))
+  }
+  
+  const text = lines.join('\n')
+  
+  navigator.clipboard.writeText(text).then(() => {
+    const cellCount = (maxRow - minRow + 1) * (maxCol - minCol + 1)
+    copyToastMessage.value = `Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`
+    showCopyToast.value = true
+    setTimeout(() => { showCopyToast.value = false }, 2000)
+  }).catch(err => {
+    console.error('Copy failed:', err)
+  })
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  // Only handle if pivot has focus or selection
+  if (!selectionBounds.value) return
+  
+  if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+    event.preventDefault()
+    copySelectionToClipboard()
+    return
+  }
+  
+  if (event.key === 'Escape') {
+    selectedCell.value = null
+    selectionStart.value = null
+    selectionEnd.value = null
+  }
+}
+
+// Selection statistics for the footer
+const selectionStats = computed(() => {
+  if (!selectionBounds.value || !props.pivotResult) return null
+  
+  const { minRow, maxRow, minCol, maxCol } = selectionBounds.value
+  const values: number[] = []
+  let count = 0
+  
+  for (let r = minRow; r <= maxRow; r++) {
+    const sortedIdx = sortedRowIndices.value[r]
+    if (sortedIdx === undefined) continue
+    
+    for (let c = minCol; c <= maxCol; c++) {
+      const cell = props.pivotResult.data[sortedIdx]?.[c]
+      count++
+      if (cell?.value !== null && cell?.value !== undefined && typeof cell.value === 'number') {
+        values.push(cell.value)
+      }
+    }
+  }
+  
+  if (count <= 1) return null
+  
+  const sum = values.reduce((a, b) => a + b, 0)
+  const avg = values.length > 0 ? sum / values.length : 0
+  
+  return {
+    count,
+    numericCount: values.length,
+    sum,
+    avg,
+  }
+})
+
+function formatStatValue(val: number): string {
+  if (Math.abs(val) >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`
+  if (Math.abs(val) >= 1_000) return `${(val / 1_000).toFixed(2)}K`
+  return val.toFixed(2)
+}
+
+// Lifecycle hooks for event listeners
+onMounted(() => {
+  document.addEventListener('mouseup', handleMouseUp)
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mouseup', handleMouseUp)
+  document.removeEventListener('keydown', handleKeydown)
+})
 
 // Drag handlers
 function handleDragOver(area: 'row' | 'column' | 'value', event: DragEvent) {
@@ -322,6 +460,16 @@ const dataColWidth = ref(80)
       { 'vpg-is-dragging': draggingField },
     ]"
   >
+    <!-- Copy Toast -->
+    <Transition name="vpg-toast">
+      <div v-if="showCopyToast" class="vpg-toast">
+        <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        {{ copyToastMessage }}
+      </div>
+    </Transition>
+
     <!-- Header Bar -->
     <div class="vpg-skeleton-header">
       <div class="vpg-skeleton-title">
@@ -587,11 +735,12 @@ const dataColWidth = ref(80)
                 :key="colIdx"
                 class="vpg-data-cell"
                 :class="[
-                  isCellSelected(sortedIdx, colIdx) && 'selected',
+                  isCellSelected(sortedRowIndices.indexOf(sortedIdx), colIdx) && 'selected',
                   cell.value === null && 'vpg-is-null',
                 ]"
                 :style="{ width: `${dataColWidth}px` }"
-                @click="handleCellClick(sortedIdx, colIdx)"
+                @mousedown="handleCellMouseDown(sortedRowIndices.indexOf(sortedIdx), colIdx, $event)"
+                @mouseenter="handleCellMouseEnter(sortedRowIndices.indexOf(sortedIdx), colIdx)"
               >
                 {{ cell.formattedValue }}
               </td>
@@ -623,7 +772,26 @@ const dataColWidth = ref(80)
 
       <!-- Footer -->
       <div v-if="isConfigured && pivotResult" class="vpg-skeleton-footer">
-        <span>{{ pivotResult.rowHeaders.length }} rows × {{ pivotResult.data[0]?.length || 0 }} columns</span>
+        <span class="vpg-footer-info">{{ pivotResult.rowHeaders.length }} rows × {{ pivotResult.data[0]?.length || 0 }} columns</span>
+        
+        <div v-if="selectionStats && selectionStats.count > 1" class="vpg-selection-stats">
+          <span class="vpg-stat">
+            <span class="vpg-stat-label">Count:</span>
+            <span class="vpg-stat-value">{{ selectionStats.count }}</span>
+          </span>
+          <template v-if="selectionStats.numericCount > 0">
+            <span class="vpg-stat-divider">|</span>
+            <span class="vpg-stat">
+              <span class="vpg-stat-label">Sum:</span>
+              <span class="vpg-stat-value">{{ formatStatValue(selectionStats.sum) }}</span>
+            </span>
+            <span class="vpg-stat-divider">|</span>
+            <span class="vpg-stat">
+              <span class="vpg-stat-label">Avg:</span>
+              <span class="vpg-stat-value">{{ formatStatValue(selectionStats.avg) }}</span>
+            </span>
+          </template>
+        </div>
       </div>
     </template>
 
@@ -1331,12 +1499,13 @@ const dataColWidth = ref(80)
   white-space: nowrap;
 }
 
+.vpg-data-cell:hover {
+  box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.4);
+}
+
 .vpg-data-cell.selected {
   background: #d1fae5;
-  outline: 2px solid #10b981;
-  outline-offset: -2px;
-  position: relative;
-  z-index: 1;
+  box-shadow: inset 0 0 0 2px #10b981;
 }
 
 .vpg-data-cell.vpg-is-null {
@@ -1388,6 +1557,7 @@ const dataColWidth = ref(80)
 .vpg-skeleton-footer {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   font-size: 0.75rem;
@@ -1395,6 +1565,42 @@ const dataColWidth = ref(80)
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
+}
+
+.vpg-skeleton-footer .vpg-footer-info {
+  color: #94a3b8;
+}
+
+.vpg-skeleton-footer .vpg-selection-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 0.25rem;
+  font-size: 0.6875rem;
+}
+
+.vpg-skeleton-footer .vpg-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.vpg-skeleton-footer .vpg-stat-label {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.vpg-skeleton-footer .vpg-stat-value {
+  color: #10b981;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.vpg-skeleton-footer .vpg-stat-divider {
+  color: #cbd5e1;
 }
 
 /* Watermark */
@@ -1473,6 +1679,35 @@ const dataColWidth = ref(80)
 
 .vpg-table-container::-webkit-scrollbar-corner {
   background: #f1f5f9;
+}
+
+/* Toast notification */
+.vpg-pivot-skeleton .vpg-toast {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #10b981;
+  color: white;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  z-index: 100;
+}
+
+.vpg-toast-enter-active,
+.vpg-toast-leave-active {
+  transition: all 0.2s ease;
+}
+
+.vpg-toast-enter-from,
+.vpg-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-0.5rem);
 }
 
 </style>
@@ -1705,6 +1940,15 @@ const dataColWidth = ref(80)
   color: #cbd5e1;
 }
 
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell:hover {
+  box-shadow: inset 0 0 0 2px rgba(52, 211, 153, 0.5);
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell.selected {
+  background: rgba(16, 185, 129, 0.2);
+  box-shadow: inset 0 0 0 2px #34d399;
+}
+
 .vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:nth-child(even) .vpg-row-header-cell,
 .vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:nth-child(even) .vpg-data-cell {
   background: #0f172a;
@@ -1759,6 +2003,27 @@ const dataColWidth = ref(80)
   background: #0f172a;
   border-color: #334155;
   color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-skeleton-footer .vpg-footer-info {
+  color: #64748b;
+}
+
+.vpg-theme-dark .vpg-skeleton-footer .vpg-selection-stats {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.vpg-theme-dark .vpg-skeleton-footer .vpg-stat-label {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-skeleton-footer .vpg-stat-value {
+  color: #34d399;
+}
+
+.vpg-theme-dark .vpg-skeleton-footer .vpg-stat-divider {
+  color: #475569;
 }
 
 .vpg-theme-dark .vpg-demo-bar {
