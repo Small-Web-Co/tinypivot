@@ -151,10 +151,38 @@ export function configureLicenseSecret(secret: string): void {
   (globalThis as Record<string, unknown>).__TP_LICENSE_SECRET__ = secret
 }
 
+// Hardcoded SHA-256 hash of the demo secret
+const DEMO_SECRET_HASH = 'A48AA0618518D3E62F31FCFCA2DD2B86E7FE0863E2F90756FB0A960AE7A51583'
+
 /**
- * Get demo mode license info
+ * Hash a string using SHA-256 (async for Web Crypto API)
  */
-export function getDemoLicenseInfo(): LicenseInfo {
+async function hashSecret(secret: string): Promise<string> {
+  try {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(secret)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Validate demo secret and return demo license info if valid
+ * Returns null if secret is invalid
+ */
+export async function getDemoLicenseInfo(secret?: string): Promise<LicenseInfo | null> {
+  if (!secret) {
+    return null
+  }
+  
+  const hash = await hashSecret(secret)
+  if (hash !== DEMO_SECRET_HASH) {
+    return null
+  }
+  
   return DEMO_LICENSE
 }
 

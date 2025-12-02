@@ -168,24 +168,57 @@ export async function setLicenseKey(key: string): Promise<void> {
   }
 }
 
+const DEMO_LICENSE: LicenseInfo = {
+  type: 'free',
+  isValid: true,
+  features: {
+    pivot: true,
+    advancedAggregations: true,
+    percentageMode: true,
+    sessionPersistence: true,
+    noWatermark: false, // Still show watermark in demo
+  },
+}
+
+// Hardcoded SHA-256 hash of the demo secret
+const DEMO_SECRET_HASH = 'A48AA0618518D3E62F31FCFCA2DD2B86E7FE0863E2F90756FB0A960AE7A51583'
+
+/**
+ * Hash a string using SHA-256
+ */
+async function hashSecret(secret: string): Promise<string> {
+  try {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(secret)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Enable demo mode - unlocks all features for evaluation
- * Shows "Demo Mode" watermark instead of license required
+ * Requires the correct demo secret
+ * Shows "Demo Mode" watermark
  */
-export function enableDemoMode(): void {
-  demoMode.value = true
-  licenseInfo.value = {
-    type: 'free',
-    isValid: true,
-    features: {
-      pivot: true,
-      advancedAggregations: true,
-      percentageMode: true,
-      sessionPersistence: true,
-      noWatermark: false, // Still show watermark in demo
-    },
+export async function enableDemoMode(secret: string): Promise<boolean> {
+  if (!secret) {
+    console.warn('[TinyPivot] Demo mode activation failed - invalid secret')
+    return false
   }
+  
+  const hash = await hashSecret(secret)
+  if (hash !== DEMO_SECRET_HASH) {
+    console.warn('[TinyPivot] Demo mode activation failed - invalid secret')
+    return false
+  }
+  
+  demoMode.value = true
+  licenseInfo.value = DEMO_LICENSE
   console.info('[TinyPivot] Demo mode enabled - all Pro features unlocked for evaluation')
+  return true
 }
 
 /**

@@ -2,8 +2,11 @@
 import { ref, computed } from 'vue'
 import { DataGrid, enableDemoMode } from 'tinypivot'
 
-// Enable demo mode for the live demo
-enableDemoMode()
+// Enable demo mode for the live demo (secret via env var)
+const demoSecret = import.meta.env.VITE_DEMO_SECRET as string
+if (demoSecret) {
+  enableDemoMode(demoSecret)
+}
 
 // Framework toggle
 const selectedFramework = ref<'vue' | 'react'>('vue')

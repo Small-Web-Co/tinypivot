@@ -153,6 +153,22 @@ export function PivotSkeleton({
     return activeFilters.map(f => f.column).join(', ')
   }, [activeFilters])
 
+  // Detailed filter tooltip
+  const [showFilterTooltip, setShowFilterTooltip] = useState(false)
+  const filterTooltipDetails = useMemo(() => {
+    if (!activeFilters || activeFilters.length === 0) return []
+    return activeFilters.map(f => {
+      const maxDisplay = 5
+      const displayValues = f.values.slice(0, maxDisplay)
+      const remaining = f.values.length - maxDisplay
+      return {
+        column: f.column,
+        values: displayValues,
+        remaining: remaining > 0 ? remaining : 0,
+      }
+    })
+  }, [activeFilters])
+
   // Drag handlers
   const handleDragOver = useCallback(
     (area: 'row' | 'column' | 'value', event: React.DragEvent) => {
@@ -303,7 +319,11 @@ export function PivotSkeleton({
 
         <div className="vpg-header-right">
           {hasActiveFilters && (
-            <div className="vpg-filter-indicator">
+            <div
+              className="vpg-filter-indicator"
+              onMouseEnter={() => setShowFilterTooltip(true)}
+              onMouseLeave={() => setShowFilterTooltip(false)}
+            >
               <svg
                 className="vpg-filter-icon"
                 fill="none"
@@ -325,6 +345,33 @@ export function PivotSkeleton({
                   </span>
                 )}
               </span>
+
+              {/* Tooltip */}
+              {showFilterTooltip && (
+                <div className="vpg-filter-tooltip">
+                  <div className="vpg-tooltip-header">Active Filters</div>
+                  {filterTooltipDetails.map(filter => (
+                    <div key={filter.column} className="vpg-tooltip-filter">
+                      <div className="vpg-tooltip-column">{filter.column}</div>
+                      <div className="vpg-tooltip-values">
+                        {filter.values.map((val, idx) => (
+                          <span key={idx} className="vpg-tooltip-value">
+                            {val}
+                          </span>
+                        ))}
+                        {filter.remaining > 0 && (
+                          <span className="vpg-tooltip-more">+{filter.remaining} more</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {filteredRowCount !== undefined && totalRowCount !== undefined && (
+                    <div className="vpg-tooltip-summary">
+                      Showing {filteredRowCount.toLocaleString()} of {totalRowCount.toLocaleString()} rows
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

@@ -40,13 +40,20 @@ export async function setLicenseKey(key: string): Promise<void> {
 }
 
 /**
- * Enable demo mode
+ * Enable demo mode - requires the correct demo secret
+ * Returns true if activation succeeded, false if secret was invalid
  */
-export function enableDemoMode(): void {
+export async function enableDemoMode(secret: string): Promise<boolean> {
+  const demoLicense = await getDemoLicenseInfo(secret)
+  if (!demoLicense) {
+    console.warn('[TinyPivot] Demo mode activation failed - invalid secret')
+    return false
+  }
   globalDemoMode = true
-  globalLicenseInfo = getDemoLicenseInfo()
+  globalLicenseInfo = demoLicense
   console.info('[TinyPivot] Demo mode enabled - all Pro features unlocked for evaluation')
   notifyListeners()
+  return true
 }
 
 /**

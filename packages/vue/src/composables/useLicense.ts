@@ -44,12 +44,19 @@ export async function setLicenseKey(key: string): Promise<void> {
 
 /**
  * Enable demo mode - unlocks all features for evaluation
- * Shows "Demo Mode" watermark instead of license required
+ * Requires the correct demo secret
+ * Shows "Demo Mode" watermark
  */
-export function enableDemoMode(): void {
+export async function enableDemoMode(secret: string): Promise<boolean> {
+  const demoLicense = await getDemoLicenseInfo(secret)
+  if (!demoLicense) {
+    console.warn('[TinyPivot] Demo mode activation failed - invalid secret')
+    return false
+  }
   demoMode.value = true
-  licenseInfo.value = getDemoLicenseInfo()
+  licenseInfo.value = demoLicense
   console.info('[TinyPivot] Demo mode enabled - all Pro features unlocked for evaluation')
+  return true
 }
 
 /**

@@ -222,26 +222,6 @@ setLicenseKey('TP-PRO1-XXXXXXXX-20251215')
 
 > **Note**: The license secret is used to verify license signatures. Set it via environment variable and inject at build time for security.
 
-### Demo Mode
-
-For evaluation, enable demo mode to unlock all Pro features (shows "DEMO" watermark):
-
-#### Vue
-
-```typescript
-import { enableDemoMode } from '@smallwebco/tinypivot-vue'
-
-enableDemoMode()
-```
-
-#### React
-
-```typescript
-import { enableDemoMode } from '@smallwebco/tinypivot-react'
-
-enableDemoMode()
-```
-
 ### Pricing
 
 | Plan | Price | Use Case |
