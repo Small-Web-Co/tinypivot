@@ -300,6 +300,30 @@ See [LICENSE.md](./LICENSE.md) for details.
 
 ---
 
+## Sponsors & Backers
+
+TinyPivot is made possible by our sponsors. [Become a sponsor](https://opencollective.com/tinypivot) to get your logo here!
+
+| Tier | Amount | Benefits |
+|------|--------|----------|
+| ☕ **Backer** | $5/mo | Support development, name in contributors |
+| 🥈 **Sponsor** | $50/mo | Small logo in README |
+| 🥇 **Gold Sponsor** | $100/mo | Large logo + priority support |
+
+### Gold Sponsors
+
+[![Gold Sponsors](https://opencollective.com/tinypivot/tiers/gold-sponsor.svg?avatarHeight=80)](https://opencollective.com/tinypivot)
+
+### Sponsors
+
+[![Sponsors](https://opencollective.com/tinypivot/tiers/sponsor.svg?avatarHeight=60)](https://opencollective.com/tinypivot)
+
+### Backers
+
+[![Backers](https://opencollective.com/tinypivot/tiers/backer.svg?avatarHeight=40)](https://opencollective.com/tinypivot)
+
+---
+
 ## GitHub Topics
 
 This repository uses the following topics for discoverability:
