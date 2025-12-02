@@ -1218,7 +1218,10 @@ function handleContainerClick(event: MouseEvent) {
           <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener">Get License →</a>
         </div>
         <span v-else-if="showWatermark" class="vpg-watermark-inline">
-          <a href="https://tiny-pivot.com" target="_blank" rel="noopener">TinyPivot</a>
+          <a href="https://tiny-pivot.com" target="_blank" rel="noopener">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Powered by TinyPivot
+          </a>
         </span>
       </div>
     </div>
@@ -2351,11 +2354,15 @@ function handleContainerClick(event: MouseEvent) {
 }
 
 .vpg-theme-dark .vpg-watermark-inline a {
-  color: #64748b;
+  color: #94a3b8;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-color: #475569;
 }
 
 .vpg-theme-dark .vpg-watermark-inline a:hover {
-  color: #94a3b8;
+  color: #cbd5e1;
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  border-color: #64748b;
 }
 
 .vpg-theme-dark .vpg-resize-grip span {

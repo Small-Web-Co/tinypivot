@@ -573,13 +573,43 @@
 
 /* Watermark */
 .vpg-watermark-inline a {
-  font-size: 0.75rem;
-  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #64748b;
   text-decoration: none;
-  transition: color 0.15s;
+  padding: 0.25rem 0.5rem;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border: 1px solid #cbd5e1;
+  border-radius: 0.25rem;
+  transition: all 0.15s ease;
 }
 
-.vpg-watermark-inline a:hover { color: #64748b; }
+.vpg-watermark-inline a:hover {
+  color: #475569;
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+  border-color: #94a3b8;
+}
+
+.vpg-watermark-inline a svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* Watermark Dark Mode */
+.vpg-theme-dark .vpg-watermark-inline a {
+  color: #94a3b8;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-color: #475569;
+}
+
+.vpg-theme-dark .vpg-watermark-inline a:hover {
+  color: #cbd5e1;
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  border-color: #64748b;
+}
 
 /* Demo Banner */
 .vpg-demo-banner {

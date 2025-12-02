@@ -2,7 +2,13 @@
 
 A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 
-**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
+**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)** · **[Patreon](https://patreon.com/smallweb)**
+
+⭐ **If you find TinyPivot useful, please consider giving it a star!** It helps others discover the project.
+
+[![Star on GitHub](https://img.shields.io/github/stars/Small-Web-Co/tinypivot?style=social)](https://github.com/Small-Web-Co/tinypivot)
+
+![TinyPivot Demo](https://tiny-pivot.com/images/tinypivot_demo.gif)
 
 ## Features
 
@@ -294,4 +300,13 @@ See [LICENSE.md](./LICENSE.md) for details.
 
 ---
 
+## GitHub Topics
+
+This repository uses the following topics for discoverability:
+`vue`, `vue3`, `react`, `data-grid`, `pivot-table`, `excel`, `spreadsheet`, `datagrid`, `table-component`, `aggregation`, `csv-export`
+
+---
+
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤️-pink)](https://github.com/sponsors/Small-Web-Co) [![Patreon](https://img.shields.io/badge/Patreon-F96854?logo=patreon&logoColor=white)](https://patreon.com/smallweb)

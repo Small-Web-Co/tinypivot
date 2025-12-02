@@ -1,6 +1,6 @@
 {
   "name": "@smallwebco/tinypivot-core",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "Core logic for TinyPivot - framework agnostic pivot table and data grid utilities",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,5 +21,16 @@
   },
   "devDependencies": {
     "typescript": "~5.3.3"
-  }
+  },
+  "keywords": [
+    "pivot-table",
+    "pivot",
+    "datagrid",
+    "data-grid",
+    "aggregation",
+    "excel",
+    "spreadsheet",
+    "data-table",
+    "csv-export"
+  ]
 }
