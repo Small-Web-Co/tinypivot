@@ -20,15 +20,49 @@ export interface GridOptions<T = Record<string, unknown>> {
 }
 
 // Pivot Table Types
-export type AggregationFunction = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct'
+export type AggregationFunction = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct' | 'median' | 'stdDev' | 'percentOfTotal' | 'custom'
 
 export interface PivotField {
   field: string
   label?: string
 }
 
+/**
+ * Custom aggregation function signature
+ * @param values - Array of numeric values to aggregate
+ * @param allFieldValues - Optional: all values across fields for cross-field calculations
+ * @returns Aggregated value or null
+ */
+export type CustomAggregationFn = (
+  values: number[],
+  allFieldValues?: Record<string, number[]>
+) => number | null
+
 export interface PivotValueField extends PivotField {
   aggregation: AggregationFunction
+  /** Custom aggregation function (required when aggregation is 'custom') */
+  customFn?: CustomAggregationFn
+  /** Custom label for the aggregation (used with 'custom' aggregation) */
+  customLabel?: string
+  /** Custom symbol for the aggregation (used with 'custom' aggregation) */
+  customSymbol?: string
+}
+
+/**
+ * Calculated field that computes values from other aggregated fields
+ * Supports formulas like "SUM(Revenue) / SUM(Units)"
+ */
+export interface CalculatedField {
+  /** Unique identifier for the calculated field */
+  id: string
+  /** Display name for the calculated field */
+  name: string
+  /** Formula expression (e.g., "SUM(revenue) / SUM(units) * 100") */
+  formula: string
+  /** How to format the result */
+  formatAs?: 'number' | 'percent' | 'currency'
+  /** Number of decimal places */
+  decimals?: number
 }
 
 export interface PivotConfig {
@@ -37,6 +71,8 @@ export interface PivotConfig {
   valueFields: PivotValueField[]
   showRowTotals: boolean
   showColumnTotals: boolean
+  /** Calculated fields that derive values from other aggregations */
+  calculatedFields?: CalculatedField[]
 }
 
 export interface PivotCell {
@@ -183,4 +219,5 @@ export interface ActiveFilter {
   column: string
   values: string[]
 }
+
 

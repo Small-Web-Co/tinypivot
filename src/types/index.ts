@@ -19,15 +19,37 @@ export interface GridOptions<T = Record<string, unknown>> {
 }
 
 // Pivot Table Types
-export type AggregationFunction = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct'
+export type AggregationFunction = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct' | 'median' | 'stdDev' | 'percentOfTotal' | 'custom'
 
 export interface PivotField {
   field: string
   label?: string
 }
 
+/**
+ * Custom aggregation function signature
+ */
+export type CustomAggregationFn = (
+  values: number[],
+  allFieldValues?: Record<string, number[]>
+) => number | null
+
 export interface PivotValueField extends PivotField {
   aggregation: AggregationFunction
+  customFn?: CustomAggregationFn
+  customLabel?: string
+  customSymbol?: string
+}
+
+/**
+ * Calculated field that computes values from other aggregated fields
+ */
+export interface CalculatedField {
+  id: string
+  name: string
+  formula: string
+  formatAs?: 'number' | 'percent' | 'currency'
+  decimals?: number
 }
 
 export interface PivotConfig {
@@ -36,6 +58,7 @@ export interface PivotConfig {
   valueFields: PivotValueField[]
   showRowTotals: boolean
   showColumnTotals: boolean
+  calculatedFields?: CalculatedField[]
 }
 
 export interface PivotCell {

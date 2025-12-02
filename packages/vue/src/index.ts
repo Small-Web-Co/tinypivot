@@ -70,3 +70,4 @@ export type {
 // Styles - import in your app: import '@tinypivot/vue/style.css'
 import './style.css'
 
+

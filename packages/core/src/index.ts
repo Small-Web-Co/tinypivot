@@ -19,6 +19,8 @@ export type {
   PivotCell,
   PivotResult,
   FieldStats,
+  CustomAggregationFn,
+  CalculatedField,
 
   // Component Props Types
   DataGridProps,
@@ -75,7 +77,24 @@ export {
   savePivotConfig,
   loadPivotConfig,
   isConfigValidForFields,
+  // Calculated Fields Storage
+  saveCalculatedFields,
+  loadCalculatedFields,
+  addCalculatedField,
+  removeCalculatedField,
+  // Calculated Fields & Formulas
+  FORMULA_FUNCTIONS,
+  parseFormula,
+  evaluateFormula,
+  formatCalculatedValue,
+  validateFormula,
+  CALCULATED_FIELD_PRESETS,
+  // Simple Formula (field-level calculations)
+  parseSimpleFormula,
+  validateSimpleFormula,
+  evaluateSimpleFormula,
 } from './pivot'
+export type { FormulaFunction } from './pivot'
 
 // License Management
 export {
@@ -97,4 +116,5 @@ export {
   formatSelectionForClipboard,
 } from './export'
 export type { PivotExportData } from './export'
+
 

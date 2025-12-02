@@ -4,7 +4,8 @@
  * Visual layout for pivot configuration and results
  */
 import { computed, ref } from 'vue'
-import type { AggregationFunction, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, PivotResult, PivotValueField, CalculatedField } from '@smallwebco/tinypivot-core'
+import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { useLicense } from '../composables/useLicense'
 
 interface ActiveFilter {
@@ -17,6 +18,7 @@ const props = defineProps<{
   rowFields: string[]
   columnFields: string[]
   valueFields: PivotValueField[]
+  calculatedFields?: CalculatedField[]
   isConfigured: boolean
   draggingField: string | null
   pivotResult: PivotResult | null
@@ -25,6 +27,21 @@ const props = defineProps<{
   totalRowCount?: number
   filteredRowCount?: number
 }>()
+
+// Helper to get display name for value fields (resolves calc IDs to names)
+function getValueFieldDisplayName(field: string): string {
+  if (field.startsWith('calc:')) {
+    const calcId = field.replace('calc:', '')
+    const calcField = props.calculatedFields?.find(c => c.id === calcId)
+    return calcField?.name || field
+  }
+  return field
+}
+
+// Helper to check if field is a calculated field
+function isCalculatedField(field: string): boolean {
+  return field.startsWith('calc:')
+}
 
 const emit = defineEmits<{
   (e: 'addRowField', field: string): void
@@ -47,31 +64,7 @@ const dragOverArea = ref<'row' | 'column' | 'value' | null>(null)
 const reorderDragSource = ref<{ zone: 'row' | 'column', index: number } | null>(null)
 const reorderDropTarget = ref<{ zone: 'row' | 'column', index: number } | null>(null)
 
-// Aggregation labels
-const aggregationLabels: Record<AggregationFunction, string> = {
-  sum: 'Sum',
-  count: 'Count',
-  avg: 'Average',
-  min: 'Min',
-  max: 'Max',
-  countDistinct: 'Count Distinct',
-}
-
-function getAggregationLabel(fn: AggregationFunction): string {
-  return aggregationLabels[fn]
-}
-
-function getAggSymbol(agg: AggregationFunction): string {
-  const symbols: Record<AggregationFunction, string> = {
-    sum: 'Σ',
-    count: '#',
-    avg: 'x̄',
-    min: '↓',
-    max: '↑',
-    countDistinct: '◇',
-  }
-  return symbols[agg] || 'Σ'
-}
+// Use getAggregationLabel and getAggregationSymbol from core
 
 // Font size
 const currentFontSize = ref(props.fontSize || 'xs')
@@ -164,7 +157,9 @@ const sortedRowIndices = computed(() => {
 const columnHeaderCells = computed(() => {
   if (!props.pivotResult || props.pivotResult.headers.length === 0) {
     return [props.valueFields.map(vf => ({
-      label: `${vf.field} (${getAggregationLabel(vf.aggregation)})`,
+      label: isCalculatedField(vf.field) 
+        ? `${getValueFieldDisplayName(vf.field)} (${getAggregationLabel(vf.aggregation)})`
+        : `${vf.field} (${getAggregationLabel(vf.aggregation)})`,
       colspan: 1,
     }))]
   }
@@ -501,9 +496,10 @@ const dataColWidth = ref(80)
               v-for="vf in valueFields"
               :key="`${vf.field}-${vf.aggregation}`"
               class="vpg-mini-chip vpg-value-chip"
+              :class="{ 'vpg-calc-chip': isCalculatedField(vf.field) }"
             >
-              <span class="vpg-agg-symbol">{{ getAggSymbol(vf.aggregation) }}</span>
-              <span class="vpg-mini-name">{{ vf.field }}</span>
+              <span class="vpg-agg-symbol">{{ isCalculatedField(vf.field) ? 'ƒ' : getAggregationSymbol(vf.aggregation) }}</span>
+              <span class="vpg-mini-name">{{ getValueFieldDisplayName(vf.field) }}</span>
               <button class="vpg-mini-remove" @click="emit('removeValueField', vf.field, vf.aggregation)">×</button>
             </div>
             <span v-if="valueFields.length === 0" class="vpg-zone-hint">Drop numeric</span>
@@ -676,7 +672,7 @@ const dataColWidth = ref(80)
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 1rem;
-  background: linear-gradient(to right, #ecfdf5, #f0fdfa);
+  background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
 }
@@ -1100,6 +1096,17 @@ const dataColWidth = ref(80)
   border: 1px solid #a7f3d0;
 }
 
+.vpg-mini-chip.vpg-value-chip.vpg-calc-chip {
+  background: #fdf4ff;
+  color: #86198f;
+  border-color: #f0abfc;
+}
+
+.vpg-mini-chip.vpg-value-chip.vpg-calc-chip .vpg-agg-symbol {
+  background: #f0abfc;
+  color: #86198f;
+}
+
 .vpg-mini-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1200,11 +1207,11 @@ const dataColWidth = ref(80)
 }
 
 .vpg-column-header-row {
-  background: #e2e8f0;
+  background: #f8fafc;
 }
 
 .vpg-column-header-row th {
-  background: #e2e8f0;
+  background: #f8fafc;
 }
 
 .vpg-row-header-label {
@@ -1217,14 +1224,14 @@ const dataColWidth = ref(80)
   font-weight: 600;
   color: #64748b;
   text-transform: uppercase;
-  border-bottom: 1px solid #cbd5e1;
-  border-right: 1px solid #cbd5e1;
-  background: #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
   cursor: pointer;
 }
 
 .vpg-row-header-label:hover {
-  background: #d1d5db;
+  background: #f1f5f9;
 }
 
 .vpg-column-header-cell {
@@ -1233,15 +1240,15 @@ const dataColWidth = ref(80)
   font-size: 0.6875rem;
   font-weight: 600;
   color: #334155;
-  border-bottom: 1px solid #cbd5e1;
-  border-right: 1px solid #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
   white-space: nowrap;
-  background: #e2e8f0;
+  background: #f8fafc;
   cursor: pointer;
 }
 
 .vpg-column-header-cell:hover {
-  background: rgba(203, 213, 225, 0.5);
+  background: #f1f5f9;
 }
 
 .vpg-header-content {
@@ -1478,12 +1485,12 @@ const dataColWidth = ref(80)
 }
 
 .vpg-theme-dark .vpg-pivot-skeleton .vpg-skeleton-header {
-  background: linear-gradient(to right, rgba(16, 185, 129, 0.15), rgba(20, 184, 166, 0.1)) !important;
+  background: #0f172a !important;
   border-color: #334155 !important;
 }
 
 .vpg-theme-dark .vpg-pivot-skeleton .vpg-skeleton-title {
-  color: #6ee7b7 !important;
+  color: #94a3b8 !important;
 }
 
 /* Config bar (drop zones container) */
@@ -1541,6 +1548,17 @@ const dataColWidth = ref(80)
   background: #064e3b !important;
   color: #6ee7b7 !important;
   border-color: #10b981 !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-mini-chip.vpg-value-chip.vpg-calc-chip {
+  background: rgba(168, 85, 247, 0.2) !important;
+  color: #c4b5fd !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-mini-chip.vpg-value-chip.vpg-calc-chip .vpg-agg-symbol {
+  background: rgba(168, 85, 247, 0.4);
+  color: #c4b5fd;
 }
 
 .vpg-theme-dark .vpg-pivot-skeleton .vpg-drag-handle {
@@ -1655,6 +1673,10 @@ const dataColWidth = ref(80)
 }
 
 .vpg-theme-dark .vpg-column-header-row {
+  background: #0f172a !important;
+}
+
+.vpg-theme-dark .vpg-column-header-row th {
   background: #0f172a !important;
 }
 

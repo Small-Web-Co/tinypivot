@@ -55,6 +55,9 @@ const aggregationLabels: Record<AggregationFunction, string> = {
   min: 'Min',
   max: 'Max',
   countDistinct: 'Count Distinct',
+  median: 'Median',
+  stdDev: 'Std Dev',
+  percentOfTotal: '% of Total',
 }
 
 function getAggregationLabel(fn: AggregationFunction): string {
@@ -69,6 +72,9 @@ function getAggSymbol(agg: AggregationFunction): string {
     min: '↓',
     max: '↑',
     countDistinct: '◇',
+    median: 'M̃',
+    stdDev: 'σ',
+    percentOfTotal: '%Σ',
   }
   return symbols[agg] || 'Σ'
 }

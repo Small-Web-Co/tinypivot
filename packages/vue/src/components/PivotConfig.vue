@@ -4,8 +4,10 @@
  * Draggable fields with aggregation selection
  */
 import { computed, ref } from 'vue'
-import type { AggregationFunction, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, PivotValueField, CalculatedField } from '@smallwebco/tinypivot-core'
+import { AGGREGATION_OPTIONS, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { useLicense } from '../composables/useLicense'
+import CalculatedFieldModal from './CalculatedFieldModal.vue'
 
 interface FieldStats {
   field: string
@@ -21,13 +23,13 @@ const props = defineProps<{
   valueFields: PivotValueField[]
   showRowTotals: boolean
   showColumnTotals: boolean
+  calculatedFields?: CalculatedField[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:showRowTotals', value: boolean): void
   (e: 'update:showColumnTotals', value: boolean): void
   (e: 'clearConfig'): void
-  (e: 'autoSuggest'): void
   (e: 'dragStart', field: string, event: DragEvent): void
   (e: 'dragEnd'): void
   (e: 'updateAggregation', field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction): void
@@ -37,27 +39,68 @@ const emit = defineEmits<{
   (e: 'removeColumnField', field: string): void
   (e: 'addValueField', field: string, aggregation: AggregationFunction): void
   (e: 'removeValueField', field: string, aggregation: AggregationFunction): void
+  (e: 'addCalculatedField', field: CalculatedField): void
+  (e: 'removeCalculatedField', id: string): void
+  (e: 'updateCalculatedField', field: CalculatedField): void
 }>()
 
-const { isPro, showWatermark } = useLicense()
+const { isPro } = useLicense()
 
-// Aggregation options
-const aggregationOptions: { value: AggregationFunction, label: string, symbol: string }[] = [
-  { value: 'sum', label: 'Sum', symbol: 'Σ' },
-  { value: 'count', label: 'Count', symbol: '#' },
-  { value: 'avg', label: 'Avg', symbol: 'x̄' },
-  { value: 'min', label: 'Min', symbol: '↓' },
-  { value: 'max', label: 'Max', symbol: '↑' },
-  { value: 'countDistinct', label: 'Unique', symbol: '◇' },
-]
+// Use aggregation options from core
+const aggregationOptions = AGGREGATION_OPTIONS
 
-function getAggSymbol(agg: AggregationFunction): string {
-  return aggregationOptions.find(a => a.value === agg)?.symbol || 'Σ'
+// Calculated field modal state
+const showCalcModal = ref(false)
+const editingCalcField = ref<CalculatedField | null>(null)
+
+// Get only numeric field names for calculated field formulas
+const numericFieldNames = computed(() =>
+  props.availableFields
+    .filter(f => f.isNumeric)
+    .map(f => f.field)
+)
+
+function openCalcModal(field?: CalculatedField) {
+  editingCalcField.value = field || null
+  showCalcModal.value = true
 }
 
-function getAggLabel(agg: AggregationFunction): string {
-  return aggregationOptions.find(a => a.value === agg)?.label || 'Sum'
+function handleSaveCalcField(field: CalculatedField) {
+  if (editingCalcField.value) {
+    emit('updateCalculatedField', field)
+  } else {
+    emit('addCalculatedField', field)
+  }
+  showCalcModal.value = false
+  editingCalcField.value = null
 }
+
+// Toggle both row and column totals together
+function handleTotalsToggle(checked: boolean) {
+  emit('update:showRowTotals', checked)
+  emit('update:showColumnTotals', checked)
+}
+
+// Convert calculated fields to virtual FieldStats for display
+const calculatedFieldsAsStats = computed(() => {
+  if (!props.calculatedFields) return []
+  return props.calculatedFields.map(calc => ({
+    field: `calc:${calc.id}`,
+    type: 'number' as const,
+    uniqueCount: 0,
+    isNumeric: true,
+    isCalculated: true,
+    calcId: calc.id,
+    calcName: calc.name,
+    calcFormula: calc.formula,
+  }))
+})
+
+// Combined available fields (data fields + calculated fields)
+const allAvailableFields = computed(() => [
+  ...props.availableFields.map(f => ({ ...f, isCalculated: false })),
+  ...calculatedFieldsAsStats.value,
+])
 
 // Assigned fields
 const assignedFields = computed(() => {
@@ -65,7 +108,7 @@ const assignedFields = computed(() => {
   const colSet = new Set(props.columnFields)
   const valueMap = new Map(props.valueFields.map(v => [v.field, v]))
 
-  return props.availableFields
+  return allAvailableFields.value
     .filter(f => rowSet.has(f.field) || colSet.has(f.field) || valueMap.has(f.field))
     .map(f => ({
       ...f,
@@ -78,13 +121,13 @@ const assignedFields = computed(() => {
     }))
 })
 
-// Unassigned fields
+// Unassigned fields (including unassigned calculated fields)
 const unassignedFields = computed(() => {
   const rowSet = new Set(props.rowFields)
   const colSet = new Set(props.columnFields)
   const valSet = new Set(props.valueFields.map(v => v.field))
 
-  return props.availableFields.filter(f =>
+  return allAvailableFields.value.filter(f =>
     !rowSet.has(f.field) && !colSet.has(f.field) && !valSet.has(f.field),
   )
 })
@@ -97,17 +140,31 @@ const filteredUnassignedFields = computed(() => {
   if (!fieldSearch.value.trim())
     return unassignedFields.value
   const search = fieldSearch.value.toLowerCase().trim()
-  return unassignedFields.value.filter(f => f.field.toLowerCase().includes(search))
+  return unassignedFields.value.filter(f => {
+    // Search by field name or calculated field display name
+    const fieldName = f.field.toLowerCase()
+    const displayName = f.isCalculated && f.calcName ? f.calcName.toLowerCase() : ''
+    return fieldName.includes(search) || displayName.includes(search)
+  })
 })
 
 // Field type icons
-function getFieldIcon(type: FieldStats['type']): string {
+function getFieldIcon(type: FieldStats['type'], isCalculated?: boolean): string {
+  if (isCalculated) return 'ƒ'
   switch (type) {
     case 'number': return '#'
     case 'date': return '📅'
     case 'boolean': return '✓'
     default: return 'Aa'
   }
+}
+
+// Get display name for field (handles calculated fields)
+function getFieldDisplayName(field: any): string {
+  if (field.isCalculated && field.calcName) {
+    return field.calcName
+  }
+  return field.field
 }
 
 function handleDragStart(field: string, event: DragEvent) {
@@ -180,17 +237,17 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
           v-for="field in assignedFields"
           :key="field.field"
           class="vpg-assigned-item"
-          :class="[`vpg-type-${field.assignedTo}`]"
-          :title="field.field"
+          :class="[`vpg-type-${field.assignedTo}`, { 'vpg-type-calc': field.isCalculated }]"
+          :title="field.isCalculated ? field.calcFormula : field.field"
           draggable="true"
           @dragstart="handleDragStart(field.field, $event)"
           @dragend="handleDragEnd"
         >
           <div class="vpg-item-main">
-            <span class="vpg-item-badge" :class="field.assignedTo">
-              {{ field.assignedTo === 'row' ? 'R' : field.assignedTo === 'column' ? 'C' : getAggSymbol(field.valueConfig?.aggregation || 'sum') }}
+            <span class="vpg-item-badge" :class="[field.assignedTo, { calc: field.isCalculated }]">
+              {{ field.isCalculated ? 'ƒ' : (field.assignedTo === 'row' ? 'R' : field.assignedTo === 'column' ? 'C' : getAggregationSymbol(field.valueConfig?.aggregation || 'sum')) }}
             </span>
-            <span class="vpg-item-name">{{ field.field }}</span>
+            <span class="vpg-item-name">{{ getFieldDisplayName(field) }}</span>
           </div>
 
           <div class="vpg-item-actions">
@@ -260,15 +317,34 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
           v-for="field in filteredUnassignedFields"
           :key="field.field"
           class="vpg-field-item"
-          :class="{ 'vpg-is-numeric': field.isNumeric }"
-          :title="field.field"
+          :class="{ 
+            'vpg-is-numeric': field.isNumeric && !field.isCalculated,
+            'vpg-is-calculated': field.isCalculated 
+          }"
+          :title="field.isCalculated ? field.calcFormula : field.field"
           draggable="true"
           @dragstart="handleDragStart(field.field, $event)"
           @dragend="handleDragEnd"
         >
-          <span class="vpg-field-type-icon" :title="field.type">{{ getFieldIcon(field.type) }}</span>
-          <span class="vpg-field-name">{{ field.field }}</span>
-          <span class="vpg-unique-count">{{ field.uniqueCount }}</span>
+          <span class="vpg-field-type-icon" :class="{ 'vpg-calc-type': field.isCalculated }">
+            {{ getFieldIcon(field.type, field.isCalculated) }}
+          </span>
+          <span class="vpg-field-name">{{ getFieldDisplayName(field) }}</span>
+          <template v-if="field.isCalculated">
+            <button
+              class="vpg-field-edit"
+              title="Edit calculated field"
+              @click.stop="openCalcModal(calculatedFields?.find(c => c.id === field.calcId))"
+            >✎</button>
+            <button
+              class="vpg-field-delete"
+              title="Delete calculated field"
+              @click.stop="emit('removeCalculatedField', field.calcId)"
+            >×</button>
+          </template>
+          <template v-else>
+            <span class="vpg-unique-count">{{ field.uniqueCount }}</span>
+          </template>
         </div>
         <div v-if="filteredUnassignedFields.length === 0 && fieldSearch" class="vpg-empty-hint">
           No fields match "{{ fieldSearch }}"
@@ -285,24 +361,24 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
         <input
           type="checkbox"
           :checked="showRowTotals"
-          @change="emit('update:showRowTotals', ($event.target as HTMLInputElement).checked)"
+          @change="handleTotalsToggle(($event.target as HTMLInputElement).checked)"
         >
         <span>Totals</span>
       </label>
-      <button class="vpg-auto-btn" @click="emit('autoSuggest')">
-        <svg class="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        Auto
+      <button class="vpg-calc-btn" @click="openCalcModal()" title="Add calculated field (e.g. Profit Margin %)">
+        <span class="vpg-calc-icon">ƒ</span>
+        <span>+ Calc</span>
       </button>
     </div>
 
-    <!-- Pro Badge / Watermark -->
-    <div v-if="showWatermark" class="vpg-watermark">
-      <a href="https://tiny-pivot.com" target="_blank" rel="noopener">
-        TinyPivot
-      </a>
-    </div>
+    <!-- Calculated Field Modal -->
+    <CalculatedFieldModal
+      :show="showCalcModal"
+      :available-fields="numericFieldNames"
+      :existing-field="editingCalcField"
+      @close="showCalcModal = false; editingCalcField = null"
+      @save="handleSaveCalcField"
+    />
   </div>
 </template>
 
@@ -438,6 +514,12 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   border: 1px solid #a7f3d0;
 }
 
+.vpg-assigned-item.vpg-type-calc {
+  background: #fdf4ff;
+  border: 1px solid #f0abfc;
+  cursor: pointer;
+}
+
 .vpg-item-main {
   display: flex;
   align-items: center;
@@ -469,6 +551,11 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-item-badge.value {
   background: #a7f3d0;
   color: #059669;
+}
+
+.vpg-item-badge.calc {
+  background: #f0abfc;
+  color: #86198f;
 }
 
 .vpg-item-name {
@@ -653,6 +740,44 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   background: rgba(239, 246, 255, 0.3);
 }
 
+.vpg-field-item.vpg-is-calculated {
+  border-color: #e9d5ff;
+  background: rgba(250, 232, 255, 0.5);
+}
+
+.vpg-calc-type {
+  background: #f0abfc !important;
+  color: #86198f !important;
+}
+
+.vpg-field-edit,
+.vpg-field-delete {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.vpg-field-edit:hover {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
+.vpg-field-delete:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
 .vpg-field-type-icon {
   width: 1.25rem;
   height: 1.25rem;
@@ -724,7 +849,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   cursor: pointer;
 }
 
-.vpg-auto-btn {
+.vpg-calc-btn {
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -732,34 +857,21 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   font-size: 0.6875rem;
   font-weight: 500;
   border-radius: 0.25rem;
-  background: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
+  background: #fdf4ff;
+  color: #a855f7;
+  border: 1px solid #e9d5ff;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.vpg-auto-btn:hover {
-  background: #d1fae5;
+.vpg-calc-btn:hover {
+  background: #fae8ff;
+  border-color: #d8b4fe;
 }
 
-.vpg-watermark {
-  padding: 0.375rem 0.75rem;
-  background: #f1f5f9;
-  border-top: 1px solid #e2e8f0;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.vpg-watermark a {
-  font-size: 0.625rem;
-  color: #94a3b8;
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.vpg-watermark a:hover {
-  color: #64748b;
+.vpg-calc-icon {
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 /* Scrollbar */
@@ -835,6 +947,11 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   border-color: rgba(16, 185, 129, 0.3);
 }
 
+.vpg-theme-dark .vpg-assigned-item.vpg-type-calc {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
 .vpg-theme-dark .vpg-item-badge.row {
   background: rgba(99, 102, 241, 0.3);
   color: #a5b4fc;
@@ -848,6 +965,11 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-theme-dark .vpg-item-badge.value {
   background: rgba(16, 185, 129, 0.3);
   color: #6ee7b7;
+}
+
+.vpg-theme-dark .vpg-item-badge.calc {
+  background: rgba(168, 85, 247, 0.3);
+  color: #c4b5fd;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-item-name {
@@ -932,6 +1054,31 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   color: #60a5fa;
 }
 
+.vpg-theme-dark .vpg-pivot-config .vpg-field-item.vpg-is-calculated {
+  border-color: rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.vpg-theme-dark .vpg-calc-type {
+  background: rgba(168, 85, 247, 0.4) !important;
+  color: #c4b5fd !important;
+}
+
+.vpg-theme-dark .vpg-field-edit,
+.vpg-theme-dark .vpg-field-delete {
+  color: #64748b;
+}
+
+.vpg-theme-dark .vpg-field-edit:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+
+.vpg-theme-dark .vpg-field-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
 .vpg-theme-dark .vpg-pivot-config .vpg-unique-count {
   color: #64748b;
 }
@@ -949,27 +1096,15 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   color: #94a3b8;
 }
 
-.vpg-theme-dark .vpg-pivot-config .vpg-auto-btn {
-  background: rgba(16, 185, 129, 0.15);
-  color: #6ee7b7;
-  border-color: rgba(16, 185, 129, 0.3);
+.vpg-theme-dark .vpg-calc-btn {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.3);
 }
 
-.vpg-theme-dark .vpg-pivot-config .vpg-auto-btn:hover {
-  background: rgba(16, 185, 129, 0.25);
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-watermark {
-  background: #0f172a;
-  border-color: #334155;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-watermark a {
-  color: #64748b;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-watermark a:hover {
-  color: #94a3b8;
+.vpg-theme-dark .vpg-calc-btn:hover {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.5);
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-field-list::-webkit-scrollbar-thumb {
@@ -979,5 +1114,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-theme-dark .vpg-pivot-config .vpg-field-list::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
 </style>
 

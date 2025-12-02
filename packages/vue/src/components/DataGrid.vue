@@ -13,7 +13,8 @@ import {
   copyToClipboard,
   formatSelectionForClipboard,
 } from '../composables/useGridFeatures'
-import type { ColumnStats } from '@smallwebco/tinypivot-core'
+import type { ColumnStats, CalculatedField } from '@smallwebco/tinypivot-core'
+import { loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 import ColumnFilter from './ColumnFilter.vue'
 import PivotConfig from './PivotConfig.vue'
 import PivotSkeleton from './PivotSkeleton.vue'
@@ -360,6 +361,34 @@ function copySelectionToClipboard() {
 const viewMode = ref<'grid' | 'pivot'>('grid')
 const showPivotConfig = ref(true)
 const draggingField = ref<string | null>(null)
+
+// Calculated fields state (persisted to localStorage)
+const calculatedFields = ref<CalculatedField[]>(loadCalculatedFields())
+
+function handleAddCalculatedField(field: CalculatedField) {
+  // Generate ID if not present
+  if (!field.id) {
+    field.id = `calc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+  calculatedFields.value = [...calculatedFields.value, field]
+  saveCalculatedFields(calculatedFields.value)
+}
+
+function handleRemoveCalculatedField(id: string) {
+  calculatedFields.value = calculatedFields.value.filter(f => f.id !== id)
+  saveCalculatedFields(calculatedFields.value)
+  // Also remove from valueFields if it was assigned
+  const calcFieldKey = `calc:${id}`
+  const existing = pivotValueFields.value.find(v => v.field === calcFieldKey)
+  if (existing) {
+    removeValueField(calcFieldKey, existing.aggregation)
+  }
+}
+
+function handleUpdateCalculatedField(field: CalculatedField) {
+  calculatedFields.value = calculatedFields.value.map(f => f.id === field.id ? field : f)
+  saveCalculatedFields(calculatedFields.value)
+}
 
 function handlePivotDragStart(field: string) {
   draggingField.value = field
@@ -1084,10 +1113,10 @@ function handleContainerClick(event: MouseEvent) {
             :value-fields="pivotValueFields"
             :show-row-totals="pivotShowRowTotals"
             :show-column-totals="pivotShowColumnTotals"
+            :calculated-fields="calculatedFields"
             @update:show-row-totals="pivotShowRowTotals = $event"
             @update:show-column-totals="pivotShowColumnTotals = $event"
             @clear-config="clearPivotConfig"
-            @auto-suggest="autoSuggestConfig"
             @drag-start="handlePivotDragStart"
             @drag-end="handlePivotDragEnd"
             @update-aggregation="updateValueFieldAggregation"
@@ -1097,6 +1126,9 @@ function handleContainerClick(event: MouseEvent) {
             @remove-column-field="removeColumnField"
             @add-value-field="addValueField"
             @remove-value-field="removeValueField"
+            @add-calculated-field="handleAddCalculatedField"
+            @remove-calculated-field="handleRemoveCalculatedField"
+            @update-calculated-field="handleUpdateCalculatedField"
           />
         </div>
 
@@ -1105,6 +1137,7 @@ function handleContainerClick(event: MouseEvent) {
             :row-fields="pivotRowFields"
             :column-fields="pivotColumnFields"
             :value-fields="pivotValueFields"
+            :calculated-fields="calculatedFields"
             :is-configured="pivotIsConfigured"
             :dragging-field="draggingField"
             :pivot-result="pivotResult"
@@ -1579,18 +1612,18 @@ function handleContainerClick(event: MouseEvent) {
 
 .vpg-header-cell {
   z-index: 10;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0.75rem;
   text-align: left;
   cursor: pointer;
   user-select: none;
-  background: white;
+  background: #f8fafc;
   transition: all 0.15s;
   border-bottom: 1px solid #e2e8f0;
   border-right: 1px solid #f1f5f9;
 }
 
 .vpg-header-cell:hover {
-  background: #f8fafc;
+  background: #f1f5f9;
 }
 
 .vpg-header-cell:last-child {
@@ -2221,7 +2254,7 @@ function handleContainerClick(event: MouseEvent) {
 }
 
 .vpg-theme-dark .vpg-header-cell {
-  background: #1e293b;
+  background: #0f172a;
   border-color: #334155;
 }
 

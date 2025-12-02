@@ -3,7 +3,7 @@
  * Wraps core pivot logic with Vue reactivity
  */
 import { type Ref, computed, ref, watch } from 'vue'
-import type { AggregationFunction, FieldStats, PivotConfig, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, CalculatedField, FieldStats, PivotConfig, PivotValueField } from '@smallwebco/tinypivot-core'
 import {
   computeAvailableFields,
   getUnassignedFields,
@@ -14,6 +14,8 @@ import {
   loadPivotConfig,
   isConfigValidForFields,
   getAggregationLabel,
+  loadCalculatedFields,
+  saveCalculatedFields,
 } from '@smallwebco/tinypivot-core'
 import { useLicense } from './useLicense'
 
@@ -32,6 +34,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   const valueFields = ref<PivotValueField[]>([])
   const showRowTotals = ref(true)
   const showColumnTotals = ref(true)
+  const calculatedFields = ref<CalculatedField[]>(loadCalculatedFields())
 
   // Track current storage key
   const currentStorageKey = ref<string | null>(null)
@@ -75,6 +78,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
       valueFields: valueFields.value,
       showRowTotals: showRowTotals.value,
       showColumnTotals: showColumnTotals.value,
+      calculatedFields: calculatedFields.value,
     })
   })
 
@@ -170,6 +174,28 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     }
   }
 
+  // Calculated field management
+  function addCalculatedField(field: CalculatedField) {
+    const existing = calculatedFields.value.findIndex(f => f.id === field.id)
+    if (existing >= 0) {
+      calculatedFields.value = [
+        ...calculatedFields.value.slice(0, existing),
+        field,
+        ...calculatedFields.value.slice(existing + 1),
+      ]
+    } else {
+      calculatedFields.value = [...calculatedFields.value, field]
+    }
+    saveCalculatedFields(calculatedFields.value)
+  }
+
+  function removeCalculatedField(id: string) {
+    calculatedFields.value = calculatedFields.value.filter(f => f.id !== id)
+    // Also remove from value fields if it was being used
+    valueFields.value = valueFields.value.filter(v => v.field !== `calc:${id}`)
+    saveCalculatedFields(calculatedFields.value)
+  }
+
   // Watch data to restore or validate config
   watch(
     data,
@@ -189,6 +215,9 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
           valueFields.value = savedConfig.valueFields
           showRowTotals.value = savedConfig.showRowTotals
           showColumnTotals.value = savedConfig.showColumnTotals
+          if (savedConfig.calculatedFields) {
+            calculatedFields.value = savedConfig.calculatedFields
+          }
         } else {
           const currentConfig: PivotConfig = {
             rowFields: rowFields.value,
@@ -219,7 +248,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
 
   // Watch config changes and save to sessionStorage
   watch(
-    [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals],
+    [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields],
     () => {
       if (!currentStorageKey.value) return
 
@@ -229,6 +258,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         valueFields: valueFields.value,
         showRowTotals: showRowTotals.value,
         showColumnTotals: showColumnTotals.value,
+        calculatedFields: calculatedFields.value,
       }
       savePivotConfig(currentStorageKey.value, config)
     },
@@ -242,6 +272,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     valueFields,
     showRowTotals,
     showColumnTotals,
+    calculatedFields,
 
     // Computed
     availableFields,
@@ -260,6 +291,9 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     clearConfig,
     moveField,
     autoSuggestConfig,
+    addCalculatedField,
+    removeCalculatedField,
   }
 }
+
 

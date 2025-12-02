@@ -49,6 +49,9 @@ const aggregationOptions: { value: AggregationFunction, label: string, symbol: s
   { value: 'min', label: 'Min', symbol: '↓' },
   { value: 'max', label: 'Max', symbol: '↑' },
   { value: 'countDistinct', label: 'Unique', symbol: '◇' },
+  { value: 'median', label: 'Median', symbol: 'M̃' },
+  { value: 'stdDev', label: 'Std Dev', symbol: 'σ' },
+  { value: 'percentOfTotal', label: '% of Total', symbol: '%Σ' },
 ]
 
 function getAggSymbol(agg: AggregationFunction): string {

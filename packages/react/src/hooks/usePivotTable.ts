@@ -5,6 +5,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import type {
   AggregationFunction,
+  CalculatedField,
   FieldStats,
   PivotConfig,
   PivotResult,
@@ -20,6 +21,8 @@ import {
   loadPivotConfig,
   isConfigValidForFields,
   getAggregationLabel,
+  loadCalculatedFields,
+  saveCalculatedFields,
 } from '@smallwebco/tinypivot-core'
 import { useLicense } from './useLicense'
 
@@ -33,6 +36,7 @@ interface UsePivotTableReturn {
   valueFields: PivotValueField[]
   showRowTotals: boolean
   showColumnTotals: boolean
+  calculatedFields: CalculatedField[]
 
   // Computed
   availableFields: FieldStats[]
@@ -58,6 +62,8 @@ interface UsePivotTableReturn {
   autoSuggestConfig: () => void
   setRowFields: (fields: string[]) => void
   setColumnFields: (fields: string[]) => void
+  addCalculatedField: (field: CalculatedField) => void
+  removeCalculatedField: (id: string) => void
 }
 
 /**
@@ -72,6 +78,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
   const [valueFields, setValueFields] = useState<PivotValueField[]>([])
   const [showRowTotals, setShowRowTotals] = useState(true)
   const [showColumnTotals, setShowColumnTotals] = useState(true)
+  const [calculatedFields, setCalculatedFields] = useState<CalculatedField[]>(() => loadCalculatedFields())
   const [currentStorageKey, setCurrentStorageKey] = useState<string | null>(null)
 
   // Compute available fields from data
@@ -106,8 +113,9 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
       valueFields,
       showRowTotals,
       showColumnTotals,
+      calculatedFields,
     })
-  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals])
+  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields])
 
   // Load/save config from storage
   useEffect(() => {
@@ -126,6 +134,9 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
         setValueFields(savedConfig.valueFields)
         setShowRowTotals(savedConfig.showRowTotals)
         setShowColumnTotals(savedConfig.showColumnTotals)
+        if (savedConfig.calculatedFields) {
+          setCalculatedFields(savedConfig.calculatedFields)
+        }
       } else {
         // Validate current config
         const currentConfig: PivotConfig = {
@@ -154,9 +165,10 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
       valueFields,
       showRowTotals,
       showColumnTotals,
+      calculatedFields,
     }
     savePivotConfig(currentStorageKey, config)
-  }, [currentStorageKey, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals])
+  }, [currentStorageKey, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields])
 
   // Actions
   const addRowField = useCallback(
@@ -250,6 +262,31 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     }
   }, [availableFields, requirePro])
 
+  // Calculated field management
+  const addCalculatedField = useCallback((field: CalculatedField) => {
+    setCalculatedFields(prev => {
+      const existing = prev.findIndex(f => f.id === field.id)
+      let updated: CalculatedField[]
+      if (existing >= 0) {
+        updated = [...prev.slice(0, existing), field, ...prev.slice(existing + 1)]
+      } else {
+        updated = [...prev, field]
+      }
+      saveCalculatedFields(updated)
+      return updated
+    })
+  }, [])
+
+  const removeCalculatedField = useCallback((id: string) => {
+    setCalculatedFields(prev => {
+      const updated = prev.filter(f => f.id !== id)
+      saveCalculatedFields(updated)
+      return updated
+    })
+    // Also remove from value fields if it was being used
+    setValueFields(prev => prev.filter(v => v.field !== `calc:${id}`))
+  }, [])
+
   return {
     // State
     rowFields,
@@ -257,6 +294,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     valueFields,
     showRowTotals,
     showColumnTotals,
+    calculatedFields,
 
     // Computed
     availableFields,
@@ -278,6 +316,9 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     autoSuggestConfig,
     setRowFields,
     setColumnFields,
+    addCalculatedField,
+    removeCalculatedField,
   }
 }
+
 

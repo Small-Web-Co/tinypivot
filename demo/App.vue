@@ -111,7 +111,7 @@ const freeFeatures = [
   'Pagination', 'Column Resize', 'Clipboard', 'Dark Mode', 'Keyboard Nav'
 ]
 const proFeatures = [
-  'Pivot Table', 'Aggregations', 'Row/Col Totals', 'No Watermark'
+  'Pivot Table', '9+ Aggregations', 'Custom Functions', 'Calculated Fields', 'Formula Builder', 'Row/Col Totals', 'No Watermark'
 ]
 
 // Active section for navigation
@@ -325,8 +325,8 @@ function copyInstallCommand() {
               <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </div>
-          <h3>Aggregations</h3>
-          <p>Sum, Count, Avg, Min, Max, Count Distinct</p>
+          <h3>Custom Calculations</h3>
+          <p>9 built-in + custom functions & formula builder</p>
           <span class="feature-badge pro">Pro</span>
         </div>
       </div>

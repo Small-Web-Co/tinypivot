@@ -3,9 +3,18 @@
  * Draggable fields with aggregation selection
  */
 import React, { useState, useMemo, useCallback } from 'react'
-import type { AggregationFunction, PivotValueField, FieldStats } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, PivotValueField, FieldStats, CalculatedField } from '@smallwebco/tinypivot-core'
 import { AGGREGATION_OPTIONS, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { useLicense } from '../hooks/useLicense'
+import { CalculatedFieldModal } from './CalculatedFieldModal'
+
+// Extended field stats for calculated fields
+interface ExtendedFieldStats extends FieldStats {
+  isCalculated?: boolean
+  calcId?: string
+  calcName?: string
+  calcFormula?: string
+}
 
 interface PivotConfigProps {
   availableFields: FieldStats[]
@@ -14,6 +23,7 @@ interface PivotConfigProps {
   valueFields: PivotValueField[]
   showRowTotals: boolean
   showColumnTotals: boolean
+  calculatedFields?: CalculatedField[]
   onShowRowTotalsChange: (value: boolean) => void
   onShowColumnTotalsChange: (value: boolean) => void
   onClearConfig: () => void
@@ -27,9 +37,13 @@ interface PivotConfigProps {
   onRemoveColumnField: (field: string) => void
   onAddValueField: (field: string, aggregation: AggregationFunction) => void
   onRemoveValueField: (field: string, aggregation: AggregationFunction) => void
+  onAddCalculatedField?: (field: CalculatedField) => void
+  onRemoveCalculatedField?: (id: string) => void
+  onUpdateCalculatedField?: (field: CalculatedField) => void
 }
 
-function getFieldIcon(type: FieldStats['type']): string {
+function getFieldIcon(type: FieldStats['type'], isCalculated?: boolean): string {
+  if (isCalculated) return 'ƒ'
   switch (type) {
     case 'number':
       return '#'
@@ -48,7 +62,9 @@ export function PivotConfig({
   columnFields,
   valueFields,
   showRowTotals,
+  calculatedFields,
   onShowRowTotalsChange,
+  onShowColumnTotalsChange,
   onClearConfig,
   onAutoSuggest,
   onDragStart,
@@ -59,9 +75,43 @@ export function PivotConfig({
   onRemoveValueField,
   onAddRowField,
   onAddColumnField,
+  onAddCalculatedField,
+  onRemoveCalculatedField,
+  onUpdateCalculatedField,
 }: PivotConfigProps) {
   const { showWatermark } = useLicense()
   const [fieldSearch, setFieldSearch] = useState('')
+  const [showCalcModal, setShowCalcModal] = useState(false)
+  const [editingCalcField, setEditingCalcField] = useState<CalculatedField | null>(null)
+
+  // Get only numeric field names for calculated field formulas
+  const numericFieldNames = useMemo(() =>
+    availableFields
+      .filter(f => f.isNumeric)
+      .map(f => f.field),
+    [availableFields]
+  )
+
+  // Convert calculated fields to virtual FieldStats for display
+  const calculatedFieldsAsStats = useMemo((): ExtendedFieldStats[] => {
+    if (!calculatedFields) return []
+    return calculatedFields.map(calc => ({
+      field: `calc:${calc.id}`,
+      type: 'number' as const,
+      uniqueCount: 0,
+      isNumeric: true,
+      isCalculated: true,
+      calcId: calc.id,
+      calcName: calc.name,
+      calcFormula: calc.formula,
+    }))
+  }, [calculatedFields])
+
+  // Combined available fields (data fields + calculated fields)
+  const allAvailableFields = useMemo((): ExtendedFieldStats[] => [
+    ...availableFields.map(f => ({ ...f, isCalculated: false })),
+    ...calculatedFieldsAsStats,
+  ], [availableFields, calculatedFieldsAsStats])
 
   // Assigned fields
   const assignedFields = useMemo(() => {
@@ -69,7 +119,7 @@ export function PivotConfig({
     const colSet = new Set(columnFields)
     const valueMap = new Map(valueFields.map(v => [v.field, v]))
 
-    return availableFields
+    return allAvailableFields
       .filter(f => rowSet.has(f.field) || colSet.has(f.field) || valueMap.has(f.field))
       .map(f => ({
         ...f,
@@ -80,26 +130,38 @@ export function PivotConfig({
             : ('value' as const),
         valueConfig: valueMap.get(f.field),
       }))
-  }, [availableFields, rowFields, columnFields, valueFields])
+  }, [allAvailableFields, rowFields, columnFields, valueFields])
 
-  // Unassigned fields
+  // Unassigned fields (including unassigned calculated fields)
   const unassignedFields = useMemo(() => {
     const rowSet = new Set(rowFields)
     const colSet = new Set(columnFields)
     const valSet = new Set(valueFields.map(v => v.field))
 
-    return availableFields.filter(
+    return allAvailableFields.filter(
       f => !rowSet.has(f.field) && !colSet.has(f.field) && !valSet.has(f.field)
     )
-  }, [availableFields, rowFields, columnFields, valueFields])
+  }, [allAvailableFields, rowFields, columnFields, valueFields])
 
   const filteredUnassignedFields = useMemo(() => {
     if (!fieldSearch.trim()) return unassignedFields
     const search = fieldSearch.toLowerCase().trim()
-    return unassignedFields.filter(f => f.field.toLowerCase().includes(search))
+    return unassignedFields.filter(f => {
+      const fieldName = f.field.toLowerCase()
+      const displayName = f.isCalculated && f.calcName ? f.calcName.toLowerCase() : ''
+      return fieldName.includes(search) || displayName.includes(search)
+    })
   }, [unassignedFields, fieldSearch])
 
   const assignedCount = assignedFields.length
+
+  // Get display name for field (handles calculated fields)
+  const getFieldDisplayName = useCallback((field: ExtendedFieldStats): string => {
+    if (field.isCalculated && field.calcName) {
+      return field.calcName
+    }
+    return field.field
+  }, [])
 
   const handleDragStart = useCallback(
     (field: string, event: React.DragEvent) => {
@@ -142,6 +204,33 @@ export function PivotConfig({
     },
     [onRemoveRowField, onRemoveColumnField, onRemoveValueField]
   )
+
+  // Handle totals toggle (toggle both row and column together)
+  const handleTotalsToggle = useCallback((checked: boolean) => {
+    onShowRowTotalsChange(checked)
+    onShowColumnTotalsChange(checked)
+  }, [onShowRowTotalsChange, onShowColumnTotalsChange])
+
+  // Calculated field modal handlers
+  const openCalcModal = useCallback((field?: CalculatedField) => {
+    setEditingCalcField(field || null)
+    setShowCalcModal(true)
+  }, [])
+
+  const handleSaveCalcField = useCallback((field: CalculatedField) => {
+    if (editingCalcField && onUpdateCalculatedField) {
+      onUpdateCalculatedField(field)
+    } else if (onAddCalculatedField) {
+      onAddCalculatedField(field)
+    }
+    setShowCalcModal(false)
+    setEditingCalcField(null)
+  }, [editingCalcField, onAddCalculatedField, onUpdateCalculatedField])
+
+  const handleCloseCalcModal = useCallback(() => {
+    setShowCalcModal(false)
+    setEditingCalcField(null)
+  }, [])
 
   return (
     <div className="vpg-pivot-config">
@@ -186,21 +275,23 @@ export function PivotConfig({
             {assignedFields.map(field => (
               <div
                 key={field.field}
-                className={`vpg-assigned-item vpg-type-${field.assignedTo}`}
-                title={field.field}
+                className={`vpg-assigned-item vpg-type-${field.assignedTo}${field.isCalculated ? ' vpg-type-calc' : ''}`}
+                title={field.isCalculated ? field.calcFormula : field.field}
                 draggable
                 onDragStart={e => handleDragStart(field.field, e)}
                 onDragEnd={onDragEnd}
               >
                 <div className="vpg-item-main">
-                  <span className={`vpg-item-badge ${field.assignedTo}`}>
-                    {field.assignedTo === 'row'
-                      ? 'R'
-                      : field.assignedTo === 'column'
-                        ? 'C'
-                        : getAggregationSymbol(field.valueConfig?.aggregation || 'sum')}
+                  <span className={`vpg-item-badge ${field.assignedTo}${field.isCalculated ? ' calc' : ''}`}>
+                    {field.isCalculated
+                      ? 'ƒ'
+                      : field.assignedTo === 'row'
+                        ? 'R'
+                        : field.assignedTo === 'column'
+                          ? 'C'
+                          : getAggregationSymbol(field.valueConfig?.aggregation || 'sum')}
                   </span>
-                  <span className="vpg-item-name">{field.field}</span>
+                  <span className="vpg-item-name">{getFieldDisplayName(field)}</span>
                 </div>
 
                 <div className="vpg-item-actions">
@@ -311,17 +402,45 @@ export function PivotConfig({
           {filteredUnassignedFields.map(field => (
             <div
               key={field.field}
-              className={`vpg-field-item ${field.isNumeric ? 'vpg-is-numeric' : ''}`}
-              title={field.field}
+              className={`vpg-field-item${field.isNumeric && !field.isCalculated ? ' vpg-is-numeric' : ''}${field.isCalculated ? ' vpg-is-calculated' : ''}`}
+              title={field.isCalculated ? field.calcFormula : field.field}
               draggable
               onDragStart={e => handleDragStart(field.field, e)}
               onDragEnd={onDragEnd}
             >
-              <span className="vpg-field-type-icon" title={field.type}>
-                {getFieldIcon(field.type)}
+              <span className={`vpg-field-type-icon${field.isCalculated ? ' vpg-calc-type' : ''}`} title={field.type}>
+                {getFieldIcon(field.type, field.isCalculated)}
               </span>
-              <span className="vpg-field-name">{field.field}</span>
-              <span className="vpg-unique-count">{field.uniqueCount}</span>
+              <span className="vpg-field-name">{getFieldDisplayName(field)}</span>
+              {field.isCalculated ? (
+                <>
+                  <button
+                    className="vpg-field-edit"
+                    title="Edit calculated field"
+                    onClick={e => {
+                      e.stopPropagation()
+                      const calcField = calculatedFields?.find(c => c.id === field.calcId)
+                      if (calcField) openCalcModal(calcField)
+                    }}
+                  >
+                    ✎
+                  </button>
+                  <button
+                    className="vpg-field-delete"
+                    title="Delete calculated field"
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (field.calcId && onRemoveCalculatedField) {
+                        onRemoveCalculatedField(field.calcId)
+                      }
+                    }}
+                  >
+                    ×
+                  </button>
+                </>
+              ) : (
+                <span className="vpg-unique-count">{field.uniqueCount}</span>
+              )}
             </div>
           ))}
           {filteredUnassignedFields.length === 0 && fieldSearch && (
@@ -337,20 +456,13 @@ export function PivotConfig({
           <input
             type="checkbox"
             checked={showRowTotals}
-            onChange={e => onShowRowTotalsChange(e.target.checked)}
+            onChange={e => handleTotalsToggle(e.target.checked)}
           />
           <span>Totals</span>
         </label>
-        <button className="vpg-auto-btn" onClick={onAutoSuggest}>
-          <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          Auto
+        <button className="vpg-calc-btn" onClick={() => openCalcModal()} title="Add calculated field (e.g. Profit Margin %)">
+          <span className="vpg-calc-icon">ƒ</span>
+          <span>+ Calc</span>
         </button>
       </div>
 
@@ -362,7 +474,15 @@ export function PivotConfig({
           </a>
         </div>
       )}
+
+      {/* Calculated Field Modal */}
+      <CalculatedFieldModal
+        show={showCalcModal}
+        availableFields={numericFieldNames}
+        existingField={editingCalcField}
+        onClose={handleCloseCalcModal}
+        onSave={handleSaveCalcField}
+      />
     </div>
   )
 }
-

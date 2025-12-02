@@ -3,8 +3,39 @@
  * Provides pivot table functionality with aggregation, row/column grouping
  */
 import { type Ref, computed, ref, watch } from 'vue'
-import type { AggregationFunction, FieldStats, PivotCell, PivotConfig, PivotResult, PivotValueField } from '../types'
+import type { AggregationFunction, CalculatedField, FieldStats, PivotCell, PivotConfig, PivotResult, PivotValueField } from '../types'
 import { useLicense } from './useLicense'
+
+// Calculated fields localStorage key
+const CALC_FIELDS_KEY = 'vpg-calculated-fields'
+
+/**
+ * Load calculated fields from localStorage
+ */
+function loadCalculatedFieldsFromStorage(): CalculatedField[] {
+  try {
+    const stored = localStorage.getItem(CALC_FIELDS_KEY)
+    if (stored) {
+      return JSON.parse(stored) as CalculatedField[]
+    }
+  }
+  catch {
+    // Ignore parse errors
+  }
+  return []
+}
+
+/**
+ * Save calculated fields to localStorage
+ */
+function saveCalculatedFieldsToStorage(fields: CalculatedField[]): void {
+  try {
+    localStorage.setItem(CALC_FIELDS_KEY, JSON.stringify(fields))
+  }
+  catch {
+    // Ignore storage errors
+  }
+}
 
 /**
  * Detect field type from sample data
@@ -34,9 +65,110 @@ function detectFieldType(data: Record<string, unknown>[], field: string): FieldS
 }
 
 /**
+ * Calculate median of an array
+ */
+function calculateMedian(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+/**
+ * Calculate standard deviation of an array
+ */
+function calculateStdDev(values: number[]): number {
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  const squaredDiffs = values.map(v => (v - mean) ** 2)
+  const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / values.length
+  return Math.sqrt(avgSquaredDiff)
+}
+
+/**
+ * Parse a simple formula to extract field references
+ */
+function parseSimpleFormula(formula: string): string[] {
+  const matches = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || []
+  const keywords = ['true', 'false', 'null', 'undefined']
+  return [...new Set(matches.filter(m => !keywords.includes(m.toLowerCase())))]
+}
+
+/**
+ * Evaluate a simple formula for a single row of data
+ */
+function evaluateSimpleFormula(
+  formula: string,
+  row: Record<string, unknown>,
+  fieldNames: string[]
+): number | null {
+  try {
+    const referencedFields = parseSimpleFormula(formula)
+    let expression = formula
+
+    for (const field of referencedFields) {
+      const actualField = fieldNames.find(f => f.toLowerCase() === field.toLowerCase()) || field
+      const value = row[actualField]
+
+      if (value === null || value === undefined || value === '') {
+        return null
+      }
+
+      const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
+      if (Number.isNaN(num)) {
+        return null
+      }
+
+      const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      expression = expression.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), String(num))
+    }
+
+    if (!/^[\d\s+\-*/().]+$/.test(expression)) {
+      return null
+    }
+
+    // eslint-disable-next-line no-new-func
+    const result = new Function(`return ${expression}`)()
+    return typeof result === 'number' && Number.isFinite(result) ? result : null
+  }
+  catch {
+    return null
+  }
+}
+
+/**
+ * Format calculated field value
+ */
+function formatCalculatedValue(
+  value: number | null,
+  formatAs?: 'number' | 'percent' | 'currency',
+  decimals = 2
+): string {
+  if (value === null)
+    return '-'
+
+  switch (formatAs) {
+    case 'percent':
+      return `${value.toFixed(decimals)}%`
+    case 'currency':
+      return value.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })
+    default:
+      return value.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: decimals,
+      })
+  }
+}
+
+/**
  * Aggregate values based on function type
  */
-function aggregate(values: number[], fn: AggregationFunction): number | null {
+function aggregate(values: number[], fn: AggregationFunction, grandTotal?: number): number | null {
   if (values.length === 0)
     return null
 
@@ -53,6 +185,15 @@ function aggregate(values: number[], fn: AggregationFunction): number | null {
       return Math.max(...values)
     case 'countDistinct':
       return new Set(values).size
+    case 'median':
+      return calculateMedian(values)
+    case 'stdDev':
+      return calculateStdDev(values)
+    case 'percentOfTotal': {
+      const sum = values.reduce((a, b) => a + b, 0)
+      if (grandTotal === undefined || grandTotal === 0) return null
+      return (sum / grandTotal) * 100
+    }
     default:
       return values.reduce((a, b) => a + b, 0)
   }
@@ -67,6 +208,14 @@ function formatValue(value: number | null, fn: AggregationFunction): string {
 
   if (fn === 'count' || fn === 'countDistinct') {
     return Math.round(value).toLocaleString()
+  }
+
+  if (fn === 'percentOfTotal') {
+    return `${value.toFixed(1)}%`
+  }
+
+  if (fn === 'stdDev') {
+    return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
   }
 
   if (Math.abs(value) >= 1000) {
@@ -87,6 +236,10 @@ export function getAggregationLabel(fn: AggregationFunction): string {
     min: 'Min',
     max: 'Max',
     countDistinct: 'Count Distinct',
+    median: 'Median',
+    stdDev: 'Std Dev',
+    percentOfTotal: '% of Total',
+    custom: 'Custom',
   }
   return labels[fn]
 }
@@ -169,6 +322,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   const valueFields = ref<PivotValueField[]>([])
   const showRowTotals = ref(true)
   const showColumnTotals = ref(true)
+  const calculatedFields = ref<CalculatedField[]>(loadCalculatedFieldsFromStorage())
 
   // Track current storage key
   const currentStorageKey = ref<string | null>(null)
@@ -211,6 +365,26 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     if (rows.length === 0)
       return null
 
+    // Build calculated field map
+    const calcFieldMap = new Map<string, CalculatedField>()
+    for (const cf of calculatedFields.value) {
+      calcFieldMap.set(cf.id, cf)
+    }
+
+    // Get all data field names for formula evaluation
+    const allDataFieldNames = rows.length > 0 ? Object.keys(rows[0]) : []
+
+    // Helper to get value field label with calc field name
+    const getValueFieldLabel = (vf: PivotValueField): string => {
+      if (vf.field.startsWith('calc:')) {
+        const calcId = vf.field.replace('calc:', '')
+        const calcDef = calcFieldMap.get(calcId)
+        const name = calcDef?.name || vf.field
+        return `${name} (${getAggregationLabel(vf.aggregation)})`
+      }
+      return `${vf.label || vf.field} (${getAggregationLabel(vf.aggregation)})`
+    }
+
     // Collect unique row and column keys
     const rowKeySet = new Set<string>()
     const colKeySet = new Set<string>()
@@ -238,15 +412,29 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
       // Collect values for each value field
       for (let i = 0; i < valueFields.value.length; i++) {
         const vf = valueFields.value[i]
-        const val = row[vf.field]
-        if (val !== null && val !== undefined && val !== '') {
-          const num = typeof val === 'number' ? val : Number.parseFloat(String(val))
-          if (!Number.isNaN(num)) {
-            valueArrays[i].push(num)
+        let num: number | null = null
+
+        if (vf.field.startsWith('calc:')) {
+          // Calculated field - evaluate formula for this row
+          const calcId = vf.field.replace('calc:', '')
+          const calcDef = calcFieldMap.get(calcId)
+          if (calcDef) {
+            num = evaluateSimpleFormula(calcDef.formula, row, allDataFieldNames)
           }
-          else if (vf.aggregation === 'count' || vf.aggregation === 'countDistinct') {
-            valueArrays[i].push(1)
+        }
+        else {
+          // Regular field - get value directly
+          const val = row[vf.field]
+          if (val !== null && val !== undefined && val !== '') {
+            num = typeof val === 'number' ? val : Number.parseFloat(String(val))
+            if (Number.isNaN(num)) {
+              num = (vf.aggregation === 'count' || vf.aggregation === 'countDistinct') ? 1 : null
+            }
           }
+        }
+
+        if (num !== null) {
+          valueArrays[i].push(num)
         }
       }
     }
@@ -254,6 +442,34 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     // Sort keys
     const rowKeys = Array.from(rowKeySet).sort()
     const colKeys = Array.from(colKeySet).sort()
+
+    // Pre-calculate grand totals for percentOfTotal calculations
+    const grandTotals: number[] = valueFields.value.map((vf) => {
+      let total = 0
+      for (const row of rows) {
+        let num: number | null = null
+
+        if (vf.field.startsWith('calc:')) {
+          const calcId = vf.field.replace('calc:', '')
+          const calcDef = calcFieldMap.get(calcId)
+          if (calcDef) {
+            num = evaluateSimpleFormula(calcDef.formula, row, allDataFieldNames)
+          }
+        }
+        else {
+          const val = row[vf.field]
+          if (val !== null && val !== undefined && val !== '') {
+            num = typeof val === 'number' ? val : Number.parseFloat(String(val))
+            if (Number.isNaN(num))
+              num = null
+          }
+        }
+
+        if (num !== null)
+          total += num
+      }
+      return total
+    })
 
     // Build column headers
     const headers: string[][] = []
@@ -271,15 +487,13 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     // If multiple value fields, add value field labels as last header row
     if (valueFields.value.length > 1 || headers.length === 0) {
       const valueLabels: string[] = []
-      for (const colKey of colKeys) {
+      for (const _colKey of colKeys) {
         for (const vf of valueFields.value) {
-          valueLabels.push(`${vf.label || vf.field} (${getAggregationLabel(vf.aggregation)})`)
+          valueLabels.push(getValueFieldLabel(vf))
         }
       }
       if (colKeys.length === 1 && colKeys[0] === '__all__') {
-        headers.push(valueFields.value.map(vf =>
-          `${vf.label || vf.field} (${getAggregationLabel(vf.aggregation)})`,
-        ))
+        headers.push(valueFields.value.map(vf => getValueFieldLabel(vf)))
       }
       else {
         headers.push(valueLabels)
@@ -310,12 +524,23 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         for (let i = 0; i < valueFields.value.length; i++) {
           const vf = valueFields.value[i]
           const values = valueArrays[i]
-          const aggValue = aggregate(values, vf.aggregation)
+          const aggValue = aggregate(values, vf.aggregation, grandTotals[i])
+
+          // Format based on whether it's a calculated field
+          let formattedValue: string
+          if (vf.field.startsWith('calc:')) {
+            const calcId = vf.field.replace('calc:', '')
+            const calcDef = calcFieldMap.get(calcId)
+            formattedValue = formatCalculatedValue(aggValue, calcDef?.formatAs || 'number', calcDef?.decimals ?? 2)
+          }
+          else {
+            formattedValue = formatValue(aggValue, vf.aggregation)
+          }
 
           rowData.push({
             value: aggValue,
             count: values.length,
-            formattedValue: formatValue(aggValue, vf.aggregation),
+            formattedValue,
           })
 
           rowTotalValues[i].push(...values)
@@ -341,7 +566,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         if (valueFields.value.length > 0) {
           const vf = valueFields.value[0]
           const allValues = rowTotalValues[0]
-          const aggValue = aggregate(allValues, vf.aggregation)
+          const aggValue = aggregate(allValues, vf.aggregation, grandTotals[0])
           totalCell.value = aggValue
           totalCell.count = allValues.length
           totalCell.formattedValue = formatValue(aggValue, vf.aggregation)
@@ -366,7 +591,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
           allColValues.push(...valueArrays[valueIdx])
         }
 
-        const aggValue = aggregate(allColValues, vf.aggregation)
+        const aggValue = aggregate(allColValues, vf.aggregation, grandTotals[valueIdx])
         columnTotals.push({
           value: aggValue,
           count: allColValues.length,
@@ -394,7 +619,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         }
       }
 
-      const aggValue = aggregate(allValues, vf.aggregation)
+      const aggValue = aggregate(allValues, vf.aggregation, grandTotals[0])
       grandTotal.value = aggValue
       grandTotal.count = allValues.length
       grandTotal.formattedValue = formatValue(aggValue, vf.aggregation)
@@ -502,6 +727,29 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     }
   }
 
+  // Calculated field management
+  function addCalculatedField(field: CalculatedField) {
+    const existing = calculatedFields.value.findIndex(f => f.id === field.id)
+    if (existing >= 0) {
+      calculatedFields.value = [
+        ...calculatedFields.value.slice(0, existing),
+        field,
+        ...calculatedFields.value.slice(existing + 1),
+      ]
+    }
+    else {
+      calculatedFields.value = [...calculatedFields.value, field]
+    }
+    saveCalculatedFieldsToStorage(calculatedFields.value)
+  }
+
+  function removeCalculatedField(id: string) {
+    calculatedFields.value = calculatedFields.value.filter(f => f.id !== id)
+    // Also remove from value fields if it was being used
+    valueFields.value = valueFields.value.filter(v => v.field !== `calc:${id}`)
+    saveCalculatedFieldsToStorage(calculatedFields.value)
+  }
+
   // Watch data to restore or validate config
   watch(data, (newData) => {
     if (newData.length === 0)
@@ -520,6 +768,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         valueFields.value = savedConfig.valueFields
         showRowTotals.value = savedConfig.showRowTotals
         showColumnTotals.value = savedConfig.showColumnTotals
+        calculatedFields.value = savedConfig.calculatedFields || []
       }
       else {
         const currentConfig: PivotConfig = {
@@ -550,7 +799,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
 
   // Watch config changes and save to sessionStorage
   watch(
-    [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals],
+    [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields],
     () => {
       if (!currentStorageKey.value)
         return
@@ -561,6 +810,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         valueFields: valueFields.value,
         showRowTotals: showRowTotals.value,
         showColumnTotals: showColumnTotals.value,
+        calculatedFields: calculatedFields.value,
       }
       saveConfig(currentStorageKey.value, config)
     },
@@ -580,6 +830,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     unassignedFields,
     isConfigured,
     pivotResult,
+    calculatedFields,
 
     // Actions
     addRowField,
@@ -592,6 +843,8 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     clearConfig,
     moveField,
     autoSuggestConfig,
+    addCalculatedField,
+    removeCalculatedField,
   }
 }
 

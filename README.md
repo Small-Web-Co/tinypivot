@@ -24,7 +24,10 @@ A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 | Dark mode | ✅ | ✅ |
 | Keyboard navigation | ✅ | ✅ |
 | Pivot table | ❌ | ✅ |
-| Aggregations (Sum, Avg, etc.) | ❌ | ✅ |
+| Basic aggregations (Sum, Count, Avg, Min, Max, Unique) | ❌ | ✅ |
+| Advanced aggregations (Median, Std Dev, % of Total) | ❌ | ✅ |
+| Custom aggregation functions | ❌ | ✅ |
+| Calculated fields with formulas | ❌ | ✅ |
 | Row/column totals | ❌ | ✅ |
 | No watermark | ❌ | ✅ |
 
@@ -197,6 +200,141 @@ const badData = [
 | `Arrow keys` | Navigate cells |
 | `Shift+Arrow` | Extend selection |
 | `Escape` | Clear selection/search |
+
+## Aggregation Functions
+
+TinyPivot includes 9 built-in aggregation functions plus support for custom calculations:
+
+| Function | Symbol | Description |
+|----------|--------|-------------|
+| **Sum** | Σ | Total of all values |
+| **Count** | # | Number of values |
+| **Average** | x̄ | Mean of all values |
+| **Min** | ↓ | Minimum value |
+| **Max** | ↑ | Maximum value |
+| **Unique** | ◇ | Count of distinct values |
+| **Median** | M̃ | Middle value (outlier-resistant) |
+| **Std Dev** | σ | Standard deviation (spread measure) |
+| **% of Total** | %Σ | Percentage contribution to grand total |
+| **Custom** | ƒ | Your own aggregation function |
+
+## Custom Calculations
+
+TinyPivot supports three types of custom calculations:
+
+### 1. Custom Aggregation Functions (Developer API)
+
+Pass your own aggregation logic via the `customFn` property:
+
+```typescript
+// Vue
+const valueFields = ref([
+  {
+    field: 'sales',
+    aggregation: 'custom',
+    customFn: (values) => {
+      // 90th percentile
+      const sorted = [...values].sort((a, b) => a - b)
+      return sorted[Math.floor(sorted.length * 0.9)]
+    },
+    customLabel: '90th Percentile',
+    customSymbol: 'P90'
+  }
+])
+```
+
+```tsx
+// React
+const valueFields = [
+  {
+    field: 'sales',
+    aggregation: 'custom',
+    customFn: (values) => {
+      // Interquartile mean
+      const sorted = [...values].sort((a, b) => a - b)
+      const q1 = Math.floor(sorted.length * 0.25)
+      const q3 = Math.floor(sorted.length * 0.75)
+      const middle = sorted.slice(q1, q3)
+      return middle.reduce((a, b) => a + b, 0) / middle.length
+    },
+    customLabel: 'IQR Mean',
+    customSymbol: 'IQM'
+  }
+]
+```
+
+### 2. Calculated Fields (UI-Based)
+
+Create fields that compute values from other aggregations using a formula builder:
+
+1. Click the **+** button in the "Calculated" section
+2. Enter a name (e.g., "Profit Margin %")
+3. Build a formula like `SUM(profit) / SUM(revenue) * 100`
+4. Choose format (Number, Percent, Currency)
+
+**Supported functions in formulas:**
+- `SUM(field)` - Sum of values
+- `AVG(field)` - Average of values
+- `MIN(field)` - Minimum value
+- `MAX(field)` - Maximum value
+- `COUNT(field)` - Count of values
+- `MEDIAN(field)` - Median value
+
+**Example formulas:**
+```
+SUM(profit) / SUM(revenue) * 100      → Profit margin %
+SUM(revenue) / SUM(units)              → Average price per unit
+(MAX(sales) - MIN(sales)) / AVG(sales) → Coefficient of variation
+```
+
+### 3. Programmatic Calculated Fields
+
+Add calculated fields via props:
+
+```typescript
+// Vue
+const calculatedFields = ref([
+  {
+    id: 'margin',
+    name: 'Profit Margin %',
+    formula: 'SUM(profit) / SUM(revenue) * 100',
+    formatAs: 'percent',
+    decimals: 1
+  },
+  {
+    id: 'avg_price',
+    name: 'Avg Price',
+    formula: 'SUM(revenue) / SUM(units)',
+    formatAs: 'currency',
+    decimals: 2
+  }
+])
+```
+
+### TypeScript Types
+
+```typescript
+import type {
+  CustomAggregationFn,
+  CalculatedField,
+  PivotValueField
+} from '@smallwebco/tinypivot-vue'
+
+// Custom aggregation function signature
+type CustomAggregationFn = (
+  values: number[],
+  allFieldValues?: Record<string, number[]>
+) => number | null
+
+// Calculated field definition
+interface CalculatedField {
+  id: string
+  name: string
+  formula: string
+  formatAs?: 'number' | 'percent' | 'currency'
+  decimals?: number
+}
+```
 
 ## Pro License
 
