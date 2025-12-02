@@ -64,6 +64,99 @@ function getCommitsSinceTag(tag) {
   }
 }
 
+function getChangedFiles(tag) {
+  const range = tag ? `${tag}..HEAD` : 'HEAD'
+  try {
+    const diff = runQuiet(`git diff --name-only ${range}`)
+    if (!diff) return []
+    return diff.split('\n').filter(f => f.length > 0)
+  } catch {
+    return []
+  }
+}
+
+function analyzeFileChanges(files) {
+  const changes = {
+    core: { components: [], hooks: [], types: [], utils: [], other: [] },
+    vue: { components: [], composables: [], styles: [], other: [] },
+    react: { components: [], hooks: [], styles: [], other: [] },
+    demo: [],
+    config: [],
+    docs: []
+  }
+
+  for (const file of files) {
+    // Skip dist, node_modules, lock files
+    if (file.includes('dist/') || file.includes('node_modules/') || file.includes('pnpm-lock')) continue
+    
+    if (file.startsWith('packages/core/')) {
+      const name = file.replace('packages/core/', '')
+      if (name.includes('types/')) changes.core.types.push(name)
+      else if (name.includes('utils/')) changes.core.utils.push(name)
+      else if (name.includes('pivot/')) changes.core.hooks.push(name)
+      else changes.core.other.push(name)
+    } else if (file.startsWith('packages/vue/')) {
+      const name = file.replace('packages/vue/', '')
+      if (name.includes('components/')) changes.vue.components.push(name)
+      else if (name.includes('composables/')) changes.vue.composables.push(name)
+      else if (name.includes('.css')) changes.vue.styles.push(name)
+      else changes.vue.other.push(name)
+    } else if (file.startsWith('packages/react/')) {
+      const name = file.replace('packages/react/', '')
+      if (name.includes('components/')) changes.react.components.push(name)
+      else if (name.includes('hooks/')) changes.react.hooks.push(name)
+      else if (name.includes('.css')) changes.react.styles.push(name)
+      else changes.react.other.push(name)
+    } else if (file.startsWith('demo/')) {
+      changes.demo.push(file)
+    } else if (file.endsWith('.md') || file.endsWith('.txt')) {
+      changes.docs.push(file)
+    } else if (file.includes('config') || file.endsWith('.json') || file.endsWith('.js') || file.endsWith('.ts')) {
+      changes.config.push(file)
+    }
+  }
+
+  return changes
+}
+
+function generateFileChangeSummary(changes) {
+  const sections = []
+
+  // Core changes
+  const coreChanges = []
+  if (changes.core.types.length) coreChanges.push(`Types (${changes.core.types.length} files)`)
+  if (changes.core.hooks.length) coreChanges.push(`Pivot logic (${changes.core.hooks.length} files)`)
+  if (changes.core.utils.length) coreChanges.push(`Utilities (${changes.core.utils.length} files)`)
+  if (coreChanges.length) {
+    sections.push(`- **Core**: ${coreChanges.join(', ')}`)
+  }
+
+  // Vue changes
+  const vueChanges = []
+  if (changes.vue.components.length) vueChanges.push(`${changes.vue.components.length} components`)
+  if (changes.vue.composables.length) vueChanges.push(`${changes.vue.composables.length} composables`)
+  if (changes.vue.styles.length) vueChanges.push(`styles`)
+  if (vueChanges.length) {
+    sections.push(`- **Vue**: ${vueChanges.join(', ')}`)
+  }
+
+  // React changes
+  const reactChanges = []
+  if (changes.react.components.length) reactChanges.push(`${changes.react.components.length} components`)
+  if (changes.react.hooks.length) reactChanges.push(`${changes.react.hooks.length} hooks`)
+  if (changes.react.styles.length) reactChanges.push(`styles`)
+  if (reactChanges.length) {
+    sections.push(`- **React**: ${reactChanges.join(', ')}`)
+  }
+
+  // Demo changes
+  if (changes.demo.length) {
+    sections.push(`- **Demo**: ${changes.demo.length} files updated`)
+  }
+
+  return sections.join('\n')
+}
+
 function categorizeCommits(commits) {
   const categories = {
     features: [],
@@ -97,6 +190,7 @@ function categorizeCommits(commits) {
     } else if (msg.startsWith('chore') || msg.includes('build') || msg.includes('ci')) {
       categories.chore.push(commit)
     } else {
+      // Include all other commits instead of skipping
       categories.other.push(commit)
     }
   }
@@ -104,7 +198,7 @@ function categorizeCommits(commits) {
   return categories
 }
 
-function generateChangelog(categories, previousTag, newVersion) {
+function generateChangelog(categories, fileChanges, previousTag, newVersion) {
   const sections = []
   
   const categoryTitles = {
@@ -118,9 +212,12 @@ function generateChangelog(categories, previousTag, newVersion) {
     other: '📝 Other Changes'
   }
 
+  // Add commit-based changes
+  let hasCommitChanges = false
   for (const [key, title] of Object.entries(categoryTitles)) {
     const commits = categories[key]
     if (commits.length > 0) {
+      hasCommitChanges = true
       sections.push(`### ${title}\n`)
       for (const commit of commits) {
         sections.push(`- ${commit.message} (\`${commit.hash}\`)`)
@@ -129,8 +226,23 @@ function generateChangelog(categories, previousTag, newVersion) {
     }
   }
 
+  // If no commit changes, show file-based summary
+  const fileSummary = generateFileChangeSummary(fileChanges)
+  if (!hasCommitChanges && fileSummary) {
+    sections.push('### 📦 Package Updates\n')
+    sections.push(fileSummary)
+    sections.push('')
+  } else if (fileSummary) {
+    // Also add file summary if we have both
+    sections.push('### 📦 Files Changed\n')
+    sections.push(fileSummary)
+    sections.push('')
+  }
+
+  // Fallback if still nothing
   if (sections.length === 0) {
-    sections.push('- Minor updates and improvements')
+    sections.push('- Internal improvements and maintenance')
+    sections.push('')
   }
 
   const compareUrl = previousTag 
@@ -143,17 +255,24 @@ function generateChangelog(categories, previousTag, newVersion) {
 function createGitHubRelease(version, changelog) {
   console.log('\n🎉 Creating GitHub release...')
   
-  // Escape the changelog for shell
-  const escapedChangelog = changelog.replace(/"/g, '\\"').replace(/`/g, '\\`')
+  // Write changelog to temp file to avoid shell escaping issues
+  const tempFile = join(rootDir, '.release-notes.tmp')
+  writeFileSync(tempFile, changelog)
   
   try {
     // Check if gh CLI is installed
     runQuiet('which gh')
     
-    // Create the release
-    run(`gh release create v${version} --title "v${version}" --notes "${escapedChangelog}"`)
+    // Create the release using file input
+    run(`gh release create v${version} --title "v${version}" --notes-file "${tempFile}"`)
     console.log('   ✓ GitHub release created')
+    
+    // Clean up temp file
+    execSync(`rm -f "${tempFile}"`, { cwd: rootDir })
   } catch (error) {
+    // Clean up temp file on error too
+    try { execSync(`rm -f "${tempFile}"`, { cwd: rootDir }) } catch {}
+    
     console.log('\n⚠️  Could not create GitHub release automatically.')
     console.log('   Please install GitHub CLI (gh) or create the release manually:')
     console.log(`   https://github.com/Small-Web-Co/tinypivot/releases/new?tag=v${version}`)
@@ -178,12 +297,22 @@ async function main() {
   console.log(`\n📦 Releasing TinyPivot`)
   console.log(`   ${currentVersion} → ${newVersion} (${bumpType})\n`)
 
-  // Get commits for changelog before making release commit
+  // Get commits and file changes for changelog before making release commit
   const previousTag = getLatestTag()
   console.log(`📝 Generating changelog since ${previousTag || 'beginning'}...`)
+  
   const commits = getCommitsSinceTag(previousTag)
   const categories = categorizeCommits(commits)
-  const changelog = generateChangelog(categories, previousTag, newVersion)
+  
+  const changedFiles = getChangedFiles(previousTag)
+  const fileChanges = analyzeFileChanges(changedFiles)
+  
+  const changelog = generateChangelog(categories, fileChanges, previousTag, newVersion)
+  
+  console.log('\n📋 Changelog preview:')
+  console.log('─'.repeat(50))
+  console.log(changelog)
+  console.log('─'.repeat(50))
 
   // Update all package.json files
   for (const pkgPath of packagePaths) {
