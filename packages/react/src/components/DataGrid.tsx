@@ -133,6 +133,9 @@ export function DataGrid({
     getSortDirection,
     columnFilters,
     activeFilters,
+    // Numeric range filters
+    setNumericRangeFilter,
+    getNumericRangeFilter,
   } = useExcelGrid({ data, enableSorting: true, enableFiltering: true })
 
   // Filtered data for pivot table
@@ -564,6 +567,13 @@ export function DataGrid({
       setColumnFilter(columnId, values)
     },
     [setColumnFilter]
+  )
+
+  const handleRangeFilter = useCallback(
+    (columnId: string, range: import('@smallwebco/tinypivot-core').NumericRange | null) => {
+      setNumericRangeFilter(columnId, range)
+    },
+    [setNumericRangeFilter]
   )
 
   const handleSort = useCallback(
@@ -1299,7 +1309,9 @@ export function DataGrid({
               stats={getColumnStats(activeFilterColumn)}
               selectedValues={getColumnFilterValues(activeFilterColumn)}
               sortDirection={getSortDirection(activeFilterColumn)}
+              numericRange={getNumericRangeFilter(activeFilterColumn)}
               onFilter={values => handleFilter(activeFilterColumn, values)}
+              onRangeFilter={range => handleRangeFilter(activeFilterColumn, range)}
               onSort={dir => handleSort(activeFilterColumn, dir)}
               onClose={closeFilterDropdown}
             />

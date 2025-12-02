@@ -62,6 +62,7 @@ export function detectFieldType(data: Record<string, unknown>[], field: string):
 
 /**
  * Get unique values for a column (for Excel-style filter dropdown)
+ * For numeric columns, also computes min and max values
  */
 export function getColumnUniqueValues<T>(
   data: T[],
@@ -70,6 +71,8 @@ export function getColumnUniqueValues<T>(
 ): ColumnStats {
   const values: unknown[] = []
   let nullCount = 0
+  let numericMin: number | undefined
+  let numericMax: number | undefined
 
   for (const row of data) {
     const value = (row as Record<string, unknown>)[columnKey]
@@ -77,6 +80,12 @@ export function getColumnUniqueValues<T>(
       nullCount++
     } else {
       values.push(value)
+      // Track numeric min/max
+      const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
+      if (!Number.isNaN(num)) {
+        if (numericMin === undefined || num < numericMin) numericMin = num
+        if (numericMax === undefined || num > numericMax) numericMax = num
+      }
     }
   }
 
@@ -97,11 +106,17 @@ export function getColumnUniqueValues<T>(
     return a.localeCompare(b)
   })
 
+  const columnType = detectColumnType(values)
+  
   return {
     uniqueValues,
     totalCount: data.length,
     nullCount,
-    type: detectColumnType(values),
+    type: columnType,
+    // Only include min/max for numeric columns
+    ...(columnType === 'number' && numericMin !== undefined && numericMax !== undefined
+      ? { numericMin, numericMax }
+      : {}),
   }
 }
 

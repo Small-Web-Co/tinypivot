@@ -125,6 +125,9 @@ const {
   getSortDirection,
   columnFilters,
   activeFilters,
+  // Numeric range filters
+  setNumericRangeFilter,
+  getNumericRangeFilter,
 } = useExcelGrid({ data: dataRef })
 
 // Filtered data for pivot table (respects column filters)
@@ -491,6 +494,10 @@ function closeFilterDropdown() {
 
 function handleFilter(columnId: string, values: string[]) {
   setColumnFilter(columnId, values)
+}
+
+function handleRangeFilter(columnId: string, range: import('@smallwebco/tinypivot-core').NumericRange | null) {
+  setNumericRangeFilter(columnId, range)
 }
 
 function handleSort(columnId: string, direction: 'asc' | 'desc' | null) {
@@ -1297,7 +1304,9 @@ function handleContainerClick(event: MouseEvent) {
           :stats="getColumnStats(activeFilterColumn)"
           :selected-values="getColumnFilterValues(activeFilterColumn)"
           :sort-direction="getSortDirection(activeFilterColumn)"
+          :numeric-range="getNumericRangeFilter(activeFilterColumn)"
           @filter="(values) => handleFilter(activeFilterColumn!, values)"
+          @range-filter="(range) => handleRangeFilter(activeFilterColumn!, range)"
           @sort="(dir) => handleSort(activeFilterColumn!, dir)"
           @close="closeFilterDropdown"
         />

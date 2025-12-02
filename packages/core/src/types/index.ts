@@ -4,12 +4,24 @@
  */
 
 // Grid Types
+export interface NumericRange {
+  min: number | null
+  max: number | null
+}
+
 export interface ColumnStats {
   uniqueValues: string[]
   totalCount: number
   nullCount: number
   type: 'string' | 'number' | 'date' | 'boolean' | 'mixed'
+  /** Min value for numeric columns */
+  numericMin?: number
+  /** Max value for numeric columns */
+  numericMax?: number
 }
+
+/** Filter value can be either selected values or numeric range */
+export type ColumnFilterValue = string[] | NumericRange
 
 export interface GridOptions<T = Record<string, unknown>> {
   data: T[]
@@ -212,12 +224,22 @@ export interface SelectionBounds {
 // Filter state
 export interface ColumnFilter {
   id: string
-  value: string[]
+  value: ColumnFilterValue
 }
 
 export interface ActiveFilter {
   column: string
   values: string[]
+  /** Numeric range filter (only for numeric columns) */
+  numericRange?: NumericRange
+}
+
+/** Type guard to check if filter value is a numeric range */
+export function isNumericRange(value: ColumnFilterValue): value is NumericRange {
+  return value !== null && 
+    typeof value === 'object' && 
+    !Array.isArray(value) && 
+    ('min' in value || 'max' in value)
 }
 
 

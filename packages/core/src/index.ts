@@ -10,6 +10,8 @@ export type {
   // Grid Types
   ColumnStats,
   GridOptions,
+  NumericRange,
+  ColumnFilterValue,
 
   // Pivot Types
   AggregationFunction,
@@ -47,6 +49,9 @@ export type {
   ColumnFilter,
   ActiveFilter,
 } from './types'
+
+// Type Guards
+export { isNumericRange } from './types'
 
 // Utility Functions
 export {

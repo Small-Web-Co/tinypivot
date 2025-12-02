@@ -1,9 +1,13 @@
 /**
  * Column Filter Dropdown Component for React
  * Shows unique values with checkboxes, search, and sort controls
+ * For numeric columns, also provides a range filter option
  */
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import type { ColumnStats } from '@smallwebco/tinypivot-core'
+import type { ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
+import { NumericRangeFilter } from './NumericRangeFilter'
+
+type FilterMode = 'values' | 'range'
 
 interface ColumnFilterProps {
   columnId: string
@@ -11,9 +15,13 @@ interface ColumnFilterProps {
   stats: ColumnStats
   selectedValues: string[]
   sortDirection: 'asc' | 'desc' | null
+  /** Current numeric range filter (if any) */
+  numericRange?: NumericRange | null
   onFilter: (values: string[]) => void
   onSort: (direction: 'asc' | 'desc' | null) => void
   onClose: () => void
+  /** Called when a numeric range filter is applied */
+  onRangeFilter?: (range: NumericRange | null) => void
 }
 
 export function ColumnFilter({
@@ -21,14 +29,27 @@ export function ColumnFilter({
   stats,
   selectedValues,
   sortDirection,
+  numericRange,
   onFilter,
   onSort,
   onClose,
+  onRangeFilter,
 }: ColumnFilterProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [localSelected, setLocalSelected] = useState<Set<string>>(new Set(selectedValues))
   const dropdownRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Filter mode (values vs range) - only available for numeric columns
+  const isNumericColumn = stats.type === 'number' &&
+    stats.numericMin !== undefined &&
+    stats.numericMax !== undefined
+
+  // Determine initial mode based on existing filters
+  const [filterMode, setFilterMode] = useState<FilterMode>(numericRange ? 'range' : 'values')
+
+  // Local range for the numeric filter
+  const [localRange, setLocalRange] = useState<NumericRange | null>(numericRange ?? null)
 
   // Include blank option if there are null values
   const hasBlankValues = stats.nullCount > 0
@@ -112,6 +133,24 @@ export function ColumnFilter({
     onClose()
   }, [onFilter, onClose])
 
+  // Handle range filter change from the NumericRangeFilter component
+  const handleRangeChange = useCallback((range: NumericRange | null) => {
+    setLocalRange(range)
+  }, [])
+
+  // Apply the range filter
+  const applyRangeFilter = useCallback(() => {
+    onRangeFilter?.(localRange)
+    onClose()
+  }, [localRange, onRangeFilter, onClose])
+
+  // Clear range filter
+  const clearRangeFilter = useCallback(() => {
+    setLocalRange(null)
+    onRangeFilter?.(null)
+    onClose()
+  }, [onRangeFilter, onClose])
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -148,6 +187,14 @@ export function ColumnFilter({
     setLocalSelected(new Set(selectedValues))
   }, [selectedValues])
 
+  // Sync numeric range with props
+  useEffect(() => {
+    setLocalRange(numericRange ?? null)
+    if (numericRange) {
+      setFilterMode('range')
+    }
+  }, [numericRange])
+
   return (
     <div ref={dropdownRef} className="vpg-filter-dropdown">
       {/* Header */}
@@ -160,7 +207,7 @@ export function ColumnFilter({
       <div className="vpg-sort-controls">
         <button
           className={`vpg-sort-btn ${sortDirection === 'asc' ? 'active' : ''}`}
-          title="Sort A to Z"
+          title={isNumericColumn ? 'Sort Low to High' : 'Sort A to Z'}
           onClick={sortAscending}
         >
           <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,11 +218,11 @@ export function ColumnFilter({
               d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
             />
           </svg>
-          <span>A→Z</span>
+          <span>{isNumericColumn ? '1→9' : 'A→Z'}</span>
         </button>
         <button
           className={`vpg-sort-btn ${sortDirection === 'desc' ? 'active' : ''}`}
-          title="Sort Z to A"
+          title={isNumericColumn ? 'Sort High to Low' : 'Sort Z to A'}
           onClick={sortDescending}
         >
           <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,94 +233,155 @@ export function ColumnFilter({
               d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"
             />
           </svg>
-          <span>Z→A</span>
+          <span>{isNumericColumn ? '9→1' : 'Z→A'}</span>
         </button>
       </div>
 
       <div className="vpg-divider" />
 
-      {/* Search */}
-      <div className="vpg-search-container">
-        <svg className="vpg-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-        <input
-          ref={searchInputRef}
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search values..."
-          className="vpg-search-input"
-        />
-        {searchQuery && (
-          <button className="vpg-clear-search" onClick={() => setSearchQuery('')}>
-            ×
-          </button>
-        )}
-      </div>
-
-      {/* Select All / Clear All */}
-      <div className="vpg-bulk-actions">
-        <button className="vpg-bulk-btn" onClick={selectAll}>
-          <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          Select All
-        </button>
-        <button className="vpg-bulk-btn" onClick={clearAll}>
-          <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-          Clear All
-        </button>
-      </div>
-
-      {/* Values List */}
-      <div className="vpg-values-list">
-        {allValues.map(value => (
-          <label
-            key={value}
-            className={`vpg-value-item ${localSelected.has(value) ? 'selected' : ''}`}
+      {/* Filter Mode Tabs (only for numeric columns) */}
+      {isNumericColumn && (
+        <div className="vpg-filter-tabs">
+          <button
+            className={`vpg-tab-btn ${filterMode === 'values' ? 'active' : ''}`}
+            onClick={() => setFilterMode('values')}
           >
+            <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+              />
+            </svg>
+            Values
+          </button>
+          <button
+            className={`vpg-tab-btn ${filterMode === 'range' ? 'active' : ''}`}
+            onClick={() => setFilterMode('range')}
+          >
+            <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+              />
+            </svg>
+            Range
+          </button>
+        </div>
+      )}
+
+      {/* Values Filter Mode */}
+      {(!isNumericColumn || filterMode === 'values') && (
+        <>
+          {/* Search */}
+          <div className="vpg-search-container">
+            <svg className="vpg-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
             <input
-              type="checkbox"
-              checked={localSelected.has(value)}
-              onChange={() => toggleValue(value)}
-              className="vpg-value-checkbox"
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search values..."
+              className="vpg-search-input"
             />
-            <span className={`vpg-value-text ${value === '(blank)' ? 'vpg-blank' : ''}`}>
-              {value}
-            </span>
-          </label>
-        ))}
+            {searchQuery && (
+              <button className="vpg-clear-search" onClick={() => setSearchQuery('')}>
+                ×
+              </button>
+            )}
+          </div>
 
-        {allValues.length === 0 && <div className="vpg-no-results">No matching values</div>}
-      </div>
+          {/* Select All / Clear All */}
+          <div className="vpg-bulk-actions">
+            <button className="vpg-bulk-btn" onClick={selectAll}>
+              <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Select All
+            </button>
+            <button className="vpg-bulk-btn" onClick={clearAll}>
+              <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              Clear All
+            </button>
+          </div>
 
-      {/* Footer */}
-      <div className="vpg-filter-footer">
-        <button className="vpg-btn-clear" onClick={clearFilter}>
-          Clear Filter
-        </button>
-        <button className="vpg-btn-apply" onClick={applyFilter}>
-          Apply
-        </button>
-      </div>
+          {/* Values List */}
+          <div className="vpg-values-list">
+            {allValues.map(value => (
+              <label
+                key={value}
+                className={`vpg-value-item ${localSelected.has(value) ? 'selected' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={localSelected.has(value)}
+                  onChange={() => toggleValue(value)}
+                  className="vpg-value-checkbox"
+                />
+                <span className={`vpg-value-text ${value === '(blank)' ? 'vpg-blank' : ''}`}>
+                  {value}
+                </span>
+              </label>
+            ))}
+
+            {allValues.length === 0 && <div className="vpg-no-results">No matching values</div>}
+          </div>
+
+          {/* Footer for Values Mode */}
+          <div className="vpg-filter-footer">
+            <button className="vpg-btn-clear" onClick={clearFilter}>
+              Clear Filter
+            </button>
+            <button className="vpg-btn-apply" onClick={applyFilter}>
+              Apply
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Range Filter Mode */}
+      {isNumericColumn && filterMode === 'range' && (
+        <>
+          <NumericRangeFilter
+            dataMin={stats.numericMin!}
+            dataMax={stats.numericMax!}
+            currentRange={localRange}
+            onChange={handleRangeChange}
+          />
+
+          {/* Footer for Range Mode */}
+          <div className="vpg-filter-footer">
+            <button className="vpg-btn-clear" onClick={clearRangeFilter}>
+              Clear Filter
+            </button>
+            <button className="vpg-btn-apply" onClick={applyRangeFilter}>
+              Apply
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
