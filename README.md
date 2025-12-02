@@ -8,7 +8,7 @@ A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 
 [![Star on GitHub](https://img.shields.io/github/stars/Small-Web-Co/tinypivot?style=social)](https://github.com/Small-Web-Co/tinypivot)
 
-![TinyPivot Demo](https://tiny-pivot.com/images/tinypivot_demo.gif)
+![TinyPivot Demo](https://bvallieres.com/images/tinypivot_demo.gif)
 
 ## Features
 
