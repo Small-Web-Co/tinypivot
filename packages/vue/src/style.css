@@ -1,34 +1,26 @@
 /**
- * TinyPivot - Base Styles
- * Import this file in your app: import 'tinypivot/style.css'
+ * TinyPivot - Shared Styles
+ * Import this file in your app: import '@smallwebco/tinypivot-vue/style.css'
  */
 
-/* Reset and Base */
+/* ==========================================================================
+   Reset and Base
+   ========================================================================== */
 .vpg-data-grid *,
 .vpg-data-grid *::before,
-.vpg-data-grid *::after {
-  box-sizing: border-box;
-}
-
+.vpg-data-grid *::after,
 .vpg-pivot-config *,
 .vpg-pivot-config *::before,
-.vpg-pivot-config *::after {
-  box-sizing: border-box;
-}
-
+.vpg-pivot-config *::after,
 .vpg-pivot-skeleton *,
 .vpg-pivot-skeleton *::before,
-.vpg-pivot-skeleton *::after {
-  box-sizing: border-box;
-}
-
+.vpg-pivot-skeleton *::after,
 .vpg-filter-dropdown *,
 .vpg-filter-dropdown *::before,
 .vpg-filter-dropdown *::after {
   box-sizing: border-box;
 }
 
-/* Base font */
 .vpg-data-grid,
 .vpg-pivot-config,
 .vpg-pivot-skeleton,
@@ -39,7 +31,6 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus visible for accessibility */
 .vpg-data-grid :focus-visible,
 .vpg-pivot-config :focus-visible,
 .vpg-pivot-skeleton :focus-visible,
@@ -48,7 +39,6 @@
   outline-offset: 2px;
 }
 
-/* Button reset */
 .vpg-data-grid button,
 .vpg-pivot-config button,
 .vpg-pivot-skeleton button,
@@ -56,7 +46,6 @@
   font-family: inherit;
 }
 
-/* Input reset */
 .vpg-data-grid input,
 .vpg-pivot-config input,
 .vpg-pivot-skeleton input,
@@ -67,4 +56,12 @@
 .vpg-filter-dropdown select {
   font-family: inherit;
 }
+
+/* ==========================================================================
+   Icons
+   ========================================================================== */
+.vpg-icon { width: 1rem; height: 1rem; }
+.vpg-icon-sm { width: 0.875rem; height: 0.875rem; }
+.vpg-icon-xs { width: 0.75rem; height: 0.75rem; }
+.vpg-icon-lg { width: 3rem; height: 3rem; }
 
