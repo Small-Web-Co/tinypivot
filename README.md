@@ -2,7 +2,7 @@
 
 A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 
-**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)** · **[Patreon](https://patreon.com/smallweb)**
+**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)** · **[Open Collective](https://opencollective.com/tinypivot)**
 
 ⭐ **If you find TinyPivot useful, please consider giving it a star!** It helps others discover the project.
 
@@ -309,4 +309,4 @@ This repository uses the following topics for discoverability:
 
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-❤️-pink)](https://github.com/sponsors/Small-Web-Co) [![Patreon](https://img.shields.io/badge/Patreon-F96854?logo=patreon&logoColor=white)](https://patreon.com/smallweb)
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤️-pink)](https://github.com/sponsors/Small-Web-Co) [![Open Collective](https://img.shields.io/badge/Open_Collective-3385FF?logo=opencollective&logoColor=white)](https://opencollective.com/tinypivot)
