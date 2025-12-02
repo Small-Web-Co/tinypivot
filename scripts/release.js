@@ -75,6 +75,132 @@ function getChangedFiles(tag) {
   }
 }
 
+function getDiffContent(tag) {
+  const range = tag ? `${tag}..HEAD` : 'HEAD'
+  try {
+    return runQuiet(`git diff ${range}`)
+  } catch {
+    return ''
+  }
+}
+
+// Extract meaningful feature changes from the diff
+function extractFeatures(diffContent) {
+  const features = {
+    newComponents: new Set(),
+    newHooks: new Set(),
+    newTypes: new Set(),
+    newProps: new Set(),
+    newCssClasses: new Set(),
+    newExports: new Set(),
+    uiChanges: new Set()
+  }
+
+  const lines = diffContent.split('\n')
+  let currentFile = ''
+
+  for (const line of lines) {
+    // Track current file
+    if (line.startsWith('+++ b/')) {
+      currentFile = line.replace('+++ b/', '')
+      continue
+    }
+
+    // Only look at added lines
+    if (!line.startsWith('+') || line.startsWith('+++')) continue
+    const added = line.slice(1).trim()
+
+    // Skip empty lines, imports, comments
+    if (!added || added.startsWith('import ') || added.startsWith('//') || added.startsWith('*')) continue
+
+    // New React/Vue component definitions
+    const componentMatch = added.match(/(?:export\s+)?(?:const|function)\s+([A-Z][a-zA-Z0-9]+)\s*[=:(]/)
+    if (componentMatch && !componentMatch[1].match(/^(React|Vue|Props|Type|Interface)/)) {
+      features.newComponents.add(componentMatch[1])
+    }
+
+    // New hooks (React) or composables (Vue)
+    const hookMatch = added.match(/(?:export\s+)?(?:const|function)\s+(use[A-Z][a-zA-Z0-9]+)/)
+    if (hookMatch) {
+      features.newHooks.add(hookMatch[1])
+    }
+
+    // New TypeScript interfaces/types
+    const typeMatch = added.match(/(?:export\s+)?(?:interface|type)\s+([A-Z][a-zA-Z0-9]+)/)
+    if (typeMatch) {
+      features.newTypes.add(typeMatch[1])
+    }
+
+    // New props in interfaces (looking for property definitions)
+    const propMatch = added.match(/^\s*([a-z][a-zA-Z0-9]+)\??:\s*/)
+    if (propMatch && currentFile.includes('types')) {
+      features.newProps.add(propMatch[1])
+    }
+
+    // New CSS classes (significant ones, not utilities)
+    const cssClassMatch = added.match(/\.([a-z][a-z0-9-]+(?:__[a-z0-9-]+)?)\s*\{/)
+    if (cssClassMatch && cssClassMatch[1].length > 3) {
+      features.newCssClasses.add(cssClassMatch[1])
+    }
+
+    // New exports
+    const exportMatch = added.match(/export\s+\{\s*([^}]+)\s*\}/)
+    if (exportMatch) {
+      exportMatch[1].split(',').forEach(e => {
+        const name = e.trim().split(' ')[0]
+        if (name && name.length > 2) features.newExports.add(name)
+      })
+    }
+
+    // UI-related changes (detecting specific patterns)
+    if (added.includes('className=') || added.includes(':class=') || added.includes('class="')) {
+      // Extract meaningful class names that indicate features
+      const uiMatch = added.match(/(?:filter|modal|dropdown|tooltip|skeleton|grid|pivot|column|row|header|footer|toolbar)/i)
+      if (uiMatch) {
+        features.uiChanges.add(uiMatch[0].toLowerCase())
+      }
+    }
+  }
+
+  return features
+}
+
+// Generate human-readable feature summary
+function generateFeatureSummary(features) {
+  const summaries = []
+
+  if (features.newComponents.size > 0) {
+    const components = Array.from(features.newComponents).slice(0, 5)
+    summaries.push(`Added components: ${components.join(', ')}${features.newComponents.size > 5 ? ` (+${features.newComponents.size - 5} more)` : ''}`)
+  }
+
+  if (features.newHooks.size > 0) {
+    const hooks = Array.from(features.newHooks).slice(0, 5)
+    summaries.push(`Added hooks/composables: ${hooks.join(', ')}`)
+  }
+
+  if (features.newTypes.size > 0) {
+    const types = Array.from(features.newTypes).slice(0, 5)
+    summaries.push(`New types: ${types.join(', ')}${features.newTypes.size > 5 ? ` (+${features.newTypes.size - 5} more)` : ''}`)
+  }
+
+  if (features.newProps.size > 0) {
+    const props = Array.from(features.newProps).slice(0, 8)
+    summaries.push(`New props/options: ${props.join(', ')}${features.newProps.size > 8 ? ` (+${features.newProps.size - 8} more)` : ''}`)
+  }
+
+  if (features.uiChanges.size > 0) {
+    const ui = Array.from(features.uiChanges)
+    summaries.push(`UI updates: ${ui.join(', ')}`)
+  }
+
+  if (features.newCssClasses.size > 3) {
+    summaries.push(`Styling updates (${features.newCssClasses.size} new CSS rules)`)
+  }
+
+  return summaries
+}
+
 function analyzeFileChanges(files) {
   const changes = {
     core: { components: [], hooks: [], types: [], utils: [], other: [] },
@@ -198,9 +324,18 @@ function categorizeCommits(commits) {
   return categories
 }
 
-function generateChangelog(categories, fileChanges, previousTag, newVersion) {
+function generateChangelog(categories, fileChanges, featureSummary, previousTag, newVersion) {
   const sections = []
   
+  // Add feature summary at the top if we have meaningful features detected
+  if (featureSummary.length > 0) {
+    sections.push('### 🚀 Highlights\n')
+    for (const summary of featureSummary) {
+      sections.push(`- ${summary}`)
+    }
+    sections.push('')
+  }
+
   const categoryTitles = {
     features: '✨ Features',
     fixes: '🐛 Bug Fixes',
@@ -226,14 +361,14 @@ function generateChangelog(categories, fileChanges, previousTag, newVersion) {
     }
   }
 
-  // If no commit changes, show file-based summary
+  // If no commit changes and no feature summary, show file-based summary
   const fileSummary = generateFileChangeSummary(fileChanges)
-  if (!hasCommitChanges && fileSummary) {
+  if (!hasCommitChanges && featureSummary.length === 0 && fileSummary) {
     sections.push('### 📦 Package Updates\n')
     sections.push(fileSummary)
     sections.push('')
-  } else if (fileSummary) {
-    // Also add file summary if we have both
+  } else if (fileSummary && featureSummary.length === 0) {
+    // Also add file summary if we have commits but no feature highlights
     sections.push('### 📦 Files Changed\n')
     sections.push(fileSummary)
     sections.push('')
@@ -307,7 +442,13 @@ async function main() {
   const changedFiles = getChangedFiles(previousTag)
   const fileChanges = analyzeFileChanges(changedFiles)
   
-  const changelog = generateChangelog(categories, fileChanges, previousTag, newVersion)
+  // Analyze diff for feature extraction
+  console.log('🔍 Analyzing code changes...')
+  const diffContent = getDiffContent(previousTag)
+  const features = extractFeatures(diffContent)
+  const featureSummary = generateFeatureSummary(features)
+  
+  const changelog = generateChangelog(categories, fileChanges, featureSummary, previousTag, newVersion)
   
   console.log('\n📋 Changelog preview:')
   console.log('─'.repeat(50))
