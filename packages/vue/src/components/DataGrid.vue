@@ -1567,9 +1567,14 @@ function handleContainerClick(event: MouseEvent) {
   border-spacing: 0;
 }
 
-.vpg-header-cell {
+.vpg-table thead {
   position: sticky;
   top: 0;
+  z-index: 20;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+.vpg-header-cell {
   z-index: 10;
   padding: 0.75rem 1rem;
   text-align: left;
