@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { DataGrid, setLicenseKey } from 'tinypivot'
+import { DataGrid, enableDemoMode } from 'tinypivot'
+
+// Enable demo mode for the live demo
+enableDemoMode()
+
+// Framework toggle
+const selectedFramework = ref<'vue' | 'react'>('vue')
 
 // Generate large sample dataset (10,000 rows)
 function generateSampleData(count: number) {
@@ -41,6 +47,9 @@ const demoTheme = ref<'light' | 'dark'>('dark')
 function toggleDemoTheme() {
   demoTheme.value = demoTheme.value === 'dark' ? 'light' : 'dark'
 }
+
+// Package name based on framework
+const packageName = computed(() => selectedFramework.value === 'vue' ? '@tinypivot/vue' : '@tinypivot/react')
 
 // Pricing
 const selectedPlan = ref<'single' | 'unlimited' | 'team'>('single')
@@ -104,6 +113,11 @@ const proFeatures = [
 
 // Active section for navigation
 const activeSection = ref('hero')
+
+// Copy to clipboard
+function copyInstallCommand() {
+  navigator.clipboard.writeText(`pnpm add ${packageName.value}`)
+}
 </script>
 
 <template>
@@ -122,6 +136,32 @@ const activeSection = ref('hero')
           <a href="#quickstart">Quick Start</a>
           <a href="#demo">Demo</a>
           <a href="#pricing">Pricing</a>
+        </div>
+        <div class="nav-actions">
+          <div class="nav-framework-toggle">
+            <button 
+              :class="['nav-framework-btn', { active: selectedFramework === 'vue' }]"
+              @click="selectedFramework = 'vue'"
+              title="Vue 3"
+            >
+              <svg viewBox="0 0 128 128" width="16" height="16">
+                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z"/>
+                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z"/>
+              </svg>
+            </button>
+            <button 
+              :class="['nav-framework-btn', { active: selectedFramework === 'react' }]"
+              @click="selectedFramework = 'react'"
+              title="React"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="#61dafb">
+                <circle cx="12" cy="12" r="2.5"/>
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1"/>
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)"/>
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)"/>
+              </svg>
+            </button>
+          </div>
           <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank" class="nav-github">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -135,11 +175,38 @@ const activeSection = ref('hero')
     <section id="hero" class="hero">
       <div class="hero-bg"></div>
       <div class="hero-content">
-        <div class="badge">Vue 3 Component Library</div>
+        <!-- Framework Toggle -->
+        <div class="framework-toggle-wrapper">
+          <div class="framework-toggle">
+            <button 
+              :class="['framework-btn', { active: selectedFramework === 'vue' }]"
+              @click="selectedFramework = 'vue'"
+            >
+              <svg viewBox="0 0 128 128" width="20" height="20">
+                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z"/>
+                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z"/>
+              </svg>
+              Vue 3
+            </button>
+            <button 
+              :class="['framework-btn', { active: selectedFramework === 'react' }]"
+              @click="selectedFramework = 'react'"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="#61dafb">
+                <circle cx="12" cy="12" r="2.5"/>
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1"/>
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)"/>
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)"/>
+              </svg>
+              React
+            </button>
+          </div>
+          <div class="badge">{{ selectedFramework === 'vue' ? 'Vue 3' : 'React 18' }} Component Library</div>
+        </div>
         <h1>Excel-like Data Grid & <span class="gradient-text">Pivot Table</span></h1>
         <p class="hero-subtitle">
           A powerful, performant data grid with built-in filtering, sorting, and pivot table functionality.
-          Freemium model - start free, upgrade when you need more.
+          Available for <strong>Vue 3</strong> and <strong>React</strong>. Freemium model - start free, upgrade when you need more.
         </p>
         <div class="hero-actions">
           <a href="#demo" class="btn btn-primary">
@@ -154,8 +221,8 @@ const activeSection = ref('hero')
           </a>
         </div>
         <div class="hero-install">
-          <code>pnpm add tinypivot</code>
-          <button class="copy-btn" title="Copy to clipboard">
+          <code>pnpm add {{ packageName }}</code>
+          <button class="copy-btn" title="Copy to clipboard" @click="copyInstallCommand">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
@@ -168,7 +235,7 @@ const activeSection = ref('hero')
     <section id="features" class="features">
       <div class="section-header">
         <h2>Features</h2>
-        <p>Everything you need for data-heavy Vue applications</p>
+        <p>Everything you need for data-heavy {{ selectedFramework === 'vue' ? 'Vue' : 'React' }} applications</p>
       </div>
       
       <div class="features-grid">
@@ -275,9 +342,9 @@ const activeSection = ref('hero')
           <div class="step-number">1</div>
           <div class="step-content">
             <h3>Install</h3>
-            <p>One package, zero dependencies</p>
+            <p>One package, zero peer deps (except {{ selectedFramework === 'vue' ? 'Vue' : 'React' }})</p>
             <div class="code-block">
-              <code>pnpm add tinypivot</code>
+              <code>pnpm add {{ packageName }}</code>
             </div>
           </div>
         </div>
@@ -294,8 +361,10 @@ const activeSection = ref('hero')
             <h3>Import</h3>
             <p>Just two lines of setup</p>
             <div class="code-block code-block-multi">
-              <pre><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'tinypivot'</span>
-<span class="code-keyword">import</span> <span class="code-string">'tinypivot/style.css'</span></code></pre>
+              <pre v-if="selectedFramework === 'vue'"><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@tinypivot/vue'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@tinypivot/vue/style.css'</span></code></pre>
+              <pre v-else><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@tinypivot/react'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@tinypivot/react/style.css'</span></code></pre>
             </div>
           </div>
         </div>
@@ -312,7 +381,8 @@ const activeSection = ref('hero')
             <h3>Use</h3>
             <p>Pass your data, done.</p>
             <div class="code-block code-block-multi">
-              <pre><code><span class="code-tag">&lt;DataGrid</span> <span class="code-attr">:data</span>=<span class="code-string">"yourData"</span> <span class="code-tag">/&gt;</span></code></pre>
+              <pre v-if="selectedFramework === 'vue'"><code><span class="code-tag">&lt;DataGrid</span> <span class="code-attr">:data</span>=<span class="code-string">"yourData"</span> <span class="code-tag">/&gt;</span></code></pre>
+              <pre v-else><code><span class="code-tag">&lt;DataGrid</span> <span class="code-attr">data</span>=<span class="code-string">{yourData}</span> <span class="code-tag">/&gt;</span></code></pre>
             </div>
           </div>
         </div>
@@ -323,12 +393,13 @@ const activeSection = ref('hero')
           <span class="example-dot"></span>
           <span class="example-dot"></span>
           <span class="example-dot"></span>
-          <span class="example-title">App.vue</span>
+          <span class="example-title">{{ selectedFramework === 'vue' ? 'App.vue' : 'App.tsx' }}</span>
         </div>
         <div class="example-code">
-          <pre><code><span class="code-tag">&lt;script setup lang="ts"&gt;</span>
-<span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'tinypivot'</span>
-<span class="code-keyword">import</span> <span class="code-string">'tinypivot/style.css'</span>
+          <!-- Vue Example -->
+          <pre v-if="selectedFramework === 'vue'"><code><span class="code-tag">&lt;script setup lang="ts"&gt;</span>
+<span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@tinypivot/vue'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@tinypivot/vue/style.css'</span>
 
 <span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
 <span class="code-tag">&lt;/script&gt;</span>
@@ -343,6 +414,26 @@ const activeSection = ref('hero')
     <span class="code-attr">theme</span>=<span class="code-string">"light"</span>
   <span class="code-tag">/&gt;</span>
 <span class="code-tag">&lt;/template&gt;</span></code></pre>
+          <!-- React Example -->
+          <pre v-else><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@tinypivot/react'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@tinypivot/react/style.css'</span>
+
+<span class="code-keyword">function</span> <span class="code-function">App</span>() {
+  <span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
+
+  <span class="code-keyword">return</span> (
+    <span class="code-tag">&lt;DataGrid</span>
+      <span class="code-attr">data</span>=<span class="code-string">{data}</span>
+      <span class="code-attr">enableSearch</span>=<span class="code-string">{true}</span>
+      <span class="code-attr">enableExport</span>=<span class="code-string">{true}</span>
+      <span class="code-attr">enablePagination</span>=<span class="code-string">{true}</span>
+      <span class="code-attr">pageSize</span>=<span class="code-string">{100}</span>
+      <span class="code-attr">theme</span>=<span class="code-string">"light"</span>
+    <span class="code-tag">/&gt;</span>
+  )
+}
+
+<span class="code-keyword">export default</span> App</code></pre>
         </div>
       </div>
 
@@ -356,42 +447,42 @@ const activeSection = ref('hero')
             <span>Description</span>
           </div>
           <div class="props-row">
-            <code>:enable-search</code>
+            <code>{{ selectedFramework === 'vue' ? ':enable-search' : 'enableSearch' }}</code>
             <span>true</span>
             <span>Global search across all columns</span>
           </div>
           <div class="props-row">
-            <code>:enable-export</code>
+            <code>{{ selectedFramework === 'vue' ? ':enable-export' : 'enableExport' }}</code>
             <span>true</span>
             <span>CSV export button in toolbar</span>
           </div>
           <div class="props-row">
-            <code>:enable-pagination</code>
+            <code>{{ selectedFramework === 'vue' ? ':enable-pagination' : 'enablePagination' }}</code>
             <span>false</span>
             <span>Paginate large datasets</span>
           </div>
           <div class="props-row">
-            <code>:page-size</code>
+            <code>{{ selectedFramework === 'vue' ? ':page-size' : 'pageSize' }}</code>
             <span>50</span>
             <span>Rows per page</span>
           </div>
           <div class="props-row">
-            <code>:enable-column-resize</code>
+            <code>{{ selectedFramework === 'vue' ? ':enable-column-resize' : 'enableColumnResize' }}</code>
             <span>true</span>
             <span>Drag column edges to resize</span>
           </div>
           <div class="props-row">
-            <code>:enable-clipboard</code>
+            <code>{{ selectedFramework === 'vue' ? ':enable-clipboard' : 'enableClipboard' }}</code>
             <span>true</span>
             <span>Ctrl+C copies selected cells</span>
           </div>
           <div class="props-row">
-            <code>:theme</code>
+            <code>theme</code>
             <span>"light"</span>
             <span>"light" | "dark" | "auto"</span>
           </div>
           <div class="props-row">
-            <code>:show-pivot</code>
+            <code>{{ selectedFramework === 'vue' ? ':show-pivot' : 'showPivot' }}</code>
             <span>true</span>
             <span>Show pivot table toggle (Pro)</span>
           </div>
@@ -439,7 +530,7 @@ const activeSection = ref('hero')
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
           <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <span><strong>Try it now!</strong> All Pro features are unlocked in this demo. Click "Pivot" to explore the pivot table functionality.</span>
+        <span><strong>Try it now!</strong> All Pro features are unlocked in this demo. Click "Pivot" to explore the pivot table functionality. Same API for Vue and React!</span>
       </div>
     </section>
 
@@ -447,7 +538,7 @@ const activeSection = ref('hero')
     <section id="pricing" class="pricing">
       <div class="section-header">
         <h2>Simple Pricing</h2>
-        <p>One-time payment, lifetime license with free updates</p>
+        <p>One-time payment, lifetime license with free updates. Works for both Vue and React.</p>
       </div>
 
       <div class="pricing-cards">
@@ -518,10 +609,10 @@ const activeSection = ref('hero')
 
     <!-- CTA Section -->
     <section class="cta">
-      <h2>Ready to supercharge your Vue app?</h2>
+      <h2>Ready to supercharge your {{ selectedFramework === 'vue' ? 'Vue' : 'React' }} app?</h2>
       <p>Join hundreds of developers using TinyPivot</p>
       <div class="cta-actions">
-        <code>pnpm add tinypivot</code>
+        <code>pnpm add {{ packageName }}</code>
       </div>
     </section>
 
@@ -535,7 +626,7 @@ const activeSection = ref('hero')
             </svg>
             <span>TinyPivot</span>
           </div>
-          <p>Excel-like data grid & pivot table for Vue 3</p>
+          <p>Excel-like data grid & pivot table for Vue 3 and React</p>
         </div>
         <div class="footer-links">
           <div class="footer-col">
@@ -567,6 +658,58 @@ const activeSection = ref('hero')
 /* Landing Page Styles */
 .landing-page {
   min-height: 100vh;
+}
+
+/* Framework Toggle */
+.framework-toggle-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.framework-toggle {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.framework-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.framework-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.framework-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.code-function {
+  color: #61afef;
+}
+
+.code-comment {
+  color: #5c6370;
+  font-style: italic;
 }
 
 /* Navigation */
@@ -622,6 +765,42 @@ const activeSection = ref('hero')
   color: white;
 }
 
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-framework-toggle {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-framework-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-framework-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-framework-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+}
+
 .nav-github {
   display: flex;
   align-items: center;
@@ -661,7 +840,6 @@ const activeSection = ref('hero')
   font-size: 0.75rem;
   font-weight: 500;
   color: #10b981;
-  margin-bottom: 1.5rem;
 }
 
 .hero h1 {
@@ -686,6 +864,10 @@ const activeSection = ref('hero')
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.hero-subtitle strong {
+  color: #e2e8f0;
 }
 
 .hero-actions {
@@ -1081,7 +1263,7 @@ const activeSection = ref('hero')
 
 .props-row {
   display: grid;
-  grid-template-columns: 180px 80px 1fr;
+  grid-template-columns: 200px 80px 1fr;
   gap: 1rem;
   padding: 0.625rem 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -1495,9 +1677,8 @@ const activeSection = ref('hero')
     font-size: 0.75rem;
   }
   
-  .nav-links a:not(.nav-github) {
+  .nav-links {
     display: none;
   }
 }
 </style>
-

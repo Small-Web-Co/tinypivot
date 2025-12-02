@@ -6,9 +6,10 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      'tinypivot/style.css': resolve(__dirname, 'src/style.css'),
-      'tinypivot': resolve(__dirname, 'src/index.ts'),
+      '@': resolve(__dirname, 'packages/vue/src'),
+      'tinypivot/style.css': resolve(__dirname, 'packages/vue/src/style.css'),
+      'tinypivot': resolve(__dirname, 'packages/vue/src/index.ts'),
+      '@smallwebco/tinypivot-core': resolve(__dirname, 'packages/core/src/index.ts'),
     },
   },
   root: 'demo',
@@ -21,5 +22,7 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
+  optimizeDeps: {
+    include: ['@tanstack/vue-table'],
+  },
 })
-

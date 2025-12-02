@@ -1,0 +1,70 @@
+/**
+ * TinyPivot - Base Styles
+ * Import this file in your app: import 'tinypivot/style.css'
+ */
+
+/* Reset and Base */
+.vpg-data-grid *,
+.vpg-data-grid *::before,
+.vpg-data-grid *::after {
+  box-sizing: border-box;
+}
+
+.vpg-pivot-config *,
+.vpg-pivot-config *::before,
+.vpg-pivot-config *::after {
+  box-sizing: border-box;
+}
+
+.vpg-pivot-skeleton *,
+.vpg-pivot-skeleton *::before,
+.vpg-pivot-skeleton *::after {
+  box-sizing: border-box;
+}
+
+.vpg-filter-dropdown *,
+.vpg-filter-dropdown *::before,
+.vpg-filter-dropdown *::after {
+  box-sizing: border-box;
+}
+
+/* Base font */
+.vpg-data-grid,
+.vpg-pivot-config,
+.vpg-pivot-skeleton,
+.vpg-filter-dropdown {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus visible for accessibility */
+.vpg-data-grid :focus-visible,
+.vpg-pivot-config :focus-visible,
+.vpg-pivot-skeleton :focus-visible,
+.vpg-filter-dropdown :focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Button reset */
+.vpg-data-grid button,
+.vpg-pivot-config button,
+.vpg-pivot-skeleton button,
+.vpg-filter-dropdown button {
+  font-family: inherit;
+}
+
+/* Input reset */
+.vpg-data-grid input,
+.vpg-pivot-config input,
+.vpg-pivot-skeleton input,
+.vpg-filter-dropdown input,
+.vpg-data-grid select,
+.vpg-pivot-config select,
+.vpg-pivot-skeleton select,
+.vpg-filter-dropdown select {
+  font-family: inherit;
+}
+

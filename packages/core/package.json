@@ -1,0 +1,25 @@
+{
+  "name": "@smallwebco/tinypivot-core",
+  "version": "1.0.8",
+  "description": "Core logic for TinyPivot - framework agnostic pivot table and data grid utilities",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "~5.3.3"
+  }
+}

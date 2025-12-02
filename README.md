@@ -1,6 +1,6 @@
 # TinyPivot
 
-A powerful Excel-like data grid and pivot table component for Vue 3.
+A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
 
@@ -24,16 +24,26 @@ A powerful Excel-like data grid and pivot table component for Vue 3.
 
 ## Installation
 
+### Vue 3
+
 ```bash
-pnpm add tinypivot
+pnpm add @smallwebco/tinypivot-vue
+```
+
+### React
+
+```bash
+pnpm add @smallwebco/tinypivot-react
 ```
 
 ## Quick Start
 
+### Vue 3
+
 ```vue
 <script setup lang="ts">
-import { DataGrid } from 'tinypivot'
-import 'tinypivot/style.css'
+import { DataGrid } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
 
 const data = [
   { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
@@ -56,6 +66,36 @@ const data = [
     export-filename="my-data.csv"
   />
 </template>
+```
+
+### React
+
+```tsx
+import { DataGrid } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+
+const data = [
+  { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
+  { id: 2, region: 'North', product: 'Widget B', sales: 8300, units: 95 },
+  { id: 3, region: 'South', product: 'Widget A', sales: 15200, units: 180 },
+  { id: 4, region: 'South', product: 'Widget B', sales: 9800, units: 110 },
+]
+
+export default function App() {
+  return (
+    <DataGrid
+      data={data}
+      enableExport={true}
+      enableSearch={true}
+      enablePagination={true}
+      pageSize={100}
+      enableColumnResize={true}
+      enableClipboard={true}
+      theme="light"
+      exportFilename="my-data.csv"
+    />
+  )
+}
 ```
 
 ## Props
@@ -106,6 +146,8 @@ const badData = [
 
 ## Events
 
+### Vue
+
 | Event | Payload | Description |
 |-------|---------|-------------|
 | `@cell-click` | `{ row, col, value, rowData }` | Cell clicked |
@@ -121,6 +163,23 @@ const badData = [
     @export="({ rowCount }) => console.log(`Exported ${rowCount} rows`)"
   />
 </template>
+```
+
+### React
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `onCellClick` | `(payload) => void` | Cell clicked |
+| `onSelectionChange` | `(payload) => void` | Selection changed |
+| `onExport` | `(payload) => void` | CSV exported |
+| `onCopy` | `(payload) => void` | Cells copied |
+
+```tsx
+<DataGrid
+  data={data}
+  onCellClick={({ rowData }) => console.log(rowData)}
+  onExport={({ rowCount }) => console.log(`Exported ${rowCount} rows`)}
+/>
 ```
 
 ## Keyboard Shortcuts
@@ -139,8 +198,10 @@ Unlock pivot table functionality and remove the watermark with a Pro license.
 
 ### Activate License
 
+#### Vue
+
 ```typescript
-import { setLicenseKey, configureLicenseSecret } from 'tinypivot'
+import { setLicenseKey, configureLicenseSecret } from '@smallwebco/tinypivot-vue'
 
 // Configure the license secret (must match your LICENSE_SECRET env var)
 // Do this once at app startup, before setLicenseKey
@@ -150,14 +211,33 @@ configureLicenseSecret(import.meta.env.VITE_LICENSE_SECRET)
 setLicenseKey('TP-PRO1-XXXXXXXX-20251215')
 ```
 
+#### React
+
+```typescript
+import { setLicenseKey, configureLicenseSecret } from '@smallwebco/tinypivot-react'
+
+configureLicenseSecret(import.meta.env.VITE_LICENSE_SECRET)
+setLicenseKey('TP-PRO1-XXXXXXXX-20251215')
+```
+
 > **Note**: The license secret is used to verify license signatures. Set it via environment variable and inject at build time for security.
 
 ### Demo Mode
 
 For evaluation, enable demo mode to unlock all Pro features (shows "DEMO" watermark):
 
+#### Vue
+
 ```typescript
-import { enableDemoMode } from 'tinypivot'
+import { enableDemoMode } from '@smallwebco/tinypivot-vue'
+
+enableDemoMode()
+```
+
+#### React
+
+```typescript
+import { enableDemoMode } from '@smallwebco/tinypivot-react'
 
 enableDemoMode()
 ```
@@ -177,7 +257,11 @@ enableDemoMode()
 TinyPivot uses scoped styles and won't conflict with your app. Import the base styles:
 
 ```typescript
-import 'tinypivot/style.css'
+// Vue
+import '@smallwebco/tinypivot-vue/style.css'
+
+// React
+import '@smallwebco/tinypivot-react/style.css'
 ```
 
 ### Custom Theming
@@ -197,15 +281,21 @@ Override CSS variables for theming:
 Full TypeScript support included. Import types as needed:
 
 ```typescript
+// Vue
 import type {
   DataGridProps,
   PivotConfig,
   AggregationFunction,
-  FilterEvent,
-  SortEvent,
   CellClickEvent,
   SelectionChangeEvent,
-} from 'tinypivot'
+} from '@smallwebco/tinypivot-vue'
+
+// React
+import type {
+  DataGridProps,
+  PivotConfig,
+  AggregationFunction,
+} from '@smallwebco/tinypivot-react'
 ```
 
 ## Browser Support
@@ -225,4 +315,3 @@ See [LICENSE.md](./LICENSE.md) for details.
 ---
 
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
-

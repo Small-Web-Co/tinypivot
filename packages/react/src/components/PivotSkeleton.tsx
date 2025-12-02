@@ -1,0 +1,539 @@
+/**
+ * Pivot Table Skeleton + Data Display for React
+ * Visual layout for pivot configuration and results
+ */
+import React, { useState, useMemo, useCallback } from 'react'
+import type { AggregationFunction, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
+import { useLicense } from '../hooks/useLicense'
+
+interface ActiveFilter {
+  column: string
+  valueCount: number
+  values: string[]
+}
+
+interface PivotSkeletonProps {
+  rowFields: string[]
+  columnFields: string[]
+  valueFields: PivotValueField[]
+  isConfigured: boolean
+  draggingField: string | null
+  pivotResult: PivotResult | null
+  fontSize?: 'xs' | 'sm' | 'base'
+  activeFilters?: ActiveFilter[] | null
+  totalRowCount?: number
+  filteredRowCount?: number
+  onAddRowField: (field: string) => void
+  onRemoveRowField: (field: string) => void
+  onAddColumnField: (field: string) => void
+  onRemoveColumnField: (field: string) => void
+  onAddValueField: (field: string, aggregation: AggregationFunction) => void
+  onRemoveValueField: (field: string, aggregation: AggregationFunction) => void
+  onUpdateAggregation: (field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction) => void
+  onReorderRowFields: (fields: string[]) => void
+  onReorderColumnFields: (fields: string[]) => void
+}
+
+export function PivotSkeleton({
+  rowFields,
+  columnFields,
+  valueFields,
+  isConfigured,
+  draggingField,
+  pivotResult,
+  fontSize = 'xs',
+  activeFilters,
+  totalRowCount,
+  filteredRowCount,
+  onAddRowField,
+  onRemoveRowField,
+  onAddColumnField,
+  onRemoveColumnField,
+  onAddValueField,
+  onRemoveValueField,
+}: PivotSkeletonProps) {
+  const { showWatermark, canUsePivot, isDemo } = useLicense()
+
+  // Drag state
+  const [dragOverArea, setDragOverArea] = useState<'row' | 'column' | 'value' | null>(null)
+
+  // Sorting
+  type SortTarget = 'row' | number
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [sortTarget, setSortTarget] = useState<SortTarget>('row')
+
+  const toggleSort = useCallback((target: SortTarget = 'row') => {
+    if (sortTarget === target) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortTarget(target)
+      setSortDirection('asc')
+    }
+  }, [sortTarget])
+
+  // Sorted row indices
+  const sortedRowIndices = useMemo(() => {
+    if (!pivotResult) return []
+
+    const indices = pivotResult.rowHeaders.map((_, i) => i)
+    const headers = pivotResult.rowHeaders
+    const data = pivotResult.data
+
+    indices.sort((a, b) => {
+      let cmp: number
+
+      if (sortTarget === 'row') {
+        const aHeader = headers[a]?.join(' / ') || ''
+        const bHeader = headers[b]?.join(' / ') || ''
+        cmp = aHeader.localeCompare(bHeader, undefined, { numeric: true, sensitivity: 'base' })
+      } else {
+        const colIdx = sortTarget as number
+        const aVal = data[a]?.[colIdx]?.value ?? null
+        const bVal = data[b]?.[colIdx]?.value ?? null
+
+        if (aVal === null && bVal === null) cmp = 0
+        else if (aVal === null) cmp = 1
+        else if (bVal === null) cmp = -1
+        else cmp = aVal - bVal
+      }
+
+      return sortDirection === 'asc' ? cmp : -cmp
+    })
+
+    return indices
+  }, [pivotResult, sortTarget, sortDirection])
+
+  // Column headers
+  const columnHeaderCells = useMemo(() => {
+    if (!pivotResult || pivotResult.headers.length === 0) {
+      return [
+        valueFields.map(vf => ({
+          label: `${vf.field} (${getAggregationLabel(vf.aggregation)})`,
+          colspan: 1,
+        })),
+      ]
+    }
+
+    const result: Array<Array<{ label: string; colspan: number }>> = []
+
+    for (let level = 0; level < pivotResult.headers.length; level++) {
+      const headerRow = pivotResult.headers[level]
+      const cells: Array<{ label: string; colspan: number }> = []
+
+      let i = 0
+      while (i < headerRow.length) {
+        const value = headerRow[i]
+        let colspan = 1
+
+        while (i + colspan < headerRow.length && headerRow[i + colspan] === value) {
+          colspan++
+        }
+
+        cells.push({ label: value, colspan })
+        i += colspan
+      }
+
+      result.push(cells)
+    }
+
+    return result
+  }, [pivotResult, valueFields])
+
+  // Filter status
+  const hasActiveFilters = activeFilters && activeFilters.length > 0
+  const filterSummary = useMemo(() => {
+    if (!activeFilters || activeFilters.length === 0) return ''
+    return activeFilters.map(f => f.column).join(', ')
+  }, [activeFilters])
+
+  // Drag handlers
+  const handleDragOver = useCallback(
+    (area: 'row' | 'column' | 'value', event: React.DragEvent) => {
+      event.preventDefault()
+      event.dataTransfer!.dropEffect = 'move'
+      setDragOverArea(area)
+    },
+    []
+  )
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverArea(null)
+  }, [])
+
+  const handleDrop = useCallback(
+    (area: 'row' | 'column' | 'value', event: React.DragEvent) => {
+      event.preventDefault()
+      const field = event.dataTransfer?.getData('text/plain')
+
+      if (!field || field.startsWith('reorder:')) {
+        setDragOverArea(null)
+        return
+      }
+
+      if (rowFields.includes(field)) onRemoveRowField(field)
+      if (columnFields.includes(field)) onRemoveColumnField(field)
+      const existingValue = valueFields.find(v => v.field === field)
+      if (existingValue) onRemoveValueField(field, existingValue.aggregation)
+
+      switch (area) {
+        case 'row':
+          onAddRowField(field)
+          break
+        case 'column':
+          onAddColumnField(field)
+          break
+        case 'value':
+          onAddValueField(field, 'sum')
+          break
+      }
+      setDragOverArea(null)
+    },
+    [rowFields, columnFields, valueFields, onAddRowField, onRemoveRowField, onAddColumnField, onRemoveColumnField, onAddValueField, onRemoveValueField]
+  )
+
+  const currentFontSize = fontSize
+
+  return (
+    <div
+      className={`vpg-pivot-skeleton vpg-font-${currentFontSize} ${draggingField ? 'vpg-is-dragging' : ''}`}
+    >
+      {/* Header Bar */}
+      <div className="vpg-skeleton-header">
+        <div className="vpg-skeleton-title">
+          <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+            />
+          </svg>
+          <span>Pivot Table</span>
+        </div>
+
+        <div className="vpg-header-right">
+          {hasActiveFilters && (
+            <div className="vpg-filter-indicator">
+              <svg
+                className="vpg-filter-icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              <span className="vpg-filter-text">
+                Filtered: <strong>{filterSummary}</strong>
+                {filteredRowCount !== undefined && totalRowCount !== undefined && (
+                  <span className="vpg-filter-count">
+                    ({filteredRowCount.toLocaleString()} of {totalRowCount.toLocaleString()} rows)
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {isConfigured && (
+            <div className="vpg-config-summary">
+              <span className="vpg-summary-badge vpg-rows">
+                {rowFields.length} row{rowFields.length !== 1 ? 's' : ''}
+              </span>
+              <span className="vpg-summary-badge vpg-cols">
+                {columnFields.length} col{columnFields.length !== 1 ? 's' : ''}
+              </span>
+              <span className="vpg-summary-badge vpg-vals">
+                {valueFields.length} val{valueFields.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* License Required Message */}
+      {!canUsePivot ? (
+        <div className="vpg-pro-required">
+          <div className="vpg-pro-content">
+            <svg className="vpg-pro-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+            <h3>Pro Feature</h3>
+            <p>Pivot Table functionality requires a Pro license.</p>
+            <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener noreferrer" className="vpg-pro-link">
+              Get Pro License →
+            </a>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Config Bar */}
+          <div className="vpg-config-bar">
+            {/* Row drop zone */}
+            <div
+              className={`vpg-drop-zone vpg-row-zone ${dragOverArea === 'row' ? 'vpg-drag-over' : ''}`}
+              onDragOver={e => handleDragOver('row', e)}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop('row', e)}
+            >
+              <div className="vpg-zone-header">
+                <span className="vpg-zone-icon vpg-row-icon">↓</span>
+                <span className="vpg-zone-label">Rows</span>
+              </div>
+              <div className="vpg-zone-chips">
+                {rowFields.map(field => (
+                  <div key={field} className="vpg-mini-chip vpg-row-chip">
+                    <span className="vpg-mini-name">{field}</span>
+                    <button
+                      className="vpg-mini-remove"
+                      onClick={() => onRemoveRowField(field)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {rowFields.length === 0 && <span className="vpg-zone-hint">Drop here</span>}
+              </div>
+            </div>
+
+            {/* Column drop zone */}
+            <div
+              className={`vpg-drop-zone vpg-column-zone ${dragOverArea === 'column' ? 'vpg-drag-over' : ''}`}
+              onDragOver={e => handleDragOver('column', e)}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop('column', e)}
+            >
+              <div className="vpg-zone-header">
+                <span className="vpg-zone-icon vpg-column-icon">→</span>
+                <span className="vpg-zone-label">Columns</span>
+              </div>
+              <div className="vpg-zone-chips">
+                {columnFields.map(field => (
+                  <div key={field} className="vpg-mini-chip vpg-column-chip">
+                    <span className="vpg-mini-name">{field}</span>
+                    <button
+                      className="vpg-mini-remove"
+                      onClick={() => onRemoveColumnField(field)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {columnFields.length === 0 && <span className="vpg-zone-hint">Drop here</span>}
+              </div>
+            </div>
+
+            {/* Values drop zone */}
+            <div
+              className={`vpg-drop-zone vpg-value-zone ${dragOverArea === 'value' ? 'vpg-drag-over' : ''}`}
+              onDragOver={e => handleDragOver('value', e)}
+              onDragLeave={handleDragLeave}
+              onDrop={e => handleDrop('value', e)}
+            >
+              <div className="vpg-zone-header">
+                <span className="vpg-zone-icon vpg-value-icon">Σ</span>
+                <span className="vpg-zone-label">Values</span>
+              </div>
+              <div className="vpg-zone-chips">
+                {valueFields.map(vf => (
+                  <div
+                    key={`${vf.field}-${vf.aggregation}`}
+                    className="vpg-mini-chip vpg-value-chip"
+                  >
+                    <span className="vpg-agg-symbol">{getAggregationSymbol(vf.aggregation)}</span>
+                    <span className="vpg-mini-name">{vf.field}</span>
+                    <button
+                      className="vpg-mini-remove"
+                      onClick={() => onRemoveValueField(vf.field, vf.aggregation)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {valueFields.length === 0 && <span className="vpg-zone-hint">Drop numeric</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Placeholder when not configured */}
+          {(!isConfigured || !pivotResult) && (
+            <div className="vpg-placeholder">
+              <div className="vpg-placeholder-content">
+                <svg
+                  className="vpg-placeholder-icon"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+                <span className="vpg-placeholder-text">
+                  {valueFields.length === 0 ? (
+                    <>
+                      Add a <strong>Values</strong> field to see your pivot table
+                    </>
+                  ) : rowFields.length === 0 && columnFields.length === 0 ? (
+                    <>
+                      Add <strong>Row</strong> or <strong>Column</strong> fields to group your data
+                    </>
+                  ) : (
+                    'Your pivot table will appear here'
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Data Table */}
+          {isConfigured && pivotResult && (
+            <div className="vpg-table-container">
+              <table className="vpg-pivot-table">
+                <thead>
+                  {columnHeaderCells.map((headerRow, levelIdx) => (
+                    <tr key={`header-${levelIdx}`} className="vpg-column-header-row">
+                      {levelIdx === 0 && (
+                        <th
+                          className="vpg-row-header-label"
+                          rowSpan={columnHeaderCells.length}
+                          onClick={() => toggleSort('row')}
+                        >
+                          <div className="vpg-header-content">
+                            <span>{rowFields.join(' / ') || 'Rows'}</span>
+                            <span className={`vpg-sort-indicator ${sortTarget === 'row' ? 'active' : ''}`}>
+                              {sortTarget === 'row' ? (sortDirection === 'asc' ? '↑' : '↓') : '⇅'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {headerRow.map((cell, idx) => (
+                        <th
+                          key={idx}
+                          className="vpg-column-header-cell"
+                          colSpan={cell.colspan}
+                          onClick={() =>
+                            levelIdx === columnHeaderCells.length - 1 && toggleSort(idx)
+                          }
+                        >
+                          <div className="vpg-header-content">
+                            <span>{cell.label}</span>
+                            {levelIdx === columnHeaderCells.length - 1 && (
+                              <span className={`vpg-sort-indicator ${sortTarget === idx ? 'active' : ''}`}>
+                                {sortTarget === idx
+                                  ? sortDirection === 'asc'
+                                    ? '↑'
+                                    : '↓'
+                                  : '⇅'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                      {pivotResult.rowTotals.length > 0 && levelIdx === 0 && (
+                        <th className="vpg-total-header" rowSpan={columnHeaderCells.length}>
+                          Total
+                        </th>
+                      )}
+                    </tr>
+                  ))}
+                </thead>
+
+                <tbody>
+                  {sortedRowIndices.map(sortedIdx => (
+                    <tr key={sortedIdx} className="vpg-data-row">
+                      <th className="vpg-row-header-cell">
+                        {pivotResult.rowHeaders[sortedIdx].map((val, idx) => (
+                          <span key={idx} className="vpg-row-value">
+                            {val}
+                          </span>
+                        ))}
+                      </th>
+
+                      {pivotResult.data[sortedIdx].map((cell, colIdx) => (
+                        <td
+                          key={colIdx}
+                          className={`vpg-data-cell ${cell.value === null ? 'vpg-is-null' : ''}`}
+                        >
+                          {cell.formattedValue}
+                        </td>
+                      ))}
+
+                      {pivotResult.rowTotals[sortedIdx] && (
+                        <td className="vpg-data-cell vpg-total-cell">
+                          {pivotResult.rowTotals[sortedIdx].formattedValue}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+
+                  {pivotResult.columnTotals.length > 0 && (
+                    <tr className="vpg-totals-row">
+                      <th className="vpg-row-header-cell vpg-total-label">Total</th>
+                      {pivotResult.columnTotals.map((cell, colIdx) => (
+                        <td key={colIdx} className="vpg-data-cell vpg-total-cell">
+                          {cell.formattedValue}
+                        </td>
+                      ))}
+                      {pivotResult.rowTotals.length > 0 && (
+                        <td className="vpg-data-cell vpg-grand-total-cell">
+                          {pivotResult.grandTotal.formattedValue}
+                        </td>
+                      )}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Footer */}
+          {isConfigured && pivotResult && (
+            <div className="vpg-skeleton-footer">
+              <span>
+                {pivotResult.rowHeaders.length} rows × {pivotResult.data[0]?.length || 0} columns
+              </span>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Watermark / Demo Banner */}
+      {showWatermark && canUsePivot && (
+        <div className={`vpg-watermark ${isDemo ? 'vpg-demo-mode' : ''}`}>
+          {isDemo ? (
+            <>
+              <span className="vpg-demo-badge">DEMO</span>
+              <span>Pro features unlocked for evaluation</span>
+              <a
+                href="https://tiny-pivot.com/#pricing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="vpg-get-pro"
+              >
+                Get Pro License →
+              </a>
+            </>
+          ) : (
+            <a href="https://tiny-pivot.com" target="_blank" rel="noopener noreferrer">
+              Powered by TinyPivot
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+

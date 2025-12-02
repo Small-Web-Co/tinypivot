@@ -1,0 +1,280 @@
+/**
+ * Column Filter Dropdown Component for React
+ * Shows unique values with checkboxes, search, and sort controls
+ */
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import type { ColumnStats } from '@smallwebco/tinypivot-core'
+
+interface ColumnFilterProps {
+  columnId: string
+  columnName: string
+  stats: ColumnStats
+  selectedValues: string[]
+  sortDirection: 'asc' | 'desc' | null
+  onFilter: (values: string[]) => void
+  onSort: (direction: 'asc' | 'desc' | null) => void
+  onClose: () => void
+}
+
+export function ColumnFilter({
+  columnName,
+  stats,
+  selectedValues,
+  sortDirection,
+  onFilter,
+  onSort,
+  onClose,
+}: ColumnFilterProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [localSelected, setLocalSelected] = useState<Set<string>>(new Set(selectedValues))
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Include blank option if there are null values
+  const hasBlankValues = stats.nullCount > 0
+
+  // Filtered unique values based on search
+  const filteredValues = useMemo(() => {
+    const values = stats.uniqueValues
+    if (!searchQuery) return values
+
+    const query = searchQuery.toLowerCase()
+    return values.filter(v => v.toLowerCase().includes(query))
+  }, [stats.uniqueValues, searchQuery])
+
+  // All values including blank
+  const allValues = useMemo(() => {
+    const values = [...filteredValues]
+    if (hasBlankValues && (!searchQuery || '(blank)'.includes(searchQuery.toLowerCase()))) {
+      values.unshift('(blank)')
+    }
+    return values
+  }, [filteredValues, hasBlankValues, searchQuery])
+
+  // Check states
+  const isAllSelected = useMemo(
+    () => allValues.every(v => localSelected.has(v)),
+    [allValues, localSelected]
+  )
+
+  // Toggle single value
+  const toggleValue = useCallback((value: string) => {
+    setLocalSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(value)) {
+        next.delete(value)
+      } else {
+        next.add(value)
+      }
+      return next
+    })
+  }, [])
+
+  // Select all visible
+  const selectAll = useCallback(() => {
+    setLocalSelected(prev => {
+      const next = new Set(prev)
+      for (const value of allValues) {
+        next.add(value)
+      }
+      return next
+    })
+  }, [allValues])
+
+  // Clear all
+  const clearAll = useCallback(() => {
+    setLocalSelected(new Set())
+  }, [])
+
+  // Apply filter
+  const applyFilter = useCallback(() => {
+    if (localSelected.size === 0) {
+      onFilter([])
+    } else {
+      onFilter(Array.from(localSelected))
+    }
+    onClose()
+  }, [localSelected, onFilter, onClose])
+
+  // Sort handlers
+  const sortAscending = useCallback(() => {
+    onSort(sortDirection === 'asc' ? null : 'asc')
+  }, [sortDirection, onSort])
+
+  const sortDescending = useCallback(() => {
+    onSort(sortDirection === 'desc' ? null : 'desc')
+  }, [sortDirection, onSort])
+
+  // Clear filter only
+  const clearFilter = useCallback(() => {
+    setLocalSelected(new Set())
+    onFilter([])
+    onClose()
+  }, [onFilter, onClose])
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [onClose])
+
+  // Keyboard handling
+  useEffect(() => {
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      } else if (event.key === 'Enter' && event.ctrlKey) {
+        applyFilter()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeydown)
+    return () => document.removeEventListener('keydown', handleKeydown)
+  }, [onClose, applyFilter])
+
+  // Focus search on mount
+  useEffect(() => {
+    searchInputRef.current?.focus()
+  }, [])
+
+  // Sync with props
+  useEffect(() => {
+    setLocalSelected(new Set(selectedValues))
+  }, [selectedValues])
+
+  return (
+    <div ref={dropdownRef} className="vpg-filter-dropdown">
+      {/* Header */}
+      <div className="vpg-filter-header">
+        <span className="vpg-filter-title">{columnName}</span>
+        <span className="vpg-filter-count">{stats.uniqueValues.length.toLocaleString()} unique</span>
+      </div>
+
+      {/* Sort Controls */}
+      <div className="vpg-sort-controls">
+        <button
+          className={`vpg-sort-btn ${sortDirection === 'asc' ? 'active' : ''}`}
+          title="Sort A to Z"
+          onClick={sortAscending}
+        >
+          <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+            />
+          </svg>
+          <span>A→Z</span>
+        </button>
+        <button
+          className={`vpg-sort-btn ${sortDirection === 'desc' ? 'active' : ''}`}
+          title="Sort Z to A"
+          onClick={sortDescending}
+        >
+          <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"
+            />
+          </svg>
+          <span>Z→A</span>
+        </button>
+      </div>
+
+      <div className="vpg-divider" />
+
+      {/* Search */}
+      <div className="vpg-search-container">
+        <svg className="vpg-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+        <input
+          ref={searchInputRef}
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search values..."
+          className="vpg-search-input"
+        />
+        {searchQuery && (
+          <button className="vpg-clear-search" onClick={() => setSearchQuery('')}>
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Select All / Clear All */}
+      <div className="vpg-bulk-actions">
+        <button className="vpg-bulk-btn" onClick={selectAll}>
+          <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          Select All
+        </button>
+        <button className="vpg-bulk-btn" onClick={clearAll}>
+          <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+          Clear All
+        </button>
+      </div>
+
+      {/* Values List */}
+      <div className="vpg-values-list">
+        {allValues.map(value => (
+          <label
+            key={value}
+            className={`vpg-value-item ${localSelected.has(value) ? 'selected' : ''}`}
+          >
+            <input
+              type="checkbox"
+              checked={localSelected.has(value)}
+              onChange={() => toggleValue(value)}
+              className="vpg-value-checkbox"
+            />
+            <span className={`vpg-value-text ${value === '(blank)' ? 'vpg-blank' : ''}`}>
+              {value}
+            </span>
+          </label>
+        ))}
+
+        {allValues.length === 0 && <div className="vpg-no-results">No matching values</div>}
+      </div>
+
+      {/* Footer */}
+      <div className="vpg-filter-footer">
+        <button className="vpg-btn-clear" onClick={clearFilter}>
+          Clear Filter
+        </button>
+        <button className="vpg-btn-apply" onClick={applyFilter}>
+          Apply
+        </button>
+      </div>
+    </div>
+  )
+}
+
