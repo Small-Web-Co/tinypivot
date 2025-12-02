@@ -208,7 +208,7 @@ import { setLicenseKey, configureLicenseSecret } from '@smallwebco/tinypivot-vue
 configureLicenseSecret(import.meta.env.VITE_LICENSE_SECRET)
 
 // Then set the license key
-setLicenseKey('TP-PRO1-XXXXXXXX-20251215')
+setLicenseKey('YOUR_LICENSE_KEY')
 ```
 
 #### React
@@ -217,7 +217,7 @@ setLicenseKey('TP-PRO1-XXXXXXXX-20251215')
 import { setLicenseKey, configureLicenseSecret } from '@smallwebco/tinypivot-react'
 
 configureLicenseSecret(import.meta.env.VITE_LICENSE_SECRET)
-setLicenseKey('TP-PRO1-XXXXXXXX-20251215')
+setLicenseKey('YOUR_LICENSE_KEY')
 ```
 
 > **Note**: The license secret is used to verify license signatures. Set it via environment variable and inject at build time for security.

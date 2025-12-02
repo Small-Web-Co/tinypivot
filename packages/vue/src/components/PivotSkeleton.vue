@@ -1760,5 +1760,23 @@ const dataColWidth = ref(80)
 .vpg-theme-dark .vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar-corner {
   background: #0f172a;
 }
+
+/* Dark mode - Placeholder */
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-placeholder {
+  background: linear-gradient(135deg, #1e293b, #0f172a, rgba(16, 185, 129, 0.05));
+  border-top-color: #334155;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-placeholder-icon {
+  color: #475569;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-placeholder-text {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-pivot-skeleton .vpg-placeholder-text strong {
+  color: #e2e8f0;
+}
 </style>
 
