@@ -1,6 +1,6 @@
 {
   "name": "@smallwebco/tinypivot-vue",
-  "version": "1.0.37",
+  "version": "1.0.38",
   "description": "TinyPivot Vue 3 - Excel-like data grid and pivot table components",
   "type": "module",
   "main": "./dist/tinypivot-vue.umd.cjs",
@@ -60,5 +60,15 @@
     "aggregation",
     "csv-export",
     "clipboard"
-  ]
+  ],
+  "author": "Small Web, LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
+  }
 }
