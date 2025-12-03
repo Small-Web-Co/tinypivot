@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 /**
  * Release script for TinyPivot
- * Usage: node scripts/release.js [patch|minor|major]
+ * Usage: node scripts/release.js [patch|minor|major] [--local]
  * Default: patch
+ * 
+ * By default, npm publishing is handled by GitHub Actions when the tag is pushed.
+ * Use --local flag to publish from your local machine (requires npm token).
  */
 
 import { readFileSync, writeFileSync } from 'fs'
@@ -591,11 +594,18 @@ async function main() {
   run('git add -A')
   run(`git commit -m "release: v${newVersion}"`)
 
-  // Publish packages
-  console.log('\n🚀 Publishing to npm...')
-  run('pnpm release:core')
-  run('pnpm release:vue')
-  run('pnpm release:react')
+  // Check if --local flag is passed to publish locally
+  const publishLocal = process.argv.includes('--local')
+  
+  if (publishLocal) {
+    // Publish packages locally (requires npm token configured)
+    console.log('\n🚀 Publishing to npm locally...')
+    run('pnpm release:core')
+    run('pnpm release:vue')
+    run('pnpm release:react')
+  } else {
+    console.log('\n📦 Skipping local npm publish - GitHub Actions will publish when tag is pushed')
+  }
 
   // Git tag and push
   console.log('\n🏷️  Tagging and pushing...')
