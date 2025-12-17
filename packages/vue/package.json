@@ -1,6 +1,6 @@
 {
   "name": "@smallwebco/tinypivot-vue",
-  "version": "1.0.43",
+  "version": "1.0.44",
   "description": "TinyPivot Vue 3 - Excel-like data grid and pivot table components",
   "type": "module",
   "main": "./dist/tinypivot-vue.umd.cjs",
