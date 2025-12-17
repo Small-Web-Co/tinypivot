@@ -45,14 +45,20 @@ jobs:
       - name: Publish @smallwebco/tinypivot-core
         if: ${{ inputs.dry_run != 'true' }}
         run: pnpm --filter @smallwebco/tinypivot-core publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @smallwebco/tinypivot-vue
         if: ${{ inputs.dry_run != 'true' }}
         run: pnpm --filter @smallwebco/tinypivot-vue publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @smallwebco/tinypivot-react
         if: ${{ inputs.dry_run != 'true' }}
         run: pnpm --filter @smallwebco/tinypivot-react publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry run summary
         if: ${{ inputs.dry_run == 'true' }}
