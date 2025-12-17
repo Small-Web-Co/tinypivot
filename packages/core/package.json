@@ -1,6 +1,6 @@
 {
   "name": "@smallwebco/tinypivot-core",
-  "version": "1.0.39",
+  "version": "1.0.40",
   "description": "Core logic for TinyPivot - framework agnostic pivot table and data grid utilities",
   "type": "module",
   "main": "./dist/index.js",
