@@ -286,6 +286,8 @@ export function DataGrid({
 
   // Calculate column widths
   useEffect(() => {
+    // Skip during SSR (no document available)
+    if (typeof document === 'undefined') return
     if (data.length === 0) return
 
     const widths: Record<string, number> = {}
@@ -1306,7 +1308,7 @@ export function DataGrid({
       )}
 
       {/* Filter Dropdown Portal */}
-      {activeFilterColumn &&
+      {activeFilterColumn && typeof document !== 'undefined' &&
         createPortal(
           <div
             className="vpg-filter-portal"

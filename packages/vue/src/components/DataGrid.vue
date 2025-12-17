@@ -441,6 +441,10 @@ const MIN_COL_WIDTH = 120
 const MAX_COL_WIDTH = 350
 
 function calculateColumnWidths() {
+  // Skip during SSR (no document available)
+  if (typeof document === 'undefined')
+    return
+
   if (props.data.length === 0)
     return
 

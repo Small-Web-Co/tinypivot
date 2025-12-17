@@ -216,6 +216,8 @@ export function CalculatedFieldModal({
     </div>
   )
 
+  // Guard for SSR
+  if (typeof document === 'undefined') return null
   return createPortal(modalContent, document.body)
 }
 
