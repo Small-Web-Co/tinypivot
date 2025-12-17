@@ -472,3 +472,7 @@ This repository uses the following topics for discoverability:
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-❤️-pink)](https://github.com/sponsors/Small-Web-Co) [![Open Collective](https://img.shields.io/badge/Open_Collective-3385FF?logo=opencollective&logoColor=white)](https://opencollective.com/tinypivot)
+
+## License
+
+TinyPivot is licensed under the MIT License. See [LICENSE.md](./LICENSE.md) for details.
