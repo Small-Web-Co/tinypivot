@@ -39,6 +39,10 @@ coverage
 .env.*
 !.env.example
 
+# License signing (keep private key secret!)
+private-key.pem
+*.pem
+
 .vercel
 .env*.local
 

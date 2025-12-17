@@ -340,31 +340,27 @@ interface CalculatedField {
 
 Unlock pivot table functionality and remove the watermark with a Pro license.
 
+**Licenses are perpetual** — once purchased, Pro features work forever. The date in your license key indicates your update eligibility period, not an expiration.
+
 ### Activate License
 
 #### Vue
 
 ```typescript
-import { setLicenseKey, configureLicenseSecret } from '@smallwebco/tinypivot-vue'
+import { setLicenseKey } from '@smallwebco/tinypivot-vue'
 
-// Configure the license secret (must match your LICENSE_SECRET env var)
-// Do this once at app startup, before setLicenseKey
-configureLicenseSecret(import.meta.env.VITE_LICENSE_SECRET)
-
-// Then set the license key
+// Call once at app startup
 setLicenseKey('YOUR_LICENSE_KEY')
 ```
 
 #### React
 
 ```typescript
-import { setLicenseKey, configureLicenseSecret } from '@smallwebco/tinypivot-react'
+import { setLicenseKey } from '@smallwebco/tinypivot-react'
 
-configureLicenseSecret(import.meta.env.VITE_LICENSE_SECRET)
+// Call once at app startup
 setLicenseKey('YOUR_LICENSE_KEY')
 ```
-
-> **Note**: The license secret is used to verify license signatures. Set it via environment variable and inject at build time for security.
 
 ### Pricing
 

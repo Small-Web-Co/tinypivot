@@ -1,8 +1,12 @@
 /**
  * TinyPivot Core - License Management
  * Framework-agnostic license validation logic
+ * 
+ * Uses ECDSA P-256 asymmetric cryptography:
+ * - Licenses are SIGNED with a private key (kept secret)
+ * - Licenses are VERIFIED with a public key (embedded here)
  */
-import type { LicenseInfo, LicenseType, LicenseFeatures } from '../types'
+import type { LicenseInfo, LicenseType } from '../types'
 
 const FREE_LICENSE: LicenseInfo = {
   type: 'free',
@@ -40,47 +44,131 @@ const DEMO_LICENSE: LicenseInfo = {
   },
 }
 
+// Public key for license verification (ECDSA P-256)
+// This is safe to embed - it can only VERIFY signatures, not create them
+const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE436rfGofder4lfo4UHsRF2M88Gs0
+zLsikg2H9GMkL8hLGuOtnGMpVfLRlc7cD8FdkPBBRgiQ8UFnG8hm+nMIug==
+-----END PUBLIC KEY-----`
+
 /**
- * HMAC-SHA256 based license signature verification
- * Must match the server-side generation algorithm
+ * Convert base64 (or URL-safe base64) to Uint8Array
+ */
+function base64ToUint8Array(base64: string): Uint8Array {
+  // Convert URL-safe base64 to standard base64
+  let standardBase64 = base64.replace(/-/g, '+').replace(/_/g, '/')
+  // Add padding if needed
+  while (standardBase64.length % 4) {
+    standardBase64 += '='
+  }
+  
+  const binaryString = atob(standardBase64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+  return bytes
+}
+
+/**
+ * Convert DER-encoded ECDSA signature to raw format (r || s)
+ * Web Crypto API expects raw format, but Node.js produces DER format
+ */
+function derToRaw(der: Uint8Array): Uint8Array {
+  // DER format: 0x30 [length] 0x02 [r-length] [r] 0x02 [s-length] [s]
+  if (der[0] !== 0x30) {
+    throw new Error('Invalid DER signature')
+  }
+  
+  let offset = 2 // Skip 0x30 and length byte
+  
+  // Read r
+  if (der[offset] !== 0x02) throw new Error('Invalid DER signature')
+  offset++
+  const rLen = der[offset]
+  offset++
+  let r = der.slice(offset, offset + rLen)
+  offset += rLen
+  
+  // Read s
+  if (der[offset] !== 0x02) throw new Error('Invalid DER signature')
+  offset++
+  const sLen = der[offset]
+  offset++
+  let s = der.slice(offset, offset + sLen)
+  
+  // For P-256, r and s should each be 32 bytes
+  // Remove leading zero padding if present (used for positive sign in DER)
+  if (r.length === 33 && r[0] === 0) r = r.slice(1)
+  if (s.length === 33 && s[0] === 0) s = s.slice(1)
+  
+  // Pad to 32 bytes if shorter
+  const padR = new Uint8Array(32)
+  const padS = new Uint8Array(32)
+  padR.set(r, 32 - r.length)
+  padS.set(s, 32 - s.length)
+  
+  // Concatenate r || s
+  const raw = new Uint8Array(64)
+  raw.set(padR, 0)
+  raw.set(padS, 32)
+  
+  return raw
+}
+
+/**
+ * Import the public key for verification
+ */
+async function importPublicKey(): Promise<CryptoKey | null> {
+  try {
+    // Convert PEM to binary
+    const pemContents = PUBLIC_KEY_PEM
+      .replace('-----BEGIN PUBLIC KEY-----', '')
+      .replace('-----END PUBLIC KEY-----', '')
+      .replace(/\s/g, '')
+    
+    const binaryKey = base64ToUint8Array(pemContents)
+    
+    return await crypto.subtle.importKey(
+      'spki',
+      new Uint8Array(binaryKey).buffer,
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      false,
+      ['verify']
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * ECDSA P-256 signature verification
+ * Verifies that the license was signed with our private key
  */
 async function verifySignature(
   typeCode: string,
   signature: string,
   expiry: string
 ): Promise<boolean> {
-  // The secret must be configured before license validation can work
-  const secret = (globalThis as Record<string, unknown>).__TP_LICENSE_SECRET__ as string
-
-  if (!secret) {
-    console.warn('[TinyPivot] License secret not configured. Call configureLicenseSecret() first.')
-    return false
-  }
-
   const payload = `TP-${typeCode}-${expiry}`
 
   try {
+    const publicKey = await importPublicKey()
+    if (!publicKey) return false
+
     const encoder = new TextEncoder()
-    const keyData = encoder.encode(secret)
     const msgData = encoder.encode(payload)
+    
+    // Convert DER-encoded signature to raw format for Web Crypto
+    const derSig = base64ToUint8Array(signature)
+    const rawSig = derToRaw(derSig)
 
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      keyData,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
+    return await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      publicKey,
+      new Uint8Array(rawSig).buffer,
+      msgData
     )
-
-    const sig = await crypto.subtle.sign('HMAC', cryptoKey, msgData)
-    const sigArray = Array.from(new Uint8Array(sig))
-    const expectedSig = sigArray
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-      .slice(0, 12)
-      .toUpperCase()
-
-    return signature === expectedSig
   } catch {
     // Fallback for environments without crypto.subtle (SSR, older browsers)
     return false
@@ -89,6 +177,9 @@ async function verifySignature(
 
 /**
  * Validate a license key and extract info
+ * 
+ * Note: Licenses are PERPETUAL - the expiry date indicates update eligibility,
+ * not when features stop working. All Pro features remain active forever.
  */
 export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   // Free tier - no key needed
@@ -97,16 +188,31 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   }
 
   // License key format: TP-{TYPE}-{SIGNATURE}-{EXPIRY}
-  // Example: TP-PRO1-A1B2C3D4E5F6-20251231
-  const parts = key.split('-')
-
-  if (parts.length !== 4 || parts[0] !== 'TP') {
+  // Example: TP-PRO1-base64signature-20251231
+  // Note: signature uses URL-safe base64 which can contain dashes
+  // So we parse from known positions: prefix (TP), type (4 chars), expiry (8 chars at end)
+  
+  if (!key.startsWith('TP-')) {
     return INVALID_LICENSE
   }
 
-  const typeCode = parts[1]
-  const signature = parts[2]
-  const expiryStr = parts[3]
+  // Extract expiry (last 8 characters after final dash)
+  const lastDashIdx = key.lastIndexOf('-')
+  if (lastDashIdx === -1 || key.length - lastDashIdx !== 9) {
+    return INVALID_LICENSE
+  }
+  const expiryStr = key.slice(lastDashIdx + 1)
+  
+  // Extract type code (between first and second dash)
+  const withoutPrefix = key.slice(3) // Remove "TP-"
+  const secondDashIdx = withoutPrefix.indexOf('-')
+  if (secondDashIdx === -1) {
+    return INVALID_LICENSE
+  }
+  const typeCode = withoutPrefix.slice(0, secondDashIdx)
+  
+  // Extract signature (everything between type and expiry)
+  const signature = withoutPrefix.slice(secondDashIdx + 1, withoutPrefix.lastIndexOf('-'))
 
   // Verify cryptographic signature
   const isValidSignature = await verifySignature(typeCode, signature, expiryStr)
@@ -114,15 +220,11 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
     return INVALID_LICENSE
   }
 
-  // Parse expiry date
+  // Parse expiry date (for update eligibility tracking, NOT feature expiration)
   const year = Number.parseInt(expiryStr.slice(0, 4))
   const month = Number.parseInt(expiryStr.slice(4, 6)) - 1
   const day = Number.parseInt(expiryStr.slice(6, 8))
   const expiresAt = new Date(year, month, day)
-
-  if (expiresAt < new Date()) {
-    return { ...INVALID_LICENSE, expiresAt }
-  }
 
   // Determine license type
   let type: LicenseType = 'free'
@@ -130,6 +232,8 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   else if (typeCode === 'PROU') type = 'pro-unlimited'
   else if (typeCode === 'PROT') type = 'pro-team'
 
+  // PERPETUAL LICENSE: Features never expire, only update eligibility does
+  // The expiresAt date is retained for informational purposes only
   return {
     type,
     isValid: true,
@@ -145,10 +249,12 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
 }
 
 /**
- * Configure the license secret (for SSR/build-time injection)
+ * @deprecated No longer needed - license verification now uses asymmetric cryptography.
+ * Kept for backwards compatibility but does nothing.
  */
-export function configureLicenseSecret(secret: string): void {
-  (globalThis as Record<string, unknown>).__TP_LICENSE_SECRET__ = secret
+export function configureLicenseSecret(_secret: string): void {
+  // No-op: Asymmetric verification doesn't need a shared secret
+  console.warn('[TinyPivot] configureLicenseSecret() is deprecated and no longer needed.')
 }
 
 // Hardcoded SHA-256 hash of the demo secret

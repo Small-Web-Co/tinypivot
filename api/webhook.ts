@@ -6,6 +6,7 @@
  * Environment Variables needed:
  * - STRIPE_SECRET_KEY: Your Stripe secret key
  * - STRIPE_WEBHOOK_SECRET: Webhook signing secret (whsec_...)
+ * - LICENSE_PRIVATE_KEY: ECDSA P-256 private key (PEM format) for signing licenses
  * - RESEND_API_KEY: (Optional) For sending license emails via Resend
  * 
  * Setup in Stripe Dashboard:
@@ -19,7 +20,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2025-02-24.acacia',
 })
 
 // License type codes
@@ -33,37 +34,113 @@ const PLAN_CODES: Record<string, string> = {
  * Generate a cryptographically signed license key
  * Format: TP-{TYPE}-{SIGNATURE}-{EXPIRY}
  * 
- * Uses HMAC-SHA256 with a secret key - impossible to forge without the secret
+ * Uses ECDSA P-256 asymmetric cryptography:
+ * - Private key (in env) signs licenses
+ * - Public key (in library) verifies them
+ * 
+ * Licenses are PERPETUAL - the expiry date only affects update eligibility
  */
 async function generateLicenseKey(plan: string): Promise<string> {
   const typeCode = PLAN_CODES[plan] || 'PRO1'
 
-  // License valid for 1 year from now
+  // License update eligibility for 1 year from now
+  // Note: Licenses are PERPETUAL - features never expire
   const expiryDate = new Date()
   expiryDate.setFullYear(expiryDate.getFullYear() + 1)
   const expiry = expiryDate.toISOString().slice(0, 10).replace(/-/g, '')
 
-  // HMAC-SHA256 signature with secret
-  const secret = process.env.LICENSE_SECRET || 'tp-change-this-secret-in-production'
+  const privateKeyPem = process.env.LICENSE_PRIVATE_KEY
+  if (!privateKeyPem) {
+    throw new Error('LICENSE_PRIVATE_KEY environment variable is required')
+  }
+
   const payload = `TP-${typeCode}-${expiry}`
   
-  const encoder = new TextEncoder()
-  const keyData = encoder.encode(secret)
-  const msgData = encoder.encode(payload)
+  // Import private key for signing
+  const pemContents = privateKeyPem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s/g, '')
+  
+  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0))
   
   const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
+    'pkcs8',
+    binaryKey.buffer,
+    { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
   )
   
-  const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData)
-  const sigArray = Array.from(new Uint8Array(signature))
-  const sigStr = sigArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 12).toUpperCase()
+  const encoder = new TextEncoder()
+  const msgData = encoder.encode(payload)
+  
+  const rawSignature = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    cryptoKey,
+    msgData
+  )
+  
+  // Convert raw signature (r || s) to DER format for compatibility with Node.js verification
+  const derSignature = rawToDer(new Uint8Array(rawSignature))
+  
+  // Convert to URL-safe base64 (replace +/ with -_)
+  const sigBase64 = btoa(String.fromCharCode.apply(null, Array.from(derSignature)))
+  const safeSig = sigBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 
-  return `TP-${typeCode}-${sigStr}-${expiry}`
+  return `TP-${typeCode}-${safeSig}-${expiry}`
+}
+
+/**
+ * Concatenate byte arrays
+ */
+function concatBytes(prefix: number[], arr: Uint8Array): Uint8Array {
+  const result = new Uint8Array(prefix.length + arr.length)
+  result.set(prefix, 0)
+  result.set(arr, prefix.length)
+  return result
+}
+
+/**
+ * Convert raw ECDSA signature (r || s) to DER format
+ * DER format: 0x30 [length] 0x02 [r-length] [r] 0x02 [s-length] [s]
+ */
+function rawToDer(raw: Uint8Array): Uint8Array {
+  const r = raw.slice(0, 32)
+  const s = raw.slice(32, 64)
+  
+  // Add leading zero if high bit is set (to indicate positive integer)
+  const rPadded = r[0] >= 0x80 ? concatBytes([0], r) : r
+  const sPadded = s[0] >= 0x80 ? concatBytes([0], s) : s
+  
+  // Remove leading zeros (except one if needed for sign)
+  const rTrimmed = trimLeadingZeros(rPadded)
+  const sTrimmed = trimLeadingZeros(sPadded)
+  
+  const totalLen = 2 + rTrimmed.length + 2 + sTrimmed.length
+  
+  const der = new Uint8Array(2 + totalLen)
+  let offset = 0
+  
+  der[offset++] = 0x30 // SEQUENCE
+  der[offset++] = totalLen
+  der[offset++] = 0x02 // INTEGER
+  der[offset++] = rTrimmed.length
+  der.set(rTrimmed, offset)
+  offset += rTrimmed.length
+  der[offset++] = 0x02 // INTEGER
+  der[offset++] = sTrimmed.length
+  der.set(sTrimmed, offset)
+  
+  return der
+}
+
+function trimLeadingZeros(arr: Uint8Array): Uint8Array {
+  let start = 0
+  while (start < arr.length - 1 && arr[start] === 0 && arr[start + 1] < 0x80) {
+    start++
+  }
+  return arr.slice(start)
 }
 
 // Check if running in development
