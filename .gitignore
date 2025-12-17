@@ -45,3 +45,5 @@ coverage
 BUILD.md
 
 .cursor
+
+scripts/generate-license.js
