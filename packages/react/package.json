@@ -1,6 +1,6 @@
 {
   "name": "@smallwebco/tinypivot-react",
-  "version": "1.0.48",
+  "version": "1.0.49",
   "description": "TinyPivot React - Excel-like data grid and pivot table components",
   "type": "module",
   "main": "./dist/index.js",
