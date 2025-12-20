@@ -4,6 +4,9 @@
   "outputDirectory": "dist-demo",
   "installCommand": "pnpm install",
   "devCommand": "vite --config vite.demo.config.ts --port $PORT",
+  "rewrites": [
+    { "source": "/vs-ag-grid", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

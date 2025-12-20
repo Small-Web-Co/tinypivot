@@ -7,6 +7,9 @@ A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 ⭐ **If you find TinyPivot useful, please consider giving it a star!** It helps others discover the project.
 
 [![Star on GitHub](https://img.shields.io/github/stars/Small-Web-Co/tinypivot?style=social)](https://github.com/Small-Web-Co/tinypivot)
+[![React Bundle](https://img.shields.io/badge/React-37KB%20gzip-brightgreen)](https://bundlephobia.com/package/@smallwebco/tinypivot-react)
+[![Vue Bundle](https://img.shields.io/badge/Vue-47KB%20gzip-brightgreen)](https://bundlephobia.com/package/@smallwebco/tinypivot-vue)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
 ![TinyPivot Demo](https://bvallieres.com/images/tinypivot_demo.gif)
 
@@ -23,12 +26,11 @@ A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 | Clipboard (Ctrl+C) | ✅ | ✅ |
 | Dark mode | ✅ | ✅ |
 | Keyboard navigation | ✅ | ✅ |
-| Pivot table | ❌ | ✅ |
-| Basic aggregations (Sum, Count, Avg, Min, Max, Unique) | ❌ | ✅ |
-| Advanced aggregations (Median, Std Dev, % of Total) | ❌ | ✅ |
+| Pivot table with Sum aggregation | ✅ | ✅ |
+| Row/column totals | ✅ | ✅ |
+| All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
 | Custom aggregation functions | ❌ | ✅ |
 | Calculated fields with formulas | ❌ | ✅ |
-| Row/column totals | ❌ | ✅ |
 | No watermark | ❌ | ✅ |
 
 ## Installation

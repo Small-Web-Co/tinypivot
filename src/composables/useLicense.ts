@@ -12,8 +12,8 @@ const licenseInfo = ref<LicenseInfo>({
   type: 'free',
   isValid: true,
   features: {
-    pivot: false,
-    advancedAggregations: false,
+    pivot: true, // Free tier includes pivot with sum aggregation
+    advancedAggregations: false, // Pro: all aggregations beyond sum
     percentageMode: false,
     sessionPersistence: false,
     noWatermark: false,
@@ -68,8 +68,8 @@ const FREE_LICENSE: LicenseInfo = {
   type: 'free',
   isValid: true,
   features: {
-    pivot: false,
-    advancedAggregations: false,
+    pivot: true, // Free tier includes pivot with sum aggregation
+    advancedAggregations: false, // Pro: all aggregations beyond sum
     percentageMode: false,
     sessionPersistence: false,
     noWatermark: false,
@@ -80,7 +80,7 @@ const INVALID_LICENSE: LicenseInfo = {
   type: 'free',
   isValid: false,
   features: {
-    pivot: false,
+    pivot: true, // Free tier includes pivot with sum aggregation
     advancedAggregations: false,
     percentageMode: false,
     sessionPersistence: false,

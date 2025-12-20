@@ -6,6 +6,12 @@ import React, { useState, useMemo, useCallback } from 'react'
 import type { AggregationFunction, PivotValueField, FieldStats, CalculatedField } from '@smallwebco/tinypivot-core'
 import { AGGREGATION_OPTIONS, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { CalculatedFieldModal } from './CalculatedFieldModal'
+import { useLicense } from '../hooks/useLicense'
+
+// Check if an aggregation requires Pro license (everything except sum)
+function aggregationRequiresPro(agg: AggregationFunction): boolean {
+  return agg !== 'sum'
+}
 
 // Extended field stats for calculated fields
 interface ExtendedFieldStats extends FieldStats {
@@ -81,6 +87,12 @@ export function PivotConfig({
   const [fieldSearch, setFieldSearch] = useState('')
   const [showCalcModal, setShowCalcModal] = useState(false)
   const [editingCalcField, setEditingCalcField] = useState<CalculatedField | null>(null)
+  const { canUseAdvancedAggregations } = useLicense()
+
+  // Check if an aggregation is available based on license
+  const isAggregationAvailable = useCallback((agg: AggregationFunction): boolean => {
+    return !aggregationRequiresPro(agg) || canUseAdvancedAggregations
+  }, [canUseAdvancedAggregations])
 
   // Get only numeric field names for calculated field formulas
   const numericFieldNames = useMemo(() =>
@@ -172,9 +184,14 @@ export function PivotConfig({
 
   const handleAggregationChange = useCallback(
     (field: string, currentAgg: AggregationFunction, newAgg: AggregationFunction) => {
+      // Prevent changing to Pro aggregations without license
+      if (!isAggregationAvailable(newAgg)) {
+        console.warn(`[TinyPivot] "${newAgg}" aggregation requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.`)
+        return
+      }
       onUpdateAggregation(field, currentAgg, newAgg)
     },
-    [onUpdateAggregation]
+    [onUpdateAggregation, isAggregationAvailable]
   )
 
   const toggleRowColumn = useCallback(
@@ -333,8 +350,12 @@ export function PivotConfig({
                       onClick={e => e.stopPropagation()}
                     >
                       {AGGREGATION_OPTIONS.map(agg => (
-                        <option key={agg.value} value={agg.value}>
-                          {agg.symbol} {agg.label}
+                        <option
+                          key={agg.value}
+                          value={agg.value}
+                          disabled={aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations}
+                        >
+                          {agg.symbol} {agg.label}{aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations ? ' (Pro)' : ''}
                         </option>
                       ))}
                     </select>

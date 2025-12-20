@@ -82,9 +82,8 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     })
   })
 
-  // Actions with license checks
+  // Actions - pivot is free with sum aggregation, Pro required for other aggregations
   function addRowField(field: string) {
-    if (!requirePro('Pivot Table - Row Fields')) return
     if (!rowFields.value.includes(field)) {
       rowFields.value = [...rowFields.value, field]
     }
@@ -95,7 +94,6 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   }
 
   function addColumnField(field: string) {
-    if (!requirePro('Pivot Table - Column Fields')) return
     if (!columnFields.value.includes(field)) {
       columnFields.value = [...columnFields.value, field]
     }
@@ -106,7 +104,10 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   }
 
   function addValueField(field: string, aggregation: AggregationFunction = 'sum') {
-    if (!requirePro('Pivot Table - Value Fields')) return
+    // Pro required for non-sum aggregations
+    if (aggregation !== 'sum' && !requirePro(`${aggregation} aggregation`)) {
+      return
+    }
     if (valueFields.value.some(v => v.field === field && v.aggregation === aggregation)) {
       return
     }

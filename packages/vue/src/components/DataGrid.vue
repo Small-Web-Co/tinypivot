@@ -69,7 +69,7 @@ const emit = defineEmits<{
   (e: 'copy', payload: { text: string, cellCount: number }): void
 }>()
 
-const { showWatermark, canUsePivot, isDemo } = useLicense()
+const { showWatermark, canUsePivot, isDemo, isPro } = useLicense()
 
 // Theme handling
 const currentTheme = computed(() => {
@@ -1006,17 +1006,30 @@ function handleContainerClick(event: MouseEvent) {
           </svg>
         </button>
 
-        <!-- Export button -->
+        <!-- Export button - Grid export is free, Pivot export requires Pro -->
         <button
-          v-if="enableExport && (viewMode === 'grid' || (viewMode === 'pivot' && pivotIsConfigured))"
+          v-if="enableExport && viewMode === 'grid'"
           class="vpg-export-btn"
-          :title="viewMode === 'pivot' ? 'Export Pivot to CSV' : 'Export to CSV'"
+          title="Export to CSV"
           @click="handleExport"
         >
           <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Export{{ viewMode === 'pivot' ? ' Pivot' : '' }}
+          Export
+        </button>
+        <button
+          v-if="enableExport && viewMode === 'pivot' && pivotIsConfigured"
+          class="vpg-export-btn"
+          :class="{ 'vpg-export-btn-disabled': !isPro }"
+          :disabled="!isPro"
+          :title="isPro ? 'Export Pivot to CSV' : 'Export Pivot to CSV (Pro feature)'"
+          @click="isPro && handleExport()"
+        >
+          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export Pivot{{ !isPro ? ' (Pro)' : '' }}
         </button>
       </div>
     </div>
@@ -2099,9 +2112,18 @@ function handleContainerClick(event: MouseEvent) {
   transition: all 0.15s;
 }
 
-.vpg-export-btn:hover {
+.vpg-export-btn:hover:not(:disabled) {
   background: #d1fae5;
   border-color: #6ee7b7;
+}
+
+.vpg-export-btn-disabled,
+.vpg-export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
 }
 
 /* Column resize handle */
@@ -2406,8 +2428,16 @@ function handleContainerClick(event: MouseEvent) {
   color: #34d399;
 }
 
-.vpg-theme-dark .vpg-export-btn:hover {
+.vpg-theme-dark .vpg-export-btn:hover:not(:disabled) {
   background: rgba(16, 185, 129, 0.3);
+}
+
+.vpg-theme-dark .vpg-export-btn-disabled,
+.vpg-theme-dark .vpg-export-btn:disabled {
+  opacity: 0.5;
+  background: #334155;
+  border-color: #475569;
+  color: #64748b;
 }
 
 .vpg-theme-dark .vpg-config-toggle {

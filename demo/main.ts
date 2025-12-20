@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { enableDemoMode } from 'tinypivot'
 import { inject } from '@vercel/analytics'
 import App from './App.vue'
+import router from './router'
 import '../src/style.css'
 
 // Enable demo mode to unlock all Pro features for evaluation
@@ -14,5 +15,4 @@ if (demoSecret) {
 // Initialize Vercel Analytics
 inject()
 
-createApp(App).mount('#app')
-
+createApp(App).use(router).mount('#app')

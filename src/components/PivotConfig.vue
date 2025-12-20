@@ -39,20 +39,27 @@ const emit = defineEmits<{
   (e: 'removeValueField', field: string, aggregation: AggregationFunction): void
 }>()
 
-const { isPro, showWatermark } = useLicense()
+const { canUseAdvancedAggregations, showWatermark } = useLicense()
 
-// Aggregation options
-const aggregationOptions: { value: AggregationFunction, label: string, symbol: string }[] = [
-  { value: 'sum', label: 'Sum', symbol: 'Σ' },
-  { value: 'count', label: 'Count', symbol: '#' },
-  { value: 'avg', label: 'Avg', symbol: 'x̄' },
-  { value: 'min', label: 'Min', symbol: '↓' },
-  { value: 'max', label: 'Max', symbol: '↑' },
-  { value: 'countDistinct', label: 'Unique', symbol: '◇' },
-  { value: 'median', label: 'Median', symbol: 'M̃' },
-  { value: 'stdDev', label: 'Std Dev', symbol: 'σ' },
-  { value: 'percentOfTotal', label: '% of Total', symbol: '%Σ' },
+// Aggregation options - sum is free, all others require Pro
+const aggregationOptions: { value: AggregationFunction, label: string, symbol: string, requiresPro: boolean }[] = [
+  { value: 'sum', label: 'Sum', symbol: 'Σ', requiresPro: false },
+  { value: 'count', label: 'Count', symbol: '#', requiresPro: true },
+  { value: 'avg', label: 'Avg', symbol: 'x̄', requiresPro: true },
+  { value: 'min', label: 'Min', symbol: '↓', requiresPro: true },
+  { value: 'max', label: 'Max', symbol: '↑', requiresPro: true },
+  { value: 'countDistinct', label: 'Unique', symbol: '◇', requiresPro: true },
+  { value: 'median', label: 'Median', symbol: 'M̃', requiresPro: true },
+  { value: 'stdDev', label: 'Std Dev', symbol: 'σ', requiresPro: true },
+  { value: 'percentOfTotal', label: '% of Total', symbol: '%Σ', requiresPro: true },
 ]
+
+// Check if an aggregation is available based on license
+function isAggregationAvailable(agg: AggregationFunction): boolean {
+  const option = aggregationOptions.find(a => a.value === agg)
+  if (!option) return false
+  return !option.requiresPro || canUseAdvancedAggregations.value
+}
 
 function getAggSymbol(agg: AggregationFunction): string {
   return aggregationOptions.find(a => a.value === agg)?.symbol || 'Σ'
@@ -124,6 +131,11 @@ function handleDragEnd() {
 }
 
 function handleAggregationChange(field: string, currentAgg: AggregationFunction, newAgg: AggregationFunction) {
+  // Prevent changing to Pro aggregations without license
+  if (!isAggregationAvailable(newAgg)) {
+    console.warn(`[TinyPivot] "${newAgg}" aggregation requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.`)
+    return
+  }
   emit('updateAggregation', field, currentAgg, newAgg)
 }
 
@@ -215,8 +227,13 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
               @change="handleAggregationChange(field.field, field.valueConfig!.aggregation, ($event.target as HTMLSelectElement).value as AggregationFunction)"
               @click.stop
             >
-              <option v-for="agg in aggregationOptions" :key="agg.value" :value="agg.value">
-                {{ agg.symbol }} {{ agg.label }}
+              <option
+                v-for="agg in aggregationOptions"
+                :key="agg.value"
+                :value="agg.value"
+                :disabled="agg.requiresPro && !canUseAdvancedAggregations"
+              >
+                {{ agg.symbol }} {{ agg.label }}{{ agg.requiresPro && !canUseAdvancedAggregations ? ' (Pro)' : '' }}
               </option>
             </select>
 
@@ -524,6 +541,11 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-agg-select:focus {
   outline: none;
   box-shadow: 0 0 0 1px #10b981;
+}
+
+.vpg-agg-select option:disabled {
+  color: #9ca3af;
+  font-style: italic;
 }
 
 .vpg-remove-btn {
@@ -874,6 +896,11 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
 .vpg-theme-dark .vpg-pivot-config .vpg-agg-select:focus {
   box-shadow: 0 0 0 1px #10b981;
+}
+
+.vpg-theme-dark .vpg-pivot-config .vpg-agg-select option:disabled {
+  color: #64748b;
+  font-style: italic;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-remove-btn {

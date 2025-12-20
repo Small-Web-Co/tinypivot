@@ -13,7 +13,10 @@ importers:
         version: 8.21.3(vue@3.5.25(typescript@5.3.3))
       '@vercel/analytics':
         specifier: ^1.6.1
-        version: 1.6.1(react@18.3.1)(vue@3.5.25(typescript@5.3.3))
+        version: 1.6.1(react@18.3.1)(vue-router@4.6.4(vue@3.5.25(typescript@5.3.3)))(vue@3.5.25(typescript@5.3.3))
+      vue-router:
+        specifier: ^4.6.4
+        version: 4.6.4(vue@3.5.25(typescript@5.3.3))
     devDependencies:
       '@types/node':
         specifier: ^20.10.0
@@ -777,6 +780,9 @@ packages:
 
   '@vue/compiler-ssr@3.5.25':
     resolution: {integrity: sha512-ritPSKLBcParnsKYi+GNtbdbrIE1mtuFEJ4U1sWeuOMlIziK5GtOL85t5RhsNy4uWIXPgk+OUdpnXiTdzn8o3A==}
+
+  '@vue/devtools-api@6.6.4':
+    resolution: {integrity: sha512-sGhTPMuXqZ1rVOk32RylztWkfXTRhuS7vgAKv0zjqk8gbsHkJ7xfFf+jbySxt7tWObEJwyKaHMikV/WGDiQm8g==}
 
   '@vue/language-core@1.8.27':
     resolution: {integrity: sha512-L8Kc27VdQserNaCUNiSFdDl9LWT24ly8Hpwf1ECy3aFb9m6bDhBGQYOujDm21N7EW3moKIOKEanQwe1q5BK+mA==}
@@ -1951,6 +1957,11 @@ packages:
       terser:
         optional: true
 
+  vue-router@4.6.4:
+    resolution: {integrity: sha512-Hz9q5sa33Yhduglwz6g9skT8OBPii+4bFn88w6J+J4MfEo4KRRpmiNG/hHHkdbRFlLBOqxN8y8gf2Fb0MTUgVg==}
+    peerDependencies:
+      vue: ^3.5.0
+
   vue-template-compiler@2.7.16:
     resolution: {integrity: sha512-AYbUWAJHLGGQM7+cNTELw+KsOG9nl2CnSv467WobS5Cv9uk3wFcnr1Etsz2sEIHEZvw1U+o9mRlEO6QbZvUPGQ==}
 
@@ -2417,10 +2428,11 @@ snapshots:
       '@types/prop-types': 15.7.15
       csstype: 3.2.3
 
-  '@vercel/analytics@1.6.1(react@18.3.1)(vue@3.5.25(typescript@5.3.3))':
+  '@vercel/analytics@1.6.1(react@18.3.1)(vue-router@4.6.4(vue@3.5.25(typescript@5.3.3)))(vue@3.5.25(typescript@5.3.3))':
     optionalDependencies:
       react: 18.3.1
       vue: 3.5.25(typescript@5.3.3)
+      vue-router: 4.6.4(vue@3.5.25(typescript@5.3.3))
 
   '@vercel/build-utils@8.7.0': {}
 
@@ -2525,6 +2537,8 @@ snapshots:
     dependencies:
       '@vue/compiler-dom': 3.5.25
       '@vue/shared': 3.5.25
+
+  '@vue/devtools-api@6.6.4': {}
 
   '@vue/language-core@1.8.27(typescript@5.3.3)':
     dependencies:
@@ -3648,6 +3662,11 @@ snapshots:
     optionalDependencies:
       '@types/node': 20.19.25
       fsevents: 2.3.3
+
+  vue-router@4.6.4(vue@3.5.25(typescript@5.3.3)):
+    dependencies:
+      '@vue/devtools-api': 6.6.4
+      vue: 3.5.25(typescript@5.3.3)
 
   vue-template-compiler@2.7.16:
     dependencies:

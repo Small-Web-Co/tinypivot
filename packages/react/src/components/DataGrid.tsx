@@ -74,7 +74,7 @@ export function DataGrid({
   onExport,
   onCopy,
 }: DataGridProps) {
-  const { showWatermark, canUsePivot, isDemo } = useLicense()
+  const { showWatermark, canUsePivot, isDemo, isPro } = useLicense()
 
   // Theme handling
   const currentTheme = useMemo(() => {
@@ -904,11 +904,11 @@ export function DataGrid({
             </button>
           )}
 
-          {/* Export button */}
-          {enableExport && (viewMode === 'grid' || (viewMode === 'pivot' && pivotIsConfigured)) && (
+          {/* Export button - Grid export is free, Pivot export requires Pro */}
+          {enableExport && viewMode === 'grid' && (
             <button
               className="vpg-export-btn"
-              title={viewMode === 'pivot' ? 'Export Pivot to CSV' : 'Export to CSV'}
+              title="Export to CSV"
               onClick={handleExport}
             >
               <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -919,7 +919,25 @@ export function DataGrid({
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              Export{viewMode === 'pivot' ? ' Pivot' : ''}
+              Export
+            </button>
+          )}
+          {enableExport && viewMode === 'pivot' && pivotIsConfigured && (
+            <button
+              className={`vpg-export-btn ${!isPro ? 'vpg-export-btn-disabled' : ''}`}
+              disabled={!isPro}
+              title={isPro ? 'Export Pivot to CSV' : 'Export Pivot to CSV (Pro feature)'}
+              onClick={() => isPro && handleExport()}
+            >
+              <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Export Pivot{!isPro ? ' (Pro)' : ''}
             </button>
           )}
         </div>

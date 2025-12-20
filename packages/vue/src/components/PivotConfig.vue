@@ -44,10 +44,20 @@ const emit = defineEmits<{
   (e: 'updateCalculatedField', field: CalculatedField): void
 }>()
 
-const { isPro } = useLicense()
+const { canUseAdvancedAggregations } = useLicense()
 
 // Use aggregation options from core
 const aggregationOptions = AGGREGATION_OPTIONS
+
+// Check if an aggregation requires Pro (everything except sum)
+function aggregationRequiresPro(agg: AggregationFunction): boolean {
+  return agg !== 'sum'
+}
+
+// Check if an aggregation is available based on license
+function isAggregationAvailable(agg: AggregationFunction): boolean {
+  return !aggregationRequiresPro(agg) || canUseAdvancedAggregations.value
+}
 
 // Calculated field modal state
 const showCalcModal = ref(false)
@@ -178,6 +188,11 @@ function handleDragEnd() {
 }
 
 function handleAggregationChange(field: string, currentAgg: AggregationFunction, newAgg: AggregationFunction) {
+  // Prevent changing to Pro aggregations without license
+  if (!isAggregationAvailable(newAgg)) {
+    console.warn(`[TinyPivot] "${newAgg}" aggregation requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.`)
+    return
+  }
   emit('updateAggregation', field, currentAgg, newAgg)
 }
 
@@ -269,8 +284,13 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
               @change="handleAggregationChange(field.field, field.valueConfig!.aggregation, ($event.target as HTMLSelectElement).value as AggregationFunction)"
               @click.stop
             >
-              <option v-for="agg in aggregationOptions" :key="agg.value" :value="agg.value">
-                {{ agg.symbol }} {{ agg.label }}
+              <option
+                v-for="agg in aggregationOptions"
+                :key="agg.value"
+                :value="agg.value"
+                :disabled="aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations"
+              >
+                {{ agg.symbol }} {{ agg.label }}{{ aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations ? ' (Pro)' : '' }}
               </option>
             </select>
 

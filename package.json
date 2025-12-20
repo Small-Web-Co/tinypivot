@@ -44,7 +44,8 @@
   },
   "dependencies": {
     "@tanstack/vue-table": "^8.20.0",
-    "@vercel/analytics": "^1.6.1"
+    "@vercel/analytics": "^1.6.1",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

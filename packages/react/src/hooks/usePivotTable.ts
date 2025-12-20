@@ -170,15 +170,14 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     savePivotConfig(currentStorageKey, config)
   }, [currentStorageKey, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields])
 
-  // Actions
+  // Actions - pivot is free with sum aggregation, Pro required for other aggregations
   const addRowField = useCallback(
     (field: string) => {
-      if (!requirePro('Pivot Table - Row Fields')) return
       if (!rowFields.includes(field)) {
         setRowFieldsState(prev => [...prev, field])
       }
     },
-    [rowFields, requirePro]
+    [rowFields]
   )
 
   const removeRowField = useCallback((field: string) => {
@@ -191,12 +190,11 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
 
   const addColumnField = useCallback(
     (field: string) => {
-      if (!requirePro('Pivot Table - Column Fields')) return
       if (!columnFields.includes(field)) {
         setColumnFieldsState(prev => [...prev, field])
       }
     },
-    [columnFields, requirePro]
+    [columnFields]
   )
 
   const removeColumnField = useCallback((field: string) => {
@@ -209,7 +207,10 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
 
   const addValueField = useCallback(
     (field: string, aggregation: AggregationFunction = 'sum') => {
-      if (!requirePro('Pivot Table - Value Fields')) return
+      // Pro required for non-sum aggregations
+      if (aggregation !== 'sum' && !requirePro(`${aggregation} aggregation`)) {
+        return
+      }
       setValueFields(prev => {
         if (prev.some(v => v.field === field && v.aggregation === aggregation)) {
           return prev
