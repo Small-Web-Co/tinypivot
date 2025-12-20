@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <!-- Primary Meta Tags -->
-  <title>TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3</title>
-  <meta name="title" content="TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3">
-  <meta name="description" content="A powerful, lightweight Excel-like data grid and pivot table component for Vue 3. Features sorting, filtering, aggregations, and drag-and-drop pivot configuration. Free tier available.">
-  <meta name="keywords" content="vue data grid, vue 3 table, pivot table vue, excel vue component, vue spreadsheet, datagrid vue, vue table component, data visualization vue, vue pivot, tanstack vue">
+  <title>TinyPivot - Lightweight Pivot Table for React & Vue | Fast Data Grid</title>
+  <meta name="title" content="TinyPivot - Lightweight Pivot Table for React & Vue | Fast Data Grid">
+  <meta name="description" content="Lightweight pivot table for React and Vue 3. Under 40KB gzipped — 10x smaller than AG Grid. Excel-like data grid with sorting, filtering, aggregations, and drag-and-drop pivot. Free tier available.">
+  <meta name="keywords" content="lightweight pivot table, react pivot table, vue pivot table, lightweight data grid react, vue pivot table component, small bundle data grid, fast pivot table, react data grid, vue 3 data grid, excel react component, excel vue component, pivot table component, javascript pivot table, typescript data grid, ag-grid alternative, ag grid alternative lightweight, tanstack table pivot, simple pivot table javascript, minimal data grid, small bundle datagrid, react spreadsheet component, vue spreadsheet, pivot table npm, best react data grid, lightweight ag grid alternative, batteries included data grid">
   <meta name="author" content="Small Web, LLC">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://tiny-pivot.com/">
@@ -16,8 +16,8 @@
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tiny-pivot.com/">
-  <meta property="og:title" content="TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3">
-  <meta property="og:description" content="A powerful, lightweight Excel-like data grid and pivot table component for Vue 3. Features sorting, filtering, aggregations, and drag-and-drop pivot configuration.">
+  <meta property="og:title" content="TinyPivot - Lightweight Pivot Table for React & Vue">
+  <meta property="og:description" content="Lightweight pivot table for React and Vue 3. Under 40KB gzipped — 10x smaller than AG Grid. Excel-like data grid with sorting, filtering, and drag-and-drop pivot. Free tier.">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:site_name" content="TinyPivot">
@@ -26,8 +26,8 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://tiny-pivot.com/">
-  <meta name="twitter:title" content="TinyPivot - Excel-like Data Grid & Pivot Table for Vue 3">
-  <meta name="twitter:description" content="A powerful, lightweight Excel-like data grid and pivot table component for Vue 3. Free tier + Pro features for pivot tables.">
+  <meta name="twitter:title" content="TinyPivot - Lightweight Pivot Table for React & Vue">
+  <meta name="twitter:description" content="Lightweight pivot table for React and Vue 3. Under 40KB gzipped — 10x smaller than AG Grid. Free tier + Pro pivot features.">
   <meta name="twitter:creator" content="@bricevallieres">
   
   <!-- Favicon -->
@@ -43,15 +43,19 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "TinyPivot",
+    "alternateName": ["Lightweight Pivot Table", "React Pivot Table", "Vue Pivot Table"],
     "applicationCategory": "DeveloperApplication",
+    "applicationSubCategory": "Data Grid Component",
     "operatingSystem": "Web",
+    "programmingLanguage": ["TypeScript", "JavaScript"],
+    "runtimePlatform": ["React", "Vue 3"],
     "offers": [
       {
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "USD",
         "name": "Free Tier",
-        "description": "Data grid with sorting, filtering, and keyboard navigation"
+        "description": "Lightweight data grid with sorting, filtering, and keyboard navigation for React and Vue"
       },
       {
         "@type": "Offer",
@@ -80,10 +84,11 @@
       "ratingValue": "5",
       "ratingCount": "1"
     },
-    "description": "A powerful Excel-like data grid and pivot table component for Vue 3 with filtering, sorting, and drag-and-drop pivot configuration.",
+    "description": "A lightweight pivot table and Excel-like data grid component for React and Vue 3. Under 40KB gzipped — 10x smaller than AG Grid. Features sorting, filtering, aggregations, and drag-and-drop pivot configuration.",
     "url": "https://tiny-pivot.com",
-    "downloadUrl": "https://www.npmjs.com/package/tinypivot",
-    "softwareVersion": "1.0.5",
+    "downloadUrl": "https://www.npmjs.com/package/@smallwebco/tinypivot-react",
+    "softwareVersion": "1.0.47",
+    "featureList": ["Pivot Tables", "Data Aggregation", "Column Sorting", "Column Filtering", "Keyboard Navigation", "Cell Selection", "CSV Export", "Drag and Drop", "Dark Mode"],
     "author": {
       "@type": "Organization",
       "name": "Small Web, LLC",
@@ -107,15 +112,15 @@
         "name": "What is TinyPivot?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "TinyPivot is a Vue 3 component library that provides an Excel-like data grid and pivot table functionality. It includes features like column filtering, sorting, keyboard navigation, and cell selection in the free tier, with advanced pivot table features available in the Pro version."
+          "text": "TinyPivot is a lightweight pivot table and data grid component for React and Vue 3. At under 40KB gzipped (10x smaller than AG Grid), it provides Excel-like functionality including pivot tables, sorting, filtering, and aggregations without the bloat of larger alternatives."
         }
       },
       {
         "@type": "Question",
-        "name": "Is TinyPivot free to use?",
+        "name": "Does TinyPivot work with React?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes, TinyPivot offers a free tier with core data grid features including sorting, filtering, keyboard navigation, and cell selection. Pro features like pivot tables and aggregations require a one-time license purchase starting at $49."
+          "text": "Yes, TinyPivot has a dedicated React package (@smallwebco/tinypivot-react) that works with React 18 and above. It provides the same lightweight pivot table functionality as the Vue version with full TypeScript support."
         }
       },
       {
@@ -123,7 +128,63 @@
         "name": "Does TinyPivot work with Vue 3?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes, TinyPivot is built specifically for Vue 3 and requires Vue 3.3.0 or higher. It's written in TypeScript and provides full type definitions."
+          "text": "Yes, TinyPivot has a Vue 3 package (@smallwebco/tinypivot-vue) that requires Vue 3.3.0 or higher. It's written in TypeScript and provides full type definitions for a great developer experience."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How small is TinyPivot compared to AG Grid or TanStack Table?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "TinyPivot is under 40KB gzipped (React: 37KB, Vue: 47KB), making it approximately 10x smaller than AG Grid (which can be 500KB+). TanStack Table is an excellent headless library with similar bundle efficiency. TinyPivot differentiates by including pivot table functionality and a complete UI out of the box."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is there a free version of TinyPivot?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, TinyPivot offers a generous free tier with core data grid features including sorting, filtering, keyboard navigation, and cell selection. Pro features like pivot tables and advanced aggregations require a one-time license starting at $49."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What makes TinyPivot a lightweight pivot table solution?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "TinyPivot is designed from the ground up to be minimal and fast. It has zero dependencies beyond React or Vue, uses efficient rendering, and includes only essential features. The result is an under-40KB bundle that handles 100,000+ rows without performance issues — perfect as a lightweight AG Grid alternative."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is TinyPivot a good AG Grid alternative?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, TinyPivot is an excellent lightweight AG Grid alternative for projects that need pivot tables and data grids without the 500KB+ bundle size. It offers similar Excel-like features including sorting, filtering, aggregations, and pivot tables at a fraction of the size and cost."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I add a pivot table to my React app?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Install the React pivot table component with 'npm install @smallwebco/tinypivot-react', import the TinyPivot component and styles, then pass your data array and column definitions. The drag-and-drop pivot configuration lets users create pivot tables by dragging columns to row/column/value areas."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I use TinyPivot as an Excel component in React?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, TinyPivot provides Excel-like functionality for React applications including cell selection, keyboard navigation (arrow keys, Tab, Enter), column resizing, sorting, and filtering. It's designed to feel familiar to spreadsheet users while remaining lightweight."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does TinyPivot compare to TanStack Table?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "TanStack Table is an outstanding headless library that gives you full control over rendering and is great for custom table implementations. TinyPivot takes a different approach — it's a batteries-included component with pivot tables, aggregations, and styling built-in. Choose TanStack Table for maximum flexibility, or TinyPivot when you want pivot functionality ready to go."
         }
       }
     ]
