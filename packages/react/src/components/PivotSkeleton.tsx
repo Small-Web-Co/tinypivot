@@ -485,6 +485,18 @@ export function PivotSkeleton({
 
   const currentFontSize = fontSize
 
+  // Calculate width per row header column
+  const rowHeaderWidth = 180
+  const rowHeaderColWidth = useMemo(() => {
+    const numCols = Math.max(rowFields.length, 1)
+    return Math.max(rowHeaderWidth / numCols, 80)
+  }, [rowFields.length])
+
+  // Calculate left offset for each row header column (for sticky positioning)
+  const getRowHeaderLeftOffset = useCallback((fieldIdx: number): number => {
+    return fieldIdx * rowHeaderColWidth
+  }, [rowHeaderColWidth])
+
   return (
     <div
       className={`vpg-pivot-skeleton vpg-font-${currentFontSize} ${draggingField ? 'vpg-is-dragging' : ''}`}
@@ -763,20 +775,24 @@ export function PivotSkeleton({
                 <thead>
                   {columnHeaderCells.map((headerRow, levelIdx) => (
                     <tr key={`header-${levelIdx}`} className="vpg-column-header-row">
-                      {levelIdx === 0 && (
+                      {levelIdx === 0 && (rowFields.length > 0 ? rowFields : ['Rows']).map((field, fieldIdx) => (
                         <th
+                          key={`row-header-${fieldIdx}`}
                           className="vpg-row-header-label"
                           rowSpan={columnHeaderCells.length}
+                          style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(fieldIdx)}px` }}
                           onClick={() => toggleSort('row')}
                         >
                           <div className="vpg-header-content">
-                            <span>{rowFields.join(' / ') || 'Rows'}</span>
-                            <span className={`vpg-sort-indicator ${sortTarget === 'row' ? 'active' : ''}`}>
-                              {sortTarget === 'row' ? (sortDirection === 'asc' ? '↑' : '↓') : '⇅'}
-                            </span>
+                            <span>{field}</span>
+                            {(fieldIdx === rowFields.length - 1 || rowFields.length === 0) && (
+                              <span className={`vpg-sort-indicator ${sortTarget === 'row' ? 'active' : ''}`}>
+                                {sortTarget === 'row' ? (sortDirection === 'asc' ? '↑' : '↓') : '⇅'}
+                              </span>
+                            )}
                           </div>
                         </th>
-                      )}
+                      ))}
                       {headerRow.map((cell, idx) => (
                         <th
                           key={idx}
@@ -812,13 +828,15 @@ export function PivotSkeleton({
                 <tbody>
                   {sortedRowIndices.map(sortedIdx => (
                     <tr key={sortedIdx} className="vpg-data-row">
-                      <th className="vpg-row-header-cell">
-                        {pivotResult.rowHeaders[sortedIdx].map((val, idx) => (
-                          <span key={idx} className="vpg-row-value">
-                            {val}
-                          </span>
-                        ))}
-                      </th>
+                      {pivotResult.rowHeaders[sortedIdx].map((val, idx) => (
+                        <th
+                          key={`row-${sortedIdx}-${idx}`}
+                          className="vpg-row-header-cell"
+                          style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
+                        >
+                          {val}
+                        </th>
+                      ))}
 
                       {pivotResult.data[sortedIdx].map((cell, colIdx) => {
                         const displayRowIdx = sortedRowIndices.indexOf(sortedIdx)
@@ -844,7 +862,13 @@ export function PivotSkeleton({
 
                   {pivotResult.columnTotals.length > 0 && (
                     <tr className="vpg-totals-row">
-                      <th className="vpg-row-header-cell vpg-total-label">Total</th>
+                      <th
+                        className="vpg-row-header-cell vpg-total-label"
+                        colSpan={Math.max(rowFields.length, 1)}
+                        style={{ width: `${rowHeaderWidth}px` }}
+                      >
+                        Total
+                      </th>
                       {pivotResult.columnTotals.map((cell, colIdx) => (
                         <td key={colIdx} className="vpg-data-cell vpg-total-cell">
                           {cell.formattedValue}

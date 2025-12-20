@@ -465,6 +465,17 @@ function isChipDropTarget(zone: 'row' | 'column', index: number): boolean {
 // Column width
 const rowHeaderWidth = ref(180)
 const dataColWidth = ref(80)
+
+// Calculate width per row header column
+const rowHeaderColWidth = computed(() => {
+  const numCols = Math.max(props.rowFields.length, 1)
+  return Math.max(rowHeaderWidth.value / numCols, 80)
+})
+
+// Calculate left offset for each row header column (for sticky positioning)
+function getRowHeaderLeftOffset(fieldIdx: number): number {
+  return fieldIdx * rowHeaderColWidth.value
+}
 </script>
 
 <template>
@@ -702,20 +713,23 @@ const dataColWidth = ref(80)
         <table class="vpg-pivot-table">
           <thead>
             <tr v-for="(headerRow, levelIdx) in columnHeaderCells" :key="`header-${levelIdx}`" class="vpg-column-header-row">
-              <th
-                v-if="levelIdx === 0"
-                class="vpg-row-header-label"
-                :rowspan="columnHeaderCells.length"
-                :style="{ width: `${rowHeaderWidth}px` }"
-                @click="toggleSort('row')"
-              >
-                <div class="vpg-header-content">
-                  <span>{{ rowFields.join(' / ') || 'Rows' }}</span>
-                  <span class="vpg-sort-indicator" :class="{ active: sortTarget === 'row' }">
-                    {{ sortTarget === 'row' ? (sortDirection === 'asc' ? '↑' : '↓') : '⇅' }}
-                  </span>
-                </div>
-              </th>
+              <template v-if="levelIdx === 0">
+                <th
+                  v-for="(field, fieldIdx) in (rowFields.length > 0 ? rowFields : ['Rows'])"
+                  :key="`row-header-${fieldIdx}`"
+                  class="vpg-row-header-label"
+                  :rowspan="columnHeaderCells.length"
+                  :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(fieldIdx)}px` }"
+                  @click="toggleSort('row')"
+                >
+                  <div class="vpg-header-content">
+                    <span>{{ field }}</span>
+                    <span v-if="fieldIdx === rowFields.length - 1 || rowFields.length === 0" class="vpg-sort-indicator" :class="{ active: sortTarget === 'row' }">
+                      {{ sortTarget === 'row' ? (sortDirection === 'asc' ? '↑' : '↓') : '⇅' }}
+                    </span>
+                  </div>
+                </th>
+              </template>
               <th
                 v-for="(cell, idx) in headerRow"
                 :key="idx"
@@ -744,12 +758,12 @@ const dataColWidth = ref(80)
           <tbody>
             <tr v-for="sortedIdx in sortedRowIndices" :key="sortedIdx" class="vpg-data-row">
               <th
+                v-for="(val, idx) in pivotResult.rowHeaders[sortedIdx]"
+                :key="`row-${sortedIdx}-${idx}`"
                 class="vpg-row-header-cell"
-                :style="{ width: `${rowHeaderWidth}px` }"
+                :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }"
               >
-                <span v-for="(val, idx) in pivotResult.rowHeaders[sortedIdx]" :key="idx" class="vpg-row-value">
-                  {{ val }}
-                </span>
+                {{ val }}
               </th>
 
               <td
@@ -773,7 +787,11 @@ const dataColWidth = ref(80)
             </tr>
 
             <tr v-if="pivotResult.columnTotals.length > 0" class="vpg-totals-row">
-              <th class="vpg-row-header-cell vpg-total-label" :style="{ width: `${rowHeaderWidth}px` }">
+              <th
+                class="vpg-row-header-cell vpg-total-label"
+                :colspan="Math.max(rowFields.length, 1)"
+                :style="{ width: `${rowHeaderWidth}px` }"
+              >
                 Total
               </th>
               <td
@@ -1406,7 +1424,7 @@ const dataColWidth = ref(80)
 
 .vpg-row-header-label {
   position: sticky;
-  left: 0;
+  /* left is set dynamically via inline style for multi-column row headers */
   z-index: 30;
   padding: 0.5rem 0.75rem;
   text-align: left;
@@ -1418,6 +1436,10 @@ const dataColWidth = ref(80)
   border-right: 1px solid #e2e8f0;
   background: #f8fafc;
   cursor: pointer;
+}
+
+.vpg-row-header-label + .vpg-row-header-label {
+  border-left: 1px solid #e2e8f0;
 }
 
 .vpg-row-header-label:hover {
@@ -1486,7 +1508,7 @@ const dataColWidth = ref(80)
 
 .vpg-row-header-cell {
   position: sticky;
-  left: 0;
+  /* left is set dynamically via inline style for multi-column row headers */
   padding: 0.5rem 0.75rem;
   text-align: left;
   font-size: 0.75rem;
@@ -1503,9 +1525,9 @@ const dataColWidth = ref(80)
   background: #f8fafc;
 }
 
-.vpg-row-value + .vpg-row-value::before {
-  content: ' / ';
-  color: #94a3b8;
+/* Row header cells now render as separate columns */
+.vpg-row-header-cell + .vpg-row-header-cell {
+  border-left: 1px solid #e2e8f0;
 }
 
 .vpg-data-cell {

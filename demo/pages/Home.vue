@@ -134,6 +134,7 @@ function copyInstallCommand() {
           <a href="#quickstart">Quick Start</a>
           <a href="#demo">Demo</a>
           <a href="#pricing">Pricing</a>
+          <router-link to="/vs-ag-grid" class="nav-link-highlight">vs AG Grid</router-link>
         </div>
         <div class="nav-actions">
           <div class="nav-framework-toggle">
@@ -226,6 +227,10 @@ function copyInstallCommand() {
             </svg>
           </button>
         </div>
+        <router-link to="/vs-ag-grid" class="hero-comparison">
+          <span class="comparison-badge">10x smaller</span>
+          <span>See how TinyPivot compares to AG Grid →</span>
+        </router-link>
       </div>
     </section>
 
@@ -761,6 +766,19 @@ function copyInstallCommand() {
   color: white;
 }
 
+.nav-link-highlight {
+  color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.nav-link-highlight:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
 .nav-actions {
   display: flex;
   align-items: center;
@@ -960,6 +978,39 @@ function copyInstallCommand() {
 .copy-btn:hover {
   color: white;
   background: rgba(255, 255, 255, 0.1);
+}
+
+.hero-comparison {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 2rem;
+  color: #10b981;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.hero-comparison:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+.comparison-badge {
+  background: #10b981;
+  color: #0f172a;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 /* Sections */
