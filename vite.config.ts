@@ -19,9 +19,9 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-name: 'TinyPivot',
-    formats: ['es', 'umd'],
-    fileName: 'tinypivot',
+      name: 'TinyPivot',
+      formats: ['es', 'umd'],
+      fileName: 'tinypivot',
     },
     rollupOptions: {
       external: ['vue'],
@@ -39,4 +39,3 @@ name: 'TinyPivot',
     cssCodeSplit: false,
   },
 })
-

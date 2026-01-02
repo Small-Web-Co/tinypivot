@@ -22,7 +22,8 @@ export interface PivotExportData {
  * Escape CSV value
  */
 function escapeCSV(value: unknown, delimiter = ','): string {
-  if (value === null || value === undefined) return ''
+  if (value === null || value === undefined)
+    return ''
   const str = String(value)
   if (str.includes(delimiter) || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`
@@ -36,7 +37,7 @@ function escapeCSV(value: unknown, delimiter = ','): string {
 export function exportToCSV<T extends Record<string, unknown>>(
   data: T[],
   columns: string[],
-  options: ExportOptions = {}
+  options: ExportOptions = {},
 ): void {
   const { filename = 'export.csv', includeHeaders = true, delimiter = ',' } = options
 
@@ -63,13 +64,13 @@ export function exportPivotToCSV(
   rowFields: string[],
   _columnFields: string[],
   valueFields: PivotValueField[],
-  options: ExportOptions = {}
+  options: ExportOptions = {},
 ): void {
   const { filename = 'pivot-export.csv', delimiter = ',' } = options
 
   const rows: string[] = []
-  const { headers, rowHeaders, data, rowTotals, columnTotals, grandTotal, showRowTotals, showColumnTotals } =
-    pivotData
+  const { headers, rowHeaders, data, rowTotals, columnTotals, grandTotal, showRowTotals, showColumnTotals }
+    = pivotData
 
   // Calculate number of row header columns
   const rowHeaderColCount = rowFields.length || 1
@@ -93,7 +94,8 @@ export function exportPivotToCSV(
           for (const vf of valueFields) {
             headerRow.push(escapeCSV(`Total (${vf.aggregation})`, delimiter))
           }
-        } else {
+        }
+        else {
           for (let i = 0; i < valueFields.length; i++) {
             headerRow.push('')
           }
@@ -101,7 +103,8 @@ export function exportPivotToCSV(
       }
       rows.push(headerRow.join(delimiter))
     }
-  } else {
+  }
+  else {
     // Simple header with value fields only
     const headerRow: string[] = []
     for (let i = 0; i < rowHeaderColCount; i++) {
@@ -186,7 +189,7 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 export function copyToClipboard(
   text: string,
   onSuccess?: () => void,
-  onError?: (err: Error) => void
+  onError?: (err: Error) => void,
 ): void {
   navigator.clipboard.writeText(text).then(onSuccess).catch(onError)
 }
@@ -197,18 +200,20 @@ export function copyToClipboard(
 export function formatSelectionForClipboard<T extends Record<string, unknown>>(
   rows: T[],
   columns: string[],
-  selectionBounds: SelectionBounds
+  selectionBounds: SelectionBounds,
 ): string {
   const { minRow, maxRow, minCol, maxCol } = selectionBounds
   const lines: string[] = []
 
   for (let r = minRow; r <= maxRow; r++) {
     const row = rows[r]
-    if (!row) continue
+    if (!row)
+      continue
     const values: string[] = []
     for (let c = minCol; c <= maxCol; c++) {
       const colId = columns[c]
-      if (!colId) continue
+      if (!colId)
+        continue
       const value = row[colId]
       values.push(value === null || value === undefined ? '' : String(value))
     }
@@ -217,5 +222,3 @@ export function formatSelectionForClipboard<T extends Record<string, unknown>>(
 
   return lines.join('\n')
 }
-
-

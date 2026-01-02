@@ -3,14 +3,14 @@
  * Provides Excel-like filtering, sorting, and data manipulation functionality
  */
 import type { ColumnDef, ColumnFiltersState, FilterFn, SortingState, VisibilityState } from '@tanstack/vue-table'
+import type { ColumnStats } from '../types'
 import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
   useVueTable,
 } from '@tanstack/vue-table'
-import { type Ref, computed, ref, watch } from 'vue'
-import type { ColumnStats } from '../types'
+import { computed, type Ref, ref, watch } from 'vue'
 
 export interface ExcelGridOptions<T> {
   data: Ref<T[]>
@@ -134,7 +134,7 @@ export function formatCellValue(value: unknown, type: ColumnStats['type']): stri
 /**
  * Multi-value filter function for Excel-style filtering
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const multiSelectFilter: FilterFn<any> = (row, columnId, filterValue) => {
   if (!filterValue || !Array.isArray(filterValue) || filterValue.length === 0) {
     return true
@@ -193,7 +193,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
         id: key,
         accessorKey: key,
         header: key,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         cell: (info: any) => formatCellValue(info.getValue(), stats.type),
         filterFn: multiSelectFilter,
         meta: {
@@ -332,4 +332,3 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
     getSortDirection,
   }
 }
-

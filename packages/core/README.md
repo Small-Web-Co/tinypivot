@@ -14,4 +14,3 @@ See the main [TinyPivot documentation](https://github.com/Small-Web-Co/tinypivot
 - **Pro Features**: Commercial license required
 
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
-

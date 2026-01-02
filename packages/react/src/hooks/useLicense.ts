@@ -1,19 +1,19 @@
+import type { LicenseInfo } from '@smallwebco/tinypivot-core'
+import {
+  canUsePivot as coreCanUsePivot,
+  configureLicenseSecret as coreConfigureLicenseSecret,
+  isPro as coreIsPro,
+  shouldShowWatermark as coreShouldShowWatermark,
+  getDemoLicenseInfo,
+  getFreeLicenseInfo,
+  logProRequired,
+  validateLicenseKey,
+} from '@smallwebco/tinypivot-core'
 /**
  * License Management Hook for React
  * Wraps core license logic with React state management
  */
-import { useState, useCallback, useMemo } from 'react'
-import type { LicenseInfo } from '@smallwebco/tinypivot-core'
-import {
-  validateLicenseKey,
-  configureLicenseSecret as coreConfigureLicenseSecret,
-  getDemoLicenseInfo,
-  getFreeLicenseInfo,
-  canUsePivot as coreCanUsePivot,
-  isPro as coreIsPro,
-  shouldShowWatermark as coreShouldShowWatermark,
-  logProRequired,
-} from '@smallwebco/tinypivot-core'
+import { useCallback, useMemo, useState } from 'react'
 
 // Global state (shared across all hook instances)
 let globalLicenseInfo: LicenseInfo = getFreeLicenseInfo()
@@ -32,7 +32,8 @@ export async function setLicenseKey(key: string): Promise<void> {
 
   if (!globalLicenseInfo.isValid) {
     console.warn('[TinyPivot] Invalid or expired license key. Running in free mode.')
-  } else if (globalLicenseInfo.type !== 'free') {
+  }
+  else if (globalLicenseInfo.type !== 'free') {
     console.info(`[TinyPivot] Pro license activated (${globalLicenseInfo.type})`)
   }
 
@@ -81,27 +82,27 @@ export function useLicense() {
 
   const isPro = useMemo(
     () => globalDemoMode || coreIsPro(licenseInfo),
-    [licenseInfo]
+    [licenseInfo],
   )
 
   const canUsePivot = useMemo(
     () => globalDemoMode || coreCanUsePivot(licenseInfo),
-    [licenseInfo]
+    [licenseInfo],
   )
 
   const canUseAdvancedAggregations = useMemo(
     () => globalDemoMode || licenseInfo.features.advancedAggregations,
-    [licenseInfo]
+    [licenseInfo],
   )
 
   const canUsePercentageMode = useMemo(
     () => globalDemoMode || licenseInfo.features.percentageMode,
-    [licenseInfo]
+    [licenseInfo],
   )
 
   const showWatermark = useMemo(
     () => coreShouldShowWatermark(licenseInfo, globalDemoMode),
-    [licenseInfo]
+    [licenseInfo],
   )
 
   const requirePro = useCallback((feature: string): boolean => {
@@ -123,5 +124,3 @@ export function useLicense() {
     requirePro,
   }
 }
-
-

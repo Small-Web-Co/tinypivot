@@ -1,14 +1,14 @@
 /**
  * Vercel Serverless Function: Stripe Webhook Handler
- * 
+ *
  * This handles successful payments and generates license keys.
- * 
+ *
  * Environment Variables needed:
  * - STRIPE_SECRET_KEY: Your Stripe secret key
  * - STRIPE_WEBHOOK_SECRET: Webhook signing secret (whsec_...)
  * - LICENSE_PRIVATE_KEY: ECDSA P-256 private key (PEM format) for signing licenses
  * - RESEND_API_KEY: (Optional) For sending license emails via Resend
- * 
+ *
  * Setup in Stripe Dashboard:
  * 1. Go to Developers → Webhooks
  * 2. Add endpoint: https://your-domain.vercel.app/api/webhook
@@ -33,11 +33,11 @@ const PLAN_CODES: Record<string, string> = {
 /**
  * Generate a cryptographically signed license key
  * Format: TP-{TYPE}-{SIGNATURE}-{EXPIRY}
- * 
+ *
  * Uses ECDSA P-256 asymmetric cryptography:
  * - Private key (in env) signs licenses
  * - Public key (in library) verifies them
- * 
+ *
  * Licenses are PERPETUAL - the expiry date only affects update eligibility
  */
 async function generateLicenseKey(plan: string): Promise<string> {
@@ -55,35 +55,35 @@ async function generateLicenseKey(plan: string): Promise<string> {
   }
 
   const payload = `TP-${typeCode}-${expiry}`
-  
+
   // Import private key for signing
   const pemContents = privateKeyPem
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
     .replace(/\s/g, '')
-  
+
   const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0))
-  
+
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8',
     binaryKey.buffer,
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
-    ['sign']
+    ['sign'],
   )
-  
+
   const encoder = new TextEncoder()
   const msgData = encoder.encode(payload)
-  
+
   const rawSignature = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     cryptoKey,
-    msgData
+    msgData,
   )
-  
+
   // Convert raw signature (r || s) to DER format for compatibility with Node.js verification
   const derSignature = rawToDer(new Uint8Array(rawSignature))
-  
+
   // Convert to URL-safe base64 (replace +/ with -_)
   const sigBase64 = btoa(String.fromCharCode.apply(null, Array.from(derSignature)))
   const safeSig = sigBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
@@ -108,20 +108,20 @@ function concatBytes(prefix: number[], arr: Uint8Array): Uint8Array {
 function rawToDer(raw: Uint8Array): Uint8Array {
   const r = raw.slice(0, 32)
   const s = raw.slice(32, 64)
-  
+
   // Add leading zero if high bit is set (to indicate positive integer)
   const rPadded = r[0] >= 0x80 ? concatBytes([0], r) : r
   const sPadded = s[0] >= 0x80 ? concatBytes([0], s) : s
-  
+
   // Remove leading zeros (except one if needed for sign)
   const rTrimmed = trimLeadingZeros(rPadded)
   const sTrimmed = trimLeadingZeros(sPadded)
-  
+
   const totalLen = 2 + rTrimmed.length + 2 + sTrimmed.length
-  
+
   const der = new Uint8Array(2 + totalLen)
   let offset = 0
-  
+
   der[offset++] = 0x30 // SEQUENCE
   der[offset++] = totalLen
   der[offset++] = 0x02 // INTEGER
@@ -131,7 +131,7 @@ function rawToDer(raw: Uint8Array): Uint8Array {
   der[offset++] = 0x02 // INTEGER
   der[offset++] = sTrimmed.length
   der.set(sTrimmed, offset)
-  
+
   return der
 }
 
@@ -163,15 +163,15 @@ async function sendLicenseEmail(email: string, licenseKey: string, plan: string)
   }
 
   // Use test sender in dev (no domain verification needed)
-  const fromAddress = isDev 
+  const fromAddress = isDev
     ? 'TinyPivot <onboarding@resend.dev>'
     : 'TinyPivot <license@tiny-pivot.com>'
-  
+
   const subjectPrefix = isDev ? '[TEST] ' : ''
 
   try {
     console.log(`📧 Sending license email to ${email}... (${isDev ? 'DEV MODE' : 'PRODUCTION'})`)
-    
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -202,12 +202,12 @@ setLicenseKey('${licenseKey}')
     })
 
     const result = await response.json()
-    
+
     if (!response.ok) {
       console.error('❌ Resend API error:', result)
       return false
     }
-    
+
     console.log(`✅ Email sent successfully! ID: ${result.id}`)
     return true
   }
@@ -231,21 +231,21 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
   if (req.body && typeof req.body === 'object') {
     return Buffer.from(JSON.stringify(req.body))
   }
-  
+
   // Otherwise read from stream (production Vercel)
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
-    
+
     req.on('data', (chunk: Buffer) => {
       chunks.push(chunk)
     })
-    
+
     req.on('end', () => {
       resolve(Buffer.concat(chunks))
     })
-    
+
     req.on('error', reject)
-    
+
     // Timeout after 10 seconds
     setTimeout(() => {
       if (chunks.length === 0) {
@@ -266,22 +266,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // This is safe because we're using Stripe CLI locally
   if (isDev) {
     console.log('🔧 DEV MODE: Skipping signature verification')
-    
+
     // Get the body - either already parsed or from stream
     let body: unknown
     if (req.body && typeof req.body === 'object') {
       body = req.body
-    } else {
+    }
+    else {
       const rawBody = await getRawBody(req)
       body = JSON.parse(rawBody.toString())
     }
-    
+
     event = body as Stripe.Event
     console.log(`📥 Received webhook: ${event.type}`)
-  } else {
+  }
+  else {
     // Production: verify signature
     const signature = req.headers['stripe-signature'] as string
-    
+
     if (!signature) {
       console.error('❌ No stripe-signature header')
       return res.status(400).json({ error: 'Missing stripe-signature header' })
@@ -329,4 +331,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   return res.status(200).json({ received: true })
 }
-

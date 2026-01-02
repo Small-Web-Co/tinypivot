@@ -2,18 +2,17 @@
  * TinyPivot React - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
  */
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { ColumnStats } from '@smallwebco/tinypivot-core'
 import { useExcelGrid } from '../hooks/useExcelGrid'
-import { usePivotTable } from '../hooks/usePivotTable'
-import { useLicense } from '../hooks/useLicense'
 import {
-  exportToCSV,
-  exportPivotToCSV,
   copyToClipboard,
+  exportPivotToCSV,
+  exportToCSV,
   formatSelectionForClipboard,
 } from '../hooks/useGridFeatures'
+import { useLicense } from '../hooks/useLicense'
+import { usePivotTable } from '../hooks/usePivotTable'
 import { ColumnFilter } from './ColumnFilter'
 import { PivotConfig } from './PivotConfig'
 import { PivotSkeleton } from './PivotSkeleton'
@@ -44,9 +43,9 @@ interface DataGridProps {
     value: unknown
     rowData: Record<string, unknown>
   }) => void
-  onSelectionChange?: (payload: { cells: Array<{ row: number; col: number }>; values: unknown[] }) => void
-  onExport?: (payload: { rowCount: number; filename: string }) => void
-  onCopy?: (payload: { text: string; cellCount: number }) => void
+  onSelectionChange?: (payload: { cells: Array<{ row: number, col: number }>, values: unknown[] }) => void
+  onExport?: (payload: { rowCount: number, filename: string }) => void
+  onCopy?: (payload: { text: string, cellCount: number }) => void
 }
 
 const MIN_COL_WIDTH = 120
@@ -104,9 +103,9 @@ export function DataGrid({
   const [draggingField, setDraggingField] = useState<string | null>(null)
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null)
   const [filterDropdownPosition, setFilterDropdownPosition] = useState({ top: 0, left: 0, maxHeight: 400 })
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null)
-  const [selectionStart, setSelectionStart] = useState<{ row: number; col: number } | null>(null)
-  const [selectionEnd, setSelectionEnd] = useState<{ row: number; col: number } | null>(null)
+  const [selectedCell, setSelectedCell] = useState<{ row: number, col: number } | null>(null)
+  const [selectionStart, setSelectionStart] = useState<{ row: number, col: number } | null>(null)
+  const [selectionEnd, setSelectionEnd] = useState<{ row: number, col: number } | null>(null)
   const [isSelecting, setIsSelecting] = useState(false)
 
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -174,13 +173,16 @@ export function DataGrid({
 
   // Active filters info for display
   const activeFilterInfo = useMemo(() => {
-    if (activeFilters.length === 0) return null
-    return activeFilters.map(f => {
+    if (activeFilters.length === 0)
+      return null
+    return activeFilters.map((f) => {
       if (f.type === 'range' && f.range) {
         // Format range filter display
         const parts = []
-        if (f.range.min !== null) parts.push(`≥ ${f.range.min}`)
-        if (f.range.max !== null) parts.push(`≤ ${f.range.max}`)
+        if (f.range.min !== null)
+          parts.push(`≥ ${f.range.min}`)
+        if (f.range.max !== null)
+          parts.push(`≤ ${f.range.max}`)
         return {
           column: f.column,
           valueCount: 1,
@@ -206,10 +208,11 @@ export function DataGrid({
       return rows
     }
     const term = globalSearchTerm.toLowerCase().trim()
-    return rows.filter(row => {
+    return rows.filter((row) => {
       for (const col of columnKeys) {
         const value = row.original[col]
-        if (value === null || value === undefined) continue
+        if (value === null || value === undefined)
+          continue
         if (String(value).toLowerCase().includes(term)) {
           return true
         }
@@ -221,12 +224,14 @@ export function DataGrid({
   // Paginated rows
   const totalSearchedRows = searchFilteredData.length
   const totalPages = useMemo(() => {
-    if (!enablePagination) return 1
+    if (!enablePagination)
+      return 1
     return Math.max(1, Math.ceil(totalSearchedRows / pageSize))
   }, [enablePagination, totalSearchedRows, pageSize])
 
   const paginatedRows = useMemo(() => {
-    if (!enablePagination) return searchFilteredData
+    if (!enablePagination)
+      return searchFilteredData
     const start = (currentPage - 1) * pageSize
     const end = start + pageSize
     return searchFilteredData.slice(start, end)
@@ -239,7 +244,8 @@ export function DataGrid({
 
   // Selection bounds
   const selectionBounds = useMemo(() => {
-    if (!selectionStart || !selectionEnd) return null
+    if (!selectionStart || !selectionEnd)
+      return null
     return {
       minRow: Math.min(selectionStart.row, selectionEnd.row),
       maxRow: Math.max(selectionStart.row, selectionEnd.row),
@@ -250,7 +256,8 @@ export function DataGrid({
 
   // Selection stats
   const selectionStats = useMemo(() => {
-    if (!selectionBounds) return null
+    if (!selectionBounds)
+      return null
     const { minRow, maxRow, minCol, maxCol } = selectionBounds
 
     const values: number[] = []
@@ -258,11 +265,13 @@ export function DataGrid({
 
     for (let r = minRow; r <= maxRow; r++) {
       const row = rows[r]
-      if (!row) continue
+      if (!row)
+        continue
 
       for (let c = minCol; c <= maxCol; c++) {
         const colId = columnKeys[c]
-        if (!colId) continue
+        if (!colId)
+          continue
 
         const value = row.original[colId]
         count++
@@ -276,7 +285,8 @@ export function DataGrid({
       }
     }
 
-    if (values.length === 0) return { count, sum: null, avg: null, numericCount: 0 }
+    if (values.length === 0)
+      return { count, sum: null, avg: null, numericCount: 0 }
 
     const sum = values.reduce((a, b) => a + b, 0)
     const avg = sum / values.length
@@ -287,14 +297,17 @@ export function DataGrid({
   // Calculate column widths
   useEffect(() => {
     // Skip during SSR (no document available)
-    if (typeof document === 'undefined') return
-    if (data.length === 0) return
+    if (typeof document === 'undefined')
+      return
+    if (data.length === 0)
+      return
 
     const widths: Record<string, number> = {}
     const sampleSize = Math.min(100, data.length)
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    if (!ctx)
+      return
 
     ctx.font = '13px system-ui, -apple-system, sans-serif'
 
@@ -317,7 +330,8 @@ export function DataGrid({
   // Column resize handlers
   const startColumnResize = useCallback(
     (columnId: string, event: React.MouseEvent) => {
-      if (!enableColumnResize) return
+      if (!enableColumnResize)
+        return
       event.preventDefault()
       event.stopPropagation()
 
@@ -325,11 +339,12 @@ export function DataGrid({
       setResizeStartX(event.clientX)
       setResizeStartWidth(columnWidths[columnId] || MIN_COL_WIDTH)
     },
-    [enableColumnResize, columnWidths]
+    [enableColumnResize, columnWidths],
   )
 
   useEffect(() => {
-    if (!resizingColumnId) return
+    if (!resizingColumnId)
+      return
 
     const handleResizeMove = (event: MouseEvent) => {
       const diff = event.clientX - resizeStartX
@@ -355,18 +370,20 @@ export function DataGrid({
   // Vertical resize handlers
   const startVerticalResize = useCallback(
     (event: React.MouseEvent) => {
-      if (!enableVerticalResize) return
+      if (!enableVerticalResize)
+        return
       event.preventDefault()
 
       setIsResizingVertically(true)
       setVerticalResizeStartY(event.clientY)
       setVerticalResizeStartHeight(gridHeight)
     },
-    [enableVerticalResize, gridHeight]
+    [enableVerticalResize, gridHeight],
   )
 
   useEffect(() => {
-    if (!isResizingVertically) return
+    if (!isResizingVertically)
+      return
 
     const handleVerticalResizeMove = (event: MouseEvent) => {
       const diff = event.clientY - verticalResizeStartY
@@ -389,7 +406,8 @@ export function DataGrid({
   // Export handlers
   const handleExport = useCallback(() => {
     if (viewMode === 'pivot') {
-      if (!pivotResult) return
+      if (!pivotResult)
+        return
 
       const pivotFilename = exportFilename.replace('.csv', '-pivot.csv')
       exportPivotToCSV(
@@ -406,15 +424,15 @@ export function DataGrid({
         pivotRowFields,
         pivotColumnFields,
         pivotValueFields,
-        { filename: pivotFilename }
+        { filename: pivotFilename },
       )
 
       onExport?.({ rowCount: pivotResult.rowHeaders.length, filename: pivotFilename })
       return
     }
 
-    const dataToExport =
-      enableSearch && globalSearchTerm.trim()
+    const dataToExport
+      = enableSearch && globalSearchTerm.trim()
         ? searchFilteredData.map(row => row.original)
         : rows.map(row => row.original)
 
@@ -443,31 +461,32 @@ export function DataGrid({
 
   // Copy to clipboard
   const copySelectionToClipboard = useCallback(() => {
-    if (!selectionBounds || !enableClipboard) return
+    if (!selectionBounds || !enableClipboard)
+      return
 
     const text = formatSelectionForClipboard(
       rows.map(r => r.original),
       columnKeys,
-      selectionBounds
+      selectionBounds,
     )
 
     copyToClipboard(
       text,
       () => {
-        const cellCount =
-          (selectionBounds.maxRow - selectionBounds.minRow + 1) *
-          (selectionBounds.maxCol - selectionBounds.minCol + 1)
+        const cellCount
+          = (selectionBounds.maxRow - selectionBounds.minRow + 1)
+            * (selectionBounds.maxCol - selectionBounds.minCol + 1)
         setCopyToastMessage(`Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`)
         setShowCopyToast(true)
         setTimeout(() => setShowCopyToast(false), 2000)
         onCopy?.({ text, cellCount })
       },
-      err => {
+      (err) => {
         setCopyToastMessage('Copy failed')
         setShowCopyToast(true)
         setTimeout(() => setShowCopyToast(false), 2000)
         console.error('Copy failed:', err)
-      }
+      },
     )
   }, [selectionBounds, enableClipboard, rows, columnKeys, onCopy])
 
@@ -478,7 +497,8 @@ export function DataGrid({
 
       if (event.shiftKey && selectedCell) {
         setSelectionEnd({ row: rowIndex, col: colIndex })
-      } else {
+      }
+      else {
         setSelectedCell({ row: rowIndex, col: colIndex })
         setSelectionStart({ row: rowIndex, col: colIndex })
         setSelectionEnd({ row: rowIndex, col: colIndex })
@@ -496,7 +516,7 @@ export function DataGrid({
         })
       }
     },
-    [selectedCell, rows, columnKeys, onCellClick]
+    [selectedCell, rows, columnKeys, onCellClick],
   )
 
   const handleMouseEnter = useCallback(
@@ -505,7 +525,7 @@ export function DataGrid({
         setSelectionEnd({ row: rowIndex, col: colIndex })
       }
     },
-    [isSelecting]
+    [isSelecting],
   )
 
   useEffect(() => {
@@ -564,7 +584,8 @@ export function DataGrid({
       if (spaceBelow >= 300 || spaceBelow >= spaceAbove) {
         top = rect.bottom + 4
         maxDropdownHeight = Math.min(400, spaceBelow - 4)
-      } else {
+      }
+      else {
         maxDropdownHeight = Math.min(400, spaceAbove - 4)
         top = rect.top - maxDropdownHeight - 4
       }
@@ -572,7 +593,7 @@ export function DataGrid({
       setFilterDropdownPosition({ top, left, maxHeight: maxDropdownHeight })
       setActiveFilterColumn(columnId)
     },
-    []
+    [],
   )
 
   const closeFilterDropdown = useCallback(() => {
@@ -583,14 +604,14 @@ export function DataGrid({
     (columnId: string, values: string[]) => {
       setColumnFilter(columnId, values)
     },
-    [setColumnFilter]
+    [setColumnFilter],
   )
 
   const handleRangeFilter = useCallback(
     (columnId: string, range: import('@smallwebco/tinypivot-core').NumericRange | null) => {
       setNumericRangeFilter(columnId, range)
     },
-    [setNumericRangeFilter]
+    [setNumericRangeFilter],
   )
 
   const handleSort = useCallback(
@@ -603,19 +624,21 @@ export function DataGrid({
             toggleSort(columnId)
           }
         }
-      } else {
+      }
+      else {
         const current = getSortDirection(columnId)
         if (current === null) {
           toggleSort(columnId)
           if (direction === 'desc' && getSortDirection(columnId) === 'asc') {
             toggleSort(columnId)
           }
-        } else if (current !== direction) {
+        }
+        else if (current !== direction) {
           toggleSort(columnId)
         }
       }
     },
-    [getSortDirection, toggleSort]
+    [getSortDirection, toggleSort],
   )
 
   const isCellSelected = useCallback(
@@ -626,11 +649,12 @@ export function DataGrid({
       const { minRow, maxRow, minCol, maxCol } = selectionBounds
       return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
     },
-    [selectionBounds, selectedCell]
+    [selectionBounds, selectedCell],
   )
 
   const formatStatValue = (value: number | null): string => {
-    if (value === null) return '-'
+    if (value === null)
+      return '-'
     if (Math.abs(value) >= 1000) {
       return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
     }
@@ -638,21 +662,24 @@ export function DataGrid({
   }
 
   // Format cell value
-  const noFormatPatterns =
-    /^(?:.*_)?(?:id|code|year|month|quarter|day|week|date|zip|phone|fax|ssn|ein|npi|ndc|gpi|hcpcs|icd|cpt|rx|bin|pcn|group|member|claim|rx_number|script|fill)(?:_.*)?$/i
+  const noFormatPatterns
+    = /^(?:.*_)?(?:id|code|year|month|quarter|day|week|date|zip|phone|fax|ssn|ein|npi|ndc|gpi|hcpcs|icd|cpt|rx|bin|pcn|group|member|claim|rx_number|script|fill)(?:_.*)?$/i
 
   const shouldFormatNumber = (columnId: string): boolean => {
     return !noFormatPatterns.test(columnId)
   }
 
   const formatCellValueDisplay = (value: unknown, columnId: string): string => {
-    if (value === null || value === undefined) return ''
-    if (value === '') return ''
+    if (value === null || value === undefined)
+      return ''
+    if (value === '')
+      return ''
 
     const stats = getColumnStats(columnId)
     if (stats.type === 'number') {
       const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
-      if (Number.isNaN(num)) return String(value)
+      if (Number.isNaN(num))
+        return String(value)
 
       if (shouldFormatNumber(columnId) && Math.abs(num) >= 1000) {
         return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
@@ -731,54 +758,27 @@ export function DataGrid({
               {/* Search */}
               {enableSearch && (
                 <div className="vpg-search-container">
-                  {!showSearchInput ? (
-                    <button
-                      className="vpg-icon-btn"
-                      title="Search (Ctrl+F)"
-                      onClick={() => setShowSearchInput(true)}
-                    >
-                      <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
-                      </svg>
-                    </button>
-                  ) : (
-                    <div className="vpg-search-box">
-                      <svg
-                        className="vpg-search-icon"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
-                      </svg>
-                      <input
-                        type="text"
-                        value={globalSearchTerm}
-                        onChange={e => setGlobalSearchTerm(e.target.value)}
-                        className="vpg-search-input"
-                        placeholder="Search all columns..."
-                        onKeyDown={e => {
-                          if (e.key === 'Escape') {
-                            setShowSearchInput(false)
-                            setGlobalSearchTerm('')
-                          }
-                        }}
-                        autoFocus
-                      />
-                      {globalSearchTerm && (
-                        <button className="vpg-search-clear" onClick={() => setGlobalSearchTerm('')}>
+                  {!showSearchInput
+                    ? (
+                        <button
+                          className="vpg-icon-btn"
+                          title="Search (Ctrl+F)"
+                          onClick={() => setShowSearchInput(true)}
+                        >
+                          <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                            />
+                          </svg>
+                        </button>
+                      )
+                    : (
+                        <div className="vpg-search-box">
                           <svg
-                            className="vpg-icon-xs"
+                            className="vpg-search-icon"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -787,13 +787,42 @@ export function DataGrid({
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                             />
                           </svg>
-                        </button>
+                          <input
+                            type="text"
+                            value={globalSearchTerm}
+                            onChange={e => setGlobalSearchTerm(e.target.value)}
+                            className="vpg-search-input"
+                            placeholder="Search all columns..."
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowSearchInput(false)
+                                setGlobalSearchTerm('')
+                              }
+                            }}
+                            autoFocus
+                          />
+                          {globalSearchTerm && (
+                            <button className="vpg-search-clear" onClick={() => setGlobalSearchTerm('')}>
+                              <svg
+                                className="vpg-icon-xs"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -822,7 +851,10 @@ export function DataGrid({
                     />
                   </svg>
                   <span>
-                    {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
+                    {activeFilterCount}
+                    {' '}
+                    filter
+                    {activeFilterCount > 1 ? 's' : ''}
                   </span>
                 </div>
               )}
@@ -830,7 +862,10 @@ export function DataGrid({
               {globalSearchTerm && (
                 <div className="vpg-search-info">
                   <span>
-                    {totalSearchedRows} match{totalSearchedRows !== 1 ? 'es' : ''}
+                    {totalSearchedRows}
+                    {' '}
+                    match
+                    {totalSearchedRows !== 1 ? 'es' : ''}
                   </span>
                 </div>
               )}
@@ -852,7 +887,9 @@ export function DataGrid({
                     d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
                   />
                 </svg>
-                {showPivotConfig ? 'Hide' : 'Show'} Config
+                {showPivotConfig ? 'Hide' : 'Show'}
+                {' '}
+                Config
               </button>
 
               {pivotIsConfigured && (
@@ -937,7 +974,8 @@ export function DataGrid({
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              Export Pivot{!isPro ? ' (Pro)' : ''}
+              Export Pivot
+              {!isPro ? ' (Pro)' : ''}
             </button>
           )}
         </div>
@@ -993,7 +1031,7 @@ export function DataGrid({
               <table className="vpg-table" style={{ minWidth: `${totalTableWidth}px` }}>
                 <thead>
                   <tr>
-                    {columnKeys.map((colId, colIndex) => (
+                    {columnKeys.map(colId => (
                       <th
                         key={colId}
                         className={`vpg-header-cell ${hasActiveFilter(colId) ? 'vpg-has-filter' : ''} ${getSortDirection(colId) !== null ? 'vpg-is-sorted' : ''} ${activeFilterColumn === colId ? 'vpg-is-active' : ''}`}
@@ -1001,7 +1039,7 @@ export function DataGrid({
                           width: `${columnWidths[colId] || MIN_COL_WIDTH}px`,
                           minWidth: `${columnWidths[colId] || MIN_COL_WIDTH}px`,
                         }}
-                        onClick={e => {
+                        onClick={(e) => {
                           const target = e.target as HTMLElement
                           if (target.closest('.vpg-dropdown-arrow')) {
                             openFilterDropdown(colId, e)
@@ -1013,31 +1051,33 @@ export function DataGrid({
                           <div className="vpg-header-icons">
                             {getSortDirection(colId) && (
                               <span className="vpg-sort-indicator">
-                                {getSortDirection(colId) === 'asc' ? (
-                                  <svg
-                                    className="vpg-icon-sm"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    className="vpg-icon-sm"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                )}
+                                {getSortDirection(colId) === 'asc'
+                                  ? (
+                                      <svg
+                                        className="vpg-icon-sm"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    )
+                                  : (
+                                      <svg
+                                        className="vpg-icon-sm"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    )}
                               </span>
                             )}
                             {hasActiveFilter(colId) && (
@@ -1128,7 +1168,7 @@ export function DataGrid({
                 onShowColumnTotalsChange={setPivotShowColumnTotals}
                 onClearConfig={clearPivotConfig}
                 onAutoSuggest={autoSuggestConfig}
-                onDragStart={(field, e) => setDraggingField(field)}
+                onDragStart={(field, _e) => setDraggingField(field)}
                 onDragEnd={() => setDraggingField(null)}
                 onUpdateAggregation={updateValueFieldAggregation}
                 onAddRowField={addRowField}
@@ -1174,36 +1214,56 @@ export function DataGrid({
       {/* Footer */}
       <div className="vpg-footer">
         <div className="vpg-footer-left">
-          {viewMode === 'grid' ? (
-            enablePagination ? (
-              <>
-                <span>
-                  {((currentPage - 1) * pageSize + 1).toLocaleString()}-
-                  {Math.min(currentPage * pageSize, totalSearchedRows).toLocaleString()}
-                </span>
-                <span className="vpg-separator">of</span>
-                <span>{totalSearchedRows.toLocaleString()}</span>
-                {totalSearchedRows !== totalRowCount && (
-                  <span className="vpg-filtered-note">({totalRowCount.toLocaleString()} total)</span>
-                )}
-              </>
-            ) : filteredRowCount === totalRowCount && totalSearchedRows === totalRowCount ? (
-              <span>{totalRowCount.toLocaleString()} records</span>
-            ) : (
-              <>
-                <span className="vpg-filtered-count">{totalSearchedRows.toLocaleString()}</span>
-                <span className="vpg-separator">of</span>
-                <span>{totalRowCount.toLocaleString()}</span>
-                <span className="vpg-separator">records</span>
-              </>
-            )
-          ) : (
-            <>
-              <span className="vpg-pivot-label">Pivot Table</span>
-              <span className="vpg-separator">•</span>
-              <span>{totalRowCount.toLocaleString()} source records</span>
-            </>
-          )}
+          {viewMode === 'grid'
+            ? (
+                enablePagination
+                  ? (
+                      <>
+                        <span>
+                          {((currentPage - 1) * pageSize + 1).toLocaleString()}
+                          -
+                          {Math.min(currentPage * pageSize, totalSearchedRows).toLocaleString()}
+                        </span>
+                        <span className="vpg-separator">of</span>
+                        <span>{totalSearchedRows.toLocaleString()}</span>
+                        {totalSearchedRows !== totalRowCount && (
+                          <span className="vpg-filtered-note">
+                            (
+                            {totalRowCount.toLocaleString()}
+                            {' '}
+                            total)
+                          </span>
+                        )}
+                      </>
+                    )
+                  : filteredRowCount === totalRowCount && totalSearchedRows === totalRowCount
+                    ? (
+                        <span>
+                          {totalRowCount.toLocaleString()}
+                          {' '}
+                          records
+                        </span>
+                      )
+                    : (
+                        <>
+                          <span className="vpg-filtered-count">{totalSearchedRows.toLocaleString()}</span>
+                          <span className="vpg-separator">of</span>
+                          <span>{totalRowCount.toLocaleString()}</span>
+                          <span className="vpg-separator">records</span>
+                        </>
+                      )
+              )
+            : (
+                <>
+                  <span className="vpg-pivot-label">Pivot Table</span>
+                  <span className="vpg-separator">•</span>
+                  <span>
+                    {totalRowCount.toLocaleString()}
+                    {' '}
+                    source records
+                  </span>
+                </>
+              )}
         </div>
 
         {/* Pagination controls */}
@@ -1238,7 +1298,13 @@ export function DataGrid({
               </svg>
             </button>
             <span className="vpg-page-info">
-              Page {currentPage} of {totalPages}
+              Page
+              {' '}
+              {currentPage}
+              {' '}
+              of
+              {' '}
+              {totalPages}
             </span>
             <button
               className="vpg-page-btn"
@@ -1295,22 +1361,31 @@ export function DataGrid({
         )}
 
         <div className="vpg-footer-right">
-          {isDemo ? (
-            <div className="vpg-demo-banner">
-              <span className="vpg-demo-badge">DEMO</span>
-              <span>Pro features enabled</span>
-              <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener noreferrer">
-                Get License →
-              </a>
-            </div>
-          ) : showWatermark ? (
-            <span className="vpg-watermark-inline">
-              <a href="https://tiny-pivot.com" target="_blank" rel="noopener noreferrer">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                Powered by TinyPivot
-              </a>
-            </span>
-          ) : null}
+          {isDemo
+            ? (
+                <div className="vpg-demo-banner">
+                  <span className="vpg-demo-badge">DEMO</span>
+                  <span>Pro features enabled</span>
+                  <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener noreferrer">
+                    Get License →
+                  </a>
+                </div>
+              )
+            : showWatermark
+              ? (
+                  <span className="vpg-watermark-inline">
+                    <a href="https://tiny-pivot.com" target="_blank" rel="noopener noreferrer">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="7" height="7" />
+                        <rect x="14" y="3" width="7" height="7" />
+                        <rect x="14" y="14" width="7" height="7" />
+                        <rect x="3" y="14" width="7" height="7" />
+                      </svg>
+                      Powered by TinyPivot
+                    </a>
+                  </span>
+                )
+              : null}
         </div>
       </div>
 
@@ -1326,34 +1401,33 @@ export function DataGrid({
       )}
 
       {/* Filter Dropdown Portal */}
-      {activeFilterColumn && typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="vpg-filter-portal"
-            style={{
-              position: 'fixed',
-              top: `${filterDropdownPosition.top}px`,
-              left: `${filterDropdownPosition.left}px`,
-              maxHeight: `${filterDropdownPosition.maxHeight}px`,
-              zIndex: 9999,
-            }}
-          >
-            <ColumnFilter
-              columnId={activeFilterColumn}
-              columnName={activeFilterColumn}
-              stats={getColumnStats(activeFilterColumn)}
-              selectedValues={getColumnFilterValues(activeFilterColumn)}
-              sortDirection={getSortDirection(activeFilterColumn)}
-              numericRange={getNumericRangeFilter(activeFilterColumn)}
-              onFilter={values => handleFilter(activeFilterColumn, values)}
-              onRangeFilter={range => handleRangeFilter(activeFilterColumn, range)}
-              onSort={dir => handleSort(activeFilterColumn, dir)}
-              onClose={closeFilterDropdown}
-            />
-          </div>,
-          document.body
-        )}
+      {activeFilterColumn && typeof document !== 'undefined'
+      && createPortal(
+        <div
+          className="vpg-filter-portal"
+          style={{
+            position: 'fixed',
+            top: `${filterDropdownPosition.top}px`,
+            left: `${filterDropdownPosition.left}px`,
+            maxHeight: `${filterDropdownPosition.maxHeight}px`,
+            zIndex: 9999,
+          }}
+        >
+          <ColumnFilter
+            columnId={activeFilterColumn}
+            columnName={activeFilterColumn}
+            stats={getColumnStats(activeFilterColumn)}
+            selectedValues={getColumnFilterValues(activeFilterColumn)}
+            sortDirection={getSortDirection(activeFilterColumn)}
+            numericRange={getNumericRangeFilter(activeFilterColumn)}
+            onFilter={values => handleFilter(activeFilterColumn, values)}
+            onRangeFilter={range => handleRangeFilter(activeFilterColumn, range)}
+            onSort={dir => handleSort(activeFilterColumn, dir)}
+            onClose={closeFilterDropdown}
+          />
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }
-

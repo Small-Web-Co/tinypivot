@@ -1,7 +1,7 @@
 /**
  * TinyPivot Core - License Management
  * Framework-agnostic license validation logic
- * 
+ *
  * Uses ECDSA P-256 asymmetric cryptography:
  * - Licenses are SIGNED with a private key (kept secret)
  * - Licenses are VERIFIED with a public key (embedded here)
@@ -61,7 +61,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
   while (standardBase64.length % 4) {
     standardBase64 += '='
   }
-  
+
   const binaryString = atob(standardBase64)
   const bytes = new Uint8Array(binaryString.length)
   for (let i = 0; i < binaryString.length; i++) {
@@ -79,40 +79,44 @@ function derToRaw(der: Uint8Array): Uint8Array {
   if (der[0] !== 0x30) {
     throw new Error('Invalid DER signature')
   }
-  
+
   let offset = 2 // Skip 0x30 and length byte
-  
+
   // Read r
-  if (der[offset] !== 0x02) throw new Error('Invalid DER signature')
+  if (der[offset] !== 0x02)
+    throw new Error('Invalid DER signature')
   offset++
   const rLen = der[offset]
   offset++
   let r = der.slice(offset, offset + rLen)
   offset += rLen
-  
+
   // Read s
-  if (der[offset] !== 0x02) throw new Error('Invalid DER signature')
+  if (der[offset] !== 0x02)
+    throw new Error('Invalid DER signature')
   offset++
   const sLen = der[offset]
   offset++
   let s = der.slice(offset, offset + sLen)
-  
+
   // For P-256, r and s should each be 32 bytes
   // Remove leading zero padding if present (used for positive sign in DER)
-  if (r.length === 33 && r[0] === 0) r = r.slice(1)
-  if (s.length === 33 && s[0] === 0) s = s.slice(1)
-  
+  if (r.length === 33 && r[0] === 0)
+    r = r.slice(1)
+  if (s.length === 33 && s[0] === 0)
+    s = s.slice(1)
+
   // Pad to 32 bytes if shorter
   const padR = new Uint8Array(32)
   const padS = new Uint8Array(32)
   padR.set(r, 32 - r.length)
   padS.set(s, 32 - s.length)
-  
+
   // Concatenate r || s
   const raw = new Uint8Array(64)
   raw.set(padR, 0)
   raw.set(padS, 32)
-  
+
   return raw
 }
 
@@ -126,17 +130,18 @@ async function importPublicKey(): Promise<CryptoKey | null> {
       .replace('-----BEGIN PUBLIC KEY-----', '')
       .replace('-----END PUBLIC KEY-----', '')
       .replace(/\s/g, '')
-    
+
     const binaryKey = base64ToUint8Array(pemContents)
-    
+
     return await crypto.subtle.importKey(
       'spki',
       new Uint8Array(binaryKey).buffer,
       { name: 'ECDSA', namedCurve: 'P-256' },
       false,
-      ['verify']
+      ['verify'],
     )
-  } catch {
+  }
+  catch {
     return null
   }
 }
@@ -148,17 +153,18 @@ async function importPublicKey(): Promise<CryptoKey | null> {
 async function verifySignature(
   typeCode: string,
   signature: string,
-  expiry: string
+  expiry: string,
 ): Promise<boolean> {
   const payload = `TP-${typeCode}-${expiry}`
 
   try {
     const publicKey = await importPublicKey()
-    if (!publicKey) return false
+    if (!publicKey)
+      return false
 
     const encoder = new TextEncoder()
     const msgData = encoder.encode(payload)
-    
+
     // Convert DER-encoded signature to raw format for Web Crypto
     const derSig = base64ToUint8Array(signature)
     const rawSig = derToRaw(derSig)
@@ -167,9 +173,10 @@ async function verifySignature(
       { name: 'ECDSA', hash: 'SHA-256' },
       publicKey,
       new Uint8Array(rawSig).buffer,
-      msgData
+      msgData,
     )
-  } catch {
+  }
+  catch {
     // Fallback for environments without crypto.subtle (SSR, older browsers)
     return false
   }
@@ -177,7 +184,7 @@ async function verifySignature(
 
 /**
  * Validate a license key and extract info
- * 
+ *
  * Note: Licenses are PERPETUAL - the expiry date indicates update eligibility,
  * not when features stop working. All Pro features remain active forever.
  */
@@ -191,7 +198,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   // Example: TP-PRO1-base64signature-20251231
   // Note: signature uses URL-safe base64 which can contain dashes
   // So we parse from known positions: prefix (TP), type (4 chars), expiry (8 chars at end)
-  
+
   if (!key.startsWith('TP-')) {
     return INVALID_LICENSE
   }
@@ -202,7 +209,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
     return INVALID_LICENSE
   }
   const expiryStr = key.slice(lastDashIdx + 1)
-  
+
   // Extract type code (between first and second dash)
   const withoutPrefix = key.slice(3) // Remove "TP-"
   const secondDashIdx = withoutPrefix.indexOf('-')
@@ -210,7 +217,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
     return INVALID_LICENSE
   }
   const typeCode = withoutPrefix.slice(0, secondDashIdx)
-  
+
   // Extract signature (everything between type and expiry)
   const signature = withoutPrefix.slice(secondDashIdx + 1, withoutPrefix.lastIndexOf('-'))
 
@@ -228,9 +235,12 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
 
   // Determine license type
   let type: LicenseType = 'free'
-  if (typeCode === 'PRO1') type = 'pro-single'
-  else if (typeCode === 'PROU') type = 'pro-unlimited'
-  else if (typeCode === 'PROT') type = 'pro-team'
+  if (typeCode === 'PRO1')
+    type = 'pro-single'
+  else if (typeCode === 'PROU')
+    type = 'pro-unlimited'
+  else if (typeCode === 'PROT')
+    type = 'pro-team'
 
   // PERPETUAL LICENSE: Features never expire, only update eligibility does
   // The expiresAt date is retained for informational purposes only
@@ -270,7 +280,8 @@ async function hashSecret(secret: string): Promise<string> {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
-  } catch {
+  }
+  catch {
     return ''
   }
 }
@@ -283,12 +294,12 @@ export async function getDemoLicenseInfo(secret?: string): Promise<LicenseInfo |
   if (!secret) {
     return null
   }
-  
+
   const hash = await hashSecret(secret)
   if (hash !== DEMO_SECRET_HASH) {
     return null
   }
-  
+
   return DEMO_LICENSE
 }
 
@@ -325,9 +336,7 @@ export function shouldShowWatermark(info: LicenseInfo, isDemo: boolean): boolean
  */
 export function logProRequired(feature: string): void {
   console.warn(
-    `[TinyPivot] "${feature}" requires a Pro license. ` +
-      `Visit https://tiny-pivot.com/#pricing to upgrade.`
+    `[TinyPivot] "${feature}" requires a Pro license. `
+    + `Visit https://tiny-pivot.com/#pricing to upgrade.`,
   )
 }
-
-

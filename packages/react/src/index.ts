@@ -6,65 +6,63 @@
  */
 
 // Components
-export { DataGrid, ColumnFilter, PivotConfig, PivotSkeleton } from './components'
+export { ColumnFilter, DataGrid, PivotConfig, PivotSkeleton } from './components'
 
 // Hooks
 export {
-  useExcelGrid,
-  usePivotTable,
-  useLicense,
-  setLicenseKey,
   configureLicenseSecret,
-  enableDemoMode,
-  getColumnUniqueValues,
-  formatCellValue,
-  getAggregationLabel,
-  exportToCSV,
-  exportPivotToCSV,
   copyToClipboard,
+  enableDemoMode,
+  exportPivotToCSV,
+  exportToCSV,
+  formatCellValue,
   formatSelectionForClipboard,
-  usePagination,
-  useGlobalSearch,
-  useRowSelection,
+  getAggregationLabel,
+  getColumnUniqueValues,
+  setLicenseKey,
   useColumnResize,
+  useExcelGrid,
+  useGlobalSearch,
+  useLicense,
+  usePagination,
+  usePivotTable,
+  useRowSelection,
 } from './hooks'
 
 // Re-export types from core
 export type {
-  // Grid Types
-  ColumnStats,
-  GridOptions,
-
   // Pivot Types
   AggregationFunction,
-  PivotField,
-  PivotValueField,
-  PivotConfig as PivotConfigType,
-  PivotCell,
-  PivotResult,
-  FieldStats,
+  CellClickEvent,
 
+  // Grid Types
+  ColumnStats,
+  CopyEvent,
   // Component Props Types
   DataGridProps,
-  PivotTableProps,
+  ExportEvent,
+  ExportOptions,
+  FieldStats,
+  // Event Types
+  FilterEvent,
+
+  GridOptions,
+  LicenseInfo,
 
   // License Types
   LicenseType,
-  LicenseInfo,
-
-  // Event Types
-  FilterEvent,
-  SortEvent,
-  CellClickEvent,
-  SelectionChangeEvent,
-  RowSelectionChangeEvent,
-  ExportEvent,
-  CopyEvent,
-
   // Feature Types
   PaginationOptions,
-  ExportOptions,
+
+  PivotCell,
+  PivotConfig as PivotConfigType,
+  PivotField,
+  PivotResult,
+  PivotTableProps,
+  PivotValueField,
+  RowSelectionChangeEvent,
+
   SelectionBounds,
+  SelectionChangeEvent,
+  SortEvent,
 } from '@smallwebco/tinypivot-core'
-
-

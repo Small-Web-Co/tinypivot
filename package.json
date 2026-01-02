@@ -1,8 +1,20 @@
 {
   "name": "tinypivot-monorepo",
-  "version": "1.0.49",
+  "type": "module",
+  "version": "1.0.50",
   "private": true,
+  "packageManager": "pnpm@9.0.0+sha512.b4106707c7225b1748b61595953ccbebff97b54ad05d002aa3635f633b9c53cd666f7ce9b8bc44704f1fa048b9a49b55371ab2d9e9d667d1efe2ef1514bcd513",
   "description": "TinyPivot Monorepo - Excel-like data grid and pivot table components for Vue 3 and React",
+  "author": "Small Web, LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
+  },
   "keywords": [
     "vue",
     "vue3",
@@ -23,7 +35,9 @@
     "aggregation",
     "csv-export"
   ],
-  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "pnpm run -r --parallel dev",
     "build": "pnpm run build:core && pnpm run build:vue && pnpm run build:react",
@@ -33,14 +47,21 @@
     "demo": "vite --config vite.demo.config.ts",
     "build:demo": "vite build --config vite.demo.config.ts",
     "type-check": "pnpm run -r type-check",
-    "clean": "rm -rf packages/*/dist node_modules/.cache",
+    "clean": "rm -rf packages/*/dist node_modules/.cache coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
     "release:core": "cd packages/core && pnpm publish --access public --no-git-checks",
     "release:vue": "cd packages/vue && pnpm publish --access public --no-git-checks",
     "release:react": "cd packages/react && pnpm publish --access public --no-git-checks",
     "release": "node scripts/release.js",
     "release:patch": "node scripts/release.js patch",
     "release:minor": "node scripts/release.js minor",
-    "release:major": "node scripts/release.js major"
+    "release:major": "node scripts/release.js major",
+    "prepare": "husky"
   },
   "dependencies": {
     "@tanstack/vue-table": "^8.20.0",
@@ -48,31 +69,28 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^3.9.2",
     "@types/node": "^20.10.0",
     "@vercel/node": "^3.0.0",
     "@vitejs/plugin-vue": "^4.5.0",
+    "@vitest/coverage-v8": "^3.2.3",
+    "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.16",
+    "eslint": "^9.26.0",
+    "happy-dom": "^18.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "postcss": "^8.4.32",
     "stripe": "^17.0.0",
     "tailwindcss": "^3.3.6",
     "typescript": "~5.3.3",
     "vite": "^5.0.0",
     "vite-plugin-dts": "^3.6.0",
+    "vitest": "^3.2.3",
     "vue": "^3.3.8",
     "vue-tsc": "^1.8.22"
   },
-  "author": "Small Web, LLC",
-  "license": "SEE LICENSE IN LICENSE.md",
-  "homepage": "https://github.com/Small-Web-Co/tinypivot",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Small-Web-Co/tinypivot.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
-  },
-  "packageManager": "pnpm@9.0.0+sha512.b4106707c7225b1748b61595953ccbebff97b54ad05d002aa3635f633b9c53cd666f7ce9b8bc44704f1fa048b9a49b55371ab2d9e9d667d1efe2ef1514bcd513",
-  "engines": {
-    "node": ">=18"
+  "lint-staged": {
+    "*.{js,ts,vue,mjs,tsx}": "eslint --fix"
   }
 }

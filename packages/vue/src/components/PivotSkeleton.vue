@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import type { AggregationFunction, CalculatedField, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display
  * Visual layout for pivot configuration and results
  */
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import type { AggregationFunction, PivotResult, PivotValueField, CalculatedField } from '@smallwebco/tinypivot-core'
-import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useLicense } from '../composables/useLicense'
 
 interface ActiveFilter {
@@ -30,6 +30,18 @@ const props = defineProps<{
   filteredRowCount?: number
 }>()
 
+const emit = defineEmits<{
+  (e: 'addRowField', field: string): void
+  (e: 'removeRowField', field: string): void
+  (e: 'addColumnField', field: string): void
+  (e: 'removeColumnField', field: string): void
+  (e: 'addValueField', field: string, aggregation: AggregationFunction): void
+  (e: 'removeValueField', field: string, aggregation: AggregationFunction): void
+  (e: 'updateAggregation', field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction): void
+  (e: 'reorderRowFields', fields: string[]): void
+  (e: 'reorderColumnFields', fields: string[]): void
+}>()
+
 // Helper to get display name for value fields (resolves calc IDs to names)
 function getValueFieldDisplayName(field: string): string {
   if (field.startsWith('calc:')) {
@@ -44,18 +56,6 @@ function getValueFieldDisplayName(field: string): string {
 function isCalculatedField(field: string): boolean {
   return field.startsWith('calc:')
 }
-
-const emit = defineEmits<{
-  (e: 'addRowField', field: string): void
-  (e: 'removeRowField', field: string): void
-  (e: 'addColumnField', field: string): void
-  (e: 'removeColumnField', field: string): void
-  (e: 'addValueField', field: string, aggregation: AggregationFunction): void
-  (e: 'removeValueField', field: string, aggregation: AggregationFunction): void
-  (e: 'updateAggregation', field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction): void
-  (e: 'reorderRowFields', fields: string[]): void
-  (e: 'reorderColumnFields', fields: string[]): void
-}>()
 
 const { showWatermark, canUsePivot, isDemo } = useLicense()
 
@@ -79,15 +79,17 @@ const fontSizeOptions = [
 // Filter status
 const hasActiveFilters = computed(() => props.activeFilters && props.activeFilters.length > 0)
 const filterSummary = computed(() => {
-  if (!props.activeFilters || props.activeFilters.length === 0) return ''
+  if (!props.activeFilters || props.activeFilters.length === 0)
+    return ''
   const columns = props.activeFilters.map(f => f.column).join(', ')
   return columns
 })
 
 // Detailed filter tooltip
 const filterTooltipDetails = computed(() => {
-  if (!props.activeFilters || props.activeFilters.length === 0) return []
-  return props.activeFilters.map(f => {
+  if (!props.activeFilters || props.activeFilters.length === 0)
+    return []
+  return props.activeFilters.map((f) => {
     // Handle range filters
     if (f.isRange && f.displayText) {
       return {
@@ -172,7 +174,7 @@ const sortedRowIndices = computed(() => {
 const columnHeaderCells = computed(() => {
   if (!props.pivotResult || props.pivotResult.headers.length === 0) {
     return [props.valueFields.map(vf => ({
-      label: isCalculatedField(vf.field) 
+      label: isCalculatedField(vf.field)
         ? `${getValueFieldDisplayName(vf.field)} (${getAggregationLabel(vf.aggregation)})`
         : `${vf.field} (${getAggregationLabel(vf.aggregation)})`,
       colspan: 1,
@@ -213,7 +215,8 @@ const showCopyToast = ref(false)
 const copyToastMessage = ref('')
 
 const selectionBounds = computed(() => {
-  if (!selectionStart.value || !selectionEnd.value) return null
+  if (!selectionStart.value || !selectionEnd.value)
+    return null
   return {
     minRow: Math.min(selectionStart.value.row, selectionEnd.value.row),
     maxRow: Math.max(selectionStart.value.row, selectionEnd.value.row),
@@ -224,10 +227,11 @@ const selectionBounds = computed(() => {
 
 function handleCellMouseDown(rowIndex: number, colIndex: number, event: MouseEvent) {
   event.preventDefault()
-  
+
   if (event.shiftKey && selectedCell.value) {
     selectionEnd.value = { row: rowIndex, col: colIndex }
-  } else {
+  }
+  else {
     selectedCell.value = { row: rowIndex, col: colIndex }
     selectionStart.value = { row: rowIndex, col: colIndex }
     selectionEnd.value = { row: rowIndex, col: colIndex }
@@ -254,15 +258,17 @@ function isCellSelected(rowIndex: number, colIndex: number): boolean {
 }
 
 function copySelectionToClipboard() {
-  if (!selectionBounds.value || !props.pivotResult) return
-  
+  if (!selectionBounds.value || !props.pivotResult)
+    return
+
   const { minRow, maxRow, minCol, maxCol } = selectionBounds.value
   const lines: string[] = []
-  
+
   for (let r = minRow; r <= maxRow; r++) {
     const sortedIdx = sortedRowIndices.value[r]
-    if (sortedIdx === undefined) continue
-    
+    if (sortedIdx === undefined)
+      continue
+
     const rowValues: string[] = []
     for (let c = minCol; c <= maxCol; c++) {
       const cell = props.pivotResult.data[sortedIdx]?.[c]
@@ -270,29 +276,30 @@ function copySelectionToClipboard() {
     }
     lines.push(rowValues.join('\t'))
   }
-  
+
   const text = lines.join('\n')
-  
+
   navigator.clipboard.writeText(text).then(() => {
     const cellCount = (maxRow - minRow + 1) * (maxCol - minCol + 1)
     copyToastMessage.value = `Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`
     showCopyToast.value = true
     setTimeout(() => { showCopyToast.value = false }, 2000)
-  }).catch(err => {
+  }).catch((err) => {
     console.error('Copy failed:', err)
   })
 }
 
 function handleKeydown(event: KeyboardEvent) {
   // Only handle if pivot has focus or selection
-  if (!selectionBounds.value) return
-  
+  if (!selectionBounds.value)
+    return
+
   if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
     event.preventDefault()
     copySelectionToClipboard()
     return
   }
-  
+
   if (event.key === 'Escape') {
     selectedCell.value = null
     selectionStart.value = null
@@ -302,16 +309,18 @@ function handleKeydown(event: KeyboardEvent) {
 
 // Selection statistics for the footer
 const selectionStats = computed(() => {
-  if (!selectionBounds.value || !props.pivotResult) return null
-  
+  if (!selectionBounds.value || !props.pivotResult)
+    return null
+
   const { minRow, maxRow, minCol, maxCol } = selectionBounds.value
   const values: number[] = []
   let count = 0
-  
+
   for (let r = minRow; r <= maxRow; r++) {
     const sortedIdx = sortedRowIndices.value[r]
-    if (sortedIdx === undefined) continue
-    
+    if (sortedIdx === undefined)
+      continue
+
     for (let c = minCol; c <= maxCol; c++) {
       const cell = props.pivotResult.data[sortedIdx]?.[c]
       count++
@@ -320,12 +329,13 @@ const selectionStats = computed(() => {
       }
     }
   }
-  
-  if (count <= 1) return null
-  
+
+  if (count <= 1)
+    return null
+
   const sum = values.reduce((a, b) => a + b, 0)
   const avg = values.length > 0 ? sum / values.length : 0
-  
+
   return {
     count,
     numericCount: values.length,
@@ -335,8 +345,10 @@ const selectionStats = computed(() => {
 })
 
 function formatStatValue(val: number): string {
-  if (Math.abs(val) >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`
-  if (Math.abs(val) >= 1_000) return `${(val / 1_000).toFixed(2)}K`
+  if (Math.abs(val) >= 1_000_000)
+    return `${(val / 1_000_000).toFixed(2)}M`
+  if (Math.abs(val) >= 1_000)
+    return `${(val / 1_000).toFixed(2)}K`
   return val.toFixed(2)
 }
 
@@ -426,30 +438,31 @@ function handleChipDragLeave() {
 function handleChipDrop(zone: 'row' | 'column', targetIndex: number, event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
-  
+
   if (!reorderDragSource.value || reorderDragSource.value.zone !== zone) {
     return
   }
-  
+
   const sourceIndex = reorderDragSource.value.index
   if (sourceIndex === targetIndex) {
     reorderDragSource.value = null
     reorderDropTarget.value = null
     return
   }
-  
+
   // Create reordered array
   const fields = zone === 'row' ? [...props.rowFields] : [...props.columnFields]
   const [movedField] = fields.splice(sourceIndex, 1)
   fields.splice(targetIndex, 0, movedField)
-  
+
   // Emit reorder event
   if (zone === 'row') {
     emit('reorderRowFields', fields)
-  } else {
+  }
+  else {
     emit('reorderColumnFields', fields)
   }
-  
+
   reorderDragSource.value = null
   reorderDropTarget.value = null
 }
@@ -525,9 +538,13 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
 
           <!-- Tooltip -->
           <div v-if="showFilterTooltip" class="vpg-filter-tooltip">
-            <div class="vpg-tooltip-header">Active Filters</div>
+            <div class="vpg-tooltip-header">
+              Active Filters
+            </div>
             <div v-for="filter in filterTooltipDetails" :key="filter.column" class="vpg-tooltip-filter">
-              <div class="vpg-tooltip-column">{{ filter.column }}</div>
+              <div class="vpg-tooltip-column">
+                {{ filter.column }}
+              </div>
               <div class="vpg-tooltip-values">
                 <!-- Range filter display -->
                 <template v-if="filter.isRange">
@@ -618,7 +635,9 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
             >
               <span class="vpg-drag-handle">⋮⋮</span>
               <span class="vpg-mini-name">{{ field }}</span>
-              <button class="vpg-mini-remove" @click.stop="emit('removeRowField', field)">×</button>
+              <button class="vpg-mini-remove" @click.stop="emit('removeRowField', field)">
+                ×
+              </button>
             </div>
             <span v-if="rowFields.length === 0" class="vpg-zone-hint">Drop here</span>
           </div>
@@ -654,7 +673,9 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
             >
               <span class="vpg-drag-handle">⋮⋮</span>
               <span class="vpg-mini-name">{{ field }}</span>
-              <button class="vpg-mini-remove" @click.stop="emit('removeColumnField', field)">×</button>
+              <button class="vpg-mini-remove" @click.stop="emit('removeColumnField', field)">
+                ×
+              </button>
             </div>
             <span v-if="columnFields.length === 0" class="vpg-zone-hint">Drop here</span>
           </div>
@@ -681,7 +702,9 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
             >
               <span class="vpg-agg-symbol">{{ isCalculatedField(vf.field) ? 'ƒ' : getAggregationSymbol(vf.aggregation) }}</span>
               <span class="vpg-mini-name">{{ getValueFieldDisplayName(vf.field) }}</span>
-              <button class="vpg-mini-remove" @click="emit('removeValueField', vf.field, vf.aggregation)">×</button>
+              <button class="vpg-mini-remove" @click="emit('removeValueField', vf.field, vf.aggregation)">
+                ×
+              </button>
             </div>
             <span v-if="valueFields.length === 0" class="vpg-zone-hint">Drop numeric</span>
           </div>
@@ -813,7 +836,7 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
       <!-- Footer -->
       <div v-if="isConfigured && pivotResult" class="vpg-skeleton-footer">
         <span class="vpg-footer-info">{{ pivotResult.rowHeaders.length }} rows × {{ pivotResult.data[0]?.length || 0 }} columns</span>
-        
+
         <div v-if="selectionStats && selectionStats.count > 1" class="vpg-selection-stats">
           <span class="vpg-stat">
             <span class="vpg-stat-label">Count:</span>
@@ -1753,7 +1776,6 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
   opacity: 0;
   transform: translateY(-0.5rem);
 }
-
 </style>
 
 <style>
@@ -2110,4 +2132,3 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
   color: #e2e8f0;
 }
 </style>
-

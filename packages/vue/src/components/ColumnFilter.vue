@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import type { ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
 /**
  * Column Filter Dropdown Component
  * Shows unique values with checkboxes, search, and sort controls
  * For numeric columns, also provides a range filter option
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
 import NumericRangeFilter from './NumericRangeFilter.vue'
 
 type FilterMode = 'values' | 'range'
@@ -34,9 +34,9 @@ const dropdownRef = ref<HTMLDivElement>()
 const searchInputRef = ref<HTMLInputElement>()
 
 // Filter mode (values vs range) - only available for numeric columns
-const isNumericColumn = computed(() => props.stats.type === 'number' && 
-  props.stats.numericMin !== undefined && 
-  props.stats.numericMax !== undefined)
+const isNumericColumn = computed(() => props.stats.type === 'number'
+  && props.stats.numericMin !== undefined
+  && props.stats.numericMax !== undefined)
 
 // Determine initial mode based on existing filters
 const filterMode = ref<FilterMode>(props.numericRange ? 'range' : 'values')
@@ -44,8 +44,8 @@ const filterMode = ref<FilterMode>(props.numericRange ? 'range' : 'values')
 // Local range for the numeric filter
 const localRange = ref<NumericRange | null>(props.numericRange ?? null)
 
-// Get all possible values including blank
-const allPossibleValues = computed(() => {
+// Get all possible values including blank (kept for potential future use)
+const _allPossibleValues = computed(() => {
   const values = [...props.stats.uniqueValues]
   if (props.stats.nullCount > 0) {
     values.unshift('(blank)')
@@ -78,12 +78,12 @@ const allValues = computed(() => {
   return values
 })
 
-// Check states
-const isAllSelected = computed(() => {
+// Check states (kept for potential future use)
+const _isAllSelected = computed(() => {
   return allValues.value.every(v => localSelected.value.has(v))
 })
 
-const isNoneSelected = computed(() => {
+const _isNoneSelected = computed(() => {
   return localSelected.value.size === 0
 })
 
@@ -662,4 +662,3 @@ watch(() => props.numericRange, (newRange) => {
   background: #4338ca;
 }
 </style>
-

@@ -1,44 +1,17 @@
 {
   "name": "@smallwebco/tinypivot-vue",
-  "version": "1.0.49",
-  "description": "TinyPivot Vue 3 - Excel-like data grid and pivot table components",
   "type": "module",
-  "main": "./dist/tinypivot-vue.umd.cjs",
-  "module": "./dist/tinypivot-vue.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/tinypivot-vue.js",
-      "require": "./dist/tinypivot-vue.umd.cjs"
-    },
-    "./style.css": "./dist/style.css"
+  "version": "1.0.50",
+  "description": "TinyPivot Vue 3 - Excel-like data grid and pivot table components",
+  "author": "Small Web, LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git"
   },
-  "files": [
-    "dist"
-  ],
-  "sideEffects": [
-    "*.css"
-  ],
-  "scripts": {
-    "build": "vite build",
-    "build:typecheck": "vue-tsc --noEmit && vite build",
-    "dev": "vite build --watch"
-  },
-  "peerDependencies": {
-    "vue": "^3.3.0"
-  },
-  "dependencies": {
-    "@tanstack/vue-table": "^8.20.0",
-    "@smallwebco/tinypivot-core": "workspace:*"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^4.5.0",
-    "typescript": "~5.3.3",
-    "vite": "^5.0.0",
-    "vite-plugin-dts": "^3.6.0",
-    "vue": "^3.3.8",
-    "vue-tsc": "^1.8.27"
+  "bugs": {
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
   },
   "keywords": [
     "vue",
@@ -61,14 +34,41 @@
     "csv-export",
     "clipboard"
   ],
-  "author": "Small Web, LLC",
-  "license": "SEE LICENSE IN LICENSE.md",
-  "homepage": "https://github.com/Small-Web-Co/tinypivot",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Small-Web-Co/tinypivot.git"
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/tinypivot-vue.js",
+      "require": "./dist/tinypivot-vue.umd.cjs"
+    },
+    "./style.css": "./dist/style.css"
   },
-  "bugs": {
-    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
+  "main": "./dist/tinypivot-vue.umd.cjs",
+  "module": "./dist/tinypivot-vue.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "build:typecheck": "vue-tsc --noEmit && vite build",
+    "dev": "vite build --watch"
+  },
+  "peerDependencies": {
+    "vue": "^3.3.0"
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-core": "workspace:*",
+    "@tanstack/vue-table": "^8.20.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.5.0",
+    "typescript": "~5.3.3",
+    "vite": "^5.0.0",
+    "vite-plugin-dts": "^3.6.0",
+    "vue": "^3.3.8",
+    "vue-tsc": "^1.8.27"
   }
 }

@@ -5,121 +5,119 @@
  * @packageDocumentation
  */
 
+// Export Utilities
+export {
+  copyToClipboard,
+  exportPivotToCSV,
+  exportToCSV,
+  formatSelectionForClipboard,
+} from './export'
+
+export type { PivotExportData } from './export'
+
+// License Management
+export {
+  canUsePivot,
+  configureLicenseSecret,
+  getDemoLicenseInfo,
+  getFreeLicenseInfo,
+  isPro,
+  logProRequired,
+  shouldShowWatermark,
+  validateLicenseKey,
+} from './license'
+
+// Pivot Table Logic
+export {
+  addCalculatedField,
+  aggregate,
+  AGGREGATION_OPTIONS,
+  CALCULATED_FIELD_PRESETS,
+  computeAvailableFields,
+  computePivotResult,
+  evaluateFormula,
+  evaluateSimpleFormula,
+  formatAggregatedValue,
+  formatCalculatedValue,
+  // Calculated Fields & Formulas
+  FORMULA_FUNCTIONS,
+  generateStorageKey,
+  getAggregationLabel,
+  getAggregationSymbol,
+  getUnassignedFields,
+  isConfigValidForFields,
+  isPivotConfigured,
+  loadCalculatedFields,
+  loadPivotConfig,
+  parseFormula,
+  // Simple Formula (field-level calculations)
+  parseSimpleFormula,
+  removeCalculatedField,
+  // Calculated Fields Storage
+  saveCalculatedFields,
+  savePivotConfig,
+  validateFormula,
+  validateSimpleFormula,
+} from './pivot'
+export type { FormulaFunction } from './pivot'
+
 // Types
 export type {
-  // Grid Types
-  ColumnStats,
-  GridOptions,
-  NumericRange,
-  ColumnFilterValue,
-
+  ActiveFilter,
   // Pivot Types
   AggregationFunction,
-  PivotField,
-  PivotValueField,
-  PivotConfig,
-  PivotCell,
-  PivotResult,
-  FieldStats,
-  CustomAggregationFn,
   CalculatedField,
+  CellClickEvent,
 
+  ColumnFilter,
+  ColumnFilterValue,
+  // Grid Types
+  ColumnStats,
+  CopyEvent,
+  CustomAggregationFn,
   // Component Props Types
   DataGridProps,
-  PivotTableProps,
-
-  // License Types
-  LicenseType,
-  LicenseInfo,
-  LicenseFeatures,
+  ExportEvent,
+  ExportOptions,
+  FieldStats,
 
   // Event Types
   FilterEvent,
-  SortEvent,
-  CellClickEvent,
-  SelectionChangeEvent,
-  RowSelectionChangeEvent,
-  ExportEvent,
-  CopyEvent,
+  GridOptions,
 
+  LicenseFeatures,
+  LicenseInfo,
+  // License Types
+  LicenseType,
+
+  NumericRange,
   // Feature Types
   PaginationOptions,
-  ExportOptions,
+  PivotCell,
+  PivotConfig,
+  PivotField,
+  PivotResult,
+  PivotTableProps,
+
+  PivotValueField,
+  RowSelectionChangeEvent,
   SelectionBounds,
-  ColumnFilter,
-  ActiveFilter,
+  SelectionChangeEvent,
+  SortEvent,
 } from './types'
 
 // Type Guards
 export { isNumericRange } from './types'
-
 // Utility Functions
 export {
+  clamp,
+  debounce,
   detectColumnType,
   detectFieldType,
-  getColumnUniqueValues,
   formatCellValue,
   formatNumber,
+  getColumnUniqueValues,
   makeKey,
-  parseKey,
   naturalSort,
-  debounce,
-  clamp,
+  parseKey,
 } from './utils'
-
-// Pivot Table Logic
-export {
-  aggregate,
-  formatAggregatedValue,
-  getAggregationLabel,
-  getAggregationSymbol,
-  AGGREGATION_OPTIONS,
-  computeAvailableFields,
-  getUnassignedFields,
-  isPivotConfigured,
-  computePivotResult,
-  generateStorageKey,
-  savePivotConfig,
-  loadPivotConfig,
-  isConfigValidForFields,
-  // Calculated Fields Storage
-  saveCalculatedFields,
-  loadCalculatedFields,
-  addCalculatedField,
-  removeCalculatedField,
-  // Calculated Fields & Formulas
-  FORMULA_FUNCTIONS,
-  parseFormula,
-  evaluateFormula,
-  formatCalculatedValue,
-  validateFormula,
-  CALCULATED_FIELD_PRESETS,
-  // Simple Formula (field-level calculations)
-  parseSimpleFormula,
-  validateSimpleFormula,
-  evaluateSimpleFormula,
-} from './pivot'
-export type { FormulaFunction } from './pivot'
-
-// License Management
-export {
-  validateLicenseKey,
-  configureLicenseSecret,
-  getDemoLicenseInfo,
-  getFreeLicenseInfo,
-  canUsePivot,
-  isPro,
-  shouldShowWatermark,
-  logProRequired,
-} from './license'
-
-// Export Utilities
-export {
-  exportToCSV,
-  exportPivotToCSV,
-  copyToClipboard,
-  formatSelectionForClipboard,
-} from './export'
-export type { PivotExportData } from './export'
-
-

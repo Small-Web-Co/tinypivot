@@ -1,44 +1,17 @@
 {
   "name": "@smallwebco/tinypivot-react",
-  "version": "1.0.49",
-  "description": "TinyPivot React - Excel-like data grid and pivot table components",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    },
-    "./style.css": "./dist/style.css"
+  "version": "1.0.50",
+  "description": "TinyPivot React - Excel-like data grid and pivot table components",
+  "author": "Small Web, LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git"
   },
-  "files": [
-    "dist"
-  ],
-  "sideEffects": [
-    "*.css"
-  ],
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
-  },
-  "dependencies": {
-    "@tanstack/react-table": "^8.20.0",
-    "@smallwebco/tinypivot-core": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "tsup": "^8.0.0",
-    "typescript": "~5.3.3"
+  "bugs": {
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
   },
   "keywords": [
     "react",
@@ -60,14 +33,41 @@
     "csv-export",
     "clipboard"
   ],
-  "author": "Small Web, LLC",
-  "license": "SEE LICENSE IN LICENSE.md",
-  "homepage": "https://github.com/Small-Web-Co/tinypivot",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Small-Web-Co/tinypivot.git"
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/style.css"
   },
-  "bugs": {
-    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-core": "workspace:*",
+    "@tanstack/react-table": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "~5.3.3"
   }
 }

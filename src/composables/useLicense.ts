@@ -1,9 +1,9 @@
+import type { LicenseInfo, LicenseType } from '../types'
 /**
  * License Management for TinyPivot
  * Handles license validation and feature gating
  */
 import { computed, ref } from 'vue'
-import type { LicenseInfo, LicenseType } from '../types'
 
 // License state
 const licenseKey = ref<string | null>(null)
@@ -31,31 +31,31 @@ async function verifySignature(typeCode: string, signature: string, expiry: stri
   // The secret must be configured before license validation can work
   // Use configureLicenseSecret() or build-time replacement
   const secret = (globalThis as Record<string, unknown>).__TP_LICENSE_SECRET__ as string
-  
+
   if (!secret) {
     console.warn('[TinyPivot] License secret not configured. Call configureLicenseSecret() first.')
     return false
   }
-  
+
   const payload = `TP-${typeCode}-${expiry}`
-  
+
   try {
     const encoder = new TextEncoder()
     const keyData = encoder.encode(secret)
     const msgData = encoder.encode(payload)
-    
+
     const cryptoKey = await crypto.subtle.importKey(
       'raw',
       keyData,
       { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ['sign']
+      ['sign'],
     )
-    
+
     const sig = await crypto.subtle.sign('HMAC', cryptoKey, msgData)
     const sigArray = Array.from(new Uint8Array(sig))
     const expectedSig = sigArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 12).toUpperCase()
-    
+
     return signature === expectedSig
   }
   catch {
@@ -154,7 +154,7 @@ async function validateLicenseKey(key: string): Promise<LicenseInfo> {
  */
 export async function setLicenseKey(key: string): Promise<void> {
   licenseKey.value = key
-  
+
   // Start validation
   validationPromise = validateLicenseKey(key)
   licenseInfo.value = await validationPromise
@@ -193,7 +193,8 @@ async function hashSecret(secret: string): Promise<string> {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
-  } catch {
+  }
+  catch {
     return ''
   }
 }
@@ -208,13 +209,13 @@ export async function enableDemoMode(secret: string): Promise<boolean> {
     console.warn('[TinyPivot] Demo mode activation failed - invalid secret')
     return false
   }
-  
+
   const hash = await hashSecret(secret)
   if (hash !== DEMO_SECRET_HASH) {
     console.warn('[TinyPivot] Demo mode activation failed - invalid secret')
     return false
   }
-  
+
   demoMode.value = true
   licenseInfo.value = DEMO_LICENSE
   console.info('[TinyPivot] Demo mode enabled - all Pro features unlocked for evaluation')
@@ -250,8 +251,8 @@ export function useLicense() {
   function requirePro(feature: string): boolean {
     if (!isPro.value) {
       console.warn(
-        `[TinyPivot] "${feature}" requires a Pro license. ` +
-        `Visit https://tiny-pivot.com/#pricing to upgrade.`,
+        `[TinyPivot] "${feature}" requires a Pro license. `
+        + `Visit https://tiny-pivot.com/#pricing to upgrade.`,
       )
       return false
     }
@@ -277,4 +278,3 @@ export function useLicense() {
 export function configureLicenseSecret(secret: string): void {
   (globalThis as Record<string, unknown>).__TP_LICENSE_SECRET__ = secret
 }
-

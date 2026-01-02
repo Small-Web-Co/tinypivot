@@ -1,8 +1,6 @@
-export { DataGrid } from './DataGrid'
+export { CalculatedFieldModal } from './CalculatedFieldModal'
 export { ColumnFilter } from './ColumnFilter'
+export { DataGrid } from './DataGrid'
 export { NumericRangeFilter } from './NumericRangeFilter'
 export { PivotConfig } from './PivotConfig'
 export { PivotSkeleton } from './PivotSkeleton'
-export { CalculatedFieldModal } from './CalculatedFieldModal'
-
-

@@ -1,22 +1,22 @@
+import type { AggregationFunction, CalculatedField, FieldStats, PivotConfig, PivotValueField } from '@smallwebco/tinypivot-core'
+import {
+  computeAvailableFields,
+  computePivotResult,
+  generateStorageKey,
+  getAggregationLabel,
+  getUnassignedFields,
+  isConfigValidForFields,
+  isPivotConfigured,
+  loadCalculatedFields,
+  loadPivotConfig,
+  saveCalculatedFields,
+  savePivotConfig,
+} from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Composable for Vue
  * Wraps core pivot logic with Vue reactivity
  */
-import { type Ref, computed, ref, watch } from 'vue'
-import type { AggregationFunction, CalculatedField, FieldStats, PivotConfig, PivotValueField } from '@smallwebco/tinypivot-core'
-import {
-  computeAvailableFields,
-  getUnassignedFields,
-  isPivotConfigured,
-  computePivotResult,
-  generateStorageKey,
-  savePivotConfig,
-  loadPivotConfig,
-  isConfigValidForFields,
-  getAggregationLabel,
-  loadCalculatedFields,
-  saveCalculatedFields,
-} from '@smallwebco/tinypivot-core'
+import { computed, type Ref, ref, watch } from 'vue'
 import { useLicense } from './useLicense'
 
 // Re-export for convenience
@@ -50,7 +50,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
       availableFields.value,
       rowFields.value,
       columnFields.value,
-      valueFields.value
+      valueFields.value,
     )
   })
 
@@ -67,10 +67,12 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
 
   // Build pivot result
   const pivotResult = computed(() => {
-    if (!isConfigured.value) return null
+    if (!isConfigured.value)
+      return null
 
     // Check license for pivot feature
-    if (!canUsePivot.value) return null
+    if (!canUsePivot.value)
+      return null
 
     return computePivotResult(data.value, {
       rowFields: rowFields.value,
@@ -117,9 +119,10 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   function removeValueField(field: string, aggregation?: AggregationFunction) {
     if (aggregation) {
       valueFields.value = valueFields.value.filter(
-        v => !(v.field === field && v.aggregation === aggregation)
+        v => !(v.field === field && v.aggregation === aggregation),
       )
-    } else {
+    }
+    else {
       valueFields.value = valueFields.value.filter(v => v.field !== field)
     }
   }
@@ -127,9 +130,9 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   function updateValueFieldAggregation(
     field: string,
     oldAgg: AggregationFunction,
-    newAgg: AggregationFunction
+    newAgg: AggregationFunction,
   ) {
-    valueFields.value = valueFields.value.map(v => {
+    valueFields.value = valueFields.value.map((v) => {
       if (v.field === field && v.aggregation === oldAgg) {
         return { ...v, aggregation: newAgg }
       }
@@ -144,8 +147,8 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   }
 
   function moveField(
-    from: { area: 'row' | 'column' | 'value'; index: number },
-    to: { area: 'row' | 'column' | 'value'; index: number }
+    from: { area: 'row' | 'column' | 'value', index: number },
+    to: { area: 'row' | 'column' | 'value', index: number },
   ) {
     if (from.area === to.area) {
       if (from.area === 'row') {
@@ -153,7 +156,8 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         const [removed] = items.splice(from.index, 1)
         items.splice(to.index, 0, removed)
         rowFields.value = items
-      } else if (from.area === 'column') {
+      }
+      else if (from.area === 'column') {
         const items = [...columnFields.value]
         const [removed] = items.splice(from.index, 1)
         items.splice(to.index, 0, removed)
@@ -163,8 +167,10 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   }
 
   function autoSuggestConfig() {
-    if (!requirePro('Pivot Table - Auto Suggest')) return
-    if (availableFields.value.length === 0) return
+    if (!requirePro('Pivot Table - Auto Suggest'))
+      return
+    if (availableFields.value.length === 0)
+      return
 
     const categoricalFields = availableFields.value.filter(f => !f.isNumeric && f.uniqueCount < 50)
     const numericFields = availableFields.value.filter(f => f.isNumeric)
@@ -184,7 +190,8 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         field,
         ...calculatedFields.value.slice(existing + 1),
       ]
-    } else {
+    }
+    else {
       calculatedFields.value = [...calculatedFields.value, field]
     }
     saveCalculatedFields(calculatedFields.value)
@@ -200,8 +207,9 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   // Watch data to restore or validate config
   watch(
     data,
-    newData => {
-      if (newData.length === 0) return
+    (newData) => {
+      if (newData.length === 0)
+        return
 
       const newKeys = Object.keys(newData[0])
       const storageKey = generateStorageKey(newKeys)
@@ -219,7 +227,8 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
           if (savedConfig.calculatedFields) {
             calculatedFields.value = savedConfig.calculatedFields
           }
-        } else {
+        }
+        else {
           const currentConfig: PivotConfig = {
             rowFields: rowFields.value,
             columnFields: columnFields.value,
@@ -231,7 +240,8 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
             clearConfig()
           }
         }
-      } else {
+      }
+      else {
         const currentConfig: PivotConfig = {
           rowFields: rowFields.value,
           columnFields: columnFields.value,
@@ -244,14 +254,15 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
         }
       }
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   // Watch config changes and save to sessionStorage
   watch(
     [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields],
     () => {
-      if (!currentStorageKey.value) return
+      if (!currentStorageKey.value)
+        return
 
       const config: PivotConfig = {
         rowFields: rowFields.value,
@@ -263,7 +274,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
       }
       savePivotConfig(currentStorageKey.value, config)
     },
-    { deep: true }
+    { deep: true },
   )
 
   return {
@@ -296,5 +307,3 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     removeCalculatedField,
   }
 }
-
-

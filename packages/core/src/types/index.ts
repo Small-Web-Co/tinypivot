@@ -183,7 +183,7 @@ export interface CellClickEvent {
 }
 
 export interface SelectionChangeEvent {
-  cells: Array<{ row: number; col: number }>
+  cells: Array<{ row: number, col: number }>
   values: unknown[]
 }
 
@@ -236,10 +236,8 @@ export interface ActiveFilter {
 
 /** Type guard to check if filter value is a numeric range */
 export function isNumericRange(value: ColumnFilterValue): value is NumericRange {
-  return value !== null && 
-    typeof value === 'object' && 
-    !Array.isArray(value) && 
-    ('min' in value || 'max' in value)
+  return value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && ('min' in value || 'max' in value)
 }
-
-

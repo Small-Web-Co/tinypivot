@@ -1,19 +1,19 @@
+import type { LicenseInfo } from '@smallwebco/tinypivot-core'
+import {
+  canUsePivot as coreCanUsePivot,
+  configureLicenseSecret as coreConfigureLicenseSecret,
+  isPro as coreIsPro,
+  shouldShowWatermark as coreShouldShowWatermark,
+  getDemoLicenseInfo,
+  getFreeLicenseInfo,
+  logProRequired,
+  validateLicenseKey,
+} from '@smallwebco/tinypivot-core'
 /**
  * License Management Composable for Vue
  * Wraps core license logic with Vue reactivity
  */
 import { computed, ref } from 'vue'
-import type { LicenseInfo } from '@smallwebco/tinypivot-core'
-import {
-  validateLicenseKey,
-  configureLicenseSecret as coreConfigureLicenseSecret,
-  getDemoLicenseInfo,
-  getFreeLicenseInfo,
-  canUsePivot as coreCanUsePivot,
-  isPro as coreIsPro,
-  shouldShowWatermark as coreShouldShowWatermark,
-  logProRequired,
-} from '@smallwebco/tinypivot-core'
 
 // License state
 const licenseKey = ref<string | null>(null)
@@ -37,7 +37,8 @@ export async function setLicenseKey(key: string): Promise<void> {
 
   if (!licenseInfo.value.isValid) {
     console.warn('[TinyPivot] Invalid or expired license key. Running in free mode.')
-  } else if (licenseInfo.value.type !== 'free') {
+  }
+  else if (licenseInfo.value.type !== 'free') {
     console.info(`[TinyPivot] Pro license activated (${licenseInfo.value.type})`)
   }
 }
@@ -77,11 +78,11 @@ export function useLicense() {
   const canUsePivot = computed(() => demoMode.value || coreCanUsePivot(licenseInfo.value))
 
   const canUseAdvancedAggregations = computed(
-    () => demoMode.value || licenseInfo.value.features.advancedAggregations
+    () => demoMode.value || licenseInfo.value.features.advancedAggregations,
   )
 
   const canUsePercentageMode = computed(
-    () => demoMode.value || licenseInfo.value.features.percentageMode
+    () => demoMode.value || licenseInfo.value.features.percentageMode,
   )
 
   const showWatermark = computed(() => coreShouldShowWatermark(licenseInfo.value, demoMode.value))
@@ -105,5 +106,3 @@ export function useLicense() {
     requirePro,
   }
 }
-
-

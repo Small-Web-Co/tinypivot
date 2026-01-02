@@ -1,9 +1,9 @@
+import type { NumericRange } from '@smallwebco/tinypivot-core'
 /**
  * Numeric Range Filter Component for React
  * Provides an intuitive dual-handle slider and input fields for filtering numeric data
  */
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import type { NumericRange } from '@smallwebco/tinypivot-core'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface NumericRangeFilterProps {
   dataMin: number
@@ -25,18 +25,25 @@ export function NumericRangeFilter({
   // Calculate step based on data range
   const step = useMemo(() => {
     const range = dataMax - dataMin
-    if (range === 0) return 1
-    if (range <= 1) return 0.01
-    if (range <= 10) return 0.1
-    if (range <= 100) return 1
-    if (range <= 1000) return 10
-    return Math.pow(10, Math.floor(Math.log10(range)) - 2)
+    if (range === 0)
+      return 1
+    if (range <= 1)
+      return 0.01
+    if (range <= 10)
+      return 0.1
+    if (range <= 100)
+      return 1
+    if (range <= 1000)
+      return 10
+    return 10 ** (Math.floor(Math.log10(range)) - 2)
   }, [dataMin, dataMax])
 
   // Format numbers for display
   const formatValue = useCallback((val: number | null): string => {
-    if (val === null) return ''
-    if (Number.isInteger(val)) return val.toLocaleString()
+    if (val === null)
+      return ''
+    if (Number.isInteger(val))
+      return val.toLocaleString()
     return val.toLocaleString(undefined, { maximumFractionDigits: 2 })
   }, [])
 
@@ -45,19 +52,21 @@ export function NumericRangeFilter({
 
   // Calculate slider percentages for visual representation
   const minPercent = useMemo(() => {
-    if (localMin === null || dataMax === dataMin) return 0
+    if (localMin === null || dataMax === dataMin)
+      return 0
     return ((localMin - dataMin) / (dataMax - dataMin)) * 100
   }, [localMin, dataMin, dataMax])
 
   const maxPercent = useMemo(() => {
-    if (localMax === null || dataMax === dataMin) return 100
+    if (localMax === null || dataMax === dataMin)
+      return 100
     return ((localMax - dataMin) / (dataMax - dataMin)) * 100
   }, [localMax, dataMin, dataMax])
 
   // Handle min slider change
   const handleMinSlider = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number.parseFloat(event.target.value)
-    setLocalMin(prev => {
+    setLocalMin(() => {
       // Ensure min doesn't exceed max
       if (localMax !== null && value > localMax) {
         return localMax
@@ -69,7 +78,7 @@ export function NumericRangeFilter({
   // Handle max slider change
   const handleMaxSlider = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number.parseFloat(event.target.value)
-    setLocalMax(prev => {
+    setLocalMax(() => {
       // Ensure max doesn't go below min
       if (localMin !== null && value < localMin) {
         return localMin
@@ -82,7 +91,8 @@ export function NumericRangeFilter({
   const handleSliderChange = useCallback(() => {
     if (localMin === null && localMax === null) {
       onChange(null)
-    } else {
+    }
+    else {
       onChange({ min: localMin, max: localMax })
     }
   }, [localMin, localMax, onChange])
@@ -93,7 +103,8 @@ export function NumericRangeFilter({
     if (value !== null && !Number.isNaN(value)) {
       // Clamp to data bounds
       setLocalMin(Math.max(dataMin, Math.min(value, localMax ?? dataMax)))
-    } else if (value === null) {
+    }
+    else if (value === null) {
       setLocalMin(null)
     }
   }, [dataMin, dataMax, localMax])
@@ -104,7 +115,8 @@ export function NumericRangeFilter({
     if (value !== null && !Number.isNaN(value)) {
       // Clamp to data bounds
       setLocalMax(Math.min(dataMax, Math.max(value, localMin ?? dataMin)))
-    } else if (value === null) {
+    }
+    else if (value === null) {
       setLocalMax(null)
     }
   }, [dataMin, dataMax, localMin])
@@ -113,7 +125,8 @@ export function NumericRangeFilter({
   const handleInputBlur = useCallback(() => {
     if (localMin === null && localMax === null) {
       onChange(null)
-    } else {
+    }
+    else {
       onChange({ min: localMin, max: localMax })
     }
   }, [localMin, localMax, onChange])
@@ -144,7 +157,10 @@ export function NumericRangeFilter({
       <div className="vpg-range-info">
         <span className="vpg-range-label">Data range:</span>
         <span className="vpg-range-bounds">
-          {formatValue(dataMin)} – {formatValue(dataMax)}
+          {formatValue(dataMin)}
+          {' '}
+          –
+          {formatValue(dataMax)}
         </span>
       </div>
 
@@ -258,14 +274,24 @@ export function NumericRangeFilter({
             />
           </svg>
           <span>
-            Showing values{' '}
-            {localMin !== null && <strong>≥ {formatValue(localMin)}</strong>}
+            Showing values
+            {' '}
+            {localMin !== null && (
+              <strong>
+                ≥
+                {formatValue(localMin)}
+              </strong>
+            )}
             {localMin !== null && localMax !== null && ' and '}
-            {localMax !== null && <strong>≤ {formatValue(localMax)}</strong>}
+            {localMax !== null && (
+              <strong>
+                ≤
+                {formatValue(localMax)}
+              </strong>
+            )}
           </span>
         </div>
       )}
     </div>
   )
 }
-

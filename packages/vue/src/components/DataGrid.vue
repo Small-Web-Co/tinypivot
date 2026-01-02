@@ -1,20 +1,20 @@
 <script setup lang="ts">
+import type { CalculatedField } from '@smallwebco/tinypivot-core'
+import { loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useExcelGrid } from '../composables/useExcelGrid'
-import { usePivotTable } from '../composables/usePivotTable'
-import { useLicense } from '../composables/useLicense'
 import {
-  exportToCSV,
-  exportPivotToCSV,
   copyToClipboard,
+  exportPivotToCSV,
+  exportToCSV,
   formatSelectionForClipboard,
 } from '../composables/useGridFeatures'
-import type { ColumnStats, CalculatedField } from '@smallwebco/tinypivot-core'
-import { loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
+import { useLicense } from '../composables/useLicense'
+import { usePivotTable } from '../composables/usePivotTable'
 import ColumnFilter from './ColumnFilter.vue'
 import PivotConfig from './PivotConfig.vue'
 import PivotSkeleton from './PivotSkeleton.vue'
@@ -138,13 +138,16 @@ const filteredDataForPivot = computed(() => {
 
 // Active filters info for display - use activeFilters from useExcelGrid
 const activeFilterInfo = computed(() => {
-  if (activeFilters.value.length === 0) return null
-  return activeFilters.value.map(f => {
+  if (activeFilters.value.length === 0)
+    return null
+  return activeFilters.value.map((f) => {
     if (f.type === 'range' && f.range) {
       // Format range filter display
       const parts = []
-      if (f.range.min !== null) parts.push(`≥ ${f.range.min}`)
-      if (f.range.max !== null) parts.push(`≤ ${f.range.max}`)
+      if (f.range.min !== null)
+        parts.push(`≥ ${f.range.min}`)
+      if (f.range.max !== null)
+        parts.push(`≤ ${f.range.max}`)
       return {
         column: f.column,
         valueCount: 1,
@@ -179,7 +182,7 @@ const {
   removeValueField,
   updateValueFieldAggregation,
   clearConfig: clearPivotConfig,
-  autoSuggestConfig,
+  autoSuggestConfig: _autoSuggestConfig,
 } = usePivotTable(filteredDataForPivot)
 
 // Filtered data based on global search
@@ -191,7 +194,8 @@ const searchFilteredData = computed(() => {
   return rows.value.filter((row) => {
     for (const col of columnKeys.value) {
       const value = row.original[col]
-      if (value === null || value === undefined) continue
+      if (value === null || value === undefined)
+        continue
       if (String(value).toLowerCase().includes(term)) {
         return true
       }
@@ -203,19 +207,22 @@ const searchFilteredData = computed(() => {
 // Paginated rows
 const totalSearchedRows = computed(() => searchFilteredData.value.length)
 const totalPages = computed(() => {
-  if (!props.enablePagination) return 1
+  if (!props.enablePagination)
+    return 1
   return Math.max(1, Math.ceil(totalSearchedRows.value / props.pageSize))
 })
 
 const paginatedRows = computed(() => {
-  if (!props.enablePagination) return searchFilteredData.value
+  if (!props.enablePagination)
+    return searchFilteredData.value
   const start = (currentPage.value - 1) * props.pageSize
   const end = start + props.pageSize
   return searchFilteredData.value.slice(start, end)
 })
 
 const paginationStart = computed(() => {
-  if (totalSearchedRows.value === 0) return 0
+  if (totalSearchedRows.value === 0)
+    return 0
   return (currentPage.value - 1) * props.pageSize + 1
 })
 
@@ -223,17 +230,19 @@ const paginationEnd = computed(() =>
   Math.min(currentPage.value * props.pageSize, totalSearchedRows.value),
 )
 
-// Pagination methods
-function goToPage(page: number) {
+// Pagination methods (kept for potential future use)
+function _goToPage(page: number) {
   currentPage.value = Math.max(1, Math.min(page, totalPages.value))
 }
 
 function nextPage() {
-  if (currentPage.value < totalPages.value) currentPage.value++
+  if (currentPage.value < totalPages.value)
+    currentPage.value++
 }
 
 function prevPage() {
-  if (currentPage.value > 1) currentPage.value--
+  if (currentPage.value > 1)
+    currentPage.value--
 }
 
 // Reset to page 1 when filters or search changes
@@ -251,20 +260,21 @@ function handleExport() {
   const dataToExport = props.enableSearch && globalSearchTerm.value.trim()
     ? searchFilteredData.value.map(row => row.original)
     : rows.value.map(row => row.original)
-  
+
   exportToCSV(dataToExport, columnKeys.value, {
     filename: props.exportFilename,
     includeHeaders: true,
   })
-  
+
   emit('export', { rowCount: dataToExport.length, filename: props.exportFilename })
 }
 
 function handlePivotExport() {
-  if (!pivotResult.value) return
+  if (!pivotResult.value)
+    return
 
   const pivotFilename = props.exportFilename.replace('.csv', '-pivot.csv')
-  
+
   exportPivotToCSV(
     {
       headers: pivotResult.value.headers,
@@ -288,20 +298,22 @@ function handlePivotExport() {
 
 // Column resize methods
 function startColumnResize(columnId: string, event: MouseEvent) {
-  if (!props.enableColumnResize) return
+  if (!props.enableColumnResize)
+    return
   event.preventDefault()
   event.stopPropagation()
-  
+
   resizingColumnId.value = columnId
   resizeStartX.value = event.clientX
   resizeStartWidth.value = columnWidths.value[columnId] || MIN_COL_WIDTH
-  
+
   document.addEventListener('mousemove', handleResizeMove)
   document.addEventListener('mouseup', handleResizeEnd)
 }
 
 function handleResizeMove(event: MouseEvent) {
-  if (!resizingColumnId.value) return
+  if (!resizingColumnId.value)
+    return
   const diff = event.clientX - resizeStartX.value
   const newWidth = Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, resizeStartWidth.value + diff))
   columnWidths.value = {
@@ -318,19 +330,21 @@ function handleResizeEnd() {
 
 // Vertical resize methods
 function startVerticalResize(event: MouseEvent) {
-  if (!props.enableVerticalResize) return
+  if (!props.enableVerticalResize)
+    return
   event.preventDefault()
-  
+
   isResizingVertically.value = true
   verticalResizeStartY.value = event.clientY
   verticalResizeStartHeight.value = gridHeight.value
-  
+
   document.addEventListener('mousemove', handleVerticalResizeMove)
   document.addEventListener('mouseup', handleVerticalResizeEnd)
 }
 
 function handleVerticalResizeMove(event: MouseEvent) {
-  if (!isResizingVertically.value) return
+  if (!isResizingVertically.value)
+    return
   const diff = event.clientY - verticalResizeStartY.value
   const newHeight = Math.max(
     props.minHeight,
@@ -347,20 +361,21 @@ function handleVerticalResizeEnd() {
 
 // Clipboard methods
 function copySelectionToClipboard() {
-  if (!selectionBounds.value || !props.enableClipboard) return
-  
+  if (!selectionBounds.value || !props.enableClipboard)
+    return
+
   const text = formatSelectionForClipboard(
     rows.value.map(r => r.original),
     columnKeys.value,
     selectionBounds.value,
   )
-  
+
   copyToClipboard(
     text,
     () => {
-      const cellCount = 
-        (selectionBounds.value!.maxRow - selectionBounds.value!.minRow + 1) *
-        (selectionBounds.value!.maxCol - selectionBounds.value!.minCol + 1)
+      const cellCount
+        = (selectionBounds.value!.maxRow - selectionBounds.value!.minRow + 1)
+          * (selectionBounds.value!.maxCol - selectionBounds.value!.minCol + 1)
       copyToastMessage.value = `Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`
       showCopyToast.value = true
       setTimeout(() => { showCopyToast.value = false }, 2000)
@@ -1297,7 +1312,7 @@ function handleContainerClick(event: MouseEvent) {
         </div>
         <span v-else-if="showWatermark" class="vpg-watermark-inline">
           <a href="https://tiny-pivot.com" target="_blank" rel="noopener">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
             Powered by TinyPivot
           </a>
         </span>
@@ -1311,9 +1326,9 @@ function handleContainerClick(event: MouseEvent) {
       @mousedown="startVerticalResize"
     >
       <div class="vpg-resize-grip">
-        <span></span>
-        <span></span>
-        <span></span>
+        <span />
+        <span />
+        <span />
       </div>
     </div>
 
@@ -2494,4 +2509,3 @@ function handleContainerClick(event: MouseEvent) {
   background: #1e293b;
 }
 </style>
-

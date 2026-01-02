@@ -1,11 +1,11 @@
+import type { CalculatedField } from '@smallwebco/tinypivot-core'
+import { validateSimpleFormula } from '@smallwebco/tinypivot-core'
 /**
  * Calculated Field Modal for React
  * UI for creating custom calculated fields with formulas
  */
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { CalculatedField } from '@smallwebco/tinypivot-core'
-import { validateSimpleFormula } from '@smallwebco/tinypivot-core'
 
 interface CalculatedFieldModalProps {
   show: boolean
@@ -37,7 +37,8 @@ export function CalculatedFieldModal({
         setFormula(existingField.formula)
         setFormatAs(existingField.formatAs || 'number')
         setDecimals(existingField.decimals ?? 2)
-      } else {
+      }
+      else {
         setName('')
         setFormula('')
         setFormatAs('number')
@@ -49,15 +50,16 @@ export function CalculatedFieldModal({
 
   // Validate formula on change
   const validationError = useMemo(() => {
-    if (!formula.trim()) return null
+    if (!formula.trim())
+      return null
     return validateSimpleFormula(formula, availableFields)
   }, [formula, availableFields])
 
   // Insert field into formula
   const insertField = useCallback((field: string) => {
-    setFormula(prev => {
+    setFormula((prev) => {
       if (prev.trim() && !prev.endsWith(' ')) {
-        return prev + ' ' + field
+        return `${prev} ${field}`
       }
       return prev + field
     })
@@ -65,11 +67,11 @@ export function CalculatedFieldModal({
 
   // Insert operator into formula
   const insertOperator = useCallback((op: string) => {
-    setFormula(prev => {
+    setFormula((prev) => {
       if (prev.trim() && !prev.endsWith(' ')) {
-        return prev + ' ' + op + ' '
+        return `${prev} ${op} `
       }
-      return prev + op + ' '
+      return `${prev + op} `
     })
   }, [])
 
@@ -105,13 +107,18 @@ export function CalculatedFieldModal({
     }
   }, [onClose])
 
-  if (!show) return null
+  if (!show)
+    return null
 
   const modalContent = (
     <div className="vpg-modal-overlay" onClick={handleOverlayClick}>
       <div className="vpg-modal">
         <div className="vpg-modal-header">
-          <h3>{existingField ? 'Edit' : 'Create'} Calculated Field</h3>
+          <h3>
+            {existingField ? 'Edit' : 'Create'}
+            {' '}
+            Calculated Field
+          </h3>
           <button className="vpg-modal-close" onClick={onClose}>×</button>
         </div>
 
@@ -158,21 +165,23 @@ export function CalculatedFieldModal({
           {/* Quick Insert: Fields (numeric only) */}
           <div className="vpg-form-group">
             <label className="vpg-label-small">Insert Field</label>
-            {availableFields.length > 0 ? (
-              <div className="vpg-button-group vpg-field-buttons">
-                {availableFields.map(field => (
-                  <button
-                    key={field}
-                    className="vpg-insert-btn vpg-field-btn"
-                    onClick={() => insertField(field)}
-                  >
-                    {field}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="vpg-no-fields">No numeric fields available</div>
-            )}
+            {availableFields.length > 0
+              ? (
+                  <div className="vpg-button-group vpg-field-buttons">
+                    {availableFields.map(field => (
+                      <button
+                        key={field}
+                        className="vpg-insert-btn vpg-field-btn"
+                        onClick={() => insertField(field)}
+                      >
+                        {field}
+                      </button>
+                    ))}
+                  </div>
+                )
+              : (
+                  <div className="vpg-no-fields">No numeric fields available</div>
+                )}
           </div>
 
           {/* Format Options */}
@@ -209,7 +218,9 @@ export function CalculatedFieldModal({
         <div className="vpg-modal-footer">
           <button className="vpg-btn vpg-btn-secondary" onClick={onClose}>Cancel</button>
           <button className="vpg-btn vpg-btn-primary" onClick={handleSave}>
-            {existingField ? 'Update' : 'Add'} Field
+            {existingField ? 'Update' : 'Add'}
+            {' '}
+            Field
           </button>
         </div>
       </div>
@@ -217,7 +228,7 @@ export function CalculatedFieldModal({
   )
 
   // Guard for SSR
-  if (typeof document === 'undefined') return null
+  if (typeof document === 'undefined')
+    return null
   return createPortal(modalContent, document.body)
 }
-

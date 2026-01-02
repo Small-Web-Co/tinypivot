@@ -9,7 +9,8 @@ import type { ColumnStats, FieldStats } from '../types'
  */
 export function detectColumnType(values: unknown[]): ColumnStats['type'] {
   const nonNullValues = values.filter(v => v !== null && v !== undefined && v !== '')
-  if (nonNullValues.length === 0) return 'string'
+  if (nonNullValues.length === 0)
+    return 'string'
 
   const sample = nonNullValues.slice(0, 100)
   let numberCount = 0
@@ -19,17 +20,22 @@ export function detectColumnType(values: unknown[]): ColumnStats['type'] {
   for (const val of sample) {
     if (typeof val === 'boolean') {
       booleanCount++
-    } else if (typeof val === 'number' || (!Number.isNaN(Number(val)) && val !== '')) {
+    }
+    else if (typeof val === 'number' || (!Number.isNaN(Number(val)) && val !== '')) {
       numberCount++
-    } else if (val instanceof Date || !Number.isNaN(Date.parse(String(val)))) {
+    }
+    else if (val instanceof Date || !Number.isNaN(Date.parse(String(val)))) {
       dateCount++
     }
   }
 
   const threshold = sample.length * 0.8
-  if (booleanCount >= threshold) return 'boolean'
-  if (numberCount >= threshold) return 'number'
-  if (dateCount >= threshold) return 'date'
+  if (booleanCount >= threshold)
+    return 'boolean'
+  if (numberCount >= threshold)
+    return 'number'
+  if (dateCount >= threshold)
+    return 'date'
   return 'string'
 }
 
@@ -67,7 +73,7 @@ export function detectFieldType(data: Record<string, unknown>[], field: string):
 export function getColumnUniqueValues<T>(
   data: T[],
   columnKey: string,
-  maxValues = 500
+  maxValues = 500,
 ): ColumnStats {
   const values: unknown[] = []
   let nullCount = 0
@@ -78,13 +84,16 @@ export function getColumnUniqueValues<T>(
     const value = (row as Record<string, unknown>)[columnKey]
     if (value === null || value === undefined || value === '') {
       nullCount++
-    } else {
+    }
+    else {
       values.push(value)
       // Track numeric min/max
       const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
       if (!Number.isNaN(num)) {
-        if (numericMin === undefined || num < numericMin) numericMin = num
-        if (numericMax === undefined || num > numericMax) numericMax = num
+        if (numericMin === undefined || num < numericMin)
+          numericMin = num
+        if (numericMax === undefined || num > numericMax)
+          numericMax = num
       }
     }
   }
@@ -93,7 +102,8 @@ export function getColumnUniqueValues<T>(
   const uniqueSet = new Set<string>()
   for (const val of values) {
     uniqueSet.add(String(val))
-    if (uniqueSet.size >= maxValues) break
+    if (uniqueSet.size >= maxValues)
+      break
   }
 
   const uniqueValues = Array.from(uniqueSet).sort((a, b) => {
@@ -107,7 +117,7 @@ export function getColumnUniqueValues<T>(
   })
 
   const columnType = detectColumnType(values)
-  
+
   return {
     uniqueValues,
     totalCount: data.length,
@@ -124,13 +134,16 @@ export function getColumnUniqueValues<T>(
  * Format cell value for display
  */
 export function formatCellValue(value: unknown, type: ColumnStats['type']): string {
-  if (value === null || value === undefined) return ''
-  if (value === '') return ''
+  if (value === null || value === undefined)
+    return ''
+  if (value === '')
+    return ''
 
   switch (type) {
     case 'number': {
       const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
-      if (Number.isNaN(num)) return String(value)
+      if (Number.isNaN(num))
+        return String(value)
       // Format with commas for large numbers
       if (Math.abs(num) >= 1000) {
         return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
@@ -139,7 +152,8 @@ export function formatCellValue(value: unknown, type: ColumnStats['type']): stri
     }
     case 'date': {
       const date = value instanceof Date ? value : new Date(String(value))
-      if (Number.isNaN(date.getTime())) return String(value)
+      if (Number.isNaN(date.getTime()))
+        return String(value)
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -157,7 +171,8 @@ export function formatCellValue(value: unknown, type: ColumnStats['type']): stri
  * Format number for display with appropriate precision
  */
 export function formatNumber(value: number | null, options?: { maximumFractionDigits?: number }): string {
-  if (value === null) return '-'
+  if (value === null)
+    return '-'
 
   const maxDigits = options?.maximumFractionDigits ?? (Math.abs(value) >= 1000 ? 2 : 4)
 
@@ -195,12 +210,13 @@ export function naturalSort(a: string, b: string): number {
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  delay: number
+  delay: number,
 ): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout> | null = null
 
   return (...args: Parameters<T>) => {
-    if (timeoutId) clearTimeout(timeoutId)
+    if (timeoutId)
+      clearTimeout(timeoutId)
     timeoutId = setTimeout(() => fn(...args), delay)
   }
 }
@@ -211,5 +227,3 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
-
-

@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type { AggregationFunction, PivotValueField } from '../types'
 /**
  * Pivot Table Configuration Panel
  * Draggable fields with aggregation selection
  */
 import { computed, ref } from 'vue'
-import type { AggregationFunction, PivotValueField } from '../types'
 import { useLicense } from '../composables/useLicense'
 
 interface FieldStats {
@@ -57,7 +57,8 @@ const aggregationOptions: { value: AggregationFunction, label: string, symbol: s
 // Check if an aggregation is available based on license
 function isAggregationAvailable(agg: AggregationFunction): boolean {
   const option = aggregationOptions.find(a => a.value === agg)
-  if (!option) return false
+  if (!option)
+    return false
   return !option.requiresPro || canUseAdvancedAggregations.value
 }
 
@@ -65,7 +66,7 @@ function getAggSymbol(agg: AggregationFunction): string {
   return aggregationOptions.find(a => a.value === agg)?.symbol || 'Σ'
 }
 
-function getAggLabel(agg: AggregationFunction): string {
+function _getAggLabel(agg: AggregationFunction): string {
   return aggregationOptions.find(a => a.value === agg)?.label || 'Sum'
 }
 
@@ -189,7 +190,9 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
     <!-- Assigned Fields -->
     <div v-if="assignedCount > 0" class="vpg-assigned-section">
-      <div class="vpg-section-label">Active</div>
+      <div class="vpg-section-label">
+        Active
+      </div>
       <div class="vpg-assigned-list">
         <div
           v-for="field in assignedFields"
@@ -804,7 +807,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-field-list::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
 }
-
 </style>
 
 <style>
@@ -1010,4 +1012,3 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   background: #475569;
 }
 </style>
-

@@ -185,4 +185,3 @@ export interface ExportOptions {
   includeHeaders?: boolean
   delimiter?: string
 }
-

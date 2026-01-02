@@ -3,15 +3,15 @@
  * Release script for TinyPivot
  * Usage: node scripts/release.js [patch|minor|major] [--local]
  * Default: patch
- * 
+ *
  * By default, npm publishing is handled by GitHub Actions when the tag is pushed.
  * Use --local flag to publish from your local machine (requires npm token).
  */
 
-import { readFileSync, writeFileSync } from 'fs'
-import { execSync } from 'child_process'
-import { dirname, join } from 'path'
-import { fileURLToPath } from 'url'
+import { execSync } from 'node:child_process'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const rootDir = join(__dirname, '..')
@@ -48,7 +48,8 @@ function runQuiet(cmd) {
 function getLatestTag() {
   try {
     return runQuiet('git describe --tags --abbrev=0')
-  } catch {
+  }
+  catch {
     return null
   }
 }
@@ -57,63 +58,71 @@ function getCommitsSinceTag(tag) {
   const range = tag ? `${tag}..HEAD` : 'HEAD'
   try {
     const log = runQuiet(`git log ${range} --pretty=format:"%s|%h|%an"`)
-    if (!log) return []
-    return log.split('\n').map(line => {
+    if (!log)
+      return []
+    return log.split('\n').map((line) => {
       const [message, hash, author] = line.split('|')
       return { message, hash, author }
     })
-  } catch {
+  }
+  catch {
     return []
   }
 }
 
 function getChangedFiles(tag) {
   const files = new Set()
-  
+
   try {
     // Get committed changes since tag
     if (tag) {
       const committed = runQuiet(`git diff --name-only ${tag}..HEAD`)
-      if (committed) committed.split('\n').forEach(f => f && files.add(f))
+      if (committed)
+        committed.split('\n').forEach(f => f && files.add(f))
     }
-    
+
     // Get staged changes (not yet committed)
     const staged = runQuiet('git diff --cached --name-only')
-    if (staged) staged.split('\n').forEach(f => f && files.add(f))
-    
+    if (staged)
+      staged.split('\n').forEach(f => f && files.add(f))
+
     // Get unstaged changes in working directory
     const unstaged = runQuiet('git diff --name-only')
-    if (unstaged) unstaged.split('\n').forEach(f => f && files.add(f))
-    
-  } catch {
+    if (unstaged)
+      unstaged.split('\n').forEach(f => f && files.add(f))
+  }
+  catch {
     // Ignore errors
   }
-  
+
   return Array.from(files)
 }
 
 function getDiffContent(tag) {
   const diffs = []
-  
+
   try {
     // Get committed changes since tag
     if (tag) {
       const committed = runQuiet(`git diff ${tag}..HEAD`)
-      if (committed) diffs.push(committed)
+      if (committed)
+        diffs.push(committed)
     }
-    
+
     // Get staged changes
     const staged = runQuiet('git diff --cached')
-    if (staged) diffs.push(staged)
-    
+    if (staged)
+      diffs.push(staged)
+
     // Get unstaged changes
     const unstaged = runQuiet('git diff')
-    if (unstaged) diffs.push(unstaged)
-    
-  } catch {
+    if (unstaged)
+      diffs.push(unstaged)
+  }
+  catch {
     // Ignore errors
   }
-  
+
   return diffs.join('\n')
 }
 
@@ -126,7 +135,7 @@ function extractFeatures(diffContent, changedFiles) {
     newProps: new Set(),
     newCssClasses: new Set(),
     newExports: new Set(),
-    uiChanges: new Set()
+    uiChanges: new Set(),
   }
 
   // Detect new components from NEW files (most reliable method)
@@ -156,15 +165,15 @@ function extractFeatures(diffContent, changedFiles) {
 
   const lines = diffContent.split('\n')
   let currentFile = ''
-  let isNewFile = false
+  let _isNewFile = false
 
   for (const line of lines) {
     // Track current file and if it's new
     if (line.startsWith('diff --git')) {
-      isNewFile = false
+      _isNewFile = false
     }
     if (line.startsWith('new file mode')) {
-      isNewFile = true
+      _isNewFile = true
     }
     if (line.startsWith('+++ b/')) {
       currentFile = line.replace('+++ b/', '')
@@ -172,11 +181,13 @@ function extractFeatures(diffContent, changedFiles) {
     }
 
     // Only look at added lines
-    if (!line.startsWith('+') || line.startsWith('+++')) continue
+    if (!line.startsWith('+') || line.startsWith('+++'))
+      continue
     const added = line.slice(1).trim()
 
     // Skip empty lines, imports, comments
-    if (!added || added.startsWith('import ') || added.startsWith('//') || added.startsWith('*')) continue
+    if (!added || added.startsWith('import ') || added.startsWith('//') || added.startsWith('*'))
+      continue
 
     // React component definitions (export function ComponentName)
     const componentMatch = added.match(/export\s+(?:default\s+)?function\s+([A-Z][a-zA-Z0-9]+)/)
@@ -204,7 +215,7 @@ function extractFeatures(diffContent, changedFiles) {
 
     // Props in type files or component interfaces
     const isTypeFile = currentFile.includes('types') || currentFile.includes('Props')
-    const propMatch = added.match(/^\s*([a-z][a-zA-Z0-9]+)\??:\s*(?:string|number|boolean|any|\[|{|Record|Array)/)
+    const propMatch = added.match(/^\s*([a-z][a-zA-Z0-9]+)\??:\s*(?:string|number|boolean|any|\[|\{|Record|Array)/)
     if (propMatch && isTypeFile) {
       features.newProps.add(propMatch[1])
     }
@@ -226,7 +237,7 @@ function extractFeatures(diffContent, changedFiles) {
     // New exports from index files
     const exportMatch = added.match(/export\s+\{\s*([^}]+)\s*\}/)
     if (exportMatch) {
-      exportMatch[1].split(',').forEach(e => {
+      exportMatch[1].split(',').forEach((e) => {
         const name = e.trim().split(' ')[0]
         if (name && name.length > 2 && /^[A-Z]/.test(name)) {
           features.newComponents.add(name)
@@ -236,7 +247,7 @@ function extractFeatures(diffContent, changedFiles) {
 
     // UI-related changes (detecting specific patterns)
     if (added.includes('className=') || added.includes(':class=') || added.includes('class="')) {
-      const uiMatch = added.match(/(?:filter|modal|dropdown|tooltip|skeleton|grid|pivot|column|row|header|footer|toolbar)/i)
+      const uiMatch = added.match(/filter|modal|dropdown|tooltip|skeleton|grid|pivot|column|row|header|footer|toolbar/i)
       if (uiMatch) {
         features.uiChanges.add(uiMatch[0].toLowerCase())
       }
@@ -291,40 +302,57 @@ function analyzeFileChanges(files) {
     scripts: [],
     config: [],
     docs: [],
-    other: []
+    other: [],
   }
 
   for (const file of files) {
     // Skip dist, node_modules, lock files
-    if (file.includes('dist/') || file.includes('node_modules/') || file.includes('pnpm-lock')) continue
-    
+    if (file.includes('dist/') || file.includes('node_modules/') || file.includes('pnpm-lock'))
+      continue
+
     if (file.startsWith('packages/core/src/')) {
       const name = file.replace('packages/core/src/', '')
-      if (name.includes('types/')) changes.core.types.push(name)
-      else if (name.includes('utils/')) changes.core.utils.push(name)
-      else if (name.includes('pivot/')) changes.core.hooks.push(name)
+      if (name.includes('types/'))
+        changes.core.types.push(name)
+      else if (name.includes('utils/'))
+        changes.core.utils.push(name)
+      else if (name.includes('pivot/'))
+        changes.core.hooks.push(name)
       else changes.core.other.push(name)
-    } else if (file.startsWith('packages/vue/src/')) {
+    }
+    else if (file.startsWith('packages/vue/src/')) {
       const name = file.replace('packages/vue/src/', '')
-      if (name.includes('components/')) changes.vue.components.push(name)
-      else if (name.includes('composables/')) changes.vue.composables.push(name)
-      else if (name.includes('.css')) changes.vue.styles.push(name)
+      if (name.includes('components/'))
+        changes.vue.components.push(name)
+      else if (name.includes('composables/'))
+        changes.vue.composables.push(name)
+      else if (name.includes('.css'))
+        changes.vue.styles.push(name)
       else changes.vue.other.push(name)
-    } else if (file.startsWith('packages/react/src/')) {
+    }
+    else if (file.startsWith('packages/react/src/')) {
       const name = file.replace('packages/react/src/', '')
-      if (name.includes('components/')) changes.react.components.push(name)
-      else if (name.includes('hooks/')) changes.react.hooks.push(name)
-      else if (name.includes('.css')) changes.react.styles.push(name)
+      if (name.includes('components/'))
+        changes.react.components.push(name)
+      else if (name.includes('hooks/'))
+        changes.react.hooks.push(name)
+      else if (name.includes('.css'))
+        changes.react.styles.push(name)
       else changes.react.other.push(name)
-    } else if (file.startsWith('demo/')) {
+    }
+    else if (file.startsWith('demo/')) {
       changes.demo.push(file)
-    } else if (file.startsWith('scripts/')) {
+    }
+    else if (file.startsWith('scripts/')) {
       changes.scripts.push(file)
-    } else if (file.endsWith('.md') || file.endsWith('.txt')) {
+    }
+    else if (file.endsWith('.md') || file.endsWith('.txt')) {
       changes.docs.push(file)
-    } else if (file.includes('config') || file.endsWith('.json')) {
+    }
+    else if (file.includes('config') || file.endsWith('.json')) {
       changes.config.push(file)
-    } else {
+    }
+    else {
       changes.other.push(file)
     }
   }
@@ -337,30 +365,42 @@ function generateFileChangeSummary(changes) {
 
   // Core changes
   const coreChanges = []
-  if (changes.core.types.length) coreChanges.push(`Types (${changes.core.types.length} files)`)
-  if (changes.core.hooks.length) coreChanges.push(`Pivot logic (${changes.core.hooks.length} files)`)
-  if (changes.core.utils.length) coreChanges.push(`Utilities (${changes.core.utils.length} files)`)
-  if (changes.core.other.length) coreChanges.push(`Other (${changes.core.other.length} files)`)
+  if (changes.core.types.length)
+    coreChanges.push(`Types (${changes.core.types.length} files)`)
+  if (changes.core.hooks.length)
+    coreChanges.push(`Pivot logic (${changes.core.hooks.length} files)`)
+  if (changes.core.utils.length)
+    coreChanges.push(`Utilities (${changes.core.utils.length} files)`)
+  if (changes.core.other.length)
+    coreChanges.push(`Other (${changes.core.other.length} files)`)
   if (coreChanges.length) {
     sections.push(`- **Core**: ${coreChanges.join(', ')}`)
   }
 
   // Vue changes
   const vueChanges = []
-  if (changes.vue.components.length) vueChanges.push(`${changes.vue.components.length} components`)
-  if (changes.vue.composables.length) vueChanges.push(`${changes.vue.composables.length} composables`)
-  if (changes.vue.styles.length) vueChanges.push(`styles`)
-  if (changes.vue.other.length) vueChanges.push(`${changes.vue.other.length} other`)
+  if (changes.vue.components.length)
+    vueChanges.push(`${changes.vue.components.length} components`)
+  if (changes.vue.composables.length)
+    vueChanges.push(`${changes.vue.composables.length} composables`)
+  if (changes.vue.styles.length)
+    vueChanges.push(`styles`)
+  if (changes.vue.other.length)
+    vueChanges.push(`${changes.vue.other.length} other`)
   if (vueChanges.length) {
     sections.push(`- **Vue**: ${vueChanges.join(', ')}`)
   }
 
   // React changes
   const reactChanges = []
-  if (changes.react.components.length) reactChanges.push(`${changes.react.components.length} components`)
-  if (changes.react.hooks.length) reactChanges.push(`${changes.react.hooks.length} hooks`)
-  if (changes.react.styles.length) reactChanges.push(`styles`)
-  if (changes.react.other.length) reactChanges.push(`${changes.react.other.length} other`)
+  if (changes.react.components.length)
+    reactChanges.push(`${changes.react.components.length} components`)
+  if (changes.react.hooks.length)
+    reactChanges.push(`${changes.react.hooks.length} hooks`)
+  if (changes.react.styles.length)
+    reactChanges.push(`styles`)
+  if (changes.react.other.length)
+    reactChanges.push(`${changes.react.other.length} other`)
   if (reactChanges.length) {
     sections.push(`- **React**: ${reactChanges.join(', ')}`)
   }
@@ -400,30 +440,38 @@ function categorizeCommits(commits) {
     style: [],
     perf: [],
     chore: [],
-    other: []
+    other: [],
   }
 
   for (const commit of commits) {
     const msg = commit.message.toLowerCase()
-    
+
     // Skip release commits
-    if (msg.startsWith('release:')) continue
-    
+    if (msg.startsWith('release:'))
+      continue
+
     if (msg.startsWith('feat') || msg.includes('add ') || msg.includes('new ')) {
       categories.features.push(commit)
-    } else if (msg.startsWith('fix') || msg.includes('fix ') || msg.includes('bug')) {
+    }
+    else if (msg.startsWith('fix') || msg.includes('fix ') || msg.includes('bug')) {
       categories.fixes.push(commit)
-    } else if (msg.startsWith('docs') || msg.includes('readme') || msg.includes('documentation')) {
+    }
+    else if (msg.startsWith('docs') || msg.includes('readme') || msg.includes('documentation')) {
       categories.docs.push(commit)
-    } else if (msg.startsWith('refactor') || msg.includes('refactor')) {
+    }
+    else if (msg.startsWith('refactor') || msg.includes('refactor')) {
       categories.refactor.push(commit)
-    } else if (msg.startsWith('style') || msg.includes('style') || msg.includes('css')) {
+    }
+    else if (msg.startsWith('style') || msg.includes('style') || msg.includes('css')) {
       categories.style.push(commit)
-    } else if (msg.startsWith('perf') || msg.includes('performance') || msg.includes('optimize')) {
+    }
+    else if (msg.startsWith('perf') || msg.includes('performance') || msg.includes('optimize')) {
       categories.perf.push(commit)
-    } else if (msg.startsWith('chore') || msg.includes('build') || msg.includes('ci')) {
+    }
+    else if (msg.startsWith('chore') || msg.includes('build') || msg.includes('ci')) {
       categories.chore.push(commit)
-    } else {
+    }
+    else {
       // Include all other commits instead of skipping
       categories.other.push(commit)
     }
@@ -434,7 +482,7 @@ function categorizeCommits(commits) {
 
 function generateChangelog(categories, fileChanges, featureSummary, previousTag, newVersion) {
   const sections = []
-  
+
   // Add feature summary at the top if we have meaningful features detected
   if (featureSummary.length > 0) {
     sections.push('### 🚀 Highlights\n')
@@ -452,15 +500,15 @@ function generateChangelog(categories, fileChanges, featureSummary, previousTag,
     style: '💅 Styling',
     docs: '📚 Documentation',
     chore: '🔧 Maintenance',
-    other: '📝 Other Changes'
+    other: '📝 Other Changes',
   }
 
   // Add commit-based changes
-  let hasCommitChanges = false
+  let _hasCommitChanges = false
   for (const [key, title] of Object.entries(categoryTitles)) {
     const commits = categories[key]
     if (commits.length > 0) {
-      hasCommitChanges = true
+      _hasCommitChanges = true
       sections.push(`### ${title}\n`)
       for (const commit of commits) {
         sections.push(`- ${commit.message} (\`${commit.hash}\`)`)
@@ -483,7 +531,7 @@ function generateChangelog(categories, fileChanges, featureSummary, previousTag,
     sections.push('')
   }
 
-  const compareUrl = previousTag 
+  const compareUrl = previousTag
     ? `**Full Changelog**: https://github.com/Small-Web-Co/tinypivot/compare/${previousTag}...v${newVersion}`
     : `**First Release**: v${newVersion}`
 
@@ -492,25 +540,27 @@ function generateChangelog(categories, fileChanges, featureSummary, previousTag,
 
 function createGitHubRelease(version, changelog) {
   console.log('\n🎉 Creating GitHub release...')
-  
+
   // Write changelog to temp file to avoid shell escaping issues
   const tempFile = join(rootDir, '.release-notes.tmp')
   writeFileSync(tempFile, changelog)
-  
+
   try {
     // Check if gh CLI is installed
     runQuiet('which gh')
-    
+
     // Create the release using file input
     run(`gh release create v${version} --title "v${version}" --notes-file "${tempFile}"`)
     console.log('   ✓ GitHub release created')
-    
+
     // Clean up temp file
     execSync(`rm -f "${tempFile}"`, { cwd: rootDir })
-  } catch (error) {
+  }
+  catch {
     // Clean up temp file on error too
-    try { execSync(`rm -f "${tempFile}"`, { cwd: rootDir }) } catch {}
-    
+    try { execSync(`rm -f "${tempFile}"`, { cwd: rootDir }) }
+    catch {}
+
     console.log('\n⚠️  Could not create GitHub release automatically.')
     console.log('   Please install GitHub CLI (gh) or create the release manually:')
     console.log(`   https://github.com/Small-Web-Co/tinypivot/releases/new?tag=v${version}`)
@@ -521,7 +571,7 @@ function createGitHubRelease(version, changelog) {
 
 async function main() {
   const bumpType = process.argv[2] || 'patch'
-  
+
   if (!['patch', 'minor', 'major'].includes(bumpType)) {
     console.error('Usage: node scripts/release.js [patch|minor|major]')
     process.exit(1)
@@ -538,40 +588,41 @@ async function main() {
   // Get commits and file changes for changelog before making release commit
   const previousTag = getLatestTag()
   console.log(`📝 Generating changelog since ${previousTag || 'beginning'}...`)
-  
+
   const commits = getCommitsSinceTag(previousTag)
   const nonReleaseCommits = commits.filter(c => !c.message.toLowerCase().startsWith('release:'))
   console.log(`   Found ${commits.length} commits (${nonReleaseCommits.length} non-release)`)
-  
+
   const categories = categorizeCommits(commits)
-  
+
   const changedFiles = getChangedFiles(previousTag)
   const sourceFiles = changedFiles.filter(f => !f.includes('dist/') && !f.includes('node_modules/') && !f.includes('pnpm-lock'))
   console.log(`   Found ${changedFiles.length} changed files (${sourceFiles.length} source files)`)
-  
+
   if (sourceFiles.length > 0 && sourceFiles.length <= 20) {
     console.log(`   Files: ${sourceFiles.join(', ')}`)
   }
-  
+
   const fileChanges = analyzeFileChanges(changedFiles)
-  
+
   // Analyze diff for feature extraction
   console.log('🔍 Analyzing code changes...')
   const diffContent = getDiffContent(previousTag)
   console.log(`   Diff size: ${diffContent.length} characters`)
-  
+
   const features = extractFeatures(diffContent, changedFiles)
   const featureSummary = generateFeatureSummary(features)
-  
+
   if (featureSummary.length > 0) {
     console.log(`   Detected features:`)
     featureSummary.forEach(s => console.log(`     - ${s}`))
-  } else {
+  }
+  else {
     console.log(`   No specific features detected from diff`)
   }
-  
+
   const changelog = generateChangelog(categories, fileChanges, featureSummary, previousTag, newVersion)
-  
+
   console.log('\n📋 Changelog preview:')
   console.log('─'.repeat(50))
   console.log(changelog)
@@ -581,7 +632,7 @@ async function main() {
   for (const pkgPath of packagePaths) {
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
     pkg.version = newVersion
-    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+    writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`)
     console.log(`   ✓ Updated ${pkgPath.replace(rootDir, '.')}`)
   }
 
@@ -596,14 +647,15 @@ async function main() {
 
   // Check if --local flag is passed to publish locally
   const publishLocal = process.argv.includes('--local')
-  
+
   if (publishLocal) {
     // Publish packages locally (requires npm token configured)
     console.log('\n🚀 Publishing to npm locally...')
     run('pnpm release:core')
     run('pnpm release:vue')
     run('pnpm release:react')
-  } else {
+  }
+  else {
     console.log('\n📦 Skipping local npm publish - GitHub Actions will publish when tag is pushed')
   }
 
@@ -619,7 +671,7 @@ async function main() {
   console.log(`\n✅ Successfully released v${newVersion}!\n`)
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('\n❌ Release failed:', err.message)
   process.exit(1)
 })

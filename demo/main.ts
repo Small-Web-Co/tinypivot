@@ -1,6 +1,6 @@
-import { createApp } from 'vue'
-import { enableDemoMode } from 'tinypivot'
 import { inject } from '@vercel/analytics'
+import { enableDemoMode } from 'tinypivot'
+import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import '../src/style.css'

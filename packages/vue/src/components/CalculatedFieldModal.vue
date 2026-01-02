@@ -1,13 +1,13 @@
 <script setup lang="ts">
-/**
- * Calculated Field Modal
- * UI for creating custom calculated fields with formulas
- */
-import { ref, computed, watch } from 'vue'
 import type { CalculatedField } from '@smallwebco/tinypivot-core'
 import {
   validateSimpleFormula,
 } from '@smallwebco/tinypivot-core'
+/**
+ * Calculated Field Modal
+ * UI for creating custom calculated fields with formulas
+ */
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   show: boolean
@@ -35,7 +35,8 @@ watch(() => props.show, (show) => {
       formula.value = props.existingField.formula
       formatAs.value = props.existingField.formatAs || 'number'
       decimals.value = props.existingField.decimals ?? 2
-    } else {
+    }
+    else {
       name.value = ''
       formula.value = ''
       formatAs.value = 'number'
@@ -47,7 +48,8 @@ watch(() => props.show, (show) => {
 
 // Validate formula on change
 const validationError = computed(() => {
-  if (!formula.value.trim()) return null
+  if (!formula.value.trim())
+    return null
   return validateSimpleFormula(formula.value, props.availableFields)
 })
 
@@ -100,7 +102,9 @@ function save() {
       <div class="vpg-modal">
         <div class="vpg-modal-header">
           <h3>{{ existingField ? 'Edit' : 'Create' }} Calculated Field</h3>
-          <button class="vpg-modal-close" @click="emit('close')">×</button>
+          <button class="vpg-modal-close" @click="emit('close')">
+            ×
+          </button>
         </div>
 
         <div class="vpg-modal-body">
@@ -112,7 +116,7 @@ function save() {
               type="text"
               class="vpg-input"
               placeholder="e.g., Profit Margin %"
-            />
+            >
           </div>
 
           <!-- Formula -->
@@ -124,20 +128,36 @@ function save() {
               placeholder="e.g., revenue / units"
               rows="2"
             />
-            <div class="vpg-formula-hint">Use field names with math operators: + - * / ( )</div>
-            <div v-if="validationError" class="vpg-error">{{ validationError }}</div>
+            <div class="vpg-formula-hint">
+              Use field names with math operators: + - * / ( )
+            </div>
+            <div v-if="validationError" class="vpg-error">
+              {{ validationError }}
+            </div>
           </div>
 
           <!-- Quick Insert: Operators -->
           <div class="vpg-form-group">
             <label class="vpg-label-small">Operators</label>
             <div class="vpg-button-group">
-              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('+')">+</button>
-              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('-')">−</button>
-              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('*')">×</button>
-              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('/')">÷</button>
-              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('(')">(</button>
-              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator(')')">)</button>
+              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('+')">
+                +
+              </button>
+              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('-')">
+                −
+              </button>
+              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('*')">
+                ×
+              </button>
+              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('/')">
+                ÷
+              </button>
+              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator('(')">
+                (
+              </button>
+              <button class="vpg-insert-btn vpg-op-btn" @click="insertOperator(')')">
+                )
+              </button>
             </div>
           </div>
 
@@ -164,9 +184,15 @@ function save() {
             <div class="vpg-form-group vpg-form-group-half">
               <label class="vpg-label">Format As</label>
               <select v-model="formatAs" class="vpg-select">
-                <option value="number">Number</option>
-                <option value="percent">Percentage</option>
-                <option value="currency">Currency ($)</option>
+                <option value="number">
+                  Number
+                </option>
+                <option value="percent">
+                  Percentage
+                </option>
+                <option value="currency">
+                  Currency ($)
+                </option>
               </select>
             </div>
             <div class="vpg-form-group vpg-form-group-half">
@@ -177,16 +203,20 @@ function save() {
                 class="vpg-input"
                 min="0"
                 max="6"
-              />
+              >
             </div>
           </div>
 
           <!-- Error -->
-          <div v-if="error" class="vpg-error vpg-error-box">{{ error }}</div>
+          <div v-if="error" class="vpg-error vpg-error-box">
+            {{ error }}
+          </div>
         </div>
 
         <div class="vpg-modal-footer">
-          <button class="vpg-btn vpg-btn-secondary" @click="emit('close')">Cancel</button>
+          <button class="vpg-btn vpg-btn-secondary" @click="emit('close')">
+            Cancel
+          </button>
           <button class="vpg-btn vpg-btn-primary" @click="save">
             {{ existingField ? 'Update' : 'Add' }} Field
           </button>
@@ -517,4 +547,3 @@ function save() {
   border-color: rgba(220, 38, 38, 0.3);
 }
 </style>
-

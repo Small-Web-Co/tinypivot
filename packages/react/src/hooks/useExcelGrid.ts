@@ -1,24 +1,24 @@
+import type { ColumnFilterValue, ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
+import { formatCellValue, getColumnUniqueValues, isNumericRange } from '@smallwebco/tinypivot-core'
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type FilterFn,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+  type VisibilityState,
+} from '@tanstack/react-table'
 /**
  * Excel-like Grid Hook for React
  * Provides Excel-like filtering, sorting, and data manipulation functionality
  */
-import { useState, useMemo, useCallback, useEffect } from 'react'
-import {
-  useReactTable,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  type ColumnDef,
-  type ColumnFiltersState,
-  type SortingState,
-  type VisibilityState,
-  type FilterFn,
-} from '@tanstack/react-table'
-import type { ColumnStats, NumericRange, ColumnFilterValue } from '@smallwebco/tinypivot-core'
-import { getColumnUniqueValues, formatCellValue, isNumericRange } from '@smallwebco/tinypivot-core'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // Re-export for convenience
-export { getColumnUniqueValues, formatCellValue, isNumericRange }
+export { formatCellValue, getColumnUniqueValues, isNumericRange }
 
 export interface ExcelGridOptions<T> {
   data: T[]
@@ -32,7 +32,8 @@ export interface ExcelGridOptions<T> {
  * Combined filter function for Excel-style filtering and numeric range filtering
  */
 const multiSelectFilter: FilterFn<unknown> = (row, columnId, filterValue: ColumnFilterValue | undefined) => {
-  if (!filterValue) return true
+  if (!filterValue)
+    return true
 
   // Handle numeric range filter
   if (isNumericRange(filterValue)) {
@@ -41,19 +42,22 @@ const multiSelectFilter: FilterFn<unknown> = (row, columnId, filterValue: Column
       return false // Exclude null/empty values from numeric range filtering
     }
     const num = typeof cellValue === 'number' ? cellValue : Number.parseFloat(String(cellValue))
-    if (Number.isNaN(num)) return false
-    
+    if (Number.isNaN(num))
+      return false
+
     const { min, max } = filterValue
-    if (min !== null && num < min) return false
-    if (max !== null && num > max) return false
+    if (min !== null && num < min)
+      return false
+    if (max !== null && num > max)
+      return false
     return true
   }
 
   // Handle multi-select array filter
   if (Array.isArray(filterValue) && filterValue.length > 0) {
     const cellValue = row.getValue(columnId)
-    const cellString =
-      cellValue === null || cellValue === undefined || cellValue === ''
+    const cellString
+      = cellValue === null || cellValue === undefined || cellValue === ''
         ? '(blank)'
         : String(cellValue)
     return filterValue.includes(cellString)
@@ -79,12 +83,13 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
 
   const dataSignature = useMemo(
     () => `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    [data]
+    [data],
   )
 
   // Compute columns from data
   const columnKeys = useMemo(() => {
-    if (data.length === 0) return []
+    if (data.length === 0)
+      return []
     return Object.keys(data[0] as Record<string, unknown>)
   }, [data])
 
@@ -99,7 +104,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
       }
       return columnStatsCache[cacheKey]
     },
-    [data, columnStatsCache, dataSignature]
+    [data, columnStatsCache, dataSignature],
   )
 
   // Clear stats cache
@@ -113,7 +118,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
 
   // Create column definitions dynamically
   const columnDefs = useMemo<ColumnDef<T, unknown>[]>(() => {
-    return columnKeys.map(key => {
+    return columnKeys.map((key) => {
       const stats = getColumnStats(key)
 
       return {
@@ -160,9 +165,9 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
 
   // Active filters (handles both array values and numeric ranges)
   const activeFilters = useMemo(() => {
-    return columnFilters.map(f => {
+    return columnFilters.map((f) => {
       const filterValue = f.value as ColumnFilterValue | undefined
-      
+
       // Handle numeric range
       if (filterValue && isNumericRange(filterValue)) {
         return {
@@ -172,7 +177,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
           values: [] as string[],
         }
       }
-      
+
       // Handle value array
       return {
         column: f.id,
@@ -187,19 +192,21 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   const hasActiveFilter = useCallback(
     (columnId: string): boolean => {
       const column = table.getColumn(columnId)
-      if (!column) return false
+      if (!column)
+        return false
       const filterValue = column.getFilterValue() as ColumnFilterValue | undefined
-      if (!filterValue) return false
-      
+      if (!filterValue)
+        return false
+
       // Check for numeric range
       if (isNumericRange(filterValue)) {
         return filterValue.min !== null || filterValue.max !== null
       }
-      
+
       // Check for value array
       return Array.isArray(filterValue) && filterValue.length > 0
     },
-    [table]
+    [table],
   )
 
   // Set column filter (value-based)
@@ -213,7 +220,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
         column.setFilterValue(values.length === 0 ? undefined : values)
       }
     },
-    [table]
+    [table],
   )
 
   // Set numeric range filter
@@ -223,26 +230,28 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
       if (column) {
         if (!range || (range.min === null && range.max === null)) {
           column.setFilterValue(undefined)
-        } else {
+        }
+        else {
           column.setFilterValue(range)
         }
       }
     },
-    [table]
+    [table],
   )
 
   // Get numeric range filter for a column
   const getNumericRangeFilter = useCallback(
     (columnId: string): NumericRange | null => {
       const column = table.getColumn(columnId)
-      if (!column) return null
+      if (!column)
+        return null
       const filterValue = column.getFilterValue() as ColumnFilterValue | undefined
       if (filterValue && isNumericRange(filterValue)) {
         return filterValue
       }
       return null
     },
-    [table]
+    [table],
   )
 
   // Clear all filters
@@ -257,22 +266,25 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   const getColumnFilterValues = useCallback(
     (columnId: string): string[] => {
       const column = table.getColumn(columnId)
-      if (!column) return []
+      if (!column)
+        return []
       const filterValue = column.getFilterValue()
       return Array.isArray(filterValue) ? filterValue : []
     },
-    [table]
+    [table],
   )
 
   // Toggle column sort
   const toggleSort = useCallback((columnId: string) => {
-    setSorting(prev => {
+    setSorting((prev) => {
       const current = prev.find(s => s.id === columnId)
       if (!current) {
         return [{ id: columnId, desc: false }]
-      } else if (!current.desc) {
+      }
+      else if (!current.desc) {
         return [{ id: columnId, desc: true }]
-      } else {
+      }
+      else {
         return []
       }
     })
@@ -282,10 +294,11 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   const getSortDirection = useCallback(
     (columnId: string): 'asc' | 'desc' | null => {
       const sort = sorting.find(s => s.id === columnId)
-      if (!sort) return null
+      if (!sort)
+        return null
       return sort.desc ? 'desc' : 'asc'
     },
-    [sorting]
+    [sorting],
   )
 
   return {
@@ -321,5 +334,3 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
     getNumericRangeFilter,
   }
 }
-
-

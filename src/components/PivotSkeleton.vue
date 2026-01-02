@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type { AggregationFunction, PivotResult, PivotValueField } from '../types'
 /**
  * Pivot Table Skeleton + Data Display
  * Visual layout for pivot configuration and results
  */
 import { computed, ref } from 'vue'
-import type { AggregationFunction, PivotResult, PivotValueField } from '../types'
 import { useLicense } from '../composables/useLicense'
 
 interface ActiveFilter {
@@ -90,15 +90,17 @@ const fontSizeOptions = [
 // Filter status
 const hasActiveFilters = computed(() => props.activeFilters && props.activeFilters.length > 0)
 const filterSummary = computed(() => {
-  if (!props.activeFilters || props.activeFilters.length === 0) return ''
+  if (!props.activeFilters || props.activeFilters.length === 0)
+    return ''
   const columns = props.activeFilters.map(f => f.column).join(', ')
   return columns
 })
 
 // Detailed filter tooltip
 const filterTooltipDetails = computed(() => {
-  if (!props.activeFilters || props.activeFilters.length === 0) return []
-  return props.activeFilters.map(f => {
+  if (!props.activeFilters || props.activeFilters.length === 0)
+    return []
+  return props.activeFilters.map((f) => {
     const maxDisplay = 5
     const displayValues = f.values.slice(0, maxDisplay)
     const remaining = f.values.length - maxDisplay
@@ -284,30 +286,31 @@ function handleChipDragLeave() {
 function handleChipDrop(zone: 'row' | 'column', targetIndex: number, event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
-  
+
   if (!reorderDragSource.value || reorderDragSource.value.zone !== zone) {
     return
   }
-  
+
   const sourceIndex = reorderDragSource.value.index
   if (sourceIndex === targetIndex) {
     reorderDragSource.value = null
     reorderDropTarget.value = null
     return
   }
-  
+
   // Create reordered array
   const fields = zone === 'row' ? [...props.rowFields] : [...props.columnFields]
   const [movedField] = fields.splice(sourceIndex, 1)
   fields.splice(targetIndex, 0, movedField)
-  
+
   // Emit reorder event
   if (zone === 'row') {
     emit('reorderRowFields', fields)
-  } else {
+  }
+  else {
     emit('reorderColumnFields', fields)
   }
-  
+
   reorderDragSource.value = null
   reorderDropTarget.value = null
 }
@@ -362,9 +365,13 @@ const dataColWidth = ref(80)
 
           <!-- Tooltip -->
           <div v-if="showFilterTooltip" class="vpg-filter-tooltip">
-            <div class="vpg-tooltip-header">Active Filters</div>
+            <div class="vpg-tooltip-header">
+              Active Filters
+            </div>
             <div v-for="filter in filterTooltipDetails" :key="filter.column" class="vpg-tooltip-filter">
-              <div class="vpg-tooltip-column">{{ filter.column }}</div>
+              <div class="vpg-tooltip-column">
+                {{ filter.column }}
+              </div>
               <div class="vpg-tooltip-values">
                 <span v-for="(val, idx) in filter.values" :key="idx" class="vpg-tooltip-value">
                   {{ val }}
@@ -448,7 +455,9 @@ const dataColWidth = ref(80)
             >
               <span class="vpg-drag-handle">⋮⋮</span>
               <span class="vpg-mini-name">{{ field }}</span>
-              <button class="vpg-mini-remove" @click.stop="emit('removeRowField', field)">×</button>
+              <button class="vpg-mini-remove" @click.stop="emit('removeRowField', field)">
+                ×
+              </button>
             </div>
             <span v-if="rowFields.length === 0" class="vpg-zone-hint">Drop here</span>
           </div>
@@ -484,7 +493,9 @@ const dataColWidth = ref(80)
             >
               <span class="vpg-drag-handle">⋮⋮</span>
               <span class="vpg-mini-name">{{ field }}</span>
-              <button class="vpg-mini-remove" @click.stop="emit('removeColumnField', field)">×</button>
+              <button class="vpg-mini-remove" @click.stop="emit('removeColumnField', field)">
+                ×
+              </button>
             </div>
             <span v-if="columnFields.length === 0" class="vpg-zone-hint">Drop here</span>
           </div>
@@ -510,7 +521,9 @@ const dataColWidth = ref(80)
             >
               <span class="vpg-agg-symbol">{{ getAggSymbol(vf.aggregation) }}</span>
               <span class="vpg-mini-name">{{ vf.field }}</span>
-              <button class="vpg-mini-remove" @click="emit('removeValueField', vf.field, vf.aggregation)">×</button>
+              <button class="vpg-mini-remove" @click="emit('removeValueField', vf.field, vf.aggregation)">
+                ×
+              </button>
             </div>
             <span v-if="valueFields.length === 0" class="vpg-zone-hint">Drop numeric</span>
           </div>
@@ -1473,7 +1486,6 @@ const dataColWidth = ref(80)
 .vpg-table-container::-webkit-scrollbar-corner {
   background: #f1f5f9;
 }
-
 </style>
 
 <style>
@@ -1767,4 +1779,3 @@ const dataColWidth = ref(80)
   background: #0f172a;
 }
 </style>
-

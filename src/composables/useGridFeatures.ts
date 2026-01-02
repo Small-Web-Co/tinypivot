@@ -30,7 +30,8 @@ export function exportToCSV<T extends Record<string, unknown>>(
   } = options
 
   const escapeCSV = (value: unknown): string => {
-    if (value === null || value === undefined) return ''
+    if (value === null || value === undefined)
+      return ''
     const str = String(value)
     if (str.includes(delimiter) || str.includes('"') || str.includes('\n')) {
       return `"${str.replace(/"/g, '""')}"`
@@ -93,7 +94,8 @@ export function exportPivotToCSV(
   } = options
 
   const escapeCSV = (value: unknown): string => {
-    if (value === null || value === undefined) return ''
+    if (value === null || value === undefined)
+      return ''
     const str = String(value)
     if (str.includes(delimiter) || str.includes('"') || str.includes('\n')) {
       return `"${str.replace(/"/g, '""')}"`
@@ -126,7 +128,8 @@ export function exportPivotToCSV(
           for (const vf of valueFields) {
             headerRow.push(escapeCSV(`Total (${vf.aggregation})`))
           }
-        } else {
+        }
+        else {
           for (let i = 0; i < valueFields.length; i++) {
             headerRow.push('')
           }
@@ -134,7 +137,8 @@ export function exportPivotToCSV(
       }
       rows.push(headerRow.join(delimiter))
     }
-  } else {
+  }
+  else {
     // Simple header with value fields only
     const headerRow: string[] = []
     for (let i = 0; i < rowHeaderColCount; i++) {
@@ -230,11 +234,13 @@ export function formatSelectionForClipboard<T extends Record<string, unknown>>(
 
   for (let r = minRow; r <= maxRow; r++) {
     const row = rows[r]
-    if (!row) continue
+    if (!row)
+      continue
     const values: string[] = []
     for (let c = minCol; c <= maxCol; c++) {
       const colId = columns[c]
-      if (!colId) continue
+      if (!colId)
+        continue
       const value = row[colId]
       values.push(value === null || value === undefined ? '' : String(value))
     }
@@ -336,7 +342,8 @@ export function useGlobalSearch<T extends Record<string, unknown>>(
     return data.value.filter((row) => {
       for (const col of columns.value) {
         const value = row[col]
-        if (value === null || value === undefined) continue
+        if (value === null || value === undefined)
+          continue
 
         const strValue = caseSensitive.value
           ? String(value)
@@ -386,7 +393,8 @@ export function useRowSelection<T>(data: Ref<T[]>) {
   function toggleRow(index: number) {
     if (selectedRowIndices.value.has(index)) {
       selectedRowIndices.value.delete(index)
-    } else {
+    }
+    else {
       selectedRowIndices.value.add(index)
     }
     selectedRowIndices.value = new Set(selectedRowIndices.value)
@@ -413,7 +421,8 @@ export function useRowSelection<T>(data: Ref<T[]>) {
   function toggleAll() {
     if (allSelected.value) {
       deselectAll()
-    } else {
+    }
+    else {
       selectAll()
     }
   }
@@ -507,4 +516,3 @@ export function useColumnResize(
     resetAllWidths,
   }
 }
-

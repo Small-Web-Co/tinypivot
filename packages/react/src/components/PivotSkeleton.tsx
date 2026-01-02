@@ -1,10 +1,10 @@
+import type { AggregationFunction, CalculatedField, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display for React
  * Visual layout for pivot configuration and results
  */
-import React, { useState, useMemo, useCallback, useEffect } from 'react'
-import type { AggregationFunction, CalculatedField, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
-import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLicense } from '../hooks/useLicense'
 
 interface ActiveFilter {
@@ -78,10 +78,10 @@ export function PivotSkeleton({
 
   // Drag state
   const [dragOverArea, setDragOverArea] = useState<'row' | 'column' | 'value' | null>(null)
-  
+
   // Reorder drag state
-  const [reorderDragSource, setReorderDragSource] = useState<{ zone: 'row' | 'column'; index: number } | null>(null)
-  const [reorderDropTarget, setReorderDropTarget] = useState<{ zone: 'row' | 'column'; index: number } | null>(null)
+  const [reorderDragSource, setReorderDragSource] = useState<{ zone: 'row' | 'column', index: number } | null>(null)
+  const [reorderDropTarget, setReorderDropTarget] = useState<{ zone: 'row' | 'column', index: number } | null>(null)
 
   // Sorting
   type SortTarget = 'row' | number
@@ -91,22 +91,24 @@ export function PivotSkeleton({
   const toggleSort = useCallback((target: SortTarget = 'row') => {
     if (sortTarget === target) {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
+    }
+    else {
       setSortTarget(target)
       setSortDirection('asc')
     }
   }, [sortTarget])
 
   // Selection state for cell selection and copy
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null)
-  const [selectionStart, setSelectionStart] = useState<{ row: number; col: number } | null>(null)
-  const [selectionEnd, setSelectionEnd] = useState<{ row: number; col: number } | null>(null)
+  const [selectedCell, setSelectedCell] = useState<{ row: number, col: number } | null>(null)
+  const [selectionStart, setSelectionStart] = useState<{ row: number, col: number } | null>(null)
+  const [selectionEnd, setSelectionEnd] = useState<{ row: number, col: number } | null>(null)
   const [isSelecting, setIsSelecting] = useState(false)
   const [showCopyToast, setShowCopyToast] = useState(false)
   const [copyToastMessage, setCopyToastMessage] = useState('')
 
   const selectionBounds = useMemo(() => {
-    if (!selectionStart || !selectionEnd) return null
+    if (!selectionStart || !selectionEnd)
+      return null
     return {
       minRow: Math.min(selectionStart.row, selectionEnd.row),
       maxRow: Math.max(selectionStart.row, selectionEnd.row),
@@ -118,17 +120,18 @@ export function PivotSkeleton({
   const handleCellMouseDown = useCallback(
     (rowIndex: number, colIndex: number, event: React.MouseEvent) => {
       event.preventDefault()
-      
+
       if (event.shiftKey && selectedCell) {
         setSelectionEnd({ row: rowIndex, col: colIndex })
-      } else {
+      }
+      else {
         setSelectedCell({ row: rowIndex, col: colIndex })
         setSelectionStart({ row: rowIndex, col: colIndex })
         setSelectionEnd({ row: rowIndex, col: colIndex })
         setIsSelecting(true)
       }
     },
-    [selectedCell]
+    [selectedCell],
   )
 
   const handleCellMouseEnter = useCallback(
@@ -137,7 +140,7 @@ export function PivotSkeleton({
         setSelectionEnd({ row: rowIndex, col: colIndex })
       }
     },
-    [isSelecting]
+    [isSelecting],
   )
 
   const isCellSelected = useCallback(
@@ -148,7 +151,7 @@ export function PivotSkeleton({
       const { minRow, maxRow, minCol, maxCol } = selectionBounds
       return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
     },
-    [selectionBounds, selectedCell]
+    [selectionBounds, selectedCell],
   )
 
   // Mouse up handler
@@ -160,7 +163,8 @@ export function PivotSkeleton({
 
   // Sorted row indices
   const sortedRowIndices = useMemo(() => {
-    if (!pivotResult) return []
+    if (!pivotResult)
+      return []
 
     const indices = pivotResult.rowHeaders.map((_, i) => i)
     const headers = pivotResult.rowHeaders
@@ -173,14 +177,18 @@ export function PivotSkeleton({
         const aHeader = headers[a]?.join(' / ') || ''
         const bHeader = headers[b]?.join(' / ') || ''
         cmp = aHeader.localeCompare(bHeader, undefined, { numeric: true, sensitivity: 'base' })
-      } else {
+      }
+      else {
         const colIdx = sortTarget as number
         const aVal = data[a]?.[colIdx]?.value ?? null
         const bVal = data[b]?.[colIdx]?.value ?? null
 
-        if (aVal === null && bVal === null) cmp = 0
-        else if (aVal === null) cmp = 1
-        else if (bVal === null) cmp = -1
+        if (aVal === null && bVal === null)
+          cmp = 0
+        else if (aVal === null)
+          cmp = 1
+        else if (bVal === null)
+          cmp = -1
         else cmp = aVal - bVal
       }
 
@@ -192,15 +200,17 @@ export function PivotSkeleton({
 
   // Copy selection to clipboard
   const copySelectionToClipboard = useCallback(() => {
-    if (!selectionBounds || !pivotResult) return
-    
+    if (!selectionBounds || !pivotResult)
+      return
+
     const { minRow, maxRow, minCol, maxCol } = selectionBounds
     const lines: string[] = []
-    
+
     for (let r = minRow; r <= maxRow; r++) {
       const sortedIdx = sortedRowIndices[r]
-      if (sortedIdx === undefined) continue
-      
+      if (sortedIdx === undefined)
+        continue
+
       const rowValues: string[] = []
       for (let c = minCol; c <= maxCol; c++) {
         const cell = pivotResult.data[sortedIdx]?.[c]
@@ -208,15 +218,15 @@ export function PivotSkeleton({
       }
       lines.push(rowValues.join('\t'))
     }
-    
+
     const text = lines.join('\n')
-    
+
     navigator.clipboard.writeText(text).then(() => {
       const cellCount = (maxRow - minRow + 1) * (maxCol - minCol + 1)
       setCopyToastMessage(`Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`)
       setShowCopyToast(true)
       setTimeout(() => setShowCopyToast(false), 2000)
-    }).catch(err => {
+    }).catch((err) => {
       console.error('Copy failed:', err)
     })
   }, [selectionBounds, pivotResult, sortedRowIndices])
@@ -224,37 +234,40 @@ export function PivotSkeleton({
   // Keyboard handler for copy
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
-      if (!selectionBounds) return
-      
+      if (!selectionBounds)
+        return
+
       if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
         event.preventDefault()
         copySelectionToClipboard()
         return
       }
-      
+
       if (event.key === 'Escape') {
         setSelectedCell(null)
         setSelectionStart(null)
         setSelectionEnd(null)
       }
     }
-    
+
     document.addEventListener('keydown', handleKeydown)
     return () => document.removeEventListener('keydown', handleKeydown)
   }, [selectionBounds, copySelectionToClipboard])
 
   // Selection statistics for footer
   const selectionStats = useMemo(() => {
-    if (!selectionBounds || !pivotResult) return null
-    
+    if (!selectionBounds || !pivotResult)
+      return null
+
     const { minRow, maxRow, minCol, maxCol } = selectionBounds
     const values: number[] = []
     let count = 0
-    
+
     for (let r = minRow; r <= maxRow; r++) {
       const sortedIdx = sortedRowIndices[r]
-      if (sortedIdx === undefined) continue
-      
+      if (sortedIdx === undefined)
+        continue
+
       for (let c = minCol; c <= maxCol; c++) {
         const cell = pivotResult.data[sortedIdx]?.[c]
         count++
@@ -263,12 +276,13 @@ export function PivotSkeleton({
         }
       }
     }
-    
-    if (count <= 1) return null
-    
+
+    if (count <= 1)
+      return null
+
     const sum = values.reduce((a, b) => a + b, 0)
     const avg = values.length > 0 ? sum / values.length : 0
-    
+
     return {
       count,
       numericCount: values.length,
@@ -278,8 +292,10 @@ export function PivotSkeleton({
   }, [selectionBounds, pivotResult, sortedRowIndices])
 
   const formatStatValue = useCallback((val: number): string => {
-    if (Math.abs(val) >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`
-    if (Math.abs(val) >= 1_000) return `${(val / 1_000).toFixed(2)}K`
+    if (Math.abs(val) >= 1_000_000)
+      return `${(val / 1_000_000).toFixed(2)}M`
+    if (Math.abs(val) >= 1_000)
+      return `${(val / 1_000).toFixed(2)}K`
     return val.toFixed(2)
   }, [])
 
@@ -294,11 +310,11 @@ export function PivotSkeleton({
       ]
     }
 
-    const result: Array<Array<{ label: string; colspan: number }>> = []
+    const result: Array<Array<{ label: string, colspan: number }>> = []
 
     for (let level = 0; level < pivotResult.headers.length; level++) {
       const headerRow = pivotResult.headers[level]
-      const cells: Array<{ label: string; colspan: number }> = []
+      const cells: Array<{ label: string, colspan: number }> = []
 
       let i = 0
       while (i < headerRow.length) {
@@ -322,15 +338,17 @@ export function PivotSkeleton({
   // Filter status
   const hasActiveFilters = activeFilters && activeFilters.length > 0
   const filterSummary = useMemo(() => {
-    if (!activeFilters || activeFilters.length === 0) return ''
+    if (!activeFilters || activeFilters.length === 0)
+      return ''
     return activeFilters.map(f => f.column).join(', ')
   }, [activeFilters])
 
   // Detailed filter tooltip
   const [showFilterTooltip, setShowFilterTooltip] = useState(false)
   const filterTooltipDetails = useMemo(() => {
-    if (!activeFilters || activeFilters.length === 0) return []
-    return activeFilters.map(f => {
+    if (!activeFilters || activeFilters.length === 0)
+      return []
+    return activeFilters.map((f) => {
       // Handle range filters
       if (f.isRange && f.displayText) {
         return {
@@ -362,7 +380,7 @@ export function PivotSkeleton({
       event.dataTransfer!.dropEffect = 'move'
       setDragOverArea(area)
     },
-    []
+    [],
   )
 
   const handleDragLeave = useCallback(() => {
@@ -379,10 +397,13 @@ export function PivotSkeleton({
         return
       }
 
-      if (rowFields.includes(field)) onRemoveRowField(field)
-      if (columnFields.includes(field)) onRemoveColumnField(field)
+      if (rowFields.includes(field))
+        onRemoveRowField(field)
+      if (columnFields.includes(field))
+        onRemoveColumnField(field)
       const existingValue = valueFields.find(v => v.field === field)
-      if (existingValue) onRemoveValueField(field, existingValue.aggregation)
+      if (existingValue)
+        onRemoveValueField(field, existingValue.aggregation)
 
       switch (area) {
         case 'row':
@@ -397,7 +418,7 @@ export function PivotSkeleton({
       }
       setDragOverArea(null)
     },
-    [rowFields, columnFields, valueFields, onAddRowField, onRemoveRowField, onAddColumnField, onRemoveColumnField, onAddValueField, onRemoveValueField]
+    [rowFields, columnFields, valueFields, onAddRowField, onRemoveRowField, onAddColumnField, onRemoveColumnField, onAddValueField, onRemoveValueField],
   )
 
   // Reorder handlers for chips within zones
@@ -411,7 +432,7 @@ export function PivotSkeleton({
         setDragOverArea(null)
       })
     },
-    []
+    [],
   )
 
   const handleChipDragEnd = useCallback(() => {
@@ -428,7 +449,7 @@ export function PivotSkeleton({
         setReorderDropTarget({ zone, index })
       }
     },
-    [reorderDragSource]
+    [reorderDragSource],
   )
 
   const handleChipDragLeave = useCallback(() => {
@@ -459,28 +480,29 @@ export function PivotSkeleton({
       // Emit reorder event
       if (zone === 'row') {
         onReorderRowFields(fields)
-      } else {
+      }
+      else {
         onReorderColumnFields(fields)
       }
 
       setReorderDragSource(null)
       setReorderDropTarget(null)
     },
-    [reorderDragSource, rowFields, columnFields, onReorderRowFields, onReorderColumnFields]
+    [reorderDragSource, rowFields, columnFields, onReorderRowFields, onReorderColumnFields],
   )
 
   const isChipDragSource = useCallback(
     (zone: 'row' | 'column', index: number): boolean => {
       return reorderDragSource?.zone === zone && reorderDragSource?.index === index
     },
-    [reorderDragSource]
+    [reorderDragSource],
   )
 
   const isChipDropTarget = useCallback(
     (zone: 'row' | 'column', index: number): boolean => {
       return reorderDropTarget?.zone === zone && reorderDropTarget?.index === index
     },
-    [reorderDropTarget]
+    [reorderDropTarget],
   )
 
   const currentFontSize = fontSize
@@ -546,10 +568,19 @@ export function PivotSkeleton({
                 />
               </svg>
               <span className="vpg-filter-text">
-                Filtered: <strong>{filterSummary}</strong>
+                Filtered:
+                {' '}
+                <strong>{filterSummary}</strong>
                 {filteredRowCount !== undefined && totalRowCount !== undefined && (
                   <span className="vpg-filter-count">
-                    ({filteredRowCount.toLocaleString()} of {totalRowCount.toLocaleString()} rows)
+                    (
+                    {filteredRowCount.toLocaleString()}
+                    {' '}
+                    of
+                    {' '}
+                    {totalRowCount.toLocaleString()}
+                    {' '}
+                    rows)
                   </span>
                 )}
               </span>
@@ -562,26 +593,41 @@ export function PivotSkeleton({
                     <div key={filter.column} className="vpg-tooltip-filter">
                       <div className="vpg-tooltip-column">{filter.column}</div>
                       <div className="vpg-tooltip-values">
-                        {filter.isRange ? (
-                          <span className="vpg-tooltip-value vpg-range-value">{filter.displayText}</span>
-                        ) : (
-                          <>
-                            {filter.values.map((val, idx) => (
-                              <span key={idx} className="vpg-tooltip-value">
-                                {val}
-                              </span>
-                            ))}
-                            {filter.remaining > 0 && (
-                              <span className="vpg-tooltip-more">+{filter.remaining} more</span>
+                        {filter.isRange
+                          ? (
+                              <span className="vpg-tooltip-value vpg-range-value">{filter.displayText}</span>
+                            )
+                          : (
+                              <>
+                                {filter.values.map((val, idx) => (
+                                  <span key={idx} className="vpg-tooltip-value">
+                                    {val}
+                                  </span>
+                                ))}
+                                {filter.remaining > 0 && (
+                                  <span className="vpg-tooltip-more">
+                                    +
+                                    {filter.remaining}
+                                    {' '}
+                                    more
+                                  </span>
+                                )}
+                              </>
                             )}
-                          </>
-                        )}
                       </div>
                     </div>
                   ))}
                   {filteredRowCount !== undefined && totalRowCount !== undefined && (
                     <div className="vpg-tooltip-summary">
-                      Showing {filteredRowCount.toLocaleString()} of {totalRowCount.toLocaleString()} rows
+                      Showing
+                      {' '}
+                      {filteredRowCount.toLocaleString()}
+                      {' '}
+                      of
+                      {' '}
+                      {totalRowCount.toLocaleString()}
+                      {' '}
+                      rows
                     </div>
                   )}
                 </div>
@@ -592,13 +638,22 @@ export function PivotSkeleton({
           {isConfigured && (
             <div className="vpg-config-summary">
               <span className="vpg-summary-badge vpg-rows">
-                {rowFields.length} row{rowFields.length !== 1 ? 's' : ''}
+                {rowFields.length}
+                {' '}
+                row
+                {rowFields.length !== 1 ? 's' : ''}
               </span>
               <span className="vpg-summary-badge vpg-cols">
-                {columnFields.length} col{columnFields.length !== 1 ? 's' : ''}
+                {columnFields.length}
+                {' '}
+                col
+                {columnFields.length !== 1 ? 's' : ''}
               </span>
               <span className="vpg-summary-badge vpg-vals">
-                {valueFields.length} val{valueFields.length !== 1 ? 's' : ''}
+                {valueFields.length}
+                {' '}
+                val
+                {valueFields.length !== 1 ? 's' : ''}
               </span>
             </div>
           )}
@@ -655,7 +710,7 @@ export function PivotSkeleton({
                     <span className="vpg-mini-name">{field}</span>
                     <button
                       className="vpg-mini-remove"
-                      onClick={e => { e.stopPropagation(); onRemoveRowField(field) }}
+                      onClick={(e) => { e.stopPropagation(); onRemoveRowField(field) }}
                     >
                       ×
                     </button>
@@ -692,7 +747,7 @@ export function PivotSkeleton({
                     <span className="vpg-mini-name">{field}</span>
                     <button
                       className="vpg-mini-remove"
-                      onClick={e => { e.stopPropagation(); onRemoveColumnField(field) }}
+                      onClick={(e) => { e.stopPropagation(); onRemoveColumnField(field) }}
                     >
                       ×
                     </button>
@@ -752,17 +807,33 @@ export function PivotSkeleton({
                   />
                 </svg>
                 <span className="vpg-placeholder-text">
-                  {valueFields.length === 0 ? (
-                    <>
-                      Add a <strong>Values</strong> field to see your pivot table
-                    </>
-                  ) : rowFields.length === 0 && columnFields.length === 0 ? (
-                    <>
-                      Add <strong>Row</strong> or <strong>Column</strong> fields to group your data
-                    </>
-                  ) : (
-                    'Your pivot table will appear here'
-                  )}
+                  {valueFields.length === 0
+                    ? (
+                        <>
+                          Add a
+                          {' '}
+                          <strong>Values</strong>
+                          {' '}
+                          field to see your pivot table
+                        </>
+                      )
+                    : rowFields.length === 0 && columnFields.length === 0
+                      ? (
+                          <>
+                            Add
+                            {' '}
+                            <strong>Row</strong>
+                            {' '}
+                            or
+                            {' '}
+                            <strong>Column</strong>
+                            {' '}
+                            fields to group your data
+                          </>
+                        )
+                      : (
+                          'Your pivot table will appear here'
+                        )}
                 </span>
               </div>
             </div>
@@ -799,8 +870,7 @@ export function PivotSkeleton({
                           className="vpg-column-header-cell"
                           colSpan={cell.colspan}
                           onClick={() =>
-                            levelIdx === columnHeaderCells.length - 1 && toggleSort(idx)
-                          }
+                            levelIdx === columnHeaderCells.length - 1 && toggleSort(idx)}
                         >
                           <div className="vpg-header-content">
                             <span>{cell.label}</span>
@@ -890,9 +960,14 @@ export function PivotSkeleton({
           {isConfigured && pivotResult && (
             <div className="vpg-skeleton-footer">
               <span className="vpg-footer-info">
-                {pivotResult.rowHeaders.length} rows × {pivotResult.data[0]?.length || 0} columns
+                {pivotResult.rowHeaders.length}
+                {' '}
+                rows ×
+                {pivotResult.data[0]?.length || 0}
+                {' '}
+                columns
               </span>
-              
+
               {selectionStats && selectionStats.count > 1 && (
                 <div className="vpg-selection-stats">
                   <span className="vpg-stat">
@@ -923,28 +998,28 @@ export function PivotSkeleton({
       {/* Watermark / Demo Banner */}
       {showWatermark && canUsePivot && (
         <div className={`vpg-watermark ${isDemo ? 'vpg-demo-mode' : ''}`}>
-          {isDemo ? (
-            <>
-              <span className="vpg-demo-badge">DEMO</span>
-              <span>Pro features unlocked for evaluation</span>
-              <a
-                href="https://tiny-pivot.com/#pricing"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="vpg-get-pro"
-              >
-                Get Pro License →
-              </a>
-            </>
-          ) : (
-            <a href="https://tiny-pivot.com" target="_blank" rel="noopener noreferrer">
-              Powered by TinyPivot
-            </a>
-          )}
+          {isDemo
+            ? (
+                <>
+                  <span className="vpg-demo-badge">DEMO</span>
+                  <span>Pro features unlocked for evaluation</span>
+                  <a
+                    href="https://tiny-pivot.com/#pricing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="vpg-get-pro"
+                  >
+                    Get Pro License →
+                  </a>
+                </>
+              )
+            : (
+                <a href="https://tiny-pivot.com" target="_blank" rel="noopener noreferrer">
+                  Powered by TinyPivot
+                </a>
+              )}
         </div>
       )}
     </div>
   )
 }
-
-

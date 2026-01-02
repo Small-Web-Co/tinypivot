@@ -6,49 +6,48 @@
  */
 
 // Components
-export { DataGrid, ColumnFilter, PivotConfig, PivotSkeleton } from './components'
+// Styles - import in your app: import 'tinypivot/style.css'
+import './style.css'
+
+export { ColumnFilter, DataGrid, PivotConfig, PivotSkeleton } from './components'
 
 // Composables
 export {
-  useExcelGrid,
-  usePivotTable,
-  useLicense,
-  setLicenseKey,
   configureLicenseSecret,
   enableDemoMode,
-  getColumnUniqueValues,
   formatCellValue,
   getAggregationLabel,
+  getColumnUniqueValues,
+  setLicenseKey,
+  useExcelGrid,
+  useLicense,
+  usePivotTable,
 } from './composables'
 
 // Types
 export type {
-  // Grid Types
-  ColumnStats,
-  GridOptions,
-  DataGridProps,
-
   // Pivot Types
   AggregationFunction,
-  PivotField,
-  PivotValueField,
-  PivotConfig as PivotConfigType,
-  PivotCell,
-  PivotResult,
-  PivotTableProps,
+  CellClickEvent,
+  // Grid Types
+  ColumnStats,
+
+  DataGridProps,
   FieldStats,
-
-  // License Types
-  LicenseType,
-  LicenseInfo,
-
   // Event Types
   FilterEvent,
-  SortEvent,
-  CellClickEvent,
+  GridOptions,
+  LicenseInfo,
+  // License Types
+  LicenseType,
+  PivotCell,
+  PivotConfig as PivotConfigType,
+
+  PivotField,
+  PivotResult,
+
+  PivotTableProps,
+  PivotValueField,
   SelectionChangeEvent,
+  SortEvent,
 } from './types'
-
-// Styles - import in your app: import 'tinypivot/style.css'
-import './style.css'
-

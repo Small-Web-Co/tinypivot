@@ -5,4 +5,3 @@ declare module 'tinypivot' {
 }
 
 declare module 'tinypivot/style.css' {}
-

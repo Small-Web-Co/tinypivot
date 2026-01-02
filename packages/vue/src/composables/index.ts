@@ -1,15 +1,13 @@
-export { useExcelGrid, getColumnUniqueValues, formatCellValue } from './useExcelGrid'
-export { usePivotTable, getAggregationLabel } from './usePivotTable'
-export { useLicense, setLicenseKey, configureLicenseSecret, enableDemoMode } from './useLicense'
+export { formatCellValue, getColumnUniqueValues, useExcelGrid } from './useExcelGrid'
 export {
-  exportToCSV,
-  exportPivotToCSV,
   copyToClipboard,
+  exportPivotToCSV,
+  exportToCSV,
   formatSelectionForClipboard,
-  usePagination,
-  useGlobalSearch,
-  useRowSelection,
   useColumnResize,
+  useGlobalSearch,
+  usePagination,
+  useRowSelection,
 } from './useGridFeatures'
-
-
+export { configureLicenseSecret, enableDemoMode, setLicenseKey, useLicense } from './useLicense'
+export { getAggregationLabel, usePivotTable } from './usePivotTable'

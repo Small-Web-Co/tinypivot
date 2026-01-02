@@ -20,17 +20,23 @@ onMounted(() => {
       <div class="nav-content">
         <RouterLink to="/" class="logo">
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
           </svg>
           <span>TinyPivot</span>
         </RouterLink>
         <div class="nav-links">
-          <RouterLink to="/#features">Features</RouterLink>
-          <RouterLink to="/#demo">Demo</RouterLink>
-          <RouterLink to="/#pricing">Pricing</RouterLink>
+          <RouterLink to="/#features">
+            Features
+          </RouterLink>
+          <RouterLink to="/#demo">
+            Demo
+          </RouterLink>
+          <RouterLink to="/#pricing">
+            Pricing
+          </RouterLink>
         </div>
       </div>
     </nav>
@@ -38,7 +44,9 @@ onMounted(() => {
     <!-- Hero Section -->
     <section class="hero">
       <div class="hero-content">
-        <div class="badge">Comparison</div>
+        <div class="badge">
+          Comparison
+        </div>
         <h1>TinyPivot vs AG Grid</h1>
         <p class="subtitle">
           Looking for a lighter, more affordable alternative to AG Grid? <br>
@@ -51,24 +59,48 @@ onMounted(() => {
     <section class="stats-section">
       <div class="stats-grid">
         <div class="stat-card highlight">
-          <div class="stat-value">10x</div>
-          <div class="stat-label">Smaller Bundle</div>
-          <div class="stat-detail">37KB vs 500KB+</div>
+          <div class="stat-value">
+            10x
+          </div>
+          <div class="stat-label">
+            Smaller Bundle
+          </div>
+          <div class="stat-detail">
+            37KB vs 500KB+
+          </div>
         </div>
         <div class="stat-card highlight">
-          <div class="stat-value">20x</div>
-          <div class="stat-label">Lower Cost</div>
-          <div class="stat-detail">$49 vs $999+</div>
+          <div class="stat-value">
+            20x
+          </div>
+          <div class="stat-label">
+            Lower Cost
+          </div>
+          <div class="stat-detail">
+            $49 vs $999+
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Dependencies</div>
-          <div class="stat-detail">Just React or Vue</div>
+          <div class="stat-value">
+            0
+          </div>
+          <div class="stat-label">
+            Dependencies
+          </div>
+          <div class="stat-detail">
+            Just React or Vue
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">100K+</div>
-          <div class="stat-label">Row Performance</div>
-          <div class="stat-detail">Handles large datasets</div>
+          <div class="stat-value">
+            100K+
+          </div>
+          <div class="stat-label">
+            Row Performance
+          </div>
+          <div class="stat-detail">
+            Handles large datasets
+          </div>
         </div>
       </div>
     </section>
@@ -81,128 +113,180 @@ onMounted(() => {
           <thead>
             <tr>
               <th>Feature</th>
-              <th class="highlight-col">TinyPivot</th>
+              <th class="highlight-col">
+                TinyPivot
+              </th>
               <th>AG Grid</th>
             </tr>
           </thead>
           <tbody>
             <tr class="category-row">
-              <td colspan="3">Bundle Size & Performance</td>
+              <td colspan="3">
+                Bundle Size & Performance
+              </td>
             </tr>
             <tr>
               <td>Bundle Size (gzipped)</td>
-              <td class="highlight-col"><span class="check">37KB</span></td>
+              <td class="highlight-col">
+                <span class="check">37KB</span>
+              </td>
               <td>500KB+</td>
             </tr>
             <tr>
               <td>Zero Dependencies</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td>No</td>
             </tr>
             <tr>
               <td>Large Dataset Support</td>
-              <td class="highlight-col"><span class="check">100K+ rows</span></td>
+              <td class="highlight-col">
+                <span class="check">100K+ rows</span>
+              </td>
               <td><span class="check">100K+ rows</span></td>
             </tr>
 
             <tr class="category-row">
-              <td colspan="3">Core Features</td>
+              <td colspan="3">
+                Core Features
+              </td>
             </tr>
             <tr>
               <td>Sorting & Filtering</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>Column Resizing</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>Keyboard Navigation</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>CSV Export</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>Dark Mode</td>
-              <td class="highlight-col"><span class="check">Built-in</span></td>
+              <td class="highlight-col">
+                <span class="check">Built-in</span>
+              </td>
               <td>Theme required</td>
             </tr>
 
             <tr class="category-row">
-              <td colspan="3">Pivot Table Features</td>
+              <td colspan="3">
+                Pivot Table Features
+              </td>
             </tr>
             <tr>
               <td>Pivot Tables</td>
-              <td class="highlight-col"><span class="check">Included</span></td>
+              <td class="highlight-col">
+                <span class="check">Included</span>
+              </td>
               <td>Enterprise only ($)</td>
             </tr>
             <tr>
               <td>Drag & Drop Pivot Config</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>Aggregations (Sum, Avg, Count...)</td>
-              <td class="highlight-col"><span class="check">9 built-in</span></td>
+              <td class="highlight-col">
+                <span class="check">9 built-in</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>Custom Aggregation Functions</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>Row/Column Totals</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
 
             <tr class="category-row">
-              <td colspan="3">Framework Support</td>
+              <td colspan="3">
+                Framework Support
+              </td>
             </tr>
             <tr>
               <td>React</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>Vue 3</td>
-              <td class="highlight-col"><span class="check">Yes</span></td>
+              <td class="highlight-col">
+                <span class="check">Yes</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
             <tr>
               <td>TypeScript</td>
-              <td class="highlight-col"><span class="check">Full types</span></td>
+              <td class="highlight-col">
+                <span class="check">Full types</span>
+              </td>
               <td><span class="check">Yes</span></td>
             </tr>
 
             <tr class="category-row">
-              <td colspan="3">Pricing</td>
+              <td colspan="3">
+                Pricing
+              </td>
             </tr>
             <tr>
               <td>Free Tier</td>
-              <td class="highlight-col"><span class="check">Data grid + Pivot (Sum)</span></td>
+              <td class="highlight-col">
+                <span class="check">Data grid + Pivot (Sum)</span>
+              </td>
               <td>Data grid only</td>
             </tr>
             <tr>
               <td>Pivot Table License</td>
-              <td class="highlight-col"><span class="check">$49 one-time</span></td>
+              <td class="highlight-col">
+                <span class="check">$49 one-time</span>
+              </td>
               <td>$999+/year</td>
             </tr>
             <tr>
               <td>Team License</td>
-              <td class="highlight-col"><span class="check">$399 one-time</span></td>
+              <td class="highlight-col">
+                <span class="check">$399 one-time</span>
+              </td>
               <td>$2,999+/year</td>
             </tr>
             <tr>
               <td>License Type</td>
-              <td class="highlight-col"><span class="check">Perpetual</span></td>
+              <td class="highlight-col">
+                <span class="check">Perpetual</span>
+              </td>
               <td>Annual subscription</td>
             </tr>
           </tbody>
@@ -242,7 +326,9 @@ onMounted(() => {
     <!-- Code Comparison -->
     <section class="code-section">
       <h2>Simple Integration</h2>
-      <p class="section-subtitle">Get started with TinyPivot in minutes, not hours</p>
+      <p class="section-subtitle">
+        Get started with TinyPivot in minutes, not hours
+      </p>
 
       <div class="code-examples">
         <div class="code-block">
@@ -293,8 +379,12 @@ const columns = [
         <h2>Ready to try TinyPivot?</h2>
         <p>Start with the free tier or get full pivot table features for just $49</p>
         <div class="cta-buttons">
-          <RouterLink to="/#demo" class="btn btn-primary">Try Live Demo</RouterLink>
-          <RouterLink to="/#pricing" class="btn btn-secondary">View Pricing</RouterLink>
+          <RouterLink to="/#demo" class="btn btn-primary">
+            Try Live Demo
+          </RouterLink>
+          <RouterLink to="/#pricing" class="btn btn-secondary">
+            View Pricing
+          </RouterLink>
         </div>
       </div>
     </section>
@@ -304,20 +394,26 @@ const columns = [
       <div class="footer-content">
         <div class="footer-logo">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
           </svg>
           <span>TinyPivot</span>
         </div>
         <p>A lightweight pivot table component for React and Vue 3</p>
         <div class="footer-links">
           <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank" rel="noopener">GitHub</a>
-          <RouterLink to="/">Home</RouterLink>
-          <RouterLink to="/#pricing">Pricing</RouterLink>
+          <RouterLink to="/">
+            Home
+          </RouterLink>
+          <RouterLink to="/#pricing">
+            Pricing
+          </RouterLink>
         </div>
-        <p class="copyright">&copy; 2024 Small Web, LLC. All rights reserved.</p>
+        <p class="copyright">
+          &copy; 2024 Small Web, LLC. All rights reserved.
+        </p>
       </div>
     </footer>
   </div>

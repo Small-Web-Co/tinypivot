@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
 import { DataGrid } from 'tinypivot'
+import { computed, ref } from 'vue'
 
 // Framework toggle
 const selectedFramework = ref<'vue' | 'react'>('vue')
@@ -59,20 +59,21 @@ const plans = [
 const isCheckingOut = ref(false)
 
 async function buyNow() {
-  if (isCheckingOut.value) return
-  
+  if (isCheckingOut.value)
+    return
+
   isCheckingOut.value = true
   try {
     console.log('Starting checkout for plan:', selectedPlan.value)
-    
+
     const response = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan: selectedPlan.value }),
     })
-    
+
     console.log('Response status:', response.status)
-    
+
     // Check if response is ok
     if (!response.ok) {
       const text = await response.text()
@@ -80,37 +81,54 @@ async function buyNow() {
       alert(`API Error (${response.status}): ${text || 'Unknown error'}`)
       return
     }
-    
+
     const data = await response.json()
     console.log('API response:', data)
-    
+
     if (data.url) {
       window.location.href = data.url
-    } else if (data.error) {
+    }
+    else if (data.error) {
       alert(`Error: ${data.error}`)
-    } else {
+    }
+    else {
       alert('Failed to create checkout session. Please try again.')
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Checkout error:', error)
     alert(`Checkout error: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  } finally {
+  }
+  finally {
     isCheckingOut.value = false
   }
 }
 
 // Features comparison - compact version
 const freeFeatures = [
-  'Data Grid', 'Sorting', 'Filtering', 'Search', 'Export CSV',
-  'Pagination', 'Column Resize', 'Clipboard', 'Dark Mode', 'Keyboard Nav',
-  'Pivot Table (Sum)', 'Row/Col Totals'
+  'Data Grid',
+  'Sorting',
+  'Filtering',
+  'Search',
+  'Export CSV',
+  'Pagination',
+  'Column Resize',
+  'Clipboard',
+  'Dark Mode',
+  'Keyboard Nav',
+  'Pivot Table (Sum)',
+  'Row/Col Totals',
 ]
 const proFeatures = [
-  'All Aggregations (9+)', 'Custom Functions', 'Calculated Fields', 'Formula Builder', 'No Watermark'
+  'All Aggregations (9+)',
+  'Custom Functions',
+  'Calculated Fields',
+  'Formula Builder',
+  'No Watermark',
 ]
 
-// Active section for navigation
-const activeSection = ref('hero')
+// Active section for navigation (kept for potential future use)
+const _activeSection = ref('hero')
 
 // Copy to clipboard
 function copyInstallCommand() {
@@ -134,36 +152,38 @@ function copyInstallCommand() {
           <a href="#quickstart">Quick Start</a>
           <a href="#demo">Demo</a>
           <a href="#pricing">Pricing</a>
-          <router-link to="/vs-ag-grid" class="nav-link-highlight">vs AG Grid</router-link>
+          <router-link to="/vs-ag-grid" class="nav-link-highlight">
+            vs AG Grid
+          </router-link>
         </div>
         <div class="nav-actions">
           <div class="nav-framework-toggle">
-            <button 
-              :class="['nav-framework-btn', { active: selectedFramework === 'vue' }]"
-              @click="selectedFramework = 'vue'"
+            <button
+              class="nav-framework-btn" :class="[{ active: selectedFramework === 'vue' }]"
               title="Vue 3"
+              @click="selectedFramework = 'vue'"
             >
               <svg viewBox="0 0 128 128" width="16" height="16">
-                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z"/>
-                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z"/>
+                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z" />
+                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z" />
               </svg>
             </button>
-            <button 
-              :class="['nav-framework-btn', { active: selectedFramework === 'react' }]"
-              @click="selectedFramework = 'react'"
+            <button
+              class="nav-framework-btn" :class="[{ active: selectedFramework === 'react' }]"
               title="React"
+              @click="selectedFramework = 'react'"
             >
               <svg viewBox="0 0 24 24" width="16" height="16" fill="#61dafb">
-                <circle cx="12" cy="12" r="2.5"/>
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1"/>
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)"/>
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)"/>
+                <circle cx="12" cy="12" r="2.5" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)" />
               </svg>
             </button>
           </div>
           <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank" class="nav-github">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
             </svg>
           </a>
         </div>
@@ -172,35 +192,37 @@ function copyInstallCommand() {
 
     <!-- Hero Section -->
     <section id="hero" class="hero">
-      <div class="hero-bg"></div>
+      <div class="hero-bg" />
       <div class="hero-content">
         <!-- Framework Toggle -->
         <div class="framework-toggle-wrapper">
           <div class="framework-toggle">
-            <button 
-              :class="['framework-btn', { active: selectedFramework === 'vue' }]"
+            <button
+              class="framework-btn" :class="[{ active: selectedFramework === 'vue' }]"
               @click="selectedFramework = 'vue'"
             >
               <svg viewBox="0 0 128 128" width="20" height="20">
-                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z"/>
-                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z"/>
+                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z" />
+                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z" />
               </svg>
               Vue 3
             </button>
-            <button 
-              :class="['framework-btn', { active: selectedFramework === 'react' }]"
+            <button
+              class="framework-btn" :class="[{ active: selectedFramework === 'react' }]"
               @click="selectedFramework = 'react'"
             >
               <svg viewBox="0 0 24 24" width="20" height="20" fill="#61dafb">
-                <circle cx="12" cy="12" r="2.5"/>
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1"/>
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)"/>
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)"/>
+                <circle cx="12" cy="12" r="2.5" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)" />
               </svg>
               React
             </button>
           </div>
-          <div class="badge">{{ selectedFramework === 'vue' ? 'Vue 3' : 'React 18' }} Component Library</div>
+          <div class="badge">
+            {{ selectedFramework === 'vue' ? 'Vue 3' : 'React 18' }} Component Library
+          </div>
         </div>
         <h1>Excel-like Data Grid & <span class="gradient-text">Pivot Table</span></h1>
         <p class="hero-subtitle">
@@ -240,7 +262,7 @@ function copyInstallCommand() {
         <h2>Features</h2>
         <p>Everything you need for data-heavy {{ selectedFramework === 'vue' ? 'Vue' : 'React' }} applications</p>
       </div>
-      
+
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon feature-icon-blue">
@@ -335,14 +357,18 @@ function copyInstallCommand() {
     <!-- Quick Start Section -->
     <section id="quickstart" class="quickstart">
       <div class="section-header">
-        <div class="badge badge-glow">Dead Simple Integration</div>
+        <div class="badge badge-glow">
+          Dead Simple Integration
+        </div>
         <h2>Up and Running in <span class="gradient-text">30 Seconds</span></h2>
         <p>No complex configuration. No boilerplate. Just install, import, and go.</p>
       </div>
 
       <div class="steps-container">
         <div class="step">
-          <div class="step-number">1</div>
+          <div class="step-number">
+            1
+          </div>
           <div class="step-content">
             <h3>Install</h3>
             <p>One package, zero peer deps (except {{ selectedFramework === 'vue' ? 'Vue' : 'React' }})</p>
@@ -359,7 +385,9 @@ function copyInstallCommand() {
         </div>
 
         <div class="step">
-          <div class="step-number">2</div>
+          <div class="step-number">
+            2
+          </div>
           <div class="step-content">
             <h3>Import</h3>
             <p>Just two lines of setup</p>
@@ -379,7 +407,9 @@ function copyInstallCommand() {
         </div>
 
         <div class="step">
-          <div class="step-number">3</div>
+          <div class="step-number">
+            3
+          </div>
           <div class="step-content">
             <h3>Use</h3>
             <p>Pass your data, done.</p>
@@ -393,9 +423,9 @@ function copyInstallCommand() {
 
       <div class="example-showcase">
         <div class="example-header">
-          <span class="example-dot"></span>
-          <span class="example-dot"></span>
-          <span class="example-dot"></span>
+          <span class="example-dot" />
+          <span class="example-dot" />
+          <span class="example-dot" />
           <span class="example-title">{{ selectedFramework === 'vue' ? 'App.vue' : 'App.tsx' }}</span>
         </div>
         <div class="example-code">
@@ -497,7 +527,7 @@ function copyInstallCommand() {
         <h2>Live Demo</h2>
         <p>Try the grid and pivot table with sample data</p>
       </div>
-      
+
       <div class="demo-controls">
         <button class="demo-theme-toggle" @click="toggleDemoTheme">
           <svg v-if="demoTheme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -509,7 +539,7 @@ function copyInstallCommand() {
           {{ demoTheme === 'dark' ? 'Light Mode' : 'Dark Mode' }}
         </button>
       </div>
-      
+
       <div class="demo-container" :class="{ 'demo-light': demoTheme === 'light' }">
         <DataGrid
           :data="sampleData"
@@ -565,7 +595,9 @@ function copyInstallCommand() {
         </div>
 
         <div class="pricing-card pricing-pro">
-          <div class="pricing-popular">Most Popular</div>
+          <div class="pricing-popular">
+            Most Popular
+          </div>
           <div class="pricing-header">
             <h3>Pro</h3>
             <div class="pricing-price">
@@ -573,7 +605,7 @@ function copyInstallCommand() {
               <span class="period">one-time</span>
             </div>
           </div>
-          
+
           <div class="plan-selector">
             <button
               v-for="plan in plans"
@@ -585,8 +617,10 @@ function copyInstallCommand() {
               {{ plan.name }}
             </button>
           </div>
-          <p class="plan-description">{{ plans.find(p => p.id === selectedPlan)?.description }}</p>
-          
+          <p class="plan-description">
+            {{ plans.find(p => p.id === selectedPlan)?.description }}
+          </p>
+
           <ul class="pricing-features">
             <li v-for="f in [...freeFeatures, ...proFeatures]" :key="f">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -595,8 +629,8 @@ function copyInstallCommand() {
               {{ f }}
             </li>
           </ul>
-          <button 
-            class="btn btn-primary" 
+          <button
+            class="btn btn-primary"
             :class="{ 'btn-loading': isCheckingOut }"
             :disabled="isCheckingOut"
             @click="buyNow"
@@ -834,7 +868,7 @@ function copyInstallCommand() {
 .hero-bg {
   position: absolute;
   inset: 0;
-  background: 
+  background:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.15), transparent),
     radial-gradient(ellipse 60% 40% at 80% 60%, rgba(79, 70, 229, 0.1), transparent);
 }
@@ -1651,48 +1685,48 @@ function copyInstallCommand() {
   .hero h1 {
     font-size: 2.5rem;
   }
-  
+
   .hero-actions {
     flex-direction: column;
   }
-  
+
   .steps-container {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .step {
     max-width: 100%;
     width: 100%;
   }
-  
+
   .step-connector {
     transform: rotate(90deg);
     padding: 0.5rem 0;
   }
-  
+
   .example-code {
     font-size: 0.75rem;
     padding: 1rem;
   }
-  
+
   .props-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .pricing-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .pricing-features {
     grid-template-columns: 1fr;
   }
-  
+
   .footer-content {
     grid-template-columns: 1fr;
     gap: 2rem;
   }
-  
+
   .footer-links {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1708,12 +1742,12 @@ function copyInstallCommand() {
   .features-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .props-row {
     grid-template-columns: 1fr;
     gap: 0.25rem;
   }
-  
+
   .props-row.props-header {
     display: none;
   }
@@ -1723,7 +1757,7 @@ function copyInstallCommand() {
   .props-table {
     font-size: 0.75rem;
   }
-  
+
   .nav-links {
     display: none;
   }

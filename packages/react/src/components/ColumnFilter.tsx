@@ -1,10 +1,10 @@
+import type { ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
 /**
  * Column Filter Dropdown Component for React
  * Shows unique values with checkboxes, search, and sort controls
  * For numeric columns, also provides a range filter option
  */
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import type { ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NumericRangeFilter } from './NumericRangeFilter'
 
 type FilterMode = 'values' | 'range'
@@ -41,9 +41,9 @@ export function ColumnFilter({
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Filter mode (values vs range) - only available for numeric columns
-  const isNumericColumn = stats.type === 'number' &&
-    stats.numericMin !== undefined &&
-    stats.numericMax !== undefined
+  const isNumericColumn = stats.type === 'number'
+    && stats.numericMin !== undefined
+    && stats.numericMax !== undefined
 
   // Determine initial mode based on existing filters
   const [filterMode, setFilterMode] = useState<FilterMode>(numericRange ? 'range' : 'values')
@@ -57,7 +57,8 @@ export function ColumnFilter({
   // Filtered unique values based on search
   const filteredValues = useMemo(() => {
     const values = stats.uniqueValues
-    if (!searchQuery) return values
+    if (!searchQuery)
+      return values
 
     const query = searchQuery.toLowerCase()
     return values.filter(v => v.toLowerCase().includes(query))
@@ -72,19 +73,20 @@ export function ColumnFilter({
     return values
   }, [filteredValues, hasBlankValues, searchQuery])
 
-  // Check states
-  const isAllSelected = useMemo(
+  // Check states (kept for potential future use)
+  const _isAllSelected = useMemo(
     () => allValues.every(v => localSelected.has(v)),
-    [allValues, localSelected]
+    [allValues, localSelected],
   )
 
   // Toggle single value
   const toggleValue = useCallback((value: string) => {
-    setLocalSelected(prev => {
+    setLocalSelected((prev) => {
       const next = new Set(prev)
       if (next.has(value)) {
         next.delete(value)
-      } else {
+      }
+      else {
         next.add(value)
       }
       return next
@@ -93,7 +95,7 @@ export function ColumnFilter({
 
   // Select all visible
   const selectAll = useCallback(() => {
-    setLocalSelected(prev => {
+    setLocalSelected((prev) => {
       const next = new Set(prev)
       for (const value of allValues) {
         next.add(value)
@@ -111,7 +113,8 @@ export function ColumnFilter({
   const applyFilter = useCallback(() => {
     if (localSelected.size === 0) {
       onFilter([])
-    } else {
+    }
+    else {
       onFilter(Array.from(localSelected))
     }
     onClose()
@@ -168,7 +171,8 @@ export function ColumnFilter({
     const handleKeydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose()
-      } else if (event.key === 'Enter' && event.ctrlKey) {
+      }
+      else if (event.key === 'Enter' && event.ctrlKey) {
         applyFilter()
       }
     }
@@ -200,7 +204,11 @@ export function ColumnFilter({
       {/* Header */}
       <div className="vpg-filter-header">
         <span className="vpg-filter-title">{columnName}</span>
-        <span className="vpg-filter-count">{stats.uniqueValues.length.toLocaleString()} unique</span>
+        <span className="vpg-filter-count">
+          {stats.uniqueValues.length.toLocaleString()}
+          {' '}
+          unique
+        </span>
       </div>
 
       {/* Sort Controls */}
@@ -385,5 +393,3 @@ export function ColumnFilter({
     </div>
   )
 }
-
-

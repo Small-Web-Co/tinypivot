@@ -93,4 +93,3 @@ See the [full documentation](https://github.com/Small-Web-Co/tinypivot) for comp
 ---
 
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
-

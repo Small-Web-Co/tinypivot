@@ -317,8 +317,8 @@ const calculatedFields = ref([
 
 ```typescript
 import type {
-  CustomAggregationFn,
   CalculatedField,
+  CustomAggregationFn,
   PivotValueField
 } from '@smallwebco/tinypivot-vue'
 
@@ -403,21 +403,21 @@ Override CSS variables for theming:
 Full TypeScript support included. Import types as needed:
 
 ```typescript
-// Vue
-import type {
-  DataGridProps,
-  PivotConfig,
-  AggregationFunction,
-  CellClickEvent,
-  SelectionChangeEvent,
-} from '@smallwebco/tinypivot-vue'
-
 // React
 import type {
+  AggregationFunction,
   DataGridProps,
   PivotConfig,
-  AggregationFunction,
 } from '@smallwebco/tinypivot-react'
+
+// Vue
+import type {
+  AggregationFunction,
+  CellClickEvent,
+  DataGridProps,
+  PivotConfig,
+  SelectionChangeEvent,
+} from '@smallwebco/tinypivot-vue'
 ```
 
 ## Browser Support

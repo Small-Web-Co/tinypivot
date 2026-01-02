@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type { NumericRange } from '@smallwebco/tinypivot-core'
 /**
  * Numeric Range Filter Component
  * Provides an intuitive dual-handle slider and input fields for filtering numeric data
  */
 import { computed, ref, watch } from 'vue'
-import type { NumericRange } from '@smallwebco/tinypivot-core'
 
 const props = defineProps<{
   dataMin: number
@@ -23,18 +23,25 @@ const localMax = ref<number | null>(props.currentRange?.max ?? null)
 // Calculate step based on data range
 const step = computed(() => {
   const range = props.dataMax - props.dataMin
-  if (range === 0) return 1
-  if (range <= 1) return 0.01
-  if (range <= 10) return 0.1
-  if (range <= 100) return 1
-  if (range <= 1000) return 10
-  return Math.pow(10, Math.floor(Math.log10(range)) - 2)
+  if (range === 0)
+    return 1
+  if (range <= 1)
+    return 0.01
+  if (range <= 10)
+    return 0.1
+  if (range <= 100)
+    return 1
+  if (range <= 1000)
+    return 10
+  return 10 ** (Math.floor(Math.log10(range)) - 2)
 })
 
 // Format numbers for display
-const formatValue = (val: number | null): string => {
-  if (val === null) return ''
-  if (Number.isInteger(val)) return val.toLocaleString()
+function formatValue(val: number | null): string {
+  if (val === null)
+    return ''
+  if (Number.isInteger(val))
+    return val.toLocaleString()
   return val.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
@@ -45,12 +52,14 @@ const isFilterActive = computed(() => {
 
 // Calculate slider percentages for visual representation
 const minPercent = computed(() => {
-  if (localMin.value === null || props.dataMax === props.dataMin) return 0
+  if (localMin.value === null || props.dataMax === props.dataMin)
+    return 0
   return ((localMin.value - props.dataMin) / (props.dataMax - props.dataMin)) * 100
 })
 
 const maxPercent = computed(() => {
-  if (localMax.value === null || props.dataMax === props.dataMin) return 100
+  if (localMax.value === null || props.dataMax === props.dataMin)
+    return 100
   return ((localMax.value - props.dataMin) / (props.dataMax - props.dataMin)) * 100
 })
 
@@ -58,11 +67,12 @@ const maxPercent = computed(() => {
 function handleMinSlider(event: Event) {
   const target = event.target as HTMLInputElement
   const value = Number.parseFloat(target.value)
-  
+
   // Ensure min doesn't exceed max
   if (localMax.value !== null && value > localMax.value) {
     localMin.value = localMax.value
-  } else {
+  }
+  else {
     localMin.value = value
   }
 }
@@ -71,11 +81,12 @@ function handleMinSlider(event: Event) {
 function handleMaxSlider(event: Event) {
   const target = event.target as HTMLInputElement
   const value = Number.parseFloat(target.value)
-  
+
   // Ensure max doesn't go below min
   if (localMin.value !== null && value < localMin.value) {
     localMax.value = localMin.value
-  } else {
+  }
+  else {
     localMax.value = value
   }
 }
@@ -84,11 +95,12 @@ function handleMaxSlider(event: Event) {
 function handleMinInput(event: Event) {
   const target = event.target as HTMLInputElement
   const value = target.value === '' ? null : Number.parseFloat(target.value)
-  
+
   if (value !== null && !Number.isNaN(value)) {
     // Clamp to data bounds
     localMin.value = Math.max(props.dataMin, Math.min(value, localMax.value ?? props.dataMax))
-  } else if (value === null) {
+  }
+  else if (value === null) {
     localMin.value = null
   }
 }
@@ -97,11 +109,12 @@ function handleMinInput(event: Event) {
 function handleMaxInput(event: Event) {
   const target = event.target as HTMLInputElement
   const value = target.value === '' ? null : Number.parseFloat(target.value)
-  
+
   if (value !== null && !Number.isNaN(value)) {
     // Clamp to data bounds
     localMax.value = Math.min(props.dataMax, Math.max(value, localMin.value ?? props.dataMin))
-  } else if (value === null) {
+  }
+  else if (value === null) {
     localMax.value = null
   }
 }
@@ -124,7 +137,8 @@ function setFullRange() {
 function emitChange() {
   if (localMin.value === null && localMax.value === null) {
     emit('change', null)
-  } else {
+  }
+  else {
     emit('change', { min: localMin.value, max: localMax.value })
   }
 }
@@ -147,15 +161,15 @@ watch(() => props.currentRange, (newRange) => {
     <!-- Dual slider track -->
     <div class="vpg-slider-container">
       <div class="vpg-slider-track">
-        <div 
+        <div
           class="vpg-slider-fill"
           :style="{
             left: `${minPercent}%`,
-            right: `${100 - maxPercent}%`
+            right: `${100 - maxPercent}%`,
           }"
         />
       </div>
-      
+
       <!-- Min slider (lower handle) -->
       <input
         type="range"
@@ -167,7 +181,7 @@ watch(() => props.currentRange, (newRange) => {
         @input="handleMinSlider"
         @change="emitChange"
       >
-      
+
       <!-- Max slider (upper handle) -->
       <input
         type="range"
@@ -212,8 +226,8 @@ watch(() => props.currentRange, (newRange) => {
 
     <!-- Quick actions -->
     <div class="vpg-range-actions">
-      <button 
-        class="vpg-range-btn" 
+      <button
+        class="vpg-range-btn"
         :disabled="!isFilterActive"
         @click="clearFilter"
       >
@@ -236,7 +250,7 @@ watch(() => props.currentRange, (newRange) => {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
       </svg>
       <span>
-        Showing values 
+        Showing values
         <strong>{{ localMin !== null ? `≥ ${formatValue(localMin)}` : '' }}</strong>
         {{ localMin !== null && localMax !== null ? ' and ' : '' }}
         <strong>{{ localMax !== null ? `≤ ${formatValue(localMax)}` : '' }}</strong>
@@ -470,4 +484,3 @@ watch(() => props.currentRange, (newRange) => {
   font-weight: 600;
 }
 </style>
-

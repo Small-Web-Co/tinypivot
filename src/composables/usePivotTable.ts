@@ -1,9 +1,9 @@
+import type { AggregationFunction, CalculatedField, FieldStats, PivotCell, PivotConfig, PivotResult, PivotValueField } from '../types'
 /**
  * Pivot Table Composable
  * Provides pivot table functionality with aggregation, row/column grouping
  */
-import { type Ref, computed, ref, watch } from 'vue'
-import type { AggregationFunction, CalculatedField, FieldStats, PivotCell, PivotConfig, PivotResult, PivotValueField } from '../types'
+import { computed, type Ref, ref, watch } from 'vue'
 import { useLicense } from './useLicense'
 
 // Calculated fields localStorage key
@@ -89,7 +89,7 @@ function calculateStdDev(values: number[]): number {
  * Parse a simple formula to extract field references
  */
 function parseSimpleFormula(formula: string): string[] {
-  const matches = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || []
+  const matches = formula.match(/[a-z_]\w*/gi) || []
   const keywords = ['true', 'false', 'null', 'undefined']
   return [...new Set(matches.filter(m => !keywords.includes(m.toLowerCase())))]
 }
@@ -100,7 +100,7 @@ function parseSimpleFormula(formula: string): string[] {
 function evaluateSimpleFormula(
   formula: string,
   row: Record<string, unknown>,
-  fieldNames: string[]
+  fieldNames: string[],
 ): number | null {
   try {
     const referencedFields = parseSimpleFormula(formula)
@@ -127,7 +127,6 @@ function evaluateSimpleFormula(
       return null
     }
 
-    // eslint-disable-next-line no-new-func
     const result = new Function(`return ${expression}`)()
     return typeof result === 'number' && Number.isFinite(result) ? result : null
   }
@@ -142,7 +141,7 @@ function evaluateSimpleFormula(
 function formatCalculatedValue(
   value: number | null,
   formatAs?: 'number' | 'percent' | 'currency',
-  decimals = 2
+  decimals = 2,
 ): string {
   if (value === null)
     return '-'
@@ -191,7 +190,8 @@ function aggregate(values: number[], fn: AggregationFunction, grandTotal?: numbe
       return calculateStdDev(values)
     case 'percentOfTotal': {
       const sum = values.reduce((a, b) => a + b, 0)
-      if (grandTotal === undefined || grandTotal === 0) return null
+      if (grandTotal === undefined || grandTotal === 0)
+        return null
       return (sum / grandTotal) * 100
     }
     default:
@@ -845,4 +845,3 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     removeCalculatedField,
   }
 }
-

@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import type { AggregationFunction, CalculatedField, PivotValueField } from '@smallwebco/tinypivot-core'
+import { AGGREGATION_OPTIONS, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Configuration Panel
  * Draggable fields with aggregation selection
  */
 import { computed, ref } from 'vue'
-import type { AggregationFunction, PivotValueField, CalculatedField } from '@smallwebco/tinypivot-core'
-import { AGGREGATION_OPTIONS, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 import { useLicense } from '../composables/useLicense'
 import CalculatedFieldModal from './CalculatedFieldModal.vue'
 
@@ -67,7 +67,7 @@ const editingCalcField = ref<CalculatedField | null>(null)
 const numericFieldNames = computed(() =>
   props.availableFields
     .filter(f => f.isNumeric)
-    .map(f => f.field)
+    .map(f => f.field),
 )
 
 function openCalcModal(field?: CalculatedField) {
@@ -78,7 +78,8 @@ function openCalcModal(field?: CalculatedField) {
 function handleSaveCalcField(field: CalculatedField) {
   if (editingCalcField.value) {
     emit('updateCalculatedField', field)
-  } else {
+  }
+  else {
     emit('addCalculatedField', field)
   }
   showCalcModal.value = false
@@ -93,7 +94,8 @@ function handleTotalsToggle(checked: boolean) {
 
 // Convert calculated fields to virtual FieldStats for display
 const calculatedFieldsAsStats = computed(() => {
-  if (!props.calculatedFields) return []
+  if (!props.calculatedFields)
+    return []
   return props.calculatedFields.map(calc => ({
     field: `calc:${calc.id}`,
     type: 'number' as const,
@@ -150,7 +152,7 @@ const filteredUnassignedFields = computed(() => {
   if (!fieldSearch.value.trim())
     return unassignedFields.value
   const search = fieldSearch.value.toLowerCase().trim()
-  return unassignedFields.value.filter(f => {
+  return unassignedFields.value.filter((f) => {
     // Search by field name or calculated field display name
     const fieldName = f.field.toLowerCase()
     const displayName = f.isCalculated && f.calcName ? f.calcName.toLowerCase() : ''
@@ -160,7 +162,8 @@ const filteredUnassignedFields = computed(() => {
 
 // Field type icons
 function getFieldIcon(type: FieldStats['type'], isCalculated?: boolean): string {
-  if (isCalculated) return 'ƒ'
+  if (isCalculated)
+    return 'ƒ'
   switch (type) {
     case 'number': return '#'
     case 'date': return '📅'
@@ -246,7 +249,9 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
     <!-- Assigned Fields -->
     <div v-if="assignedCount > 0" class="vpg-assigned-section">
-      <div class="vpg-section-label">Active</div>
+      <div class="vpg-section-label">
+        Active
+      </div>
       <div class="vpg-assigned-list">
         <div
           v-for="field in assignedFields"
@@ -337,9 +342,9 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
           v-for="field in filteredUnassignedFields"
           :key="field.field"
           class="vpg-field-item"
-          :class="{ 
+          :class="{
             'vpg-is-numeric': field.isNumeric && !field.isCalculated,
-            'vpg-is-calculated': field.isCalculated 
+            'vpg-is-calculated': field.isCalculated,
           }"
           :title="field.isCalculated ? field.calcFormula : field.field"
           draggable="true"
@@ -355,12 +360,16 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
               class="vpg-field-edit"
               title="Edit calculated field"
               @click.stop="openCalcModal(calculatedFields?.find(c => c.id === field.calcId))"
-            >✎</button>
+            >
+              ✎
+            </button>
             <button
               class="vpg-field-delete"
               title="Delete calculated field"
               @click.stop="emit('removeCalculatedField', field.calcId)"
-            >×</button>
+            >
+              ×
+            </button>
           </template>
           <template v-else>
             <span class="vpg-unique-count">{{ field.uniqueCount }}</span>
@@ -385,7 +394,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
         >
         <span>Totals</span>
       </label>
-      <button class="vpg-calc-btn" @click="openCalcModal()" title="Add calculated field (e.g. Profit Margin %)">
+      <button class="vpg-calc-btn" title="Add calculated field (e.g. Profit Margin %)" @click="openCalcModal()">
         <span class="vpg-calc-icon">ƒ</span>
         <span>+ Calc</span>
       </button>
@@ -911,7 +920,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-field-list::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
 }
-
 </style>
 
 <style>
@@ -1134,6 +1142,4 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-theme-dark .vpg-pivot-config .vpg-field-list::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
-
 </style>
-

@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type { ColumnStats } from '../types'
 /**
  * Column Filter Dropdown Component
  * Shows unique values with checkboxes, search, and sort controls
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { ColumnStats } from '../types'
 
 const props = defineProps<{
   columnId: string
@@ -25,8 +25,8 @@ const searchQuery = ref('')
 const dropdownRef = ref<HTMLDivElement>()
 const searchInputRef = ref<HTMLInputElement>()
 
-// Get all possible values including blank
-const allPossibleValues = computed(() => {
+// Get all possible values including blank (kept for potential future use)
+const _allPossibleValues = computed(() => {
   const values = [...props.stats.uniqueValues]
   if (props.stats.nullCount > 0) {
     values.unshift('(blank)')
@@ -59,12 +59,12 @@ const allValues = computed(() => {
   return values
 })
 
-// Check states
-const isAllSelected = computed(() => {
+// Check states (kept for potential future use)
+const _isAllSelected = computed(() => {
   return allValues.value.every(v => localSelected.value.has(v))
 })
 
-const isNoneSelected = computed(() => {
+const _isNoneSelected = computed(() => {
   return localSelected.value.size === 0
 })
 
@@ -525,4 +525,3 @@ watch(() => props.selectedValues, (newValues) => {
   background: #4338ca;
 }
 </style>
-

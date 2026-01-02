@@ -1,22 +1,21 @@
+import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds } from '@smallwebco/tinypivot-core'
+import {
+  copyToClipboard as coreCopyToClipboard,
+  exportPivotToCSV as coreExportPivotToCSV,
+  exportToCSV as coreExportToCSV,
+  formatSelectionForClipboard as coreFormatSelection,
+} from '@smallwebco/tinypivot-core'
 /**
  * Grid Features Hook for React
  * Provides CSV export, clipboard, pagination, and other utility features
  */
-import { useState, useMemo, useCallback } from 'react'
-import type { PaginationOptions, SelectionBounds, PivotValueField } from '@smallwebco/tinypivot-core'
-import {
-  exportToCSV as coreExportToCSV,
-  exportPivotToCSV as coreExportPivotToCSV,
-  copyToClipboard as coreCopyToClipboard,
-  formatSelectionForClipboard as coreFormatSelection,
-} from '@smallwebco/tinypivot-core'
-import type { PivotExportData, ExportOptions } from '@smallwebco/tinypivot-core'
+import { useCallback, useMemo, useState } from 'react'
 
 // Re-export core functions
 export function exportToCSV<T extends Record<string, unknown>>(
   data: T[],
   columns: string[],
-  options?: ExportOptions
+  options?: ExportOptions,
 ): void {
   coreExportToCSV(data, columns, options)
 }
@@ -26,7 +25,7 @@ export function exportPivotToCSV(
   rowFields: string[],
   columnFields: string[],
   valueFields: PivotValueField[],
-  options?: ExportOptions
+  options?: ExportOptions,
 ): void {
   coreExportPivotToCSV(pivotData, rowFields, columnFields, valueFields, options)
 }
@@ -34,7 +33,7 @@ export function exportPivotToCSV(
 export function copyToClipboard(
   text: string,
   onSuccess?: () => void,
-  onError?: (err: Error) => void
+  onError?: (err: Error) => void,
 ): void {
   coreCopyToClipboard(text, onSuccess, onError)
 }
@@ -42,7 +41,7 @@ export function copyToClipboard(
 export function formatSelectionForClipboard<T extends Record<string, unknown>>(
   rows: T[],
   columns: string[],
-  selectionBounds: SelectionBounds
+  selectionBounds: SelectionBounds,
 ): string {
   return coreFormatSelection(rows, columns, selectionBounds)
 }
@@ -56,7 +55,7 @@ export function usePagination<T>(data: T[], options: PaginationOptions = {}) {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(data.length / pageSize)),
-    [data.length, pageSize]
+    [data.length, pageSize],
   )
 
   const paginatedData = useMemo(() => {
@@ -68,14 +67,14 @@ export function usePagination<T>(data: T[], options: PaginationOptions = {}) {
   const startIndex = useMemo(() => (currentPage - 1) * pageSize + 1, [currentPage, pageSize])
   const endIndex = useMemo(
     () => Math.min(currentPage * pageSize, data.length),
-    [currentPage, pageSize, data.length]
+    [currentPage, pageSize, data.length],
   )
 
   const goToPage = useCallback(
     (page: number) => {
       setCurrentPage(Math.max(1, Math.min(page, totalPages)))
     },
-    [totalPages]
+    [totalPages],
   )
 
   const nextPage = useCallback(() => {
@@ -133,10 +132,11 @@ export function useGlobalSearch<T extends Record<string, unknown>>(data: T[], co
 
     const term = caseSensitive ? searchTerm.trim() : searchTerm.trim().toLowerCase()
 
-    return data.filter(row => {
+    return data.filter((row) => {
       for (const col of columns) {
         const value = row[col]
-        if (value === null || value === undefined) continue
+        if (value === null || value === undefined)
+          continue
 
         const strValue = caseSensitive ? String(value) : String(value).toLowerCase()
 
@@ -184,11 +184,12 @@ export function useRowSelection<T>(data: T[]) {
   }, [data.length, selectedRowIndices.size])
 
   const toggleRow = useCallback((index: number) => {
-    setSelectedRowIndices(prev => {
+    setSelectedRowIndices((prev) => {
       const next = new Set(prev)
       if (next.has(index)) {
         next.delete(index)
-      } else {
+      }
+      else {
         next.add(index)
       }
       return next
@@ -200,7 +201,7 @@ export function useRowSelection<T>(data: T[]) {
   }, [])
 
   const deselectRow = useCallback((index: number) => {
-    setSelectedRowIndices(prev => {
+    setSelectedRowIndices((prev) => {
       const next = new Set(prev)
       next.delete(index)
       return next
@@ -218,7 +219,8 @@ export function useRowSelection<T>(data: T[]) {
   const toggleAll = useCallback(() => {
     if (allSelected) {
       deselectAll()
-    } else {
+    }
+    else {
       selectAll()
     }
   }, [allSelected, selectAll, deselectAll])
@@ -227,13 +229,13 @@ export function useRowSelection<T>(data: T[]) {
     (index: number): boolean => {
       return selectedRowIndices.has(index)
     },
-    [selectedRowIndices]
+    [selectedRowIndices],
   )
 
   const selectRange = useCallback((startIndex: number, endIndex: number) => {
     const min = Math.min(startIndex, endIndex)
     const max = Math.max(startIndex, endIndex)
-    setSelectedRowIndices(prev => {
+    setSelectedRowIndices((prev) => {
       const next = new Set(prev)
       for (let i = min; i <= max; i++) {
         next.add(i)
@@ -264,7 +266,7 @@ export function useRowSelection<T>(data: T[]) {
 export function useColumnResize(
   initialWidths: Record<string, number>,
   minWidth = 60,
-  maxWidth = 600
+  maxWidth = 600,
 ) {
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({ ...initialWidths })
   const [isResizing, setIsResizing] = useState(false)
@@ -296,7 +298,7 @@ export function useColumnResize(
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
     },
-    [columnWidths, minWidth, maxWidth]
+    [columnWidths, minWidth, maxWidth],
   )
 
   const resetColumnWidth = useCallback(
@@ -308,7 +310,7 @@ export function useColumnResize(
         }))
       }
     },
-    [initialWidths]
+    [initialWidths],
   )
 
   const resetAllWidths = useCallback(() => {
@@ -325,5 +327,3 @@ export function useColumnResize(
     resetAllWidths,
   }
 }
-
-

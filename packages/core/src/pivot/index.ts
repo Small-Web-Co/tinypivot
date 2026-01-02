@@ -48,9 +48,10 @@ export function aggregate(
   fn: AggregationFunction,
   grandTotal?: number,
   customFn?: CustomAggregationFn,
-  allFieldValues?: Record<string, number[]>
+  allFieldValues?: Record<string, number[]>,
 ): number | null {
-  if (values.length === 0 && fn !== 'custom') return null
+  if (values.length === 0 && fn !== 'custom')
+    return null
 
   switch (fn) {
     case 'sum':
@@ -71,14 +72,16 @@ export function aggregate(
       return calculateStdDev(values)
     case 'percentOfTotal': {
       const sum = values.reduce((a, b) => a + b, 0)
-      if (grandTotal === undefined || grandTotal === 0) return null
+      if (grandTotal === undefined || grandTotal === 0)
+        return null
       return (sum / grandTotal) * 100
     }
     case 'custom':
       if (customFn) {
         try {
           return customFn(values, allFieldValues)
-        } catch {
+        }
+        catch {
           return null
         }
       }
@@ -92,7 +95,8 @@ export function aggregate(
  * Format aggregated value for display
  */
 export function formatAggregatedValue(value: number | null, fn: AggregationFunction): string {
-  if (value === null) return '-'
+  if (value === null)
+    return '-'
 
   if (fn === 'count' || fn === 'countDistinct') {
     return Math.round(value).toLocaleString()
@@ -117,7 +121,8 @@ export function formatAggregatedValue(value: number | null, fn: AggregationFunct
  * Get aggregation function display label
  */
 export function getAggregationLabel(fn: AggregationFunction, customLabel?: string): string {
-  if (fn === 'custom' && customLabel) return customLabel
+  if (fn === 'custom' && customLabel)
+    return customLabel
   const labels: Record<AggregationFunction, string> = {
     sum: 'Sum',
     count: 'Count',
@@ -137,7 +142,8 @@ export function getAggregationLabel(fn: AggregationFunction, customLabel?: strin
  * Get aggregation function symbol
  */
 export function getAggregationSymbol(fn: AggregationFunction, customSymbol?: string): string {
-  if (fn === 'custom' && customSymbol) return customSymbol
+  if (fn === 'custom' && customSymbol)
+    return customSymbol
   const symbols: Record<AggregationFunction, string> = {
     sum: 'Σ',
     count: '#',
@@ -186,9 +192,9 @@ export type FormulaFunction = typeof FORMULA_FUNCTIONS[number]
  * Parse a formula and extract field references
  * e.g., "SUM(revenue) / SUM(units)" -> [{fn: 'SUM', field: 'revenue'}, {fn: 'SUM', field: 'units'}]
  */
-export function parseFormula(formula: string): Array<{ fn: FormulaFunction; field: string }> {
+export function parseFormula(formula: string): Array<{ fn: FormulaFunction, field: string }> {
   const regex = /(SUM|AVG|MIN|MAX|COUNT|MEDIAN)\s*\(\s*([^)]+)\s*\)/gi
-  const matches: Array<{ fn: FormulaFunction; field: string }> = []
+  const matches: Array<{ fn: FormulaFunction, field: string }> = []
   let match
 
   while ((match = regex.exec(formula)) !== null) {
@@ -209,14 +215,15 @@ export function parseFormula(formula: string): Array<{ fn: FormulaFunction; fiel
  */
 export function evaluateFormula(
   formula: string,
-  aggregatedValues: Record<string, number | null>
+  aggregatedValues: Record<string, number | null>,
 ): number | null {
   try {
     // Replace function calls with their values
     let expression = formula
 
     for (const [key, value] of Object.entries(aggregatedValues)) {
-      if (value === null) return null
+      if (value === null)
+        return null
       // Escape special regex characters in key and replace
       const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       expression = expression.replace(new RegExp(escaped, 'gi'), String(value))
@@ -237,7 +244,8 @@ export function evaluateFormula(
     }
 
     return result
-  } catch (error) {
+  }
+  catch (error) {
     console.warn('Formula evaluation error:', error)
     return null
   }
@@ -249,9 +257,10 @@ export function evaluateFormula(
 export function formatCalculatedValue(
   value: number | null,
   formatAs?: 'number' | 'percent' | 'currency',
-  decimals = 2
+  decimals = 2,
 ): string {
-  if (value === null) return '-'
+  if (value === null)
+    return '-'
 
   switch (formatAs) {
     case 'percent':
@@ -288,7 +297,7 @@ export function validateFormula(formula: string, availableFields: string[]): str
 
   // Case-insensitive field matching
   const lowerFields = availableFields.map(f => f.toLowerCase())
-  
+
   for (const ref of references) {
     const fieldLower = ref.field.toLowerCase()
     if (!lowerFields.includes(fieldLower)) {
@@ -316,7 +325,7 @@ export function validateFormula(formula: string, availableFields: string[]): str
  */
 export function parseSimpleFormula(formula: string): string[] {
   // Match word characters that could be field names (not operators or numbers)
-  const matches = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || []
+  const matches = formula.match(/[a-z_]\w*/gi) || []
   // Filter out common keywords/operators
   const keywords = ['true', 'false', 'null', 'undefined']
   return [...new Set(matches.filter(m => !keywords.includes(m.toLowerCase())))]
@@ -331,14 +340,14 @@ export function validateSimpleFormula(formula: string, availableFields: string[]
   }
 
   const referencedFields = parseSimpleFormula(formula)
-  
+
   if (referencedFields.length === 0) {
     return 'Formula must reference at least one field'
   }
 
   // Case-insensitive field matching
   const lowerFields = availableFields.map(f => f.toLowerCase())
-  
+
   for (const field of referencedFields) {
     if (!lowerFields.includes(field.toLowerCase())) {
       return `Unknown field: ${field}`
@@ -353,9 +362,10 @@ export function validateSimpleFormula(formula: string, availableFields: string[]
       const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       testExpr = testExpr.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '1')
     }
-    // eslint-disable-next-line no-new-func
+
     new Function(`return ${testExpr}`)
-  } catch {
+  }
+  catch {
     return 'Invalid formula syntax'
   }
 
@@ -368,7 +378,7 @@ export function validateSimpleFormula(formula: string, availableFields: string[]
 export function evaluateSimpleFormula(
   formula: string,
   row: Record<string, unknown>,
-  fieldNames: string[]
+  fieldNames: string[],
 ): number | null {
   try {
     const referencedFields = parseSimpleFormula(formula)
@@ -378,16 +388,16 @@ export function evaluateSimpleFormula(
       // Find actual field name (case-insensitive)
       const actualField = fieldNames.find(f => f.toLowerCase() === field.toLowerCase()) || field
       const value = row[actualField]
-      
+
       if (value === null || value === undefined || value === '') {
         return null // Can't compute if any referenced field is missing
       }
-      
+
       const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
       if (Number.isNaN(num)) {
         return null
       }
-      
+
       // Replace field name with value
       const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       expression = expression.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), String(num))
@@ -398,10 +408,10 @@ export function evaluateSimpleFormula(
       return null
     }
 
-    // eslint-disable-next-line no-new-func
     const result = new Function(`return ${expression}`)()
     return typeof result === 'number' && Number.isFinite(result) ? result : null
-  } catch {
+  }
+  catch {
     return null
   }
 }
@@ -434,7 +444,8 @@ export const CALCULATED_FIELD_PRESETS = [
  * Compute available fields from data
  */
 export function computeAvailableFields(data: Record<string, unknown>[]): FieldStats[] {
-  if (data.length === 0) return []
+  if (data.length === 0)
+    return []
 
   const keys = Object.keys(data[0])
   return keys.map(field => detectFieldType(data, field))
@@ -447,7 +458,7 @@ export function getUnassignedFields(
   availableFields: FieldStats[],
   rowFields: string[],
   columnFields: string[],
-  valueFields: PivotValueField[]
+  valueFields: PivotValueField[],
 ): FieldStats[] {
   const assigned = new Set([
     ...rowFields,
@@ -469,12 +480,14 @@ export function isPivotConfigured(config: PivotConfig): boolean {
  */
 export function computePivotResult(
   data: Record<string, unknown>[],
-  config: PivotConfig
+  config: PivotConfig,
 ): PivotResult | null {
   const { rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields } = config
 
-  if (!isPivotConfigured(config)) return null
-  if (data.length === 0) return null
+  if (!isPivotConfigured(config))
+    return null
+  if (data.length === 0)
+    return null
 
   // Build a map of calculated field IDs to their definitions
   const calcFieldMap = new Map<string, CalculatedField>()
@@ -524,7 +537,8 @@ export function computePivotResult(
         if (calcDef) {
           num = evaluateSimpleFormula(calcDef.formula, row, allDataFieldNames)
         }
-      } else {
+      }
+      else {
         // Regular field - get value directly
         const val = row[vf.field]
         if (val !== null && val !== undefined && val !== '') {
@@ -546,26 +560,29 @@ export function computePivotResult(
   const colKeys = Array.from(colKeySet).sort()
 
   // Pre-calculate grand totals for percentOfTotal calculations
-  const grandTotals: number[] = valueFields.map((vf, i) => {
+  const grandTotals: number[] = valueFields.map((vf, _i) => {
     let total = 0
     for (const row of data) {
       let num: number | null = null
-      
+
       if (vf.field.startsWith('calc:')) {
         const calcId = vf.field.replace('calc:', '')
         const calcDef = calcFieldMap.get(calcId)
         if (calcDef) {
           num = evaluateSimpleFormula(calcDef.formula, row, allDataFieldNames)
         }
-      } else {
+      }
+      else {
         const val = row[vf.field]
         if (val !== null && val !== undefined && val !== '') {
           num = typeof val === 'number' ? val : Number.parseFloat(String(val))
-          if (Number.isNaN(num)) num = null
+          if (Number.isNaN(num))
+            num = null
         }
       }
-      
-      if (num !== null) total += num
+
+      if (num !== null)
+        total += num
     }
     return total
   })
@@ -603,23 +620,25 @@ export function computePivotResult(
   // If multiple value fields, add value field labels as last header row
   if (valueFields.length > 1 || headers.length === 0) {
     const valueLabels: string[] = []
-    for (const colKey of colKeys) {
+    for (const _colKey of colKeys) {
       for (const vf of valueFields) {
         valueLabels.push(getValueFieldLabel(vf))
       }
     }
     if (colKeys.length === 1 && colKeys[0] === '__all__') {
       headers.push(
-        valueFields.map(vf => getValueFieldLabel(vf))
+        valueFields.map(vf => getValueFieldLabel(vf)),
       )
-    } else {
+    }
+    else {
       headers.push(valueLabels)
     }
   }
 
   // Build row headers
-  const rowHeaders: string[][] = rowKeys.map(key => {
-    if (key === '__all__') return ['Total']
+  const rowHeaders: string[][] = rowKeys.map((key) => {
+    if (key === '__all__')
+      return ['Total']
     return parseKey(key)
   })
 
@@ -657,17 +676,18 @@ export function computePivotResult(
         const values = rawValues[vfIdx] || []
         const gtValue = grandTotals[vfIdx]
         const aggValue = aggregate(values, vf.aggregation, gtValue)
-        
+
         // Format based on whether it's a calculated field
         let formattedValue: string
         if (vf.field.startsWith('calc:')) {
           const calcId = vf.field.replace('calc:', '')
           const calcDef = calcFieldMap.get(calcId)
           formattedValue = formatCalculatedValue(aggValue, calcDef?.formatAs || 'number', calcDef?.decimals ?? 2)
-        } else {
+        }
+        else {
           formattedValue = formatAggregatedValue(aggValue, vf.aggregation)
         }
-        
+
         rowData.push({
           value: aggValue,
           count: values.length,
@@ -689,7 +709,8 @@ export function computePivotResult(
           count: values.length,
           formattedValue: formatAggregatedValue(aggValue, vf.aggregation),
         })
-      } else {
+      }
+      else {
         rowTotals.push({ value: null, count: 0, formattedValue: '-' })
       }
     }
@@ -731,7 +752,7 @@ export function computePivotResult(
         }
       }
     }
-    
+
     const vf = valueFields[0]
     const values = allRawValues[0] || []
     const aggValue = aggregate(values, vf.aggregation, grandTotals[0])
@@ -768,7 +789,8 @@ export function generateStorageKey(columns: string[]): string {
 export function savePivotConfig(key: string, config: PivotConfig): void {
   try {
     sessionStorage.setItem(key, JSON.stringify(config))
-  } catch {
+  }
+  catch {
     // Ignore storage errors
   }
 }
@@ -782,7 +804,8 @@ export function loadPivotConfig(key: string): PivotConfig | null {
     if (stored) {
       return JSON.parse(stored) as PivotConfig
     }
-  } catch {
+  }
+  catch {
     // Ignore parse errors
   }
   return null
@@ -813,7 +836,8 @@ const CALC_FIELDS_KEY = 'vpg-calculated-fields'
 export function saveCalculatedFields(fields: CalculatedField[]): void {
   try {
     localStorage.setItem(CALC_FIELDS_KEY, JSON.stringify(fields))
-  } catch {
+  }
+  catch {
     // Ignore storage errors
   }
 }
@@ -827,7 +851,8 @@ export function loadCalculatedFields(): CalculatedField[] {
     if (stored) {
       return JSON.parse(stored) as CalculatedField[]
     }
-  } catch {
+  }
+  catch {
     // Ignore parse errors
   }
   return []
@@ -841,7 +866,8 @@ export function addCalculatedField(field: CalculatedField): CalculatedField[] {
   const existing = fields.findIndex(f => f.id === field.id)
   if (existing >= 0) {
     fields[existing] = field
-  } else {
+  }
+  else {
     fields.push(field)
   }
   saveCalculatedFields(fields)
@@ -856,5 +882,3 @@ export function removeCalculatedField(id: string): CalculatedField[] {
   saveCalculatedFields(fields)
   return fields
 }
-
-
