@@ -1979,6 +1979,13 @@
   margin: 0 0 0.5rem 0;
 }
 
+.vpg-chart-fields-hint {
+  font-weight: 400;
+  text-transform: none;
+  color: #94a3b8;
+  margin-left: 0.25rem;
+}
+
 .vpg-chart-fields-list {
   display: flex;
   flex-direction: column;
@@ -2257,4 +2264,27 @@
 .vpg-theme-dark .vpg-chart-empty-state h3 { color: #e2e8f0; }
 .vpg-theme-dark .vpg-chart-empty-state p { color: #64748b; }
 .vpg-theme-dark .vpg-chart-hint { background: #1e293b; color: #94a3b8; }
+
+/* ==========================================================================
+   ApexCharts Tooltip Overrides
+   ========================================================================== */
+/* Light mode tooltip - ensure dark text for better contrast */
+.apexcharts-tooltip.apexcharts-theme-light {
+  color: #1e293b !important;
+}
+
+.apexcharts-tooltip.apexcharts-theme-light .apexcharts-tooltip-title {
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.apexcharts-tooltip.apexcharts-theme-light .apexcharts-tooltip-series-group {
+  color: #334155 !important;
+}
+
+.apexcharts-tooltip.apexcharts-theme-light .apexcharts-tooltip-text-y-label,
+.apexcharts-tooltip.apexcharts-theme-light .apexcharts-tooltip-text-y-value {
+  color: #1e293b !important;
+}
 

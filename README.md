@@ -2,7 +2,7 @@
 
 A powerful Excel-like data grid, pivot table, and chart builder component for Vue 3 and React.
 
-**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)** · **[Open Collective](https://opencollective.com/tinypivot)**
+**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)**
 
 ⭐ **If you find TinyPivot useful, please consider giving it a star!** It helps others discover the project.
 
@@ -28,7 +28,7 @@ A powerful Excel-like data grid, pivot table, and chart builder component for Vu
 | Keyboard navigation | ✅ | ✅ |
 | Pivot table with Sum aggregation | ✅ | ✅ |
 | Row/column totals | ✅ | ✅ |
-| **Chart Builder** (10 chart types, drag-and-drop) | ❌ | ✅ |
+| **Chart Builder** (6 chart types, drag-and-drop) | ❌ | ✅ |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
 | Custom aggregation functions | ❌ | ✅ |
 | Calculated fields with formulas | ❌ | ✅ |
@@ -223,7 +223,7 @@ TinyPivot includes 9 built-in aggregation functions plus support for custom calc
 
 ## Chart Builder (Pro)
 
-TinyPivot Pro includes a drag-and-drop chart builder with 10 chart types. Simply drag fields to configure your visualization — dimensions go to the X-axis and measures to the Y-axis.
+TinyPivot Pro includes a drag-and-drop chart builder with 6 chart types. Simply drag fields to configure your visualization — dimensions go to the X-axis and measures to the Y-axis.
 
 ### Supported Chart Types
 
@@ -234,10 +234,6 @@ TinyPivot Pro includes a drag-and-drop chart builder with 10 chart types. Simply
 | **Area** | Volume trends, stacked comparisons |
 | **Pie** | Part-to-whole proportions |
 | **Donut** | Proportions with center metric |
-| **Scatter** | Correlation, outlier detection |
-| **Bubble** | Three-variable comparison |
-| **Heatmap** | Density, cross-tabulation |
-| **Treemap** | Hierarchical proportions |
 | **Radar** | Multi-metric comparison |
 
 ### How It Works
@@ -466,30 +462,6 @@ See [LICENSE.md](./LICENSE.md) for details.
 
 ---
 
-## Sponsors & Backers
-
-TinyPivot is made possible by our sponsors. [Become a sponsor](https://opencollective.com/tinypivot) to get your logo here!
-
-| Tier | Amount | Benefits |
-|------|--------|----------|
-| ☕ **Backer** | $5/mo | Support development, name in contributors |
-| 🥈 **Sponsor** | $50/mo | Small logo in README |
-| 🥇 **Gold Sponsor** | $100/mo | Large logo + priority support |
-
-### Gold Sponsors
-
-[![Gold Sponsors](https://opencollective.com/tinypivot/tiers/gold-sponsor.svg?avatarHeight=80)](https://opencollective.com/tinypivot)
-
-### Sponsors
-
-[![Sponsors](https://opencollective.com/tinypivot/tiers/sponsor.svg?avatarHeight=60)](https://opencollective.com/tinypivot)
-
-### Backers
-
-[![Backers](https://opencollective.com/tinypivot/tiers/backer.svg?avatarHeight=40)](https://opencollective.com/tinypivot)
-
----
-
 ## GitHub Topics
 
 This repository uses the following topics for discoverability:
@@ -499,7 +471,7 @@ This repository uses the following topics for discoverability:
 
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-❤️-pink)](https://github.com/sponsors/Small-Web-Co) [![Open Collective](https://img.shields.io/badge/Open_Collective-3385FF?logo=opencollective&logoColor=white)](https://opencollective.com/tinypivot)
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤️-pink)](https://github.com/sponsors/Small-Web-Co)
 
 ## License
 

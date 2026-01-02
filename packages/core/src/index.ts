@@ -21,10 +21,12 @@ export {
   isChartConfigValid,
   loadChartConfig,
   processChartData,
+  processChartDataForHeatmap,
   processChartDataForPie,
   processChartDataForScatter,
   saveChartConfig,
 } from './chart'
+export type { HeatmapSeriesData, ScatterPoint, ScatterSeriesData } from './chart'
 
 // Export Utilities
 export {

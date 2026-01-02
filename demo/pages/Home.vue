@@ -15,10 +15,20 @@ function generateSampleData(count: number) {
   const salesReps = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack']
   const statuses = ['Completed', 'Pending', 'Processing', 'Shipped', 'Delivered']
 
+  // Generate dates spanning 3 years (2022-2024)
+  const startDate = new Date('2022-01-01')
+  const endDate = new Date('2024-12-31')
+  const dateRange = endDate.getTime() - startDate.getTime()
+
   const data = []
   for (let i = 1; i <= count; i++) {
     const basePrice = Math.floor(Math.random() * 500) + 50
     const units = Math.floor(Math.random() * 200) + 10
+
+    // Generate a random date within the range
+    const randomDate = new Date(startDate.getTime() + Math.random() * dateRange)
+    const dateStr = randomDate.toISOString().split('T')[0] // YYYY-MM-DD format
+
     data.push({
       id: i,
       region: regions[Math.floor(Math.random() * regions.length)],
@@ -32,6 +42,7 @@ function generateSampleData(count: number) {
       rep: salesReps[Math.floor(Math.random() * salesReps.length)],
       status: statuses[Math.floor(Math.random() * statuses.length)],
       margin: Math.round((Math.random() * 30 + 10) * 100) / 100,
+      date: dateStr,
     })
   }
   return data
@@ -120,7 +131,7 @@ const freeFeatures = [
   'Row/Col Totals',
 ]
 const proFeatures = [
-  'Chart Builder (10 types)',
+  'Chart Builder (6 types)',
   'All Aggregations (9+)',
   'Custom Functions',
   'Calculated Fields',
@@ -250,10 +261,6 @@ function copyInstallCommand() {
             </svg>
           </button>
         </div>
-        <router-link to="/vs-ag-grid" class="hero-comparison">
-          <span class="comparison-badge">10x smaller</span>
-          <span>See how TinyPivot compares to AG Grid →</span>
-        </router-link>
       </div>
     </section>
 
@@ -360,7 +367,7 @@ function copyInstallCommand() {
             </svg>
           </div>
           <h3>Chart Builder</h3>
-          <p>10 chart types with drag-and-drop configuration</p>
+          <p>6 chart types with drag-and-drop configuration</p>
           <span class="feature-badge pro">Pro</span>
         </div>
       </div>

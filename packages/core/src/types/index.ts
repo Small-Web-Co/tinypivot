@@ -252,10 +252,9 @@ export type ChartType =
   | 'pie'
   | 'donut'
   | 'scatter'
-  | 'heatmap'
-  | 'treemap'
-  | 'radar'
   | 'bubble'
+  | 'heatmap'
+  | 'radar'
 
 export type ChartAggregation = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct'
 

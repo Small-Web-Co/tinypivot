@@ -73,8 +73,8 @@ export const CHART_TYPES: ChartTypeInfo[] = [
     icon: 'scatter',
     description: 'Show relationships between two variables',
     requiredFields: ['measure', 'measure'],
-    optionalFields: ['dimension', 'measure'],
-    guidance: 'Drag two number fields to see their correlation',
+    optionalFields: ['dimension'],
+    guidance: 'Drag a number to X-axis and another number to Y-axis',
     bestFor: ['Correlation', 'Outlier detection', 'Distribution'],
   },
   {
@@ -84,7 +84,7 @@ export const CHART_TYPES: ChartTypeInfo[] = [
     description: 'Three-dimensional comparison',
     requiredFields: ['measure', 'measure'],
     optionalFields: ['measure', 'dimension'],
-    guidance: 'Like scatter, plus drag a third number for bubble size',
+    guidance: 'Like scatter, plus drag a third number to Size for bubble size',
     bestFor: ['Multi-variable comparison', 'Weighted relationships'],
   },
   {
@@ -94,18 +94,8 @@ export const CHART_TYPES: ChartTypeInfo[] = [
     description: 'Visualize density or intensity',
     requiredFields: ['dimension', 'dimension', 'measure'],
     optionalFields: [],
-    guidance: 'Drag two categories and a number to see patterns',
+    guidance: 'Drag two categories (X and Y) and a number to Color',
     bestFor: ['Patterns', 'Density', 'Cross-tabulation'],
-  },
-  {
-    type: 'treemap',
-    label: 'Treemap',
-    icon: 'treemap',
-    description: 'Hierarchical data as nested rectangles',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: ['dimension'],
-    guidance: 'Shows hierarchical proportions. Great for many categories.',
-    bestFor: ['Hierarchies', 'Many categories', 'Size comparison'],
   },
   {
     type: 'radar',
@@ -287,14 +277,21 @@ export function isChartConfigValid(config: ChartConfig): boolean {
     case 'area':
     case 'pie':
     case 'donut':
-    case 'treemap':
     case 'radar':
       return !!config.xAxis && !!config.yAxis
+
     case 'scatter':
-    case 'bubble':
+      // Scatter needs two numeric fields (X and Y)
       return !!config.xAxis && !!config.yAxis
+
+    case 'bubble':
+      // Bubble needs two numeric fields (X and Y), size is optional
+      return !!config.xAxis && !!config.yAxis
+
     case 'heatmap':
+      // Heatmap needs two categories (X and Y) plus a measure for color intensity
       return !!config.xAxis && !!config.yAxis && !!config.colorField
+
     default:
       return false
   }
@@ -332,43 +329,38 @@ export function getChartGuidance(config: ChartConfig): string {
         return 'Drag a number field (values)'
       return 'Chart is ready!'
 
-    case 'scatter':
-      if (!config.xAxis)
-        return 'Drag a number field to the X-axis'
-      if (!config.yAxis)
-        return 'Drag another number field to the Y-axis'
-      return config.sizeField ? 'Chart is ready!' : 'Optionally add a Size field for bubble chart'
-
-    case 'bubble':
-      if (!config.xAxis)
-        return 'Drag a number field to the X-axis'
-      if (!config.yAxis)
-        return 'Drag another number field to the Y-axis'
-      if (!config.sizeField)
-        return 'Drag a number field to Size'
-      return 'Chart is ready!'
-
-    case 'heatmap':
-      if (!config.xAxis)
-        return 'Drag a category to the X-axis'
-      if (!config.yAxis)
-        return 'Drag a category to the Y-axis'
-      if (!config.colorField)
-        return 'Drag a number field to Color for intensity'
-      return 'Chart is ready!'
-
-    case 'treemap':
-      if (!config.xAxis)
-        return 'Drag a category field for segments'
-      if (!config.yAxis)
-        return 'Drag a number field for size'
-      return 'Chart is ready!'
-
     case 'radar':
       if (!config.xAxis)
         return 'Drag a category field for axes'
       if (!config.yAxis)
         return 'Drag a number field for values'
+      return 'Chart is ready!'
+
+    case 'scatter':
+      if (!config.xAxis)
+        return 'Drag a number field to X-axis'
+      if (!config.yAxis)
+        return 'Drag a number field to Y-axis'
+      if (!config.seriesField)
+        return 'Optionally add a category to color points by group'
+      return 'Tip: Filter data first for clearer visualizations'
+
+    case 'bubble':
+      if (!config.xAxis)
+        return 'Drag a number field to X-axis'
+      if (!config.yAxis)
+        return 'Drag a number field to Y-axis'
+      if (!config.sizeField)
+        return 'Drag a number field to Size for bubble size'
+      return 'Tip: Filter to fewer records for readable bubbles'
+
+    case 'heatmap':
+      if (!config.xAxis)
+        return 'Drag a category field to X-axis'
+      if (!config.yAxis)
+        return 'Drag a category field to Y-axis'
+      if (!config.colorField)
+        return 'Drag a number field to Value for color intensity'
       return 'Chart is ready!'
 
     default:
@@ -528,22 +520,41 @@ export function processChartDataForPie(
   }
 }
 
+/** Point data for scatter/bubble charts */
+export interface ScatterPoint {
+  x: number
+  y: number
+  z?: number
+  label?: string
+}
+
+/** Grouped scatter data with multiple series */
+export interface ScatterSeriesData {
+  series: Array<{
+    name: string
+    data: ScatterPoint[]
+  }>
+}
+
 /**
  * Process data for scatter/bubble charts
+ * Returns grouped series when seriesField is provided for color-coding
  */
 export function processChartDataForScatter(
   data: Record<string, unknown>[],
   config: ChartConfig,
-): Array<{ x: number, y: number, z?: number, label?: string }> {
+): ScatterSeriesData {
   if (!config.xAxis || !config.yAxis || data.length === 0) {
-    return []
+    return { series: [] }
   }
 
   const xField = config.xAxis.field
   const yField = config.yAxis.field
   const sizeField = config.sizeField?.field
+  const seriesField = config.seriesField?.field
 
-  const result: Array<{ x: number, y: number, z?: number, label?: string }> = []
+  // Group by series field if provided
+  const grouped = new Map<string, ScatterPoint[]>()
 
   for (const row of data) {
     const x = Number(row[xField])
@@ -552,7 +563,7 @@ export function processChartDataForScatter(
     if (Number.isNaN(x) || Number.isNaN(y))
       continue
 
-    const point: { x: number, y: number, z?: number, label?: string } = { x, y }
+    const point: ScatterPoint = { x, y }
 
     if (sizeField) {
       const z = Number(row[sizeField])
@@ -561,10 +572,114 @@ export function processChartDataForScatter(
       }
     }
 
-    result.push(point)
+    // Group by series field or use default
+    const seriesName = seriesField
+      ? String(row[seriesField] ?? '(blank)')
+      : '_default'
+
+    if (!grouped.has(seriesName)) {
+      grouped.set(seriesName, [])
+    }
+    grouped.get(seriesName)!.push(point)
   }
 
-  return result
+  // Convert to series array
+  const series = Array.from(grouped.entries()).map(([name, points]) => ({
+    name: name === '_default' ? (config.yAxis?.label || 'Data') : name,
+    data: points,
+  }))
+
+  return { series }
+}
+
+/** Heatmap series data format for ApexCharts */
+export interface HeatmapSeriesData {
+  series: Array<{
+    name: string
+    data: Array<{ x: string, y: number }>
+  }>
+}
+
+/**
+ * Process data for heatmap charts
+ * ApexCharts heatmaps need: series[] where each series is a Y category
+ * containing data[] of {x: X category, y: value}
+ */
+export function processChartDataForHeatmap(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+): HeatmapSeriesData {
+  if (!config.xAxis || !config.yAxis || !config.colorField || data.length === 0) {
+    return { series: [] }
+  }
+
+  const xField = config.xAxis.field
+  const yField = config.yAxis.field
+  const colorField = config.colorField.field
+  const colorAggregation = config.colorField.aggregation || 'sum'
+
+  // Group data by Y category, then by X category
+  // Structure: Map<yValue, Map<xValue, number[]>>
+  const grouped = new Map<string, Map<string, number[]>>()
+  const allXCategories = new Set<string>()
+
+  for (const row of data) {
+    const xValue = String(row[xField] ?? '(blank)')
+    const yValue = String(row[yField] ?? '(blank)')
+    const colorValue = Number(row[colorField])
+
+    if (Number.isNaN(colorValue))
+      continue
+
+    allXCategories.add(xValue)
+
+    if (!grouped.has(yValue)) {
+      grouped.set(yValue, new Map())
+    }
+    const yGroup = grouped.get(yValue)!
+
+    if (!yGroup.has(xValue)) {
+      yGroup.set(xValue, [])
+    }
+    yGroup.get(xValue)!.push(colorValue)
+  }
+
+  // Sort X categories
+  const sortedXCategories = Array.from(allXCategories).sort((a, b) => {
+    const numA = Number.parseFloat(a)
+    const numB = Number.parseFloat(b)
+    if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
+      return numA - numB
+    }
+    return a.localeCompare(b)
+  })
+
+  // Sort Y categories (series names)
+  const sortedYCategories = Array.from(grouped.keys()).sort((a, b) => {
+    const numA = Number.parseFloat(a)
+    const numB = Number.parseFloat(b)
+    if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
+      return numA - numB
+    }
+    return a.localeCompare(b)
+  })
+
+  // Build series - each Y category becomes a series
+  const series = sortedYCategories.map((yCategory) => {
+    const yGroup = grouped.get(yCategory)!
+    const seriesData = sortedXCategories.map((xCategory) => {
+      const values = yGroup.get(xCategory) || []
+      const aggregatedValue = values.length > 0 ? aggregateValues(values, colorAggregation) : 0
+      return { x: xCategory, y: aggregatedValue }
+    })
+
+    return {
+      name: yCategory,
+      data: seriesData,
+    }
+  })
+
+  return { series }
 }
 
 /**
