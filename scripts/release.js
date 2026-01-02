@@ -628,6 +628,14 @@ async function main() {
   console.log(changelog)
   console.log('─'.repeat(50))
 
+  // Run quality checks before release
+  console.log('\n🔍 Running quality checks...')
+  console.log('   Running lint...')
+  run('pnpm lint')
+  console.log('   Running tests...')
+  run('pnpm test:unit')
+  console.log('   ✓ All quality checks passed')
+
   // Update all package.json files
   for (const pkgPath of packagePaths) {
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
