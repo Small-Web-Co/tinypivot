@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CalculatedField } from '@smallwebco/tinypivot-core'
+import type { CalculatedField, ChartConfig } from '@smallwebco/tinypivot-core'
 import { loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
@@ -15,6 +15,7 @@ import {
 } from '../composables/useGridFeatures'
 import { useLicense } from '../composables/useLicense'
 import { usePivotTable } from '../composables/usePivotTable'
+import ChartBuilder from './ChartBuilder.vue'
 import ColumnFilter from './ColumnFilter.vue'
 import PivotConfig from './PivotConfig.vue'
 import PivotSkeleton from './PivotSkeleton.vue'
@@ -69,7 +70,7 @@ const emit = defineEmits<{
   (e: 'copy', payload: { text: string, cellCount: number }): void
 }>()
 
-const { showWatermark, canUsePivot, isDemo, isPro } = useLicense()
+const { showWatermark, canUsePivot, canUseCharts, isDemo, isPro } = useLicense()
 
 // Theme handling
 const currentTheme = computed(() => {
@@ -391,7 +392,12 @@ function copySelectionToClipboard() {
 }
 
 // View mode
-const viewMode = ref<'grid' | 'pivot'>('grid')
+const viewMode = ref<'grid' | 'pivot' | 'chart'>('grid')
+const chartConfig = ref<ChartConfig | null>(null)
+
+function handleChartConfigChange(config: ChartConfig) {
+  chartConfig.value = config
+}
 const showPivotConfig = ref(true)
 const draggingField = ref<string | null>(null)
 
@@ -913,6 +919,18 @@ function handleContainerClick(event: MouseEvent) {
             </svg>
             Pivot
           </button>
+          <button
+            class="vpg-view-btn vpg-chart-btn"
+            :class="{ 'active': viewMode === 'chart', 'vpg-pro-feature': !canUseCharts }"
+            :title="canUseCharts ? 'Chart Builder' : 'Chart Builder (Pro feature)'"
+            @click="canUseCharts ? viewMode = 'chart' : null"
+          >
+            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Chart
+            <span v-if="!canUseCharts" class="vpg-pro-badge">Pro</span>
+          </button>
         </div>
 
         <!-- Grid mode controls -->
@@ -1157,7 +1175,7 @@ function handleContainerClick(event: MouseEvent) {
     </template>
 
     <!-- Pivot View -->
-    <template v-else>
+    <template v-else-if="viewMode === 'pivot'">
       <div class="vpg-pivot-container">
         <div v-if="showPivotConfig && canUsePivot" class="vpg-pivot-config-panel">
           <PivotConfig
@@ -1213,6 +1231,27 @@ function handleContainerClick(event: MouseEvent) {
       </div>
     </template>
 
+    <!-- Chart View -->
+    <template v-else-if="viewMode === 'chart'">
+      <div class="vpg-chart-view">
+        <!-- Filter indicator for chart -->
+        <div v-if="activeFilterInfo && activeFilterInfo.length > 0" class="vpg-chart-filter-bar">
+          <svg class="vpg-icon" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
+          </svg>
+          <span>Chart showing {{ filteredRowCount.toLocaleString() }} of {{ totalRowCount.toLocaleString() }} records</span>
+          <button class="vpg-chart-clear-filters" @click="clearAllFilters">
+            Clear filters
+          </button>
+        </div>
+        <ChartBuilder
+          :data="filteredDataForPivot"
+          :theme="currentTheme"
+          @config-change="handleChartConfigChange"
+        />
+      </div>
+    </template>
+
     <!-- Footer -->
     <div class="vpg-footer">
       <div class="vpg-footer-left">
@@ -1235,10 +1274,15 @@ function handleContainerClick(event: MouseEvent) {
             <span class="vpg-separator">records</span>
           </template>
         </template>
-        <template v-else>
+        <template v-else-if="viewMode === 'pivot'">
           <span class="vpg-pivot-label">Pivot Table</span>
           <span class="vpg-separator">•</span>
           <span>{{ totalRowCount.toLocaleString() }} source records</span>
+        </template>
+        <template v-else-if="viewMode === 'chart'">
+          <span class="vpg-chart-label">Chart Builder</span>
+          <span class="vpg-separator">•</span>
+          <span>{{ totalRowCount.toLocaleString() }} records</span>
         </template>
       </div>
 

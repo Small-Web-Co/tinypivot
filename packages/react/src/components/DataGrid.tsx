@@ -2,6 +2,7 @@
  * TinyPivot React - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
  */
+import type { ChartConfig } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useExcelGrid } from '../hooks/useExcelGrid'
@@ -13,6 +14,7 @@ import {
 } from '../hooks/useGridFeatures'
 import { useLicense } from '../hooks/useLicense'
 import { usePivotTable } from '../hooks/usePivotTable'
+import { ChartBuilder } from './ChartBuilder'
 import { ColumnFilter } from './ColumnFilter'
 import { PivotConfig } from './PivotConfig'
 import { PivotSkeleton } from './PivotSkeleton'
@@ -73,7 +75,7 @@ export function DataGrid({
   onExport,
   onCopy,
 }: DataGridProps) {
-  const { showWatermark, canUsePivot, isDemo, isPro } = useLicense()
+  const { showWatermark, canUsePivot, canUseCharts, isDemo, isPro } = useLicense()
 
   // Theme handling
   const currentTheme = useMemo(() => {
@@ -98,7 +100,12 @@ export function DataGrid({
   const [verticalResizeStartHeight, setVerticalResizeStartHeight] = useState(0)
   const [showCopyToast, setShowCopyToast] = useState(false)
   const [copyToastMessage, setCopyToastMessage] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'pivot'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'pivot' | 'chart'>('grid')
+  const [_chartConfig, setChartConfig] = useState<ChartConfig | null>(null)
+
+  const handleChartConfigChange = useCallback((config: ChartConfig) => {
+    setChartConfig(config)
+  }, [])
   const [showPivotConfig, setShowPivotConfig] = useState(true)
   const [draggingField, setDraggingField] = useState<string | null>(null)
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null)
@@ -749,6 +756,22 @@ export function DataGrid({
                 </svg>
                 Pivot
               </button>
+              <button
+                className={`vpg-view-btn vpg-chart-btn ${viewMode === 'chart' ? 'active' : ''} ${!canUseCharts ? 'vpg-pro-feature' : ''}`}
+                title={canUseCharts ? 'Chart Builder' : 'Chart Builder (Pro feature)'}
+                onClick={() => canUseCharts && setViewMode('chart')}
+              >
+                <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+                Chart
+                {!canUseCharts && <span className="vpg-pro-badge">Pro</span>}
+              </button>
             </div>
           )}
 
@@ -1211,6 +1234,37 @@ export function DataGrid({
         </div>
       )}
 
+      {/* Chart View */}
+      {viewMode === 'chart' && (
+        <div className="vpg-chart-view">
+          {/* Filter indicator for chart */}
+          {activeFilterInfo && activeFilterInfo.length > 0 && (
+            <div className="vpg-chart-filter-bar">
+              <svg className="vpg-icon" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+              </svg>
+              <span>
+                Chart showing
+                {filteredRowCount.toLocaleString()}
+                {' '}
+                of
+                {totalRowCount.toLocaleString()}
+                {' '}
+                records
+              </span>
+              <button className="vpg-chart-clear-filters" onClick={clearAllFilters}>
+                Clear filters
+              </button>
+            </div>
+          )}
+          <ChartBuilder
+            data={filteredDataForPivot}
+            theme={currentTheme}
+            onConfigChange={handleChartConfigChange}
+          />
+        </div>
+      )}
+
       {/* Footer */}
       <div className="vpg-footer">
         <div className="vpg-footer-left">
@@ -1253,17 +1307,29 @@ export function DataGrid({
                         </>
                       )
               )
-            : (
-                <>
-                  <span className="vpg-pivot-label">Pivot Table</span>
-                  <span className="vpg-separator">•</span>
-                  <span>
-                    {totalRowCount.toLocaleString()}
-                    {' '}
-                    source records
-                  </span>
-                </>
-              )}
+            : viewMode === 'pivot'
+              ? (
+                  <>
+                    <span className="vpg-pivot-label">Pivot Table</span>
+                    <span className="vpg-separator">•</span>
+                    <span>
+                      {totalRowCount.toLocaleString()}
+                      {' '}
+                      source records
+                    </span>
+                  </>
+                )
+              : (
+                  <>
+                    <span className="vpg-chart-label">Chart Builder</span>
+                    <span className="vpg-separator">•</span>
+                    <span>
+                      {totalRowCount.toLocaleString()}
+                      {' '}
+                      records
+                    </span>
+                  </>
+                )}
         </div>
 
         {/* Pagination controls */}

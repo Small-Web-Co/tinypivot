@@ -1,7 +1,7 @@
 {
   "name": "@smallwebco/tinypivot-react",
   "type": "module",
-  "version": "1.0.51",
+  "version": "1.0.52",
   "description": "TinyPivot React - Excel-like data grid and pivot table components",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
@@ -60,7 +60,9 @@
   },
   "dependencies": {
     "@smallwebco/tinypivot-core": "workspace:*",
-    "@tanstack/react-table": "^8.20.0"
+    "@tanstack/react-table": "^8.20.0",
+    "apexcharts": "^4.3.0",
+    "react-apexcharts": "^1.6.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

@@ -1,4 +1,5 @@
 export { default as CalculatedFieldModal } from './CalculatedFieldModal.vue'
+export { default as ChartBuilder } from './ChartBuilder.vue'
 export { default as ColumnFilter } from './ColumnFilter.vue'
 export { default as DataGrid } from './DataGrid.vue'
 export { default as NumericRangeFilter } from './NumericRangeFilter.vue'

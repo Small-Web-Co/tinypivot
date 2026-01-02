@@ -5,6 +5,27 @@
  * @packageDocumentation
  */
 
+// Chart Utilities
+export {
+  aggregateValues,
+  analyzeFieldsForChart,
+  CHART_AGGREGATIONS,
+  CHART_COLORS,
+  CHART_TYPES,
+  createDefaultChartConfig,
+  detectFieldRole,
+  formatFieldLabel,
+  generateChartStorageKey,
+  getChartGuidance,
+  getChartTypeInfo,
+  isChartConfigValid,
+  loadChartConfig,
+  processChartData,
+  processChartDataForPie,
+  processChartDataForScatter,
+  saveChartConfig,
+} from './chart'
+
 // Export Utilities
 export {
   copyToClipboard,
@@ -17,6 +38,7 @@ export type { PivotExportData } from './export'
 
 // License Management
 export {
+  canUseCharts,
   canUsePivot,
   configureLicenseSecret,
   getDemoLicenseInfo,
@@ -69,6 +91,17 @@ export type {
   CalculatedField,
   CellClickEvent,
 
+  // Chart Types
+  ChartAggregation,
+  ChartConfig,
+  ChartData,
+  ChartField,
+  ChartFieldInfo,
+  ChartOptions,
+  ChartSeries,
+  ChartType,
+  ChartTypeInfo,
+
   ColumnFilter,
   ColumnFilterValue,
   // Grid Types
@@ -79,6 +112,7 @@ export type {
   DataGridProps,
   ExportEvent,
   ExportOptions,
+  FieldRole,
   FieldStats,
 
   // Event Types

@@ -17,6 +17,7 @@ const FREE_LICENSE: LicenseInfo = {
     percentageMode: false,
     sessionPersistence: false,
     noWatermark: false,
+    charts: false, // Chart builder is Pro only
   },
 }
 
@@ -29,6 +30,7 @@ const INVALID_LICENSE: LicenseInfo = {
     percentageMode: false,
     sessionPersistence: false,
     noWatermark: false,
+    charts: false,
   },
 }
 
@@ -41,6 +43,7 @@ const DEMO_LICENSE: LicenseInfo = {
     percentageMode: true,
     sessionPersistence: true,
     noWatermark: false, // Still show watermark in demo
+    charts: true, // Demo can use charts
   },
 }
 
@@ -254,6 +257,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
       percentageMode: type !== 'free',
       sessionPersistence: type !== 'free',
       noWatermark: type !== 'free',
+      charts: type !== 'free',
     },
   }
 }
@@ -315,6 +319,13 @@ export function getFreeLicenseInfo(): LicenseInfo {
  */
 export function canUsePivot(info: LicenseInfo): boolean {
   return info.features.pivot
+}
+
+/**
+ * Check if license allows chart builder feature
+ */
+export function canUseCharts(info: LicenseInfo): boolean {
+  return info.features.charts
 }
 
 /**

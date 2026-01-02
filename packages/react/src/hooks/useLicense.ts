@@ -1,5 +1,6 @@
 import type { LicenseInfo } from '@smallwebco/tinypivot-core'
 import {
+  canUseCharts as coreCanUseCharts,
   canUsePivot as coreCanUsePivot,
   configureLicenseSecret as coreConfigureLicenseSecret,
   isPro as coreIsPro,
@@ -100,6 +101,11 @@ export function useLicense() {
     [licenseInfo],
   )
 
+  const canUseCharts = useMemo(
+    () => globalDemoMode || coreCanUseCharts(licenseInfo),
+    [licenseInfo],
+  )
+
   const showWatermark = useMemo(
     () => coreShouldShowWatermark(licenseInfo, globalDemoMode),
     [licenseInfo],
@@ -120,6 +126,7 @@ export function useLicense() {
     canUsePivot,
     canUseAdvancedAggregations,
     canUsePercentageMode,
+    canUseCharts,
     showWatermark,
     requirePro,
   }

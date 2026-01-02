@@ -1,6 +1,6 @@
 # TinyPivot
 
-A powerful Excel-like data grid and pivot table component for Vue 3 and React.
+A powerful Excel-like data grid, pivot table, and chart builder component for Vue 3 and React.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)** · **[Open Collective](https://opencollective.com/tinypivot)**
 
@@ -28,6 +28,7 @@ A powerful Excel-like data grid and pivot table component for Vue 3 and React.
 | Keyboard navigation | ✅ | ✅ |
 | Pivot table with Sum aggregation | ✅ | ✅ |
 | Row/column totals | ✅ | ✅ |
+| **Chart Builder** (10 chart types, drag-and-drop) | ❌ | ✅ |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
 | Custom aggregation functions | ❌ | ✅ |
 | Calculated fields with formulas | ❌ | ✅ |
@@ -219,6 +220,35 @@ TinyPivot includes 9 built-in aggregation functions plus support for custom calc
 | **Std Dev** | σ | Standard deviation (spread measure) |
 | **% of Total** | %Σ | Percentage contribution to grand total |
 | **Custom** | ƒ | Your own aggregation function |
+
+## Chart Builder (Pro)
+
+TinyPivot Pro includes a drag-and-drop chart builder with 10 chart types. Simply drag fields to configure your visualization — dimensions go to the X-axis and measures to the Y-axis.
+
+### Supported Chart Types
+
+| Chart Type | Best For |
+|------------|----------|
+| **Bar** | Comparing categories, rankings |
+| **Line** | Trends over time, continuous data |
+| **Area** | Volume trends, stacked comparisons |
+| **Pie** | Part-to-whole proportions |
+| **Donut** | Proportions with center metric |
+| **Scatter** | Correlation, outlier detection |
+| **Bubble** | Three-variable comparison |
+| **Heatmap** | Density, cross-tabulation |
+| **Treemap** | Hierarchical proportions |
+| **Radar** | Multi-metric comparison |
+
+### How It Works
+
+1. Click the **Chart** button in the view toggle
+2. Select a chart type from the type bar
+3. Drag a dimension field (text/date) to the **X-Axis**
+4. Drag a measure field (number) to the **Y-Axis**
+5. Optionally add a field to **Color/Series** for grouped charts
+
+Charts automatically respect any filters applied in Grid view — filter your data, then visualize the subset.
 
 ## Custom Calculations
 
@@ -463,7 +493,7 @@ TinyPivot is made possible by our sponsors. [Become a sponsor](https://opencolle
 ## GitHub Topics
 
 This repository uses the following topics for discoverability:
-`vue`, `vue3`, `react`, `data-grid`, `pivot-table`, `excel`, `spreadsheet`, `datagrid`, `table-component`, `aggregation`, `csv-export`
+`vue`, `vue3`, `react`, `data-grid`, `pivot-table`, `chart-builder`, `data-visualization`, `excel`, `spreadsheet`, `datagrid`, `table-component`, `aggregation`, `csv-export`
 
 ---
 

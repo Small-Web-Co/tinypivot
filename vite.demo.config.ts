@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   root: 'demo',
+  envDir: resolve(__dirname), // Load .env from project root
   base: '/',
   build: {
     outDir: '../dist-demo',

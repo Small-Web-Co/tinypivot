@@ -120,6 +120,7 @@ const freeFeatures = [
   'Row/Col Totals',
 ]
 const proFeatures = [
+  'Chart Builder (10 types)',
   'All Aggregations (9+)',
   'Custom Functions',
   'Calculated Fields',
@@ -224,9 +225,9 @@ function copyInstallCommand() {
             {{ selectedFramework === 'vue' ? 'Vue 3' : 'React 18' }} Component Library
           </div>
         </div>
-        <h1>Excel-like Data Grid & <span class="gradient-text">Pivot Table</span></h1>
+        <h1>Excel-like Data Grid, <span class="gradient-text">Pivot Table & Charts</span></h1>
         <p class="hero-subtitle">
-          A powerful, performant data grid with built-in filtering, sorting, and pivot table functionality.
+          A powerful, performant data grid with built-in filtering, sorting, pivot tables, and chart builder.
           Available for <strong>Vue 3</strong> and <strong>React</strong>. Freemium model - start free, upgrade when you need more.
         </p>
         <div class="hero-actions">
@@ -349,6 +350,17 @@ function copyInstallCommand() {
           </div>
           <h3>Custom Calculations</h3>
           <p>9 built-in + custom functions & formula builder</p>
+          <span class="feature-badge pro">Pro</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-violet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h3>Chart Builder</h3>
+          <p>10 chart types with drag-and-drop configuration</p>
           <span class="feature-badge pro">Pro</span>
         </div>
       </div>
@@ -525,7 +537,7 @@ function copyInstallCommand() {
     <section id="demo" class="demo">
       <div class="section-header">
         <h2>Live Demo</h2>
-        <p>Try the grid and pivot table with sample data</p>
+        <p>Try the grid, pivot table, and chart builder with 10,000 rows of sample data</p>
       </div>
 
       <div class="demo-controls">
@@ -561,7 +573,7 @@ function copyInstallCommand() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
           <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <span><strong>Try it now!</strong> Pivot table with Sum is free. All aggregations unlocked in this demo. Click "Pivot" to explore! Same API for Vue and React.</span>
+        <span><strong>Try it now!</strong> Pivot table with Sum is free. All Pro features unlocked in this demo — click "Pivot" for pivot tables or "Chart" to build visualizations! Same API for Vue and React.</span>
       </div>
     </section>
 

@@ -1,4 +1,5 @@
 export { CalculatedFieldModal } from './CalculatedFieldModal'
+export { ChartBuilder } from './ChartBuilder'
 export { ColumnFilter } from './ColumnFilter'
 export { DataGrid } from './DataGrid'
 export { NumericRangeFilter } from './NumericRangeFilter'

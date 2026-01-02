@@ -155,6 +155,8 @@ export interface LicenseFeatures {
   percentageMode: boolean
   sessionPersistence: boolean
   noWatermark: boolean
+  /** Chart builder feature (Pro only) */
+  charts: boolean
 }
 
 export interface LicenseInfo {
@@ -240,4 +242,128 @@ export function isNumericRange(value: ColumnFilterValue): value is NumericRange 
     && typeof value === 'object'
     && !Array.isArray(value)
     && ('min' in value || 'max' in value)
+}
+
+// Chart Types
+export type ChartType =
+  | 'bar'
+  | 'line'
+  | 'area'
+  | 'pie'
+  | 'donut'
+  | 'scatter'
+  | 'heatmap'
+  | 'treemap'
+  | 'radar'
+  | 'bubble'
+
+export type ChartAggregation = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct'
+
+/** Field classification for chart building */
+export type FieldRole = 'dimension' | 'measure' | 'temporal'
+
+/** A field configured for chart use */
+export interface ChartField {
+  field: string
+  label?: string
+  role: FieldRole
+  /** Aggregation to apply (for measures) */
+  aggregation?: ChartAggregation
+}
+
+/** Chart configuration built via drag and drop */
+export interface ChartConfig {
+  /** Chart type to render */
+  type: ChartType
+  /** Field for X-axis (category/dimension) */
+  xAxis?: ChartField
+  /** Field for Y-axis (measure/value) */
+  yAxis?: ChartField
+  /** Field for series/grouping (creates multiple series) */
+  seriesField?: ChartField
+  /** Field for bubble size (scatter/bubble charts) */
+  sizeField?: ChartField
+  /** Field for color encoding */
+  colorField?: ChartField
+  /** Additional configuration options */
+  options?: ChartOptions
+}
+
+/** Visual and display options for charts */
+export interface ChartOptions {
+  /** Show data labels on chart */
+  showDataLabels?: boolean
+  /** Show legend */
+  showLegend?: boolean
+  /** Legend position */
+  legendPosition?: 'top' | 'bottom' | 'left' | 'right'
+  /** Enable chart animations */
+  animated?: boolean
+  /** Custom color palette */
+  colors?: string[]
+  /** Chart title */
+  title?: string
+  /** X-axis title */
+  xAxisTitle?: string
+  /** Y-axis title */
+  yAxisTitle?: string
+  /** Stacking mode for bar/area charts */
+  stacked?: boolean
+  /** Show grid lines */
+  showGrid?: boolean
+  /** Enable zoom */
+  enableZoom?: boolean
+  /** Number format for values */
+  valueFormat?: 'number' | 'percent' | 'currency'
+  /** Decimal places for values */
+  decimals?: number
+}
+
+/** Information about a field for chart building */
+export interface ChartFieldInfo {
+  field: string
+  label: string
+  role: FieldRole
+  /** Data type detected from values */
+  dataType: 'string' | 'number' | 'date' | 'boolean'
+  /** Number of unique values (useful for dimension suitability) */
+  uniqueCount: number
+  /** Sample values for preview */
+  sampleValues: unknown[]
+  /** Min value (for numeric fields) */
+  min?: number
+  /** Max value (for numeric fields) */
+  max?: number
+}
+
+/** Chart type metadata for UI */
+export interface ChartTypeInfo {
+  type: ChartType
+  label: string
+  icon: string
+  description: string
+  /** Required field roles */
+  requiredFields: FieldRole[]
+  /** Optional field roles */
+  optionalFields: FieldRole[]
+  /** Guidance text for building this chart */
+  guidance: string
+  /** Best suited for this type of analysis */
+  bestFor: string[]
+}
+
+/** Pre-processed data ready for chart rendering */
+export interface ChartData {
+  /** Category labels (x-axis values) */
+  categories: string[]
+  /** Data series */
+  series: ChartSeries[]
+}
+
+/** A single data series for charts */
+export interface ChartSeries {
+  name: string
+  data: number[]
+  /** For bubble charts: additional data dimensions */
+  extra?: Record<string, unknown>[]
 }
