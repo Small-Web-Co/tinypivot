@@ -234,6 +234,15 @@ TinyPivot includes 9 built-in aggregation functions plus support for custom calc
 
 TinyPivot Pro includes an AI-powered data analyst that lets users explore data using natural language. Ask questions like "What's the return rate by category?" or "Show me sales trends over time" and get instant SQL-generated results.
 
+### Requirements
+
+To enable the AI Data Analyst, you need:
+
+1. **Pro License**: Call `setLicenseKey('YOUR_LICENSE_KEY')` at app startup
+2. **AI Config**: Pass the `aiAnalyst` prop with `enabled: true`
+3. **Data Sources**: For client-side data, configure `dataSources` and `dataSourceLoader`
+4. **API Endpoint**: A server endpoint to proxy AI requests (keeps your API key secure)
+
 ### Key Benefits
 
 - **Bring Your Own Key (BYOK)**: Use your own OpenAI, Anthropic, or OpenRouter API key — full control over costs and rate limits
@@ -289,39 +298,174 @@ export const POST = createTinyPivotHandler({
 ```vue
 <!-- Frontend: Vue -->
 <script setup lang="ts">
-import { DataGrid } from '@smallwebco/tinypivot-vue'
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-vue'
 import '@smallwebco/tinypivot-vue/style.css'
+
+// Activate Pro license
+setLicenseKey('YOUR_LICENSE_KEY')
+
+const aiAnalystConfig = {
+  enabled: true,
+  endpoint: '/api/tinypivot',
+}
 </script>
 
 <template>
   <DataGrid 
     :data="[]" 
-    :ai-analyst="{ endpoint: '/api/tinypivot' }"
+    :ai-analyst="aiAnalystConfig"
   />
 </template>
 ```
 
 ```tsx
 // Frontend: React
-import { DataGrid } from '@smallwebco/tinypivot-react'
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-react'
 import '@smallwebco/tinypivot-react/style.css'
+
+// Activate Pro license
+setLicenseKey('YOUR_LICENSE_KEY')
 
 function App() {
   return (
     <DataGrid 
       data={[]} 
-      aiAnalyst={{ endpoint: '/api/tinypivot' }}
+      aiAnalyst={{ enabled: true, endpoint: '/api/tinypivot' }}
     />
   )
 }
 ```
 
-#### Option B: Client-Side Queries (DuckDB WASM)
+#### Option B: Client-Side Data (In-Memory)
 
-For browser-based data processing, use `queryExecutor` for queries and an endpoint for AI chat only:
+For client-side data that's already loaded in the browser, you must configure `dataSources` and `dataSourceLoader` to make your data available to the AI Analyst:
+
+```vue
+<!-- Vue 3 -->
+<script setup lang="ts">
+import { ref } from 'vue'
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
+
+// Activate Pro license
+setLicenseKey('YOUR_LICENSE_KEY')
+
+// Your data
+const salesData = ref([
+  { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
+  { id: 2, region: 'South', product: 'Widget B', sales: 8300, units: 95 },
+  // ... more data
+])
+
+// Helper to infer schema from data
+function inferSchema(data: Record<string, unknown>[]) {
+  if (!data.length) return []
+  const sample = data[0]
+  return Object.entries(sample).map(([name, value]) => ({
+    name,
+    type: typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string',
+  }))
+}
+
+// AI Analyst configuration
+const aiAnalystConfig = {
+  enabled: true,                        // Required: explicitly enable
+  endpoint: '/api/ai-chat',             // Your AI proxy endpoint
+  dataSources: [                        // Required: define available data sources
+    {
+      id: 'sales',
+      table: 'sales',
+      name: 'Sales Data',
+      description: 'Sales transactions with region, product, sales amount, and units',
+    },
+  ],
+  dataSourceLoader: async (id: string) => {  // Required: return data + schema
+    if (id === 'sales') {
+      return {
+        data: salesData.value,
+        schema: inferSchema(salesData.value),
+      }
+    }
+    throw new Error(`Unknown data source: ${id}`)
+  },
+  persistToLocalStorage: true,          // Optional: save conversations
+  sessionId: 'my-session',              // Optional: conversation ID
+}
+</script>
+
+<template>
+  <DataGrid
+    :data="salesData"
+    :ai-analyst="aiAnalystConfig"
+  />
+</template>
+```
+
+```tsx
+// React
+import { useState } from 'react'
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+
+// Activate Pro license
+setLicenseKey('YOUR_LICENSE_KEY')
+
+function inferSchema(data: Record<string, unknown>[]) {
+  if (!data.length) return []
+  const sample = data[0]
+  return Object.entries(sample).map(([name, value]) => ({
+    name,
+    type: typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string',
+  }))
+}
+
+function App() {
+  const [salesData] = useState([
+    { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
+    { id: 2, region: 'South', product: 'Widget B', sales: 8300, units: 95 },
+    // ... more data
+  ])
+
+  const aiAnalystConfig = {
+    enabled: true,
+    endpoint: '/api/ai-chat',
+    dataSources: [
+      {
+        id: 'sales',
+        table: 'sales',
+        name: 'Sales Data',
+        description: 'Sales transactions with region, product, sales amount, and units',
+      },
+    ],
+    dataSourceLoader: async (id: string) => {
+      if (id === 'sales') {
+        return {
+          data: salesData,
+          schema: inferSchema(salesData),
+        }
+      }
+      throw new Error(`Unknown data source: ${id}`)
+    },
+    persistToLocalStorage: true,
+    sessionId: 'my-session',
+  }
+
+  return (
+    <DataGrid
+      data={salesData}
+      aiAnalyst={aiAnalystConfig}
+    />
+  )
+}
+```
+
+#### Option C: Client-Side Queries (DuckDB WASM)
+
+For browser-based SQL execution with DuckDB WASM, add a `queryExecutor`:
 
 ```typescript
 const aiConfig = {
+  enabled: true,
   endpoint: '/api/ai-proxy',  // Server endpoint for AI chat
   queryExecutor: async (sql, table) => {
     // Execute SQL via DuckDB WASM (client-side)
