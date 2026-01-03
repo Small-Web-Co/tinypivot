@@ -132,6 +132,9 @@ const fontSizeOptions = [
   { value: 'base', label: 'L' },
 ] as const
 
+// AI Analyst component ref (for accessing loadFullData)
+const aiAnalystRef = ref<InstanceType<typeof AIAnalyst> | null>(null)
+
 // AI-loaded data (replaces current data when AI loads results)
 // Must be defined before displayData and dataRef
 const aiLoadedData = ref<Record<string, unknown>[] | null>(null)
@@ -427,9 +430,40 @@ function handleAIDataLoaded(payload: AIDataLoadedEvent) {
 // Track if we're showing AI-shaped data (filtered/aggregated by AI queries)
 const isShowingAIData = computed(() => aiLoadedData.value !== null)
 
+// Loading state for full data reset
+const isLoadingFullData = ref(false)
+
 // Reset to full original dataset
-function resetToFullData() {
-  aiLoadedData.value = null
+// If AI Analyst is enabled and has a selected data source, load full data from that source
+// Otherwise, just clear the AI loaded data to show original props.data
+async function resetToFullData() {
+  // If we have AI Analyst with a selected data source, load full data from it
+  if (aiAnalystRef.value?.selectedDataSource) {
+    isLoadingFullData.value = true
+    try {
+      const fullData = await aiAnalystRef.value.loadFullData()
+      if (fullData && fullData.length > 0) {
+        aiLoadedData.value = fullData
+      }
+      else {
+        // Fall back to props.data if loading fails
+        aiLoadedData.value = null
+      }
+    }
+    catch (err) {
+      console.warn('Failed to load full data:', err)
+      aiLoadedData.value = null
+    }
+    finally {
+      isLoadingFullData.value = false
+    }
+  }
+  else {
+    // No AI Analyst or no selected data source - just clear filters by resetting to props.data
+    aiLoadedData.value = null
+  }
+  // Also clear any grid filters
+  clearAllFilters()
 }
 
 function handleAIConversationUpdate(payload: AIConversationUpdateEvent) {
@@ -1076,13 +1110,18 @@ function handleContainerClick(event: MouseEvent) {
           <button
             v-if="isShowingAIData"
             class="vpg-reset-data-btn"
+            :class="{ 'vpg-loading-btn': isLoadingFullData }"
+            :disabled="isLoadingFullData"
             title="Reset to full dataset"
             @click="resetToFullData"
           >
-            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-if="isLoadingFullData" class="vpg-icon vpg-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span>Full Data</span>
+            <svg v-else class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>{{ isLoadingFullData ? 'Loading...' : 'Full Data' }}</span>
           </button>
 
           <div v-if="globalSearchTerm" class="vpg-search-info">
@@ -1163,6 +1202,7 @@ function handleContainerClick(event: MouseEvent) {
     <!-- AI Analyst View - use v-show to preserve state when switching tabs -->
     <div v-if="showAIAnalyst && aiAnalyst" v-show="viewMode === 'ai'" class="vpg-ai-view">
       <AIAnalyst
+        ref="aiAnalystRef"
         :config="aiAnalyst"
         :theme="currentTheme"
         @data-loaded="handleAIDataLoaded"

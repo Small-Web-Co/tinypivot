@@ -21,7 +21,7 @@ import {
 } from '../hooks/useGridFeatures'
 import { useLicense } from '../hooks/useLicense'
 import { usePivotTable } from '../hooks/usePivotTable'
-import { AIAnalyst } from './AIAnalyst'
+import { AIAnalyst, type AIAnalystHandle } from './AIAnalyst'
 import { ChartBuilder } from './ChartBuilder'
 import { ColumnFilter } from './ColumnFilter'
 import { PivotConfig } from './PivotConfig'
@@ -128,8 +128,14 @@ export function DataGrid({
   const [copyToastMessage, setCopyToastMessage] = useState('')
   const [viewMode, setViewMode] = useState<'ai' | 'grid' | 'pivot' | 'chart'>('grid')
 
+  // AI Analyst ref (for accessing loadFullData)
+  const aiAnalystRef = useRef<AIAnalystHandle>(null)
+
   // AI-loaded data (replaces current data when AI loads results)
   const [aiLoadedData, setAiLoadedData] = useState<Record<string, unknown>[] | null>(null)
+
+  // Loading state for full data reset
+  const [isLoadingFullData, setIsLoadingFullData] = useState(false)
 
   // Data to display - AI loaded data takes precedence
   const displayData = useMemo(() => aiLoadedData || data, [aiLoadedData, data])
@@ -571,9 +577,37 @@ export function DataGrid({
   const isShowingAIData = aiLoadedData !== null
 
   // Reset to full original dataset
-  const resetToFullData = useCallback(() => {
-    setAiLoadedData(null)
-  }, [])
+  // If AI Analyst is enabled and has a selected data source, load full data from that source
+  // Otherwise, just clear the AI loaded data to show original props.data
+  const resetToFullData = useCallback(async () => {
+    // If we have AI Analyst with a selected data source, load full data from it
+    if (aiAnalystRef.current?.selectedDataSource) {
+      setIsLoadingFullData(true)
+      try {
+        const fullData = await aiAnalystRef.current.loadFullData()
+        if (fullData && fullData.length > 0) {
+          setAiLoadedData(fullData)
+        }
+        else {
+          // Fall back to props.data if loading fails
+          setAiLoadedData(null)
+        }
+      }
+      catch (err) {
+        console.warn('Failed to load full data:', err)
+        setAiLoadedData(null)
+      }
+      finally {
+        setIsLoadingFullData(false)
+      }
+    }
+    else {
+      // No AI Analyst or no selected data source - just clear filters by resetting to props.data
+      setAiLoadedData(null)
+    }
+    // Also clear any grid filters
+    clearAllFilters()
+  }, [clearAllFilters])
 
   // AI Analyst event handlers
   const handleAIDataLoaded = useCallback(
@@ -1045,11 +1079,12 @@ export function DataGrid({
           {/* Reset to full data button (when showing AI-filtered results) */}
           {viewMode === 'grid' && isShowingAIData && (
             <button
-              className="vpg-reset-data-btn"
+              className={`vpg-reset-data-btn${isLoadingFullData ? ' vpg-loading-btn' : ''}`}
+              disabled={isLoadingFullData}
               title="Reset to full dataset"
               onClick={resetToFullData}
             >
-              <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`vpg-icon${isLoadingFullData ? ' vpg-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -1057,7 +1092,7 @@ export function DataGrid({
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              <span>Full Data</span>
+              <span>{isLoadingFullData ? 'Loading...' : 'Full Data'}</span>
             </button>
           )}
 
@@ -1123,6 +1158,7 @@ export function DataGrid({
       {showAIAnalyst && aiAnalyst && (
         <div className="vpg-ai-view" style={{ display: viewMode === 'ai' ? undefined : 'none' }}>
           <AIAnalyst
+            ref={aiAnalystRef}
             config={aiAnalyst}
             theme={currentTheme}
             onDataLoaded={handleAIDataLoaded}

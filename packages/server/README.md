@@ -1,6 +1,6 @@
 # @smallwebco/tinypivot-server
 
-Server-side handlers for TinyPivot AI Data Analyst.
+Server-side handlers for TinyPivot's **Embedded AI Data Analyst**. Enables natural language to SQL conversion, PostgreSQL integration, and BYOK AI chat proxy.
 
 ## Two Deployment Options
 

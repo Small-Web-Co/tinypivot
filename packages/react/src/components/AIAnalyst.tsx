@@ -13,7 +13,7 @@ import type {
   AITableSchema,
 } from '@smallwebco/tinypivot-core'
 import { stripSQLFromContent } from '@smallwebco/tinypivot-core'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useAIAnalyst } from '../hooks/useAIAnalyst'
 
 interface AIAnalystProps {
@@ -26,7 +26,12 @@ interface AIAnalystProps {
   onViewResults?: (payload: { data: Record<string, unknown>[], query: string }) => void
 }
 
-export function AIAnalyst({
+export interface AIAnalystHandle {
+  loadFullData: () => Promise<Record<string, unknown>[] | null>
+  selectedDataSource: string | undefined
+}
+
+export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
   config,
   theme = 'light',
   onDataLoaded,
@@ -34,7 +39,7 @@ export function AIAnalyst({
   onQueryExecuted,
   onError,
   onViewResults,
-}: AIAnalystProps) {
+}, ref) => {
   const {
     messages,
     hasMessages,
@@ -48,6 +53,7 @@ export function AIAnalyst({
     selectDataSource,
     sendMessage,
     clearConversation,
+    loadFullData,
   } = useAIAnalyst({
     config,
     onDataLoaded,
@@ -55,6 +61,12 @@ export function AIAnalyst({
     onQueryExecuted,
     onError,
   })
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    loadFullData,
+    selectedDataSource,
+  }), [loadFullData, selectedDataSource])
 
   const [inputText, setInputText] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -688,4 +700,4 @@ export function AIAnalyst({
       </div>
     </div>
   )
-}
+})

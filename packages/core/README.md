@@ -1,8 +1,8 @@
 # @smallwebco/tinypivot-core
 
-Core logic for TinyPivot - framework agnostic pivot table and data grid utilities.
+Core logic for TinyPivot — framework-agnostic utilities for AI-enabled data grids, embedded analytics, pivot tables, and natural language data exploration.
 
-> **Note**: This is an internal package. For application development, use [@smallwebco/tinypivot-vue](https://www.npmjs.com/package/@smallwebco/tinypivot-vue) or [@smallwebco/tinypivot-react](https://www.npmjs.com/package/@smallwebco/tinypivot-react).
+> **Note**: This is an internal package. For application development, use [@smallwebco/tinypivot-vue](https://www.npmjs.com/package/@smallwebco/tinypivot-vue) or [@smallwebco/tinypivot-react](https://www.npmjs.com/package/@smallwebco/tinypivot-react) to embed an AI Data Analyst in your app.
 
 ## Documentation
 

@@ -1,8 +1,8 @@
 {
   "name": "@smallwebco/tinypivot-core",
   "type": "module",
-  "version": "1.0.57",
-  "description": "Core logic for TinyPivot - framework agnostic pivot table and data grid utilities",
+  "version": "1.0.58",
+  "description": "Core logic for TinyPivot - framework agnostic utilities for AI-enabled data grids, pivot tables, and embedded analytics",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://github.com/Small-Web-Co/tinypivot",
@@ -14,6 +14,10 @@
     "url": "https://github.com/Small-Web-Co/tinypivot/issues"
   },
   "keywords": [
+    "ai-data-analyst",
+    "embedded-analytics",
+    "natural-language-query",
+    "text-to-sql",
     "pivot-table",
     "pivot",
     "datagrid",

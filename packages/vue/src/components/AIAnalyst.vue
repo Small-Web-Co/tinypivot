@@ -43,12 +43,19 @@ const {
   selectDataSource,
   sendMessage,
   clearConversation,
+  loadFullData,
 } = useAIAnalyst({
   config: props.config,
   onDataLoaded: payload => emit('dataLoaded', payload),
   onConversationUpdate: payload => emit('conversationUpdate', payload),
   onQueryExecuted: payload => emit('queryExecuted', payload),
   onError: payload => emit('error', payload),
+})
+
+// Expose loadFullData for parent component access
+defineExpose({
+  loadFullData,
+  selectedDataSource,
 })
 
 // Input state

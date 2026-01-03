@@ -1,6 +1,6 @@
 # TinyPivot
 
-A lightweight, AI-ready data grid with pivot tables and charts for Vue 3 and React. **Under 40KB gzipped** — 10x smaller than AG Grid.
+**Embed an AI Data Analyst in your React or Vue app.** Ask questions in plain English, get instant SQL-powered insights. AI-enabled data grid with pivot tables and charts — all under 40KB gzipped.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)**
 
@@ -15,9 +15,10 @@ A lightweight, AI-ready data grid with pivot tables and charts for Vue 3 and Rea
 
 ## Why TinyPivot?
 
-- **Lightweight**: Under 40KB gzipped vs 500KB+ for AG Grid
-- **AI-Ready**: Natural language data exploration with your own API key (BYOK)
-- **Batteries Included**: Pivot tables, charts, and Excel-like features out of the box
+- **Embedded AI Data Analyst**: Let users ask questions in plain English — AI generates SQL and returns results instantly
+- **Bring Your Own Key (BYOK)**: Use your own OpenAI, Anthropic, or any LLM API key — full control over costs and privacy
+- **Lightweight**: Under 40KB gzipped vs 500KB+ for AG Grid (10x smaller)
+- **Batteries Included**: Pivot tables, 6 chart types, Excel-like features out of the box
 - **Framework Support**: First-class Vue 3 and React packages
 - **One-Time License**: No subscriptions — pay once, use forever
 
@@ -230,9 +231,11 @@ TinyPivot includes 9 built-in aggregation functions plus support for custom calc
 | **% of Total** | %Σ | Percentage contribution to grand total |
 | **Custom** | ƒ | Your own aggregation function |
 
-## AI Data Analyst (Pro)
+## Embedded AI Data Analyst (Pro)
 
-TinyPivot Pro includes an AI-powered data analyst that lets users explore data using natural language. Ask questions like "What's the return rate by category?" or "Show me sales trends over time" and get instant SQL-generated results.
+TinyPivot Pro includes an **embedded AI Data Analyst** that lets users explore data using natural language. Ask questions like "What's the return rate by category?" or "Show me sales trends over time" and get instant SQL-generated results.
+
+**This is conversational analytics for your app** — no need to build complex dashboards or teach users SQL. The AI understands your data schema and generates appropriate queries automatically.
 
 ### Requirements
 
@@ -759,7 +762,7 @@ See [LICENSE.md](./LICENSE.md) for details.
 ## GitHub Topics
 
 This repository uses the following topics for discoverability:
-`vue`, `vue3`, `react`, `data-grid`, `pivot-table`, `chart-builder`, `data-visualization`, `excel`, `spreadsheet`, `datagrid`, `table-component`, `aggregation`, `csv-export`
+`ai-data-analyst`, `embedded-analytics`, `conversational-bi`, `natural-language-query`, `text-to-sql`, `byok`, `llm-integration`, `vue`, `vue3`, `react`, `data-grid`, `pivot-table`, `chart-builder`, `data-visualization`, `excel`, `spreadsheet`, `datagrid`, `table-component`, `aggregation`, `csv-export`
 
 ---
 

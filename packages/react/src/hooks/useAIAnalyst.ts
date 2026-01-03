@@ -720,6 +720,103 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
   }, [isLoading, schemas, effectiveDataSources, callAIEndpoint, executeQuery, handleDemoResponse, onConversationUpdate, onError])
 
   /**
+   * Load full data for the currently selected data source
+   * Returns the full dataset (not limited) for displaying in the grid
+   */
+  const loadFullData = useCallback(async (): Promise<Record<string, unknown>[] | null> => {
+    const dataSourceId = conversation.dataSourceId
+    if (!dataSourceId) {
+      return null
+    }
+
+    const dataSource = effectiveDataSources.find(ds => ds.id === dataSourceId)
+    if (!dataSource) {
+      return null
+    }
+
+    const currentConfig = configRef.current
+
+    // Use custom data source loader if provided
+    if (currentConfig.dataSourceLoader) {
+      try {
+        const { data } = await currentConfig.dataSourceLoader(dataSourceId)
+        if (data && data.length > 0) {
+          return data
+        }
+      }
+      catch (err) {
+        console.warn('Failed to load full data:', err)
+        onError?.({
+          message: err instanceof Error ? err.message : 'Failed to load full data',
+          type: 'network',
+        })
+      }
+      return null
+    }
+
+    // Use query executor to get all data
+    if (currentConfig.queryExecutor) {
+      try {
+        const result = await currentConfig.queryExecutor(
+          `SELECT * FROM ${dataSource.table}`,
+          dataSource.table,
+        )
+        if (result.data && result.data.length > 0) {
+          return result.data
+        }
+      }
+      catch (err) {
+        console.warn('Failed to load full data via query:', err)
+        onError?.({
+          message: err instanceof Error ? err.message : 'Failed to load full data',
+          type: 'network',
+        })
+      }
+      return null
+    }
+
+    // Use endpoint query action
+    if (currentConfig.endpoint) {
+      try {
+        const response = await fetch(currentConfig.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'query',
+            sql: `SELECT * FROM ${dataSource.table}`,
+            table: dataSource.table,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to load data: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        if (data.data && data.data.length > 0) {
+          return data.data
+        }
+      }
+      catch (err) {
+        console.warn('Failed to load full data from endpoint:', err)
+        onError?.({
+          message: err instanceof Error ? err.message : 'Failed to load full data',
+          type: 'network',
+        })
+      }
+      return null
+    }
+
+    // Demo mode - get initial data
+    if (currentConfig.demoMode) {
+      const initialData = getInitialDemoData(dataSourceId)
+      return initialData || null
+    }
+
+    return null
+  }, [conversation.dataSourceId, effectiveDataSources, onError])
+
+  /**
    * Clear the conversation
    */
   const clearConversation = useCallback(() => {
@@ -768,5 +865,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     importConversation,
     /** Refresh table list from endpoint */
     fetchTables,
+    /** Load full data for the currently selected data source */
+    loadFullData,
   }
 }
