@@ -1,15 +1,14 @@
 # @smallwebco/tinypivot-vue
 
-**Embed an AI Data Analyst in your Vue 3 app.** Ask questions in plain English, get instant SQL-powered insights. AI-enabled data grid with pivot tables and charts — all under 50KB gzipped.
+A lightweight data grid with pivot tables, charts, and optional AI-powered data exploration for Vue 3. **Under 50KB gzipped** — 10x smaller than AG Grid.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
 
 ## Why TinyPivot?
 
-- **Embedded AI Data Analyst**: Let users ask questions in plain English — AI generates SQL and returns results instantly
-- **Bring Your Own Key (BYOK)**: Use your own OpenAI, Anthropic, or any LLM API key — full control over costs and privacy
-- **Lightweight**: Under 50KB gzipped vs 500KB+ for AG Grid (10x smaller)
+- **Lightweight**: Under 50KB gzipped vs 500KB+ for AG Grid
 - **Batteries Included**: Pivot tables, 6 chart types, Excel-like features out of the box
+- **AI Data Analyst** (Pro): Natural language queries with BYOK — use your own OpenAI/Anthropic key
 - **One-Time License**: No subscriptions — pay once, use forever
 
 ## Installation
@@ -89,9 +88,11 @@ const data = [
 | `@export` | `{ rowCount, filename }` | CSV exported |
 | `@copy` | `{ text, cellCount }` | Cells copied |
 
-## Embedded AI Data Analyst (Pro)
+## AI Data Analyst (Pro)
 
-Embed an AI-powered data analyst that lets users explore data using natural language. Ask questions like "What's the return rate by category?" and get instant results — no SQL knowledge required for end users.
+Optional AI-powered data analyst that lets users explore data using natural language. Ask questions like "What's the return rate by category?" and get instant results.
+
+> See the [AI Analyst Demo](https://github.com/Small-Web-Co/tinypivot/tree/master/examples/ai-analyst-demo) for a complete working example.
 
 ```vue
 <script setup lang="ts">

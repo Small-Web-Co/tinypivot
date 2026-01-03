@@ -1,8 +1,8 @@
 {
   "name": "@smallwebco/tinypivot-vue",
   "type": "module",
-  "version": "1.0.58",
-  "description": "TinyPivot Vue 3 - Embedded AI Data Analyst component. Ask questions in plain English, get SQL-powered insights. AI-enabled data grid with pivot tables, charts, and BYOK. Under 50KB gzipped.",
+  "version": "1.0.59",
+  "description": "TinyPivot Vue 3 - Lightweight data grid with pivot tables, charts, and optional AI Data Analyst. Under 50KB gzipped. BYOK for AI features.",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://github.com/Small-Web-Co/tinypivot",
