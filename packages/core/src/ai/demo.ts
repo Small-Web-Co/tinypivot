@@ -122,6 +122,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
 - "What are the top selling products?"
 - "Show me sales trends over time"
 - "Which sales channel performs best?"
+- "Show me sales with customer names" (JOIN example)
 
 What would you like to know?`,
     triggers: [
@@ -266,6 +267,82 @@ This shows revenue and average order value by channel. Online has the highest vo
           { channel: 'Online', total_revenue: 1850000, transactions: 6500, avg_order_value: 284.62 },
           { channel: 'Retail', total_revenue: 1200000, transactions: 3800, avg_order_value: 315.79 },
           { channel: 'Wholesale', total_revenue: 775000, transactions: 800, avg_order_value: 968.75 },
+        ],
+      },
+      {
+        keywords: ['customer name', 'with customer', 'join customer', 'customer info'],
+        response: `I'll join the sales data with customers to show you sales with customer names.
+
+Here's my approach:
+1. **JOIN**: Link sales_transactions with customers table on customer_id
+
+\`\`\`sql
+-- Join sales with customer information
+SELECT 
+  s.id,
+  s.date,
+  c.name as customer_name,
+  c.segment,
+  s.revenue,
+  s.quantity,
+  s.region,
+  s.channel
+FROM sales_transactions s
+JOIN customers c ON s.customer_id = c.id
+ORDER BY s.date DESC
+\`\`\`
+
+Here are the sales records enriched with customer names and segments. You can now filter or pivot by customer segment!`,
+        query: 'SELECT s.id, s.date, c.name as customer_name, c.segment, s.revenue, s.quantity, s.region, s.channel FROM sales_transactions s JOIN customers c ON s.customer_id = c.id ORDER BY s.date DESC',
+        mockData: [
+          { id: 1, date: '2024-12-05', customer_name: 'Acme Corporation', segment: 'Enterprise', revenue: 2499.99, quantity: 5, region: 'West', channel: 'Wholesale' },
+          { id: 2, date: '2024-12-05', customer_name: 'Jane Smith', segment: 'Consumer', revenue: 149.99, quantity: 2, region: 'North', channel: 'Online' },
+          { id: 3, date: '2024-12-04', customer_name: 'TechStart Inc', segment: 'SMB', revenue: 899.97, quantity: 3, region: 'East', channel: 'Retail' },
+          { id: 4, date: '2024-12-04', customer_name: 'Global Industries', segment: 'Enterprise', revenue: 4599.99, quantity: 10, region: 'West', channel: 'Wholesale' },
+          { id: 5, date: '2024-12-03', customer_name: 'John Doe', segment: 'Consumer', revenue: 79.99, quantity: 1, region: 'South', channel: 'Online' },
+          { id: 6, date: '2024-12-03', customer_name: 'Nordic Solutions', segment: 'Enterprise', revenue: 1899.99, quantity: 4, region: 'North', channel: 'Retail' },
+          { id: 7, date: '2024-12-02', customer_name: 'Boutique Shop', segment: 'SMB', revenue: 449.97, quantity: 3, region: 'East', channel: 'Online' },
+          { id: 8, date: '2024-12-02', customer_name: 'Maria Garcia', segment: 'Consumer', revenue: 129.99, quantity: 1, region: 'South', channel: 'Online' },
+          { id: 9, date: '2024-12-01', customer_name: 'Local Crafts Co', segment: 'SMB', revenue: 679.98, quantity: 2, region: 'West', channel: 'Retail' },
+          { id: 10, date: '2024-12-01', customer_name: 'Alex Johnson', segment: 'Consumer', revenue: 59.99, quantity: 1, region: 'North', channel: 'Online' },
+        ],
+      },
+      {
+        keywords: ['product name', 'with product', 'join product', 'product info', 'product detail'],
+        response: `I'll join the sales data with products to show you sales with product details.
+
+Here's my approach:
+1. **JOIN**: Link sales_transactions with products table on product_id
+
+\`\`\`sql
+-- Join sales with product information
+SELECT 
+  s.id,
+  s.date,
+  p.name as product_name,
+  p.category,
+  s.quantity,
+  s.revenue,
+  s.region,
+  s.channel
+FROM sales_transactions s
+JOIN products p ON s.product_id = p.id
+ORDER BY s.revenue DESC
+\`\`\`
+
+Here are the sales records enriched with product names and categories. Try pivoting by category to see which product types sell best!`,
+        query: 'SELECT s.id, s.date, p.name as product_name, p.category, s.quantity, s.revenue, s.region, s.channel FROM sales_transactions s JOIN products p ON s.product_id = p.id ORDER BY s.revenue DESC',
+        mockData: [
+          { id: 1, date: '2024-12-04', product_name: 'Standing Desk Frame', category: 'Home & Garden', quantity: 3, revenue: 1049.97, region: 'West', channel: 'Wholesale' },
+          { id: 2, date: '2024-12-05', product_name: 'Bluetooth Headphones', category: 'Electronics', quantity: 4, revenue: 599.96, region: 'North', channel: 'Retail' },
+          { id: 3, date: '2024-12-03', product_name: 'Running Shoes Elite', category: 'Sports', quantity: 3, revenue: 389.97, region: 'East', channel: 'Online' },
+          { id: 4, date: '2024-12-02', product_name: 'Wireless Mouse Pro', category: 'Electronics', quantity: 4, revenue: 319.96, region: 'South', channel: 'Online' },
+          { id: 5, date: '2024-12-05', product_name: 'Denim Jeans Classic', category: 'Clothing', quantity: 3, revenue: 209.97, region: 'West', channel: 'Retail' },
+          { id: 6, date: '2024-12-01', product_name: 'Garden Tool Set', category: 'Home & Garden', quantity: 2, revenue: 179.98, region: 'North', channel: 'Online' },
+          { id: 7, date: '2024-12-04', product_name: 'Yoga Mat Premium', category: 'Sports', quantity: 3, revenue: 137.97, region: 'East', channel: 'Online' },
+          { id: 8, date: '2024-12-03', product_name: 'Cotton T-Shirt Basic', category: 'Clothing', quantity: 5, revenue: 124.95, region: 'South', channel: 'Online' },
+          { id: 9, date: '2024-12-02', product_name: 'Clean Code', category: 'Books', quantity: 2, revenue: 69.98, region: 'West', channel: 'Online' },
+          { id: 10, date: '2024-12-01', product_name: 'JavaScript: The Good Parts', category: 'Books', quantity: 2, revenue: 59.98, region: 'North', channel: 'Online' },
         ],
       },
     ],

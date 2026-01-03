@@ -261,6 +261,16 @@ To enable the AI Data Analyst, you need:
 3. Query executes against your data
 4. Results display in the grid, ready for pivot/chart analysis
 
+### Cross-Table JOINs
+
+The AI Analyst automatically understands relationships between your tables and can generate JOIN queries when needed. Ask questions like:
+
+- "Show me sales with customer names" (joins sales → customers)
+- "What products are selling best by category?" (joins sales → products)
+- "List orders with product details and customer info" (multi-table join)
+
+The AI sees all available table schemas and identifies foreign key relationships (columns ending in `_id`) to construct proper JOINs.
+
 ### Setup
 
 #### Environment Variables
