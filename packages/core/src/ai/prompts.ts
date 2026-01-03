@@ -46,7 +46,7 @@ ${otherTables.length > 0 ? formatRelatedTablesContext(otherTables) : ''}
 
 ## Query Rules
 1. **READ-ONLY**: ONLY use SELECT. NEVER use INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or any write operations.
-2. **LIMIT RESULTS**: Always use LIMIT (default 100-1000 rows) to avoid overwhelming results.
+2. **NO LIMIT**: Do NOT add LIMIT clauses unless the user explicitly asks for a limited number of results. Return all matching rows by default.
 3. **PRIMARY TABLE**: The main table is \`${selectedSchema?.table || 'table_name'}\`
 4. **JOINs ALLOWED**: You CAN JOIN with other tables listed in "Related Tables" when the user needs data from multiple tables.
 5. **BE SPECIFIC**: Select relevant columns, not SELECT * (unless showing sample data)
@@ -55,7 +55,7 @@ ${otherTables.length > 0 ? formatRelatedTablesContext(otherTables) : ''}
 Output queries in this EXACT format (the system auto-executes SQL blocks):
 
 \`\`\`sql
-SELECT column1, column2 FROM ${selectedSchema?.table || 'table_name'} WHERE condition LIMIT 100
+SELECT column1, column2 FROM ${selectedSchema?.table || 'table_name'} WHERE condition
 \`\`\`
 
 For JOINs (when user needs data from related tables):
@@ -64,7 +64,6 @@ SELECT p.column1, r.column2
 FROM ${selectedSchema?.table || 'primary_table'} p
 JOIN related_table r ON p.foreign_key = r.id
 WHERE condition
-LIMIT 100
 \`\`\`
 
 For complex analysis, use CTEs:
@@ -74,7 +73,7 @@ WITH summary AS (
   FROM ${selectedSchema?.table || 'table_name'}
   GROUP BY category
 )
-SELECT * FROM summary ORDER BY count DESC LIMIT 20
+SELECT * FROM summary ORDER BY count DESC
 \`\`\`
 
 ## Response Format
@@ -87,7 +86,7 @@ Keep responses concise and insight-focused:
 
 Example response:
 "\`\`\`sql
-SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department ORDER BY avg_salary DESC LIMIT 10
+SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department ORDER BY avg_salary DESC
 \`\`\`
 
 Engineering and Product teams have the highest average salaries at $145K and $138K respectively, while Support and Operations are at the lower end around $75K. This 2x salary gap may indicate market-driven compensation or role complexity differences.
