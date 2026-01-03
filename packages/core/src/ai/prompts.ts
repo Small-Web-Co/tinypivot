@@ -6,16 +6,24 @@ import type { AIColumnSchema, AIDataSource, AITableSchema } from '../types'
 
 /**
  * Build the system prompt for the AI Data Analyst
+ * @param dataSources - List of available data sources
+ * @param schemas - Map of table schemas (selected table schema)
+ * @param selectedSourceId - Currently selected data source ID
+ * @param allSchemas - Optional: ALL table schemas for enabling JOINs
  */
 export function buildSystemPrompt(
   dataSources: AIDataSource[],
   schemas: Map<string, AITableSchema>,
   selectedSourceId?: string,
+  allSchemas?: AITableSchema[],
 ): string {
   const selectedSchema = selectedSourceId ? schemas.get(selectedSourceId) : undefined
   const selectedSource = selectedSourceId
     ? dataSources.find(ds => ds.id === selectedSourceId)
     : undefined
+
+  // Filter out the selected table from allSchemas to get "other tables"
+  const otherTables = allSchemas?.filter(s => s.table !== selectedSchema?.table) || []
 
   return `You are a data analyst assistant. Your job is to translate user questions into SQL queries and return data results.
 
@@ -34,17 +42,29 @@ ${formatDataSourcesList(dataSources)}
 
 ${selectedSource && selectedSchema ? formatSelectedSchemaContext(selectedSource, selectedSchema) : '## No Data Source Selected\nPlease ask the user to select a data source first.'}
 
+${otherTables.length > 0 ? formatRelatedTablesContext(otherTables) : ''}
+
 ## Query Rules
 1. **READ-ONLY**: ONLY use SELECT. NEVER use INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or any write operations.
 2. **LIMIT RESULTS**: Always use LIMIT (default 100-1000 rows) to avoid overwhelming results.
-3. **ONE TABLE**: Only query the currently selected table: \`${selectedSchema?.table || 'table_name'}\`
-4. **BE SPECIFIC**: Select relevant columns, not SELECT * (unless showing sample data)
+3. **PRIMARY TABLE**: The main table is \`${selectedSchema?.table || 'table_name'}\`
+4. **JOINs ALLOWED**: You CAN JOIN with other tables listed in "Related Tables" when the user needs data from multiple tables.
+5. **BE SPECIFIC**: Select relevant columns, not SELECT * (unless showing sample data)
 
 ## Query Format
 Output queries in this EXACT format (the system auto-executes SQL blocks):
 
 \`\`\`sql
 SELECT column1, column2 FROM ${selectedSchema?.table || 'table_name'} WHERE condition LIMIT 100
+\`\`\`
+
+For JOINs (when user needs data from related tables):
+\`\`\`sql
+SELECT p.column1, r.column2 
+FROM ${selectedSchema?.table || 'primary_table'} p
+JOIN related_table r ON p.foreign_key = r.id
+WHERE condition
+LIMIT 100
 \`\`\`
 
 For complex analysis, use CTEs:
@@ -130,6 +150,52 @@ ${formatColumnsTable(columnsWithDescriptions)}
 - The table name is \`${schema.table}\`
 - For text searches, use ILIKE for case-insensitive matching
 - For date columns, use standard SQL date functions`
+}
+
+/**
+ * Format the context for related tables that can be JOINed
+ */
+function formatRelatedTablesContext(tables: AITableSchema[]): string {
+  if (tables.length === 0)
+    return ''
+
+  const tablesSummary = tables.map((table) => {
+    // Show table name and key columns (likely join keys)
+    const keyColumns = table.columns
+      .filter(col =>
+        col.name === 'id'
+        || col.name.endsWith('_id')
+        || col.name.startsWith('id_')
+        || col.name === 'uuid',
+      )
+      .map(col => `\`${col.name}\``)
+      .join(', ')
+
+    const otherColumns = table.columns
+      .filter(col =>
+        col.name !== 'id'
+        && !col.name.endsWith('_id')
+        && !col.name.startsWith('id_')
+        && col.name !== 'uuid',
+      )
+      .slice(0, 5) // Show up to 5 other columns
+      .map(col => `\`${col.name}\` (${col.type})`)
+      .join(', ')
+
+    const moreCount = table.columns.length - (keyColumns ? keyColumns.split(',').length : 0) - 5
+    const moreText = moreCount > 0 ? `, +${moreCount} more` : ''
+
+    return `- **\`${table.table}\`**
+  - Keys: ${keyColumns || 'none'}
+  - Columns: ${otherColumns}${moreText}`
+  }).join('\n')
+
+  return `## Related Tables (Available for JOINs)
+You can JOIN with these tables when the user needs additional data.
+Look for foreign key relationships (columns ending in \`_id\`).
+
+${tablesSummary}
+`
 }
 
 /**

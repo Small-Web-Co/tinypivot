@@ -660,11 +660,16 @@ function hasQueryResult(message: AIMessage): boolean {
 .vpg-ai-picker-content {
   max-width: 600px;
   width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .vpg-ai-picker-header {
   text-align: center;
   margin-bottom: 2rem;
+  flex-shrink: 0;
 }
 
 .vpg-ai-icon-lg {
@@ -706,6 +711,7 @@ function hasQueryResult(message: AIMessage): boolean {
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .vpg-ai-search svg {
@@ -733,6 +739,9 @@ function hasQueryResult(message: AIMessage): boolean {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 0.75rem;
+  overflow-y: auto;
+  max-height: 400px;
+  padding-right: 0.25rem;
 }
 
 .vpg-ai-datasource-card {

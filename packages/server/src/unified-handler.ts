@@ -127,7 +127,7 @@ export interface TinyPivotHandlerOptions {
  */
 export interface TinyPivotRequest {
   /** Action to perform */
-  action: 'list-tables' | 'get-schema' | 'query' | 'chat'
+  action: 'list-tables' | 'get-schema' | 'get-all-schemas' | 'query' | 'chat'
 
   // For get-schema
   tables?: string[]
@@ -432,6 +432,9 @@ export function createTinyPivotHandler(options: TinyPivotHandlerOptions = {}): R
         case 'get-schema':
           return handleGetSchema(body.tables || [], connectionString, schemas, tableOptions, onError)
 
+        case 'get-all-schemas':
+          return handleGetAllSchemas(connectionString, schemas, tableOptions, onError)
+
         case 'query':
           return handleQuery(
             body.sql,
@@ -643,6 +646,117 @@ async function handleGetSchema(
     const err = error instanceof Error ? error : new Error(String(error))
     onError?.(err)
     return createErrorResponse(`Failed to get schema: ${err.message}`, 500)
+  }
+  finally {
+    await pool.end()
+  }
+}
+
+/**
+ * Handle get-all-schemas action - get schemas for ALL allowed tables at once
+ * This enables the AI to understand relationships and generate JOINs
+ */
+async function handleGetAllSchemas(
+  connectionString: string | undefined,
+  schemas: string[],
+  tableOptions: TableFilterOptions,
+  onError?: (error: Error) => void,
+): Promise<Response> {
+  // Check if pg is available
+  let Pool: typeof import('pg').Pool
+  try {
+    const pg = await import('pg')
+    Pool = pg.Pool
+  }
+  catch {
+    return createErrorResponse(
+      'PostgreSQL driver (pg) is not installed. Install it with: pnpm add pg',
+      500,
+    )
+  }
+
+  if (!connectionString) {
+    return createErrorResponse(
+      'Database connection not configured. Set DATABASE_URL environment variable.',
+      500,
+    )
+  }
+
+  const pool = new Pool({ connectionString })
+
+  try {
+    // First, get all allowed tables
+    const schemaPlaceholders = schemas.map((_, i) => `$${i + 1}`).join(', ')
+    const tablesResult = await pool.query(
+      `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema IN (${schemaPlaceholders})
+        AND table_type = 'BASE TABLE'
+      ORDER BY table_name
+      `,
+      schemas,
+    )
+
+    let tableNames = tablesResult.rows.map((row: { table_name: string }) => row.table_name)
+    tableNames = filterTables(tableNames, tableOptions)
+
+    if (tableNames.length === 0) {
+      const response: SchemaResponse = { schemas: [] }
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Get schemas for all tables in a single query for efficiency
+    const tablePlaceholders = tableNames.map((_: string, i: number) => `$${i + 1}`).join(', ')
+    const columnsResult = await pool.query(
+      `
+      SELECT 
+        table_name,
+        column_name,
+        data_type,
+        is_nullable
+      FROM information_schema.columns 
+      WHERE table_name IN (${tablePlaceholders})
+        AND table_schema = ANY($${tableNames.length + 1}::text[])
+      ORDER BY table_name, ordinal_position
+      `,
+      [...tableNames, schemas],
+    )
+
+    // Group columns by table
+    const tableMap = new Map<string, AIColumnSchema[]>()
+    for (const row of columnsResult.rows) {
+      const tableName = row.table_name as string
+      if (!tableMap.has(tableName)) {
+        tableMap.set(tableName, [])
+      }
+      tableMap.get(tableName)!.push({
+        name: row.column_name,
+        type: PG_TYPE_MAP[row.data_type.toLowerCase()] || 'unknown',
+        nullable: row.is_nullable === 'YES',
+      })
+    }
+
+    // Build response
+    const tableSchemas: AITableSchema[] = []
+    for (const [tableName, columns] of tableMap) {
+      tableSchemas.push({ table: tableName, columns })
+    }
+
+    const response: SchemaResponse = { schemas: tableSchemas }
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    onError?.(err)
+    return createErrorResponse(`Failed to get all schemas: ${err.message}`, 500)
   }
   finally {
     await pool.end()

@@ -93,6 +93,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
   // State
   const [conversation, setConversation] = useState<AIConversation>(() => loadFromStorage())
   const [schemas, setSchemas] = useState<Map<string, AITableSchema>>(new Map())
+  const [allSchemas, setAllSchemas] = useState<AITableSchema[]>([]) // All table schemas for JOINs
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastLoadedData, setLastLoadedData] = useState<Record<string, unknown>[] | null>(null)
@@ -122,6 +123,48 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
   )
   const messages = conversation.messages
   const hasMessages = conversation.messages.length > 0
+
+  /**
+   * Fetch schemas for ALL tables at once (enables JOINs)
+   */
+  const fetchAllSchemas = useCallback(async () => {
+    if (!configRef.current.endpoint)
+      return
+
+    try {
+      const response = await fetch(configRef.current.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-all-schemas' }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch all schemas: ${response.statusText}`)
+      }
+
+      const data: SchemaResponse = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Store all schemas for JOIN support
+      setAllSchemas(data.schemas)
+
+      // Also populate the individual schemas map
+      setSchemas((prev) => {
+        const newMap = new Map(prev)
+        for (const schema of data.schemas) {
+          newMap.set(schema.table, schema)
+        }
+        return newMap
+      })
+    }
+    catch (err) {
+      // Schema fetch is optional - continue without it
+      console.warn('[TinyPivot] Failed to fetch all schemas:', err)
+    }
+  }, [])
 
   /**
    * Fetch available tables from endpoint (auto-discovery mode)
@@ -155,6 +198,9 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
         name: t.name.charAt(0).toUpperCase() + t.name.slice(1), // Capitalize
         description: t.description,
       })))
+
+      // Fetch all schemas for JOIN support
+      await fetchAllSchemas()
     }
     catch (err) {
       console.warn('[TinyPivot] Failed to fetch tables:', err)
@@ -166,7 +212,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     finally {
       setIsLoadingTables(false)
     }
-  }, [onError])
+  }, [onError, fetchAllSchemas])
 
   // Initialize: fetch tables if using endpoint
   useEffect(() => {
@@ -335,6 +381,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     currentConversation: AIConversation,
     currentSchemas: Map<string, AITableSchema>,
     currentDataSources: AIDataSource[],
+    currentAllSchemas: AITableSchema[],
   ): Promise<string> => {
     if (!configRef.current.endpoint) {
       throw new Error('No endpoint configured. Set `endpoint` in AI analyst config.')
@@ -343,10 +390,12 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     const dataSourceId = currentConversation.dataSourceId
 
     // Build system prompt using effective data sources
+    // Pass allSchemas to enable JOINs with related tables
     const systemPrompt = buildSystemPrompt(
       currentDataSources,
       currentSchemas,
       dataSourceId,
+      currentAllSchemas.length > 0 ? currentAllSchemas : undefined,
     )
 
     // Get conversation messages for API
@@ -692,7 +741,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
       }
 
       // Call AI endpoint
-      const aiResponse = await callAIEndpoint(content, currentConv, schemas, effectiveDataSources)
+      const aiResponse = await callAIEndpoint(content, currentConv, schemas, effectiveDataSources, allSchemas)
 
       // Check if AI wants to run a query
       const sqlQuery = extractSQLFromResponse(aiResponse)

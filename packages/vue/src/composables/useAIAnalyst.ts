@@ -90,6 +90,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
   // State
   const conversation = ref<AIConversation>(loadFromStorage())
   const schemas = ref<Map<string, AITableSchema>>(new Map())
+  const allSchemas = ref<AITableSchema[]>([]) // All table schemas for JOINs
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const lastLoadedData = ref<Record<string, unknown>[] | null>(null)
@@ -146,6 +147,9 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
         name: t.name.charAt(0).toUpperCase() + t.name.slice(1), // Capitalize
         description: t.description,
       }))
+
+      // Fetch all schemas for JOIN support
+      await fetchAllSchemas()
     }
     catch (err) {
       console.warn('[TinyPivot] Failed to fetch tables:', err)
@@ -156,6 +160,44 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     }
     finally {
       isLoadingTables.value = false
+    }
+  }
+
+  /**
+   * Fetch schemas for ALL tables at once (enables JOINs)
+   */
+  async function fetchAllSchemas() {
+    if (!config.endpoint)
+      return
+
+    try {
+      const response = await fetch(config.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-all-schemas' }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch all schemas: ${response.statusText}`)
+      }
+
+      const data: SchemaResponse = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Store all schemas for JOIN support
+      allSchemas.value = data.schemas
+
+      // Also populate the individual schemas map
+      for (const schema of data.schemas) {
+        schemas.value.set(schema.table, schema)
+      }
+    }
+    catch (err) {
+      // Schema fetch is optional - continue without it
+      console.warn('[TinyPivot] Failed to fetch all schemas:', err)
     }
   }
 
@@ -478,10 +520,12 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     const dataSourceId = conversation.value.dataSourceId
 
     // Build system prompt using effective data sources
+    // Pass allSchemas to enable JOINs with related tables
     const systemPrompt = buildSystemPrompt(
       effectiveDataSources.value,
       schemas.value,
       dataSourceId,
+      allSchemas.value.length > 0 ? allSchemas.value : undefined,
     )
 
     // Get conversation messages for API
