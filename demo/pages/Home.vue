@@ -249,6 +249,7 @@ function copyInstallCommand() {
         </div>
         <div class="nav-links">
           <a href="#features">Features</a>
+          <a href="#ai-analyst">AI Analyst</a>
           <a href="#quickstart">Quick Start</a>
           <a href="#demo">Demo</a>
           <a href="#pricing">Pricing</a>
@@ -472,6 +473,136 @@ function copyInstallCommand() {
       </div>
     </section>
 
+    <!-- AI Data Analyst Section -->
+    <section id="ai-analyst" class="ai-analyst-section">
+      <div class="section-header">
+        <div class="badge badge-glow badge-ai">
+          Pro Feature
+        </div>
+        <h2>AI Data Analyst <span class="gradient-text">(BYOK)</span></h2>
+        <p>Let users explore data with natural language. Bring Your Own Key — use OpenAI, Anthropic, or any LLM.</p>
+      </div>
+
+      <div class="ai-demo-container">
+        <div class="ai-demo-gif">
+          <img src="/assets/tinypivot-ai.gif" alt="AI Data Analyst Demo - Ask questions in natural language" loading="lazy">
+        </div>
+        <div class="ai-demo-features">
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <div>
+              <h4>Natural Language Queries</h4>
+              <p>Users ask questions in plain English — no SQL knowledge needed</p>
+            </div>
+          </div>
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+            <div>
+              <h4>Bring Your Own Key</h4>
+              <p>Use your OpenAI, Anthropic, or OpenRouter API key — full cost control</p>
+            </div>
+          </div>
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <div>
+              <h4>Privacy-First</h4>
+              <p>Your data never passes through our servers — queries run in your environment</p>
+            </div>
+          </div>
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+            </svg>
+            <div>
+              <h4>Multiple Data Sources</h4>
+              <p>Connect PostgreSQL, DuckDB WASM, or any SQL backend</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-code-example">
+        <div class="example-header">
+          <span class="example-dot" />
+          <span class="example-dot" />
+          <span class="example-dot" />
+          <span class="example-title">{{ selectedFramework === 'vue' ? 'App.vue' : 'App.tsx' }} — AI Analyst Setup</span>
+        </div>
+        <div class="example-code">
+          <!-- Vue AI Example -->
+          <pre v-if="selectedFramework === 'vue'"><code><span class="code-tag">&lt;script setup lang="ts"&gt;</span>
+<span class="code-keyword">import</span> { DataGrid, setLicenseKey } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-vue'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-vue/style.css'</span>
+
+<span class="code-comment">// Activate Pro license</span>
+setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
+
+<span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
+
+<span class="code-comment">// AI Analyst configuration</span>
+<span class="code-keyword">const</span> aiConfig = {
+  enabled: <span class="code-keyword">true</span>,
+  endpoint: <span class="code-string">'/api/tinypivot'</span>,  <span class="code-comment">// Your server endpoint</span>
+  aiModelName: <span class="code-string">'Claude Sonnet'</span>,  <span class="code-comment">// Display in UI</span>
+  persistToLocalStorage: <span class="code-keyword">true</span>,
+}
+<span class="code-tag">&lt;/script&gt;</span>
+
+<span class="code-tag">&lt;template&gt;</span>
+  <span class="code-tag">&lt;DataGrid</span>
+    <span class="code-attr">:data</span>=<span class="code-string">"data"</span>
+    <span class="code-attr">:ai-analyst</span>=<span class="code-string">"aiConfig"</span>
+  <span class="code-tag">/&gt;</span>
+<span class="code-tag">&lt;/template&gt;</span></code></pre>
+          <!-- React AI Example -->
+          <pre v-else><code><span class="code-keyword">import</span> { DataGrid, setLicenseKey } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-react'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-react/style.css'</span>
+
+<span class="code-comment">// Activate Pro license</span>
+setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
+
+<span class="code-keyword">function</span> <span class="code-function">App</span>() {
+  <span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
+
+  <span class="code-comment">// AI Analyst configuration</span>
+  <span class="code-keyword">const</span> aiConfig = {
+    enabled: <span class="code-keyword">true</span>,
+    endpoint: <span class="code-string">'/api/tinypivot'</span>,  <span class="code-comment">// Your server endpoint</span>
+    aiModelName: <span class="code-string">'Claude Sonnet'</span>,  <span class="code-comment">// Display in UI</span>
+    persistToLocalStorage: <span class="code-keyword">true</span>,
+  }
+
+  <span class="code-keyword">return</span> (
+    <span class="code-tag">&lt;DataGrid</span>
+      <span class="code-attr">data</span>=<span class="code-string">{data}</span>
+      <span class="code-attr">aiAnalyst</span>=<span class="code-string">{aiConfig}</span>
+    <span class="code-tag">/&gt;</span>
+  )
+}
+
+<span class="code-keyword">export default</span> App</code></pre>
+        </div>
+      </div>
+
+      <div class="ai-cta">
+        <a href="https://github.com/Small-Web-Co/tinypivot/tree/master/examples/ai-analyst-demo" target="_blank" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+          </svg>
+          View Complete Example on GitHub
+        </a>
+        <p class="ai-cta-note">
+          Includes PostgreSQL backend, server handler setup, and DuckDB WASM for client-side queries
+        </p>
+      </div>
+    </section>
+
     <!-- Quick Start Section -->
     <section id="quickstart" class="quickstart">
       <div class="section-header">
@@ -680,7 +811,7 @@ function copyInstallCommand() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
           <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <span><strong>Try it now!</strong> Pivot table with Sum is free. All Pro features unlocked in this demo — click "Pivot" for pivot tables or "Chart" to build visualizations! Same API for Vue and React.</span>
+        <span><strong>Try it now!</strong> All Pro features unlocked — click "AI" to ask questions in natural language, "Pivot" for pivot tables, or "Chart" to build visualizations! Same API for Vue and React.</span>
       </div>
     </section>
 
@@ -1282,6 +1413,139 @@ function copyInstallCommand() {
 .feature-badge.pro {
   background: rgba(139, 92, 246, 0.15);
   color: #a78bfa;
+}
+
+/* AI Data Analyst Section */
+.ai-analyst-section {
+  padding: 6rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.ai-analyst-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse 60% 40% at 50% 30%, rgba(139, 92, 246, 0.1), transparent);
+  pointer-events: none;
+}
+
+.badge-ai {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2));
+  color: #a78bfa;
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.ai-demo-container {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 3rem;
+  margin: 3rem 0;
+  align-items: center;
+}
+
+.ai-demo-gif {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.ai-demo-gif img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ai-demo-features {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ai-feature {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.ai-feature svg {
+  flex-shrink: 0;
+  color: #a78bfa;
+}
+
+.ai-feature h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.ai-feature p {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.ai-code-example {
+  margin: 3rem 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1e1e2e;
+}
+
+.ai-code-example .example-header {
+  background: #181825;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-code-example .example-code {
+  padding: 1.5rem;
+  overflow-x: auto;
+}
+
+.ai-code-example pre {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+.ai-cta {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.ai-cta .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-cta-note {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .ai-demo-container {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .ai-demo-gif {
+    order: -1;
+  }
 }
 
 /* Quick Start */
