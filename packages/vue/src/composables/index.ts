@@ -1,3 +1,5 @@
+export { useAIAnalyst } from './useAIAnalyst'
+export type { UseAIAnalystOptions } from './useAIAnalyst'
 export { formatCellValue, getColumnUniqueValues, useExcelGrid } from './useExcelGrid'
 export {
   copyToClipboard,

@@ -18,6 +18,7 @@ const FREE_LICENSE: LicenseInfo = {
     sessionPersistence: false,
     noWatermark: false,
     charts: false, // Chart builder is Pro only
+    aiAnalyst: false, // AI Data Analyst is Pro only
   },
 }
 
@@ -31,6 +32,7 @@ const INVALID_LICENSE: LicenseInfo = {
     sessionPersistence: false,
     noWatermark: false,
     charts: false,
+    aiAnalyst: false,
   },
 }
 
@@ -44,6 +46,7 @@ const DEMO_LICENSE: LicenseInfo = {
     sessionPersistence: true,
     noWatermark: false, // Still show watermark in demo
     charts: true, // Demo can use charts
+    aiAnalyst: true, // Demo can use AI Analyst
   },
 }
 
@@ -258,6 +261,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
       sessionPersistence: type !== 'free',
       noWatermark: type !== 'free',
       charts: type !== 'free',
+      aiAnalyst: type !== 'free',
     },
   }
 }
@@ -326,6 +330,13 @@ export function canUsePivot(info: LicenseInfo): boolean {
  */
 export function canUseCharts(info: LicenseInfo): boolean {
   return info.features.charts
+}
+
+/**
+ * Check if license allows AI Data Analyst feature
+ */
+export function canUseAIAnalyst(info: LicenseInfo): boolean {
+  return info.features.aiAnalyst
 }
 
 /**

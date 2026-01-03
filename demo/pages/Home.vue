@@ -1,6 +1,20 @@
 <script setup lang="ts">
+import type { AIAnalystConfig, AIDataSource, AITableSchema, QueryExecutorResult } from '@smallwebco/tinypivot-core'
 import { DataGrid } from 'tinypivot'
 import { computed, ref } from 'vue'
+import { DATASETS, getDataset } from '../datasets'
+import { executeQuery as executeDuckDBQuery, initDuckDB, loadData } from '../utils/duckdb'
+
+// Track which datasets have been loaded into DuckDB
+const loadedDatasets = new Set<string>()
+
+// Convert datasets to AIDataSource format
+const AI_DATA_SOURCES: AIDataSource[] = DATASETS.map(d => ({
+  id: d.id,
+  table: d.tableName,
+  name: d.name,
+  description: d.description,
+}))
 
 // Framework toggle
 const selectedFramework = ref<'vue' | 'react'>('vue')
@@ -10,24 +24,33 @@ function generateSampleData(count: number) {
   const regions = ['North', 'South', 'East', 'West', 'Central', 'Northeast', 'Southeast', 'Northwest', 'Southwest']
   const products = ['Widget A', 'Widget B', 'Widget C', 'Gadget X', 'Gadget Y', 'Device Pro', 'Device Lite', 'Tool Plus']
   const categories = ['Electronics', 'Hardware', 'Software', 'Services', 'Accessories']
-  const quarters = ['Q1', 'Q2', 'Q3', 'Q4']
   const years = [2022, 2023, 2024]
   const salesReps = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack']
   const statuses = ['Completed', 'Pending', 'Processing', 'Shipped', 'Delivered']
 
-  // Generate dates spanning 3 years (2022-2024)
-  const startDate = new Date('2022-01-01')
-  const endDate = new Date('2024-12-31')
-  const dateRange = endDate.getTime() - startDate.getTime()
+  // Helper to get quarter from month (0-indexed)
+  function getQuarter(month: number): string {
+    if (month < 3)
+      return 'Q1'
+    if (month < 6)
+      return 'Q2'
+    if (month < 9)
+      return 'Q3'
+    return 'Q4'
+  }
 
   const data = []
   for (let i = 1; i <= count; i++) {
     const basePrice = Math.floor(Math.random() * 500) + 50
     const units = Math.floor(Math.random() * 200) + 10
 
-    // Generate a random date within the range
-    const randomDate = new Date(startDate.getTime() + Math.random() * dateRange)
+    // Generate a random year and month, then derive quarter from date
+    const year = years[Math.floor(Math.random() * years.length)]
+    const month = Math.floor(Math.random() * 12) // 0-11
+    const day = Math.floor(Math.random() * 28) + 1 // 1-28 to avoid month-end issues
+    const randomDate = new Date(year, month, day)
     const dateStr = randomDate.toISOString().split('T')[0] // YYYY-MM-DD format
+    const quarter = getQuarter(month)
 
     data.push({
       id: i,
@@ -37,8 +60,8 @@ function generateSampleData(count: number) {
       sales: basePrice * units,
       units,
       price: basePrice,
-      quarter: quarters[Math.floor(Math.random() * quarters.length)],
-      year: years[Math.floor(Math.random() * years.length)],
+      quarter,
+      year,
       rep: salesReps[Math.floor(Math.random() * salesReps.length)],
       status: statuses[Math.floor(Math.random() * statuses.length)],
       margin: Math.round((Math.random() * 30 + 10) * 100) / 100,
@@ -49,6 +72,69 @@ function generateSampleData(count: number) {
 }
 
 const sampleData = ref(generateSampleData(10000))
+
+// Custom data source loader - generates and loads data into DuckDB
+async function loadDataSource(dataSourceId: string): Promise<{ data: Record<string, unknown>[], schema?: AITableSchema }> {
+  console.log('[AI] Loading data source:', dataSourceId)
+
+  const dataset = getDataset(dataSourceId)
+  if (!dataset) {
+    console.error('[AI] Dataset not found:', dataSourceId, 'Available:', DATASETS.map(d => d.id))
+    throw new Error(`Dataset ${dataSourceId} not found`)
+  }
+
+  // Initialize DuckDB if needed
+  console.log('[AI] Initializing DuckDB...')
+  await initDuckDB()
+
+  // Generate and load data if not already loaded
+  if (!loadedDatasets.has(dataSourceId)) {
+    console.log('[AI] Generating dataset...')
+    const data = dataset.generate()
+    console.log('[AI] Loading', data.length, 'rows into DuckDB table:', dataset.tableName)
+    await loadData(dataset.tableName, data)
+    loadedDatasets.add(dataSourceId)
+    console.log('[AI] Dataset loaded successfully')
+  }
+
+  // Fetch first 100 rows as initial sample data for preview
+  const result = await executeDuckDBQuery(`SELECT * FROM ${dataset.tableName} LIMIT 100`)
+  console.log('[AI] Loaded', result.rows.length, 'sample rows for preview')
+
+  return { data: result.rows, schema: dataset.schema }
+}
+
+// Custom query executor - runs SQL via DuckDB WASM
+async function queryExecutor(sql: string, _table: string): Promise<QueryExecutorResult> {
+  try {
+    const result = await executeDuckDBQuery(sql)
+    return {
+      data: result.rows,
+      rowCount: result.rows.length,
+      truncated: false,
+    }
+  }
+  catch (err) {
+    return {
+      data: [],
+      rowCount: 0,
+      error: err instanceof Error ? err.message : 'Query failed',
+    }
+  }
+}
+
+// AI Analyst configuration with real AI + client-side DuckDB for queries
+// Uses /api/ai-proxy for LLM calls (Vercel serverless function)
+// Uses queryExecutor for running SQL against DuckDB WASM
+const aiAnalystConfig: AIAnalystConfig = {
+  enabled: true,
+  endpoint: '/api/ai-proxy', // Vercel serverless function for AI chat
+  dataSources: AI_DATA_SOURCES,
+  dataSourceLoader: loadDataSource,
+  queryExecutor, // Executes SQL via DuckDB WASM (client-side)
+  persistToLocalStorage: true,
+  aiModelName: __AI_MODEL__,
+}
 
 // Theme toggle
 const demoTheme = ref<'light' | 'dark'>('dark')
@@ -131,6 +217,8 @@ const freeFeatures = [
   'Row/Col Totals',
 ]
 const proFeatures = [
+  'AI Data Analyst (BYOK)',
+  'Natural Language Queries',
   'Chart Builder (6 types)',
   'All Aggregations (9+)',
   'Custom Functions',
@@ -370,6 +458,17 @@ function copyInstallCommand() {
           <p>6 chart types with drag-and-drop configuration</p>
           <span class="feature-badge pro">Pro</span>
         </div>
+
+        <div class="feature-card feature-card-highlight">
+          <div class="feature-icon feature-icon-gradient">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <h3>AI Data Analyst</h3>
+          <p>Natural language queries with your own API key (BYOK)</p>
+          <span class="feature-badge pro">Pro</span>
+        </div>
       </div>
     </section>
 
@@ -573,6 +672,7 @@ function copyInstallCommand() {
           :theme="demoTheme"
           :striped-rows="true"
           export-filename="tinypivot-demo.csv"
+          :ai-analyst="aiAnalystConfig"
         />
       </div>
 
@@ -1135,6 +1235,20 @@ function copyInstallCommand() {
 .feature-icon-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
 .feature-icon-indigo { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
 .feature-icon-rose { background: rgba(244, 63, 94, 0.15); color: #f43f5e; }
+.feature-icon-gradient {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+  color: #a78bfa;
+}
+
+.feature-card-highlight {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08));
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.feature-card-highlight:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.12));
+  border-color: rgba(139, 92, 246, 0.5);
+}
 
 .feature-card h3 {
   font-size: 0.9375rem;

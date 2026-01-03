@@ -23,8 +23,7 @@ import {
   processChartDataForPie,
   processChartDataForScatter,
 } from '@smallwebco/tinypivot-core'
-import { computed, onMounted, ref, watch } from 'vue'
-import VueApexCharts from 'vue3-apexcharts'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   data: Record<string, unknown>[]
@@ -34,6 +33,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'configChange', config: ChartConfig): void
 }>()
+
+// Lazy load ApexCharts only on client side to avoid SSR issues
+const VueApexCharts = defineAsyncComponent(() =>
+  import('vue3-apexcharts').then(m => m.default),
+)
 
 // Chart configuration state
 const chartConfig = ref<ChartConfig>(createDefaultChartConfig())
@@ -769,13 +773,21 @@ onMounted(() => {
       <!-- Chart Preview -->
       <div class="vpg-chart-preview-panel">
         <div v-if="chartIsValid" class="vpg-chart-container">
-          <VueApexCharts
-            :key="`${chartConfig.type}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}`"
-            :type="getApexChartType(chartConfig.type)"
-            :options="chartOptionsWithCategories"
-            :series="chartSeries"
-            height="100%"
-          />
+          <Suspense>
+            <VueApexCharts
+              :key="`${chartConfig.type}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}`"
+              :type="getApexChartType(chartConfig.type)"
+              :options="chartOptionsWithCategories"
+              :series="chartSeries"
+              height="100%"
+            />
+            <template #fallback>
+              <div class="vpg-chart-loading">
+                <div class="vpg-chart-spinner" />
+                <span>Loading chart...</span>
+              </div>
+            </template>
+          </Suspense>
         </div>
         <div v-else class="vpg-chart-empty-state">
           <svg class="vpg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">

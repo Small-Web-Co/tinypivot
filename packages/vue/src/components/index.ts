@@ -1,3 +1,4 @@
+export { default as AIAnalyst } from './AIAnalyst.vue'
 export { default as CalculatedFieldModal } from './CalculatedFieldModal.vue'
 export { default as ChartBuilder } from './ChartBuilder.vue'
 export { default as ColumnFilter } from './ColumnFilter.vue'

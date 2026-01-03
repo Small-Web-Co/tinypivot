@@ -157,6 +157,8 @@ export interface LicenseFeatures {
   noWatermark: boolean
   /** Chart builder feature (Pro only) */
   charts: boolean
+  /** AI Data Analyst feature (Pro only) */
+  aiAnalyst: boolean
 }
 
 export interface LicenseInfo {
@@ -365,4 +367,354 @@ export interface ChartSeries {
   data: number[]
   /** For bubble charts: additional data dimensions */
   extra?: Record<string, unknown>[]
+}
+
+// ============================================================================
+// AI Data Analyst Types
+// ============================================================================
+
+/** Supported AI providers */
+export type AIProvider = 'anthropic' | 'openai' | 'openrouter'
+
+/** Result from a custom query executor */
+export interface QueryExecutorResult {
+  /** Query results as an array of records */
+  data: Record<string, unknown>[]
+  /** Number of rows returned */
+  rowCount: number
+  /** Whether results were truncated */
+  truncated?: boolean
+  /** Error message if query failed */
+  error?: string
+}
+
+/** Custom function to execute SQL queries (e.g., using DuckDB client-side) */
+export type QueryExecutor = (sql: string, table: string) => Promise<QueryExecutorResult>
+
+/** Custom function to load data for a data source (called when user selects a source) */
+export type DataSourceLoader = (dataSourceId: string) => Promise<{
+  data: Record<string, unknown>[]
+  schema?: AITableSchema
+}>
+
+/**
+ * AI Analyst configuration passed to DataGrid
+ *
+ * ## Server-Side Mode (Recommended)
+ *
+ * Use a single `endpoint` that handles everything:
+ *
+ * ```typescript
+ * // Frontend
+ * <DataGrid
+ *   :data="[]"
+ *   :ai-analyst="{ endpoint: '/api/tinypivot' }"
+ * />
+ *
+ * // Backend (Next.js App Router)
+ * import { createTinyPivotHandler } from '@smallwebco/tinypivot-server'
+ * export const POST = createTinyPivotHandler()
+ * ```
+ *
+ * Set `DATABASE_URL` and `AI_API_KEY` in your environment.
+ *
+ * ## Demo Mode (Client-Side DuckDB)
+ *
+ * For demos, use `dataSources`, `queryExecutor`, and `dataSourceLoader`.
+ * See the TinyPivot demo for an example.
+ */
+export interface AIAnalystConfig {
+  /**
+   * Enable the AI Analyst feature (default: true if endpoint is provided)
+   */
+  enabled?: boolean
+
+  /**
+   * TinyPivot API endpoint that handles everything:
+   * - Table discovery
+   * - Schema introspection
+   * - Query execution
+   * - AI chat
+   *
+   * Use with `createTinyPivotHandler` from @smallwebco/tinypivot-server.
+   *
+   * @example '/api/tinypivot'
+   */
+  endpoint?: string
+
+  // === DEMO MODE: Client-side DuckDB ===
+
+  /**
+   * Available data sources (for demo/client-side mode only)
+   * Not needed when using `endpoint` - tables are auto-discovered.
+   */
+  dataSources?: AIDataSource[]
+
+  /**
+   * Custom query executor (for client-side DuckDB demos)
+   */
+  queryExecutor?: QueryExecutor
+
+  /**
+   * Custom data source loader (for client-side DuckDB demos)
+   */
+  dataSourceLoader?: DataSourceLoader
+
+  /**
+   * Enable demo mode with canned responses (no real AI calls)
+   */
+  demoMode?: boolean
+
+  // === Common options ===
+
+  /**
+   * Maximum rows to return from queries
+   * @default 10000
+   */
+  maxRows?: number
+
+  /**
+   * Session ID for conversation continuity
+   */
+  sessionId?: string
+
+  /**
+   * Persist conversations to localStorage
+   * @default false
+   */
+  persistToLocalStorage?: boolean
+
+  /**
+   * AI model display name to show in the UI
+   * Purely cosmetic - doesn't affect which model is used.
+   * @example "Claude 3.5 Sonnet"
+   */
+  aiModelName?: string
+}
+
+/** A database table/data source available for AI queries */
+export interface AIDataSource {
+  /** Unique identifier for this data source */
+  id: string
+  /** Database table name */
+  table: string
+  /** Display name shown in UI */
+  name: string
+  /** Description to help AI understand the data context */
+  description?: string
+  /** Column overrides for auto-discovered schema */
+  columns?: AIColumnOverride[]
+}
+
+/** Override settings for auto-discovered columns */
+export interface AIColumnOverride {
+  /** Column name in the database */
+  name: string
+  /** Rich description to help AI understand the column */
+  description?: string
+  /** Hide this column from AI queries */
+  hidden?: boolean
+}
+
+/** Schema for a database table (auto-discovered or provided) */
+export interface AITableSchema {
+  /** Table name */
+  table: string
+  /** Column definitions */
+  columns: AIColumnSchema[]
+}
+
+/** Schema for a database column */
+export interface AIColumnSchema {
+  /** Column name */
+  name: string
+  /** Data type */
+  type: 'string' | 'number' | 'date' | 'boolean' | 'unknown'
+  /** Whether column allows null values */
+  nullable: boolean
+  /** Rich description for AI context */
+  description?: string
+}
+
+/** A message in the AI conversation */
+export interface AIMessage {
+  /** Unique message identifier */
+  id: string
+  /** Message sender role */
+  role: 'user' | 'assistant' | 'system'
+  /** Message content */
+  content: string
+  /** Unix timestamp when message was created */
+  timestamp: number
+  /** Additional metadata about the message */
+  metadata?: AIMessageMetadata
+}
+
+/** Metadata attached to AI messages */
+export interface AIMessageMetadata {
+  /** SQL query if this message triggered a database query */
+  query?: string
+  /** Number of rows returned */
+  rowCount?: number
+  /** Error message if query failed */
+  error?: string
+  /** Duration of query execution in ms */
+  duration?: number
+  /** Data source ID that was queried */
+  dataSourceId?: string
+  /** Query result data (for displaying in preview) */
+  data?: Record<string, unknown>[]
+}
+
+/** A conversation session with the AI */
+export interface AIConversation {
+  /** Unique conversation identifier */
+  id: string
+  /** Messages in the conversation */
+  messages: AIMessage[]
+  /** Currently selected data source ID */
+  dataSourceId?: string
+  /** Unix timestamp when conversation was created */
+  createdAt: number
+  /** Unix timestamp when conversation was last updated */
+  updatedAt: number
+}
+
+// ============================================================================
+// AI Analyst API Contracts (for server package and custom implementations)
+// ============================================================================
+
+/** Request to execute a SQL query */
+export interface QueryRequest {
+  /** SQL query to execute (SELECT only) */
+  sql: string
+  /** Table name (for validation against whitelist) */
+  table: string
+  /** Parameterized values for the query */
+  params?: unknown[]
+}
+
+/** Response from a SQL query execution */
+export interface QueryResponse {
+  /** Whether the query succeeded */
+  success: boolean
+  /** Query result data */
+  data?: Record<string, unknown>[]
+  /** Number of rows returned */
+  rowCount?: number
+  /** Error message if query failed */
+  error?: string
+  /** Whether results were truncated due to maxRows limit */
+  truncated?: boolean
+  /** Query execution time in ms */
+  duration?: number
+}
+
+/** Request to the AI proxy endpoint */
+export interface AIProxyRequest {
+  /** Conversation messages */
+  messages: Array<{ role: 'user' | 'assistant' | 'system', content: string }>
+  /** Model to use (optional, provider-specific default) */
+  model?: string
+}
+
+/** Response from the AI proxy endpoint */
+export interface AIProxyResponse {
+  /** AI response content */
+  content: string
+  /** Error message if request failed */
+  error?: string
+}
+
+/** Request to discover schema for tables */
+export interface SchemaRequest {
+  /** Table names to introspect */
+  tables: string[]
+}
+
+/** Response with discovered schemas */
+export interface SchemaResponse {
+  /** Discovered table schemas */
+  schemas: AITableSchema[]
+  /** Error message if discovery failed */
+  error?: string
+}
+
+// ============================================================================
+// Unified Database Endpoint Types (for simplified databaseEndpoint mode)
+// ============================================================================
+
+/** Request to the unified database endpoint */
+export interface DatabaseEndpointRequest {
+  /** Action to perform */
+  action: 'list-tables' | 'get-schema' | 'query'
+  /** Table names for schema discovery (action: 'get-schema') */
+  tables?: string[]
+  /** SQL query (action: 'query') */
+  sql?: string
+  /** Primary table being queried (action: 'query') */
+  table?: string
+  /** Query parameters (action: 'query') */
+  params?: unknown[]
+}
+
+/** Response from list-tables action */
+export interface ListTablesResponse {
+  /** List of available tables */
+  tables: Array<{
+    /** Table name */
+    name: string
+    /** Optional description for AI context */
+    description?: string
+  }>
+  /** Error message if request failed */
+  error?: string
+}
+
+// ============================================================================
+// AI Analyst Event Types
+// ============================================================================
+
+/** Event emitted when AI loads data into the grid */
+export interface AIDataLoadedEvent {
+  /** The data that was loaded */
+  data: Record<string, unknown>[]
+  /** The SQL query that produced this data */
+  query: string
+  /** Data source that was queried */
+  dataSourceId: string
+  /** Number of rows returned */
+  rowCount: number
+}
+
+/** Event emitted when the conversation updates */
+export interface AIConversationUpdateEvent {
+  /** The updated conversation */
+  conversation: AIConversation
+}
+
+/** Event emitted when a query is executed */
+export interface AIQueryExecutedEvent {
+  /** The SQL query that was executed */
+  query: string
+  /** Number of rows returned */
+  rowCount: number
+  /** Query execution duration in ms */
+  duration: number
+  /** Data source that was queried */
+  dataSourceId: string
+  /** Whether the query succeeded */
+  success: boolean
+  /** Error message if query failed */
+  error?: string
+}
+
+/** Event emitted when an AI error occurs */
+export interface AIErrorEvent {
+  /** Error message */
+  message: string
+  /** The query that caused the error (if applicable) */
+  query?: string
+  /** Error type classification */
+  type: 'query' | 'ai' | 'network' | 'validation'
 }

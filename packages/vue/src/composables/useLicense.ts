@@ -1,5 +1,6 @@
 import type { LicenseInfo } from '@smallwebco/tinypivot-core'
 import {
+  canUseAIAnalyst as coreCanUseAIAnalyst,
   canUseCharts as coreCanUseCharts,
   canUsePivot as coreCanUsePivot,
   configureLicenseSecret as coreConfigureLicenseSecret,
@@ -88,6 +89,8 @@ export function useLicense() {
 
   const canUseCharts = computed(() => demoMode.value || coreCanUseCharts(licenseInfo.value))
 
+  const canUseAIAnalyst = computed(() => demoMode.value || coreCanUseAIAnalyst(licenseInfo.value))
+
   const showWatermark = computed(() => coreShouldShowWatermark(licenseInfo.value, demoMode.value))
 
   function requirePro(feature: string): boolean {
@@ -106,6 +109,7 @@ export function useLicense() {
     canUseAdvancedAggregations,
     canUsePercentageMode,
     canUseCharts,
+    canUseAIAnalyst,
     showWatermark,
     requirePro,
   }

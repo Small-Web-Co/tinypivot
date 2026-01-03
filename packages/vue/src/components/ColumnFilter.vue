@@ -44,15 +44,6 @@ const filterMode = ref<FilterMode>(props.numericRange ? 'range' : 'values')
 // Local range for the numeric filter
 const localRange = ref<NumericRange | null>(props.numericRange ?? null)
 
-// Get all possible values including blank (kept for potential future use)
-const _allPossibleValues = computed(() => {
-  const values = [...props.stats.uniqueValues]
-  if (props.stats.nullCount > 0) {
-    values.unshift('(blank)')
-  }
-  return values
-})
-
 // Initialize with selected values
 const localSelected = ref<Set<string>>(new Set(props.selectedValues))
 
@@ -76,15 +67,6 @@ const allValues = computed(() => {
     values.unshift('(blank)')
   }
   return values
-})
-
-// Check states (kept for potential future use)
-const _isAllSelected = computed(() => {
-  return allValues.value.every(v => localSelected.value.has(v))
-})
-
-const _isNoneSelected = computed(() => {
-  return localSelected.value.size === 0
 })
 
 // Toggle single value

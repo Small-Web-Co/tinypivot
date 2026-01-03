@@ -1,3 +1,4 @@
+export { AIAnalyst } from './AIAnalyst'
 export { CalculatedFieldModal } from './CalculatedFieldModal'
 export { ChartBuilder } from './ChartBuilder'
 export { ColumnFilter } from './ColumnFilter'

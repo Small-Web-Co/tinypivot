@@ -1,0 +1,54 @@
+{
+  "name": "@smallwebco/tinypivot-server",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Optional backend handlers for TinyPivot AI Data Analyst",
+  "license": "MIT",
+  "homepage": "https://tiny-pivot.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smallwebco/tinypivot.git",
+    "directory": "packages/server"
+  },
+  "keywords": [
+    "tinypivot",
+    "ai",
+    "data-analyst",
+    "postgresql",
+    "sql"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "pg": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.6",
+    "tsup": "^8.0.1",
+    "typescript": "~5.6.2"
+  }
+}

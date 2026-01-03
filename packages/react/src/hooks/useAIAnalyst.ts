@@ -1,0 +1,772 @@
+/**
+ * TinyPivot React - AI Analyst Hook
+ * Manages AI conversation state and data fetching
+ */
+import type {
+  AIAnalystConfig,
+  AIConversation,
+  AIConversationUpdateEvent,
+  AIDataLoadedEvent,
+  AIDataSource,
+  AIErrorEvent,
+  AIProxyResponse,
+  AIQueryExecutedEvent,
+  AITableSchema,
+  ListTablesResponse,
+  SchemaResponse,
+} from '@smallwebco/tinypivot-core'
+import {
+  addMessageToConversation,
+  buildSystemPrompt,
+  createAssistantMessage,
+  createConversation,
+  createUserMessage,
+  extractSQLFromResponse,
+  findDemoResponse,
+  getDefaultDemoResponse,
+  getDemoSchema,
+  getInitialDemoData,
+  getMessagesForAPI,
+  setConversationDataSource,
+  validateSQLSafety,
+} from '@smallwebco/tinypivot-core'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+export interface UseAIAnalystOptions {
+  config: AIAnalystConfig
+  onDataLoaded?: (event: AIDataLoadedEvent) => void
+  onConversationUpdate?: (event: AIConversationUpdateEvent) => void
+  onQueryExecuted?: (event: AIQueryExecutedEvent) => void
+  onError?: (event: AIErrorEvent) => void
+}
+
+export function useAIAnalyst(options: UseAIAnalystOptions) {
+  const { config, onDataLoaded, onConversationUpdate, onQueryExecuted, onError } = options
+
+  // Use refs to avoid stale closures in callbacks
+  const configRef = useRef(config)
+  configRef.current = config
+
+  // LocalStorage key for persistence
+  const storageKey = config.persistToLocalStorage
+    ? `tinypivot-ai-conversation-${config.sessionId || 'default'}`
+    : null
+
+  // Load initial conversation from localStorage if enabled
+  const loadFromStorage = useCallback((): AIConversation => {
+    if (storageKey && typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(storageKey)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (parsed.id && Array.isArray(parsed.messages)) {
+            return parsed as AIConversation
+          }
+        }
+      }
+      catch (e) {
+        console.warn('[TinyPivot] Failed to load conversation from localStorage:', e)
+      }
+    }
+    return createConversation(config.sessionId)
+  }, [storageKey, config.sessionId])
+
+  // Save conversation to localStorage if enabled
+  const saveToStorage = useCallback((conv: AIConversation) => {
+    if (storageKey && typeof window !== 'undefined') {
+      try {
+        // Custom replacer to handle BigInt values (common in DuckDB results)
+        const replacer = (_key: string, value: unknown) => {
+          if (typeof value === 'bigint') {
+            return Number(value)
+          }
+          return value
+        }
+        localStorage.setItem(storageKey, JSON.stringify(conv, replacer))
+      }
+      catch (e) {
+        console.warn('[TinyPivot] Failed to save conversation to localStorage:', e)
+      }
+    }
+  }, [storageKey])
+
+  // State
+  const [conversation, setConversation] = useState<AIConversation>(() => loadFromStorage())
+  const [schemas, setSchemas] = useState<Map<string, AITableSchema>>(new Map())
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [lastLoadedData, setLastLoadedData] = useState<Record<string, unknown>[] | null>(null)
+
+  // Dynamic data sources (discovered from endpoint)
+  const [discoveredDataSources, setDiscoveredDataSources] = useState<AIDataSource[]>([])
+  const [isLoadingTables, setIsLoadingTables] = useState(false)
+
+  // Get effective data sources (config or discovered)
+  const effectiveDataSources = useMemo<AIDataSource[]>(() => {
+    if (config.dataSources && config.dataSources.length > 0) {
+      return config.dataSources
+    }
+    return discoveredDataSources
+  }, [config.dataSources, discoveredDataSources])
+
+  // Save to storage whenever conversation changes
+  useEffect(() => {
+    saveToStorage(conversation)
+  }, [conversation, saveToStorage])
+
+  // Computed values
+  const selectedDataSource = conversation.dataSourceId
+  const selectedDataSourceInfo = useMemo(
+    () => effectiveDataSources.find((ds: AIDataSource) => ds.id === conversation.dataSourceId),
+    [effectiveDataSources, conversation.dataSourceId],
+  )
+  const messages = conversation.messages
+  const hasMessages = conversation.messages.length > 0
+
+  /**
+   * Fetch available tables from endpoint (auto-discovery mode)
+   */
+  const fetchTables = useCallback(async () => {
+    if (!configRef.current.endpoint)
+      return
+
+    setIsLoadingTables(true)
+    try {
+      const response = await fetch(configRef.current.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list-tables' }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tables: ${response.statusText}`)
+      }
+
+      const data: ListTablesResponse = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Convert to AIDataSource format
+      setDiscoveredDataSources(data.tables.map((t: { name: string, description?: string }) => ({
+        id: t.name,
+        table: t.name,
+        name: t.name.charAt(0).toUpperCase() + t.name.slice(1), // Capitalize
+        description: t.description,
+      })))
+    }
+    catch (err) {
+      console.warn('[TinyPivot] Failed to fetch tables:', err)
+      onError?.({
+        message: err instanceof Error ? err.message : 'Failed to fetch tables',
+        type: 'network',
+      })
+    }
+    finally {
+      setIsLoadingTables(false)
+    }
+  }, [onError])
+
+  // Initialize: fetch tables if using endpoint
+  useEffect(() => {
+    if (configRef.current.endpoint && (!config.dataSources || config.dataSources.length === 0)) {
+      fetchTables()
+    }
+  }, [fetchTables, config.dataSources])
+
+  /**
+   * Fetch schema from the unified endpoint
+   */
+  const fetchSchema = useCallback(async (dataSource: AIDataSource) => {
+    if (!configRef.current.endpoint)
+      return
+
+    try {
+      const response = await fetch(configRef.current.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-schema',
+          tables: [dataSource.table],
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch schema: ${response.statusText}`)
+      }
+
+      const data: SchemaResponse = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      if (data.schemas.length > 0) {
+        setSchemas(prev => new Map(prev).set(dataSource.id, data.schemas[0]))
+      }
+    }
+    catch (err) {
+      // Schema fetch is optional - continue without it
+      console.warn('Failed to fetch schema:', err)
+    }
+  }, [])
+
+  /**
+   * Select a data source and fetch its schema
+   */
+  const selectDataSource = useCallback(async (dataSourceId: string) => {
+    const dataSource = effectiveDataSources.find(ds => ds.id === dataSourceId)
+    if (!dataSource) {
+      setError(`Data source "${dataSourceId}" not found`)
+      return
+    }
+
+    // Update conversation
+    setConversation((prev) => {
+      const updated = setConversationDataSource(prev, dataSourceId)
+      const withMessage = addMessageToConversation(
+        updated,
+        createAssistantMessage(
+          `I'm now connected to **${dataSource.name}**. ${dataSource.description || ''}\n\nWhat would you like to know about this data?`,
+        ),
+      )
+      onConversationUpdate?.({ conversation: withMessage })
+      return withMessage
+    })
+
+    // Load data source if custom loader is provided (demo mode)
+    if (configRef.current.dataSourceLoader) {
+      try {
+        const { data, schema } = await configRef.current.dataSourceLoader(dataSourceId)
+        if (schema) {
+          setSchemas(prev => new Map(prev).set(dataSourceId, schema))
+        }
+        // Store the loaded data for the data source
+        if (data && data.length > 0) {
+          setLastLoadedData(data)
+          onDataLoaded?.({
+            data,
+            query: `SELECT * FROM ${dataSource.table} LIMIT 100`,
+            dataSourceId,
+            rowCount: data.length,
+          })
+        }
+      }
+      catch (err) {
+        console.warn('Failed to load data source:', err)
+      }
+    }
+    // Fetch schema (demo mode uses mock schemas)
+    else if (configRef.current.demoMode) {
+      const demoSchema = getDemoSchema(dataSourceId)
+      if (demoSchema) {
+        setSchemas(prev => new Map(prev).set(dataSourceId, demoSchema))
+      }
+      // Load initial sample data for the preview
+      const initialData = getInitialDemoData(dataSourceId)
+      if (initialData) {
+        setLastLoadedData(initialData)
+        onDataLoaded?.({
+          data: initialData,
+          query: `SELECT * FROM ${dataSource.table} LIMIT 10`,
+          dataSourceId,
+          rowCount: initialData.length,
+        })
+      }
+    }
+    // Use endpoint for schema discovery
+    else if (configRef.current.endpoint) {
+      await fetchSchema(dataSource)
+    }
+  }, [effectiveDataSources, fetchSchema, onConversationUpdate, onDataLoaded])
+
+  /**
+   * Call the AI endpoint
+   */
+  const callAIEndpoint = useCallback(async (
+    userInput: string,
+    currentConversation: AIConversation,
+    currentSchemas: Map<string, AITableSchema>,
+    currentDataSources: AIDataSource[],
+  ): Promise<string> => {
+    if (!configRef.current.endpoint) {
+      throw new Error('No endpoint configured. Set `endpoint` in AI analyst config.')
+    }
+
+    const dataSourceId = currentConversation.dataSourceId
+
+    // Build system prompt using effective data sources
+    const systemPrompt = buildSystemPrompt(
+      currentDataSources,
+      currentSchemas,
+      dataSourceId,
+    )
+
+    // Get conversation messages for API
+    const apiMessages = getMessagesForAPI(currentConversation)
+
+    // Add system prompt and current user message
+    const messages = [
+      { role: 'user' as const, content: systemPrompt },
+      { role: 'assistant' as const, content: 'I understand. I\'m ready to help you analyze the data.' },
+      ...apiMessages.slice(0, -1), // Exclude the just-added user message
+      { role: 'user' as const, content: userInput },
+    ]
+
+    const response = await fetch(configRef.current.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'chat', messages }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`AI request failed: ${response.statusText}`)
+    }
+
+    const data: AIProxyResponse = await response.json()
+
+    if (data.error) {
+      throw new Error(data.error)
+    }
+
+    return data.content
+  }, [])
+
+  /**
+   * Execute a SQL query and update the specified message with results
+   * @param sql The SQL query to execute
+   * @param currentConversation Current conversation state
+   * @param currentDataSources Available data sources
+   * @param messageId Optional message ID to update with results (instead of adding new message)
+   */
+  const executeQuery = useCallback(async (
+    sql: string,
+    currentConversation: AIConversation,
+    currentDataSources: AIDataSource[],
+    messageId?: string,
+  ) => {
+    const dataSourceId = currentConversation.dataSourceId
+    if (!dataSourceId)
+      return
+
+    const dataSource = currentDataSources.find((ds: { id: string }) => ds.id === dataSourceId)
+    if (!dataSource)
+      return
+
+    const startTime = Date.now()
+
+    try {
+      let data: { data?: Record<string, unknown>[], rowCount?: number, truncated?: boolean, error?: string, success?: boolean }
+
+      // Use custom query executor if provided (demo mode)
+      if (configRef.current.queryExecutor) {
+        const result = await configRef.current.queryExecutor(sql, dataSource.table)
+        data = {
+          data: result.data,
+          rowCount: result.rowCount,
+          truncated: result.truncated,
+          error: result.error,
+          success: !result.error,
+        }
+      }
+      // Use unified endpoint
+      else if (configRef.current.endpoint) {
+        const response = await fetch(configRef.current.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'query',
+            sql,
+            table: dataSource.table,
+          }),
+        })
+
+        data = await response.json()
+      }
+      else {
+        throw new Error('No query executor or endpoint configured')
+      }
+
+      const duration = Date.now() - startTime
+
+      if (!data.success || data.error) {
+        // Add error message
+        setConversation((prev: AIConversation) => {
+          const updated = addMessageToConversation(
+            prev,
+            createAssistantMessage(
+              `The query failed: ${data.error || 'Unknown error'}. Would you like me to try a different approach?`,
+              { error: data.error, query: sql },
+            ),
+          )
+          onConversationUpdate?.({ conversation: updated })
+          return updated
+        })
+
+        onQueryExecuted?.({
+          query: sql,
+          rowCount: 0,
+          duration,
+          dataSourceId,
+          success: false,
+          error: data.error,
+        })
+
+        onError?.({
+          message: data.error || 'Query failed',
+          query: sql,
+          type: 'query',
+        })
+        return
+      }
+
+      // Success - load data
+      if (data.data) {
+        setLastLoadedData(data.data)
+
+        // Update the existing message with data, or add a new one if no messageId
+        if (messageId) {
+          // Find and update the existing message's metadata with the data
+          setConversation((prev: AIConversation) => {
+            const updatedMessages = prev.messages.map((msg) => {
+              if (msg.id === messageId) {
+                return {
+                  ...msg,
+                  metadata: {
+                    ...msg.metadata,
+                    data: data.data,
+                    rowCount: data.rowCount,
+                    truncated: data.truncated,
+                  },
+                }
+              }
+              return msg
+            })
+            const updated = {
+              ...prev,
+              messages: updatedMessages,
+              updatedAt: Date.now(),
+            }
+            onConversationUpdate?.({ conversation: updated })
+            return updated
+          })
+        }
+        else {
+          // Fallback: add a new message (shouldn't happen in normal flow)
+          const truncatedNote = data.truncated
+            ? ` (limited to ${configRef.current.maxRows || 10000} rows)`
+            : ''
+
+          setConversation((prev: AIConversation) => {
+            const updated = addMessageToConversation(
+              prev,
+              createAssistantMessage(
+                `Retrieved **${data.rowCount} rows**${truncatedNote}.`,
+                { query: sql, rowCount: data.rowCount, data: data.data },
+              ),
+            )
+            onConversationUpdate?.({ conversation: updated })
+            return updated
+          })
+        }
+
+        onDataLoaded?.({
+          data: data.data,
+          query: sql,
+          dataSourceId,
+          rowCount: data.rowCount || data.data.length,
+        })
+
+        onQueryExecuted?.({
+          query: sql,
+          rowCount: data.rowCount || data.data.length,
+          duration,
+          dataSourceId,
+          success: true,
+        })
+      }
+    }
+    catch (err) {
+      const duration = Date.now() - startTime
+      const errorMsg = err instanceof Error ? err.message : 'Query execution failed'
+
+      setConversation((prev: AIConversation) => {
+        const updated = addMessageToConversation(
+          prev,
+          createAssistantMessage(
+            `Failed to execute query: ${errorMsg}`,
+            { error: errorMsg, query: sql },
+          ),
+        )
+        onConversationUpdate?.({ conversation: updated })
+        return updated
+      })
+
+      onQueryExecuted?.({
+        query: sql,
+        rowCount: 0,
+        duration,
+        dataSourceId,
+        success: false,
+        error: errorMsg,
+      })
+
+      onError?.({
+        message: errorMsg,
+        query: sql,
+        type: 'network',
+      })
+    }
+  }, [onConversationUpdate, onDataLoaded, onQueryExecuted, onError])
+
+  /**
+   * Handle demo mode responses
+   */
+  const handleDemoResponse = useCallback(async (
+    userInput: string,
+    currentConversation: AIConversation,
+  ) => {
+    // Simulate loading delay
+    await new Promise(resolve => setTimeout(resolve, 800))
+
+    const dataSourceId = currentConversation.dataSourceId
+
+    if (!dataSourceId) {
+      setConversation((prev) => {
+        const updated = addMessageToConversation(
+          prev,
+          createAssistantMessage(
+            'Please select a data source first by clicking one of the options above.',
+          ),
+        )
+        onConversationUpdate?.({ conversation: updated })
+        return updated
+      })
+      return
+    }
+
+    // Find matching demo response
+    const demoTrigger = findDemoResponse(dataSourceId, userInput)
+
+    if (demoTrigger) {
+      // Add AI response
+      setConversation((prev) => {
+        const updated = addMessageToConversation(
+          prev,
+          createAssistantMessage(demoTrigger.response, {
+            query: demoTrigger.query,
+            rowCount: demoTrigger.mockData?.length,
+          }),
+        )
+        onConversationUpdate?.({ conversation: updated })
+        return updated
+      })
+
+      // Load mock data
+      if (demoTrigger.mockData) {
+        setLastLoadedData(demoTrigger.mockData)
+
+        onDataLoaded?.({
+          data: demoTrigger.mockData,
+          query: demoTrigger.query || '',
+          dataSourceId,
+          rowCount: demoTrigger.mockData.length,
+        })
+
+        onQueryExecuted?.({
+          query: demoTrigger.query || '',
+          rowCount: demoTrigger.mockData.length,
+          duration: 150, // Fake duration
+          dataSourceId,
+          success: true,
+        })
+      }
+    }
+    else {
+      // Use default response
+      const defaultResponse = getDefaultDemoResponse(dataSourceId)
+      setConversation((prev) => {
+        const updated = addMessageToConversation(
+          prev,
+          createAssistantMessage(defaultResponse),
+        )
+        onConversationUpdate?.({ conversation: updated })
+        return updated
+      })
+    }
+  }, [onConversationUpdate, onDataLoaded, onQueryExecuted])
+
+  /**
+   * Send a message to the AI
+   */
+  const sendMessage = useCallback(async (content: string) => {
+    if (!content.trim())
+      return
+    if (isLoading)
+      return
+
+    setError(null)
+    setIsLoading(true)
+
+    // Add user message
+    let updatedConversation: AIConversation
+    setConversation((prev) => {
+      updatedConversation = addMessageToConversation(prev, createUserMessage(content))
+      onConversationUpdate?.({ conversation: updatedConversation })
+      return updatedConversation
+    })
+
+    try {
+      // Wait for state to update
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      // Get current state
+      const currentConv = updatedConversation!
+
+      // Handle demo mode
+      if (configRef.current.demoMode) {
+        await handleDemoResponse(content, currentConv)
+        return
+      }
+
+      // Check if data source is selected
+      if (!currentConv.dataSourceId) {
+        setConversation((prev) => {
+          const updated = addMessageToConversation(
+            prev,
+            createAssistantMessage(
+              'Please select a data source first by clicking one of the options above.',
+            ),
+          )
+          onConversationUpdate?.({ conversation: updated })
+          return updated
+        })
+        return
+      }
+
+      // Call AI endpoint
+      const aiResponse = await callAIEndpoint(content, currentConv, schemas, effectiveDataSources)
+
+      // Check if AI wants to run a query
+      const sqlQuery = extractSQLFromResponse(aiResponse)
+
+      if (sqlQuery) {
+        // Validate SQL
+        const validation = validateSQLSafety(sqlQuery)
+        if (!validation.valid) {
+          setConversation((prev) => {
+            const updated = addMessageToConversation(
+              prev,
+              createAssistantMessage(
+                `I generated an invalid query: ${validation.error}. Let me try again with a corrected approach.`,
+                { error: validation.error },
+              ),
+            )
+            onConversationUpdate?.({ conversation: updated })
+            return updated
+          })
+          return
+        }
+
+        // Create the AI message and capture its ID for updating with query results
+        const aiMessage = createAssistantMessage(aiResponse, { query: sqlQuery })
+
+        setConversation((prev) => {
+          const updated = addMessageToConversation(prev, aiMessage)
+          onConversationUpdate?.({ conversation: updated })
+          return updated
+        })
+
+        // Execute query and update the same message with data
+        await executeQuery(sqlQuery, currentConv, effectiveDataSources, aiMessage.id)
+      }
+      else {
+        // Just add AI response
+        setConversation((prev) => {
+          const updated = addMessageToConversation(
+            prev,
+            createAssistantMessage(aiResponse),
+          )
+          onConversationUpdate?.({ conversation: updated })
+          return updated
+        })
+      }
+    }
+    catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'An error occurred'
+      setError(errorMsg)
+
+      setConversation((prev) => {
+        const updated = addMessageToConversation(
+          prev,
+          createAssistantMessage(
+            `Sorry, I encountered an error: ${errorMsg}. Please try again.`,
+            { error: errorMsg },
+          ),
+        )
+        onConversationUpdate?.({ conversation: updated })
+        return updated
+      })
+
+      onError?.({
+        message: errorMsg,
+        type: 'ai',
+      })
+    }
+    finally {
+      setIsLoading(false)
+    }
+  }, [isLoading, schemas, effectiveDataSources, callAIEndpoint, executeQuery, handleDemoResponse, onConversationUpdate, onError])
+
+  /**
+   * Clear the conversation
+   */
+  const clearConversation = useCallback(() => {
+    const newConv = createConversation(configRef.current.sessionId)
+    setConversation(newConv)
+    setError(null)
+    setLastLoadedData(null)
+    onConversationUpdate?.({ conversation: newConv })
+  }, [onConversationUpdate])
+
+  /**
+   * Export conversation for persistence
+   */
+  const exportConversation = useCallback((): AIConversation => {
+    return { ...conversation }
+  }, [conversation])
+
+  /**
+   * Import a conversation
+   */
+  const importConversation = useCallback((conv: AIConversation) => {
+    setConversation(conv)
+    onConversationUpdate?.({ conversation: conv })
+  }, [onConversationUpdate])
+
+  return {
+    // State
+    conversation,
+    messages,
+    hasMessages,
+    schemas,
+    isLoading,
+    isLoadingTables,
+    error,
+    lastLoadedData,
+    selectedDataSource,
+    selectedDataSourceInfo,
+    /** Available data sources (either from config or auto-discovered) */
+    dataSources: effectiveDataSources,
+
+    // Actions
+    selectDataSource,
+    sendMessage,
+    clearConversation,
+    exportConversation,
+    importConversation,
+    /** Refresh table list from endpoint */
+    fetchTables,
+  }
+}

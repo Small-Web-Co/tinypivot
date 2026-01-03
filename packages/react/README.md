@@ -1,8 +1,15 @@
 # @smallwebco/tinypivot-react
 
-A powerful Excel-like data grid and pivot table component for React.
+A lightweight, AI-ready data grid with pivot tables and charts for React. **Under 40KB gzipped** — 10x smaller than AG Grid.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
+
+## Why TinyPivot?
+
+- **Lightweight**: Under 40KB gzipped vs 500KB+ for AG Grid
+- **AI-Ready**: Natural language data exploration with your own API key (BYOK)
+- **Batteries Included**: Pivot tables, charts, and Excel-like features out of the box
+- **One-Time License**: No subscriptions — pay once, use forever
 
 ## Installation
 
@@ -49,6 +56,8 @@ export default function App() {
 | Column resizing | ✅ | ✅ |
 | Clipboard (Ctrl+C) | ✅ | ✅ |
 | Dark mode | ✅ | ✅ |
+| **AI Data Analyst** (natural language, BYOK) | ❌ | ✅ |
+| **Chart Builder** (6 chart types) | ❌ | ✅ |
 | Pivot table | ❌ | ✅ |
 | Aggregations (Sum, Avg, etc.) | ❌ | ✅ |
 | Row/column totals | ❌ | ✅ |
@@ -78,6 +87,87 @@ export default function App() {
 | `onSelectionChange` | `(payload) => void` | Selection changed |
 | `onExport` | `(payload) => void` | CSV exported |
 | `onCopy` | `(payload) => void` | Cells copied |
+
+## AI Data Analyst (Pro)
+
+Enable natural language data exploration with your own AI API key (BYOK).
+
+```tsx
+import { DataGrid } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+
+const data = [/* your data */]
+
+const aiConfig = {
+  enabled: true,
+  aiEndpoint: '/api/ai-proxy',           // Your AI proxy endpoint
+  databaseEndpoint: '/api/tp-database',  // Optional: auto-discover tables
+  aiModelName: 'Claude Sonnet 4',        // Optional: display in UI
+  persistToLocalStorage: true,           // Preserve conversation on tab switch
+}
+
+export default function App() {
+  return (
+    <DataGrid
+      data={data}
+      aiAnalyst={aiConfig}
+    />
+  )
+}
+```
+
+### AI Analyst Config Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `enabled` | `boolean` | Enable the AI Analyst tab |
+| `aiEndpoint` | `string` | Your AI proxy endpoint (keeps API keys secure) |
+| `databaseEndpoint` | `string` | Unified endpoint for table discovery and queries |
+| `dataSources` | `AIDataSource[]` | Manual list of available tables |
+| `queryExecutor` | `function` | Custom query executor (e.g., client-side DuckDB) |
+| `aiModelName` | `string` | Display name for the AI model in UI |
+| `persistToLocalStorage` | `boolean` | Persist conversation across tab switches |
+| `sessionId` | `string` | Unique session ID for conversation isolation |
+| `maxRows` | `number` | Max rows to return (default: 10000) |
+| `demoMode` | `boolean` | Use canned responses (no real AI calls) |
+
+### AI Analyst Callbacks
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `onAIDataLoaded` | `(payload) => void` | Query results loaded |
+| `onAIConversationUpdate` | `(payload) => void` | Conversation state changed |
+| `onAIQueryExecuted` | `(payload) => void` | SQL query executed |
+| `onAIError` | `(payload) => void` | Error occurred |
+
+### State Preservation
+
+The AI Analyst preserves state when switching between tabs (Grid, Pivot, Chart, AI):
+
+- **Conversation history** is maintained in memory
+- **Query results** are preserved
+- **SQL queries** remain accessible via the SQL panel
+
+To persist across page refreshes, enable `persistToLocalStorage: true`. The conversation will be saved to localStorage using the `sessionId` as the key.
+
+For production apps, use `onAIConversationUpdate` to implement your own persistence:
+
+```tsx
+function App() {
+  const saveConversation = ({ conversation }) => {
+    // Save to your backend
+    api.saveConversation(userId, conversation)
+  }
+
+  return (
+    <DataGrid
+      data={data}
+      aiAnalyst={aiConfig}
+      onAIConversationUpdate={saveConversation}
+    />
+  )
+}
+```
 
 ## Documentation
 

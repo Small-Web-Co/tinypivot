@@ -1,6 +1,6 @@
 # TinyPivot
 
-A powerful Excel-like data grid, pivot table, and chart builder component for Vue 3 and React.
+A lightweight, AI-ready data grid with pivot tables and charts for Vue 3 and React. **Under 40KB gzipped** — 10x smaller than AG Grid.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)**
 
@@ -12,6 +12,14 @@ A powerful Excel-like data grid, pivot table, and chart builder component for Vu
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
 ![TinyPivot Demo](https://bvallieres.com/images/tinypivot_demo.gif)
+
+## Why TinyPivot?
+
+- **Lightweight**: Under 40KB gzipped vs 500KB+ for AG Grid
+- **AI-Ready**: Natural language data exploration with your own API key (BYOK)
+- **Batteries Included**: Pivot tables, charts, and Excel-like features out of the box
+- **Framework Support**: First-class Vue 3 and React packages
+- **One-Time License**: No subscriptions — pay once, use forever
 
 ## Features
 
@@ -28,6 +36,7 @@ A powerful Excel-like data grid, pivot table, and chart builder component for Vu
 | Keyboard navigation | ✅ | ✅ |
 | Pivot table with Sum aggregation | ✅ | ✅ |
 | Row/column totals | ✅ | ✅ |
+| **AI Data Analyst** (natural language queries, BYOK) | ❌ | ✅ |
 | **Chart Builder** (6 chart types, drag-and-drop) | ❌ | ✅ |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
 | Custom aggregation functions | ❌ | ✅ |
@@ -220,6 +229,135 @@ TinyPivot includes 9 built-in aggregation functions plus support for custom calc
 | **Std Dev** | σ | Standard deviation (spread measure) |
 | **% of Total** | %Σ | Percentage contribution to grand total |
 | **Custom** | ƒ | Your own aggregation function |
+
+## AI Data Analyst (Pro)
+
+TinyPivot Pro includes an AI-powered data analyst that lets users explore data using natural language. Ask questions like "What's the return rate by category?" or "Show me sales trends over time" and get instant SQL-generated results.
+
+### Key Benefits
+
+- **Bring Your Own Key (BYOK)**: Use your own OpenAI, Anthropic, or OpenRouter API key — full control over costs and rate limits
+- **Privacy-First**: Your data never passes through TinyPivot servers
+- **Natural Language**: Ask questions in plain English — no SQL knowledge required for end users
+- **Simple Setup**: One endpoint handles everything
+
+### How It Works
+
+1. User types a natural language question
+2. AI generates a SQL query based on your data schema
+3. Query executes against your data
+4. Results display in the grid, ready for pivot/chart analysis
+
+### Setup
+
+#### Environment Variables
+
+```bash
+# .env
+DATABASE_URL=postgresql://user:password@localhost:5432/mydb
+AI_API_KEY=sk-...  # OpenAI, Anthropic, or OpenRouter key
+
+# Optional: Override the default model
+AI_MODEL=claude-sonnet-4-20250514
+```
+
+The AI provider is **auto-detected** from your API key format:
+- `sk-ant-...` → Anthropic (defaults to `claude-3-haiku-20240307`)
+- `sk-or-...` → OpenRouter (defaults to `anthropic/claude-3-haiku`)
+- `sk-...` → OpenAI (defaults to `gpt-4o-mini`)
+
+Default models are cheap/fast. Set `AI_MODEL` for better quality.
+
+#### Option A: PostgreSQL (Recommended)
+
+One unified endpoint handles table discovery, schema, queries, and AI chat:
+
+```typescript
+// Backend: app/api/tinypivot/route.ts (Next.js App Router)
+import { createTinyPivotHandler } from '@smallwebco/tinypivot-server'
+
+export const POST = createTinyPivotHandler({
+  tables: {
+    include: ['sales', 'customers', 'products'],  // Only expose these tables
+    descriptions: {
+      sales: 'Sales transactions with revenue data',
+    }
+  }
+})
+```
+
+```vue
+<!-- Frontend: Vue -->
+<script setup lang="ts">
+import { DataGrid } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
+</script>
+
+<template>
+  <DataGrid 
+    :data="[]" 
+    :ai-analyst="{ endpoint: '/api/tinypivot' }"
+  />
+</template>
+```
+
+```tsx
+// Frontend: React
+import { DataGrid } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+
+function App() {
+  return (
+    <DataGrid 
+      data={[]} 
+      aiAnalyst={{ endpoint: '/api/tinypivot' }}
+    />
+  )
+}
+```
+
+#### Option B: Client-Side Queries (DuckDB WASM)
+
+For browser-based data processing, use `queryExecutor` for queries and an endpoint for AI chat only:
+
+```typescript
+const aiConfig = {
+  endpoint: '/api/ai-proxy',  // Server endpoint for AI chat
+  queryExecutor: async (sql, table) => {
+    // Execute SQL via DuckDB WASM (client-side)
+    const result = await duckdb.query(sql)
+    return { data: result.toArray(), rowCount: result.numRows }
+  },
+  dataSources: [
+    { id: 'sales', table: 'sales', name: 'Sales Data', description: '...' }
+  ],
+  dataSourceLoader: async (id) => {
+    // Load data into DuckDB and return schema
+    const data = await fetchData(id)
+    await duckdb.loadTable(id, data)
+    return { data, schema: inferSchema(data) }
+  }
+}
+```
+
+### Conversation Persistence
+
+```typescript
+const aiConfig = {
+  endpoint: '/api/tinypivot',
+  sessionId: 'user-123',
+  persistToLocalStorage: true,  // Auto-save conversations
+}
+```
+
+### Security
+
+The server handler includes built-in protections:
+- **SQL Validation**: Only SELECT queries allowed
+- **Table Whitelisting**: Only configured tables are queryable
+- **Error Sanitization**: Connection strings stripped from errors
+
+See [@smallwebco/tinypivot-server](./packages/server/README.md) for full documentation
 
 ## Chart Builder (Pro)
 

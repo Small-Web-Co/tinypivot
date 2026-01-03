@@ -1,8 +1,8 @@
 {
   "name": "@smallwebco/tinypivot-react",
   "type": "module",
-  "version": "1.0.53",
-  "description": "TinyPivot React - Excel-like data grid and pivot table components",
+  "version": "1.0.54",
+  "description": "TinyPivot React - AI-ready data grid, pivot table, and chart builder. Natural language data exploration with BYOK. Under 40KB gzipped.",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://github.com/Small-Web-Co/tinypivot",
@@ -14,6 +14,9 @@
     "url": "https://github.com/Small-Web-Co/tinypivot/issues"
   },
   "keywords": [
+    "ai-data-analyst",
+    "natural-language-query",
+    "byok",
     "react",
     "react-component",
     "datagrid",
@@ -31,7 +34,9 @@
     "sorting",
     "aggregation",
     "csv-export",
-    "clipboard"
+    "clipboard",
+    "chart-builder",
+    "lightweight"
   ],
   "sideEffects": [
     "*.css"

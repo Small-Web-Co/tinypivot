@@ -2,7 +2,14 @@
  * TinyPivot React - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
  */
-import type { ChartConfig } from '@smallwebco/tinypivot-core'
+import type {
+  AIAnalystConfig,
+  AIConversationUpdateEvent,
+  AIDataLoadedEvent,
+  AIErrorEvent,
+  AIQueryExecutedEvent,
+  ChartConfig,
+} from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useExcelGrid } from '../hooks/useExcelGrid'
@@ -14,10 +21,14 @@ import {
 } from '../hooks/useGridFeatures'
 import { useLicense } from '../hooks/useLicense'
 import { usePivotTable } from '../hooks/usePivotTable'
+import { AIAnalyst } from './AIAnalyst'
 import { ChartBuilder } from './ChartBuilder'
 import { ColumnFilter } from './ColumnFilter'
 import { PivotConfig } from './PivotConfig'
 import { PivotSkeleton } from './PivotSkeleton'
+
+// Re-export AI types for public API
+export type { AIAnalystConfig, AIConversationUpdateEvent, AIDataLoadedEvent, AIErrorEvent, AIQueryExecutedEvent }
 
 interface DataGridProps {
   data: Record<string, unknown>[]
@@ -39,6 +50,8 @@ interface DataGridProps {
   initialHeight?: number
   minHeight?: number
   maxHeight?: number
+  /** AI Data Analyst configuration (Pro feature, disabled by default) */
+  aiAnalyst?: AIAnalystConfig
   onCellClick?: (payload: {
     row: number
     col: number
@@ -48,6 +61,11 @@ interface DataGridProps {
   onSelectionChange?: (payload: { cells: Array<{ row: number, col: number }>, values: unknown[] }) => void
   onExport?: (payload: { rowCount: number, filename: string }) => void
   onCopy?: (payload: { text: string, cellCount: number }) => void
+  // AI Analyst events
+  onAIDataLoaded?: (payload: AIDataLoadedEvent) => void
+  onAIConversationUpdate?: (payload: AIConversationUpdateEvent) => void
+  onAIQueryExecuted?: (payload: AIQueryExecutedEvent) => void
+  onAIError?: (payload: AIErrorEvent) => void
 }
 
 const MIN_COL_WIDTH = 120
@@ -71,11 +89,19 @@ export function DataGrid({
   initialHeight = 600,
   minHeight = 300,
   maxHeight = 1200,
+  aiAnalyst,
   onCellClick,
   onExport,
   onCopy,
+  onAIDataLoaded,
+  onAIConversationUpdate,
+  onAIQueryExecuted,
+  onAIError,
 }: DataGridProps) {
-  const { showWatermark, canUsePivot, canUseCharts, isDemo, isPro } = useLicense()
+  const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro } = useLicense()
+
+  // Check if AI Analyst should be shown (enabled in config + licensed)
+  const showAIAnalyst = aiAnalyst?.enabled && canUseAIAnalyst
 
   // Theme handling
   const currentTheme = useMemo(() => {
@@ -100,7 +126,13 @@ export function DataGrid({
   const [verticalResizeStartHeight, setVerticalResizeStartHeight] = useState(0)
   const [showCopyToast, setShowCopyToast] = useState(false)
   const [copyToastMessage, setCopyToastMessage] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'pivot' | 'chart'>('grid')
+  const [viewMode, setViewMode] = useState<'ai' | 'grid' | 'pivot' | 'chart'>('grid')
+
+  // AI-loaded data (replaces current data when AI loads results)
+  const [aiLoadedData, setAiLoadedData] = useState<Record<string, unknown>[] | null>(null)
+
+  // Data to display - AI loaded data takes precedence
+  const displayData = useMemo(() => aiLoadedData || data, [aiLoadedData, data])
   const [_chartConfig, setChartConfig] = useState<ChartConfig | null>(null)
 
   const handleChartConfigChange = useCallback((config: ChartConfig) => {
@@ -142,7 +174,7 @@ export function DataGrid({
     // Numeric range filters
     setNumericRangeFilter,
     getNumericRangeFilter,
-  } = useExcelGrid({ data, enableSorting: true, enableFiltering: true })
+  } = useExcelGrid({ data: displayData, enableSorting: true, enableFiltering: true })
 
   // Filtered data for pivot table
   const filteredDataForPivot = useMemo(() => {
@@ -306,11 +338,11 @@ export function DataGrid({
     // Skip during SSR (no document available)
     if (typeof document === 'undefined')
       return
-    if (data.length === 0)
+    if (displayData.length === 0)
       return
 
     const widths: Record<string, number> = {}
-    const sampleSize = Math.min(100, data.length)
+    const sampleSize = Math.min(100, displayData.length)
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
     if (!ctx)
@@ -322,7 +354,7 @@ export function DataGrid({
       let maxWidth = ctx.measureText(key).width + 56
 
       for (let i = 0; i < sampleSize; i++) {
-        const value = data[i][key]
+        const value = displayData[i][key]
         const text = value === null || value === undefined ? '' : String(value)
         const width = ctx.measureText(text).width + 28
         maxWidth = Math.max(maxWidth, width)
@@ -332,7 +364,7 @@ export function DataGrid({
     }
 
     setColumnWidths(widths)
-  }, [data, columnKeys])
+  }, [displayData, columnKeys])
 
   // Column resize handlers
   const startColumnResize = useCallback(
@@ -535,6 +567,45 @@ export function DataGrid({
     [isSelecting],
   )
 
+  // Track if we're showing AI-shaped data (filtered/aggregated by AI queries)
+  const isShowingAIData = aiLoadedData !== null
+
+  // Reset to full original dataset
+  const resetToFullData = useCallback(() => {
+    setAiLoadedData(null)
+  }, [])
+
+  // AI Analyst event handlers
+  const handleAIDataLoaded = useCallback(
+    (payload: AIDataLoadedEvent) => {
+      setAiLoadedData(payload.data)
+      // Don't auto-switch to grid - let user decide when to view results
+      onAIDataLoaded?.(payload)
+    },
+    [onAIDataLoaded],
+  )
+
+  const handleAIConversationUpdate = useCallback(
+    (payload: AIConversationUpdateEvent) => {
+      onAIConversationUpdate?.(payload)
+    },
+    [onAIConversationUpdate],
+  )
+
+  const handleAIQueryExecuted = useCallback(
+    (payload: AIQueryExecutedEvent) => {
+      onAIQueryExecuted?.(payload)
+    },
+    [onAIQueryExecuted],
+  )
+
+  const handleAIError = useCallback(
+    (payload: AIErrorEvent) => {
+      onAIError?.(payload)
+    },
+    [onAIError],
+  )
+
   useEffect(() => {
     const handleMouseUp = () => setIsSelecting(false)
     document.addEventListener('mouseup', handleMouseUp)
@@ -728,6 +799,31 @@ export function DataGrid({
           {/* View mode toggle */}
           {showPivot && (
             <div className="vpg-view-toggle">
+              {/* AI Analyst button (first, only if enabled) */}
+              {showAIAnalyst && (
+                <button
+                  className={`vpg-view-btn vpg-ai-btn ${viewMode === 'ai' ? 'active' : ''}`}
+                  onClick={() => setViewMode('ai')}
+                >
+                  <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+                  </svg>
+                  AI Analyst
+                </button>
+              )}
+              {aiAnalyst?.enabled && !canUseAIAnalyst && (
+                <button
+                  className="vpg-view-btn vpg-ai-btn vpg-pro-feature"
+                  title="AI Analyst (Pro feature)"
+                  onClick={e => e.preventDefault()}
+                >
+                  <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+                  </svg>
+                  AI Analyst
+                  <span className="vpg-pro-badge">Pro</span>
+                </button>
+              )}
               <button
                 className={`vpg-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
                 onClick={() => setViewMode('grid')}
@@ -946,6 +1042,25 @@ export function DataGrid({
             </button>
           )}
 
+          {/* Reset to full data button (when showing AI-filtered results) */}
+          {viewMode === 'grid' && isShowingAIData && (
+            <button
+              className="vpg-reset-data-btn"
+              title="Reset to full dataset"
+              onClick={resetToFullData}
+            >
+              <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span>Full Data</span>
+            </button>
+          )}
+
           {/* Copy button */}
           {enableClipboard && selectionBounds && viewMode === 'grid' && (
             <button
@@ -1004,6 +1119,20 @@ export function DataGrid({
         </div>
       </div>
 
+      {/* AI Analyst View - always render if enabled, use CSS to hide for state preservation */}
+      {showAIAnalyst && aiAnalyst && (
+        <div className="vpg-ai-view" style={{ display: viewMode === 'ai' ? undefined : 'none' }}>
+          <AIAnalyst
+            config={aiAnalyst}
+            theme={currentTheme}
+            onDataLoaded={handleAIDataLoaded}
+            onConversationUpdate={handleAIConversationUpdate}
+            onQueryExecuted={handleAIQueryExecuted}
+            onError={handleAIError}
+          />
+        </div>
+      )}
+
       {/* Grid View */}
       {viewMode === 'grid' && (
         <div ref={tableContainerRef} className="vpg-grid-container" tabIndex={0}>
@@ -1014,7 +1143,7 @@ export function DataGrid({
             </div>
           )}
 
-          {!loading && data.length === 0 && (
+          {!loading && displayData.length === 0 && (
             <div className="vpg-empty">
               <div className="vpg-empty-icon">
                 <svg className="vpg-icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1030,7 +1159,7 @@ export function DataGrid({
             </div>
           )}
 
-          {!loading && data.length > 0 && filteredRowCount === 0 && (
+          {!loading && displayData.length > 0 && filteredRowCount === 0 && (
             <div className="vpg-empty">
               <div className="vpg-empty-icon vpg-warning">
                 <svg className="vpg-icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">

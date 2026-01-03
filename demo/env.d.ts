@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
-declare module 'tinypivot' {
-  export * from '../src/index'
-}
+declare module 'tinypivot'
+declare module 'tinypivot/style.css'
 
-declare module 'tinypivot/style.css' {}
+// Global defined by vite.demo.config.ts
+declare const __AI_MODEL__: string

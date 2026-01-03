@@ -178,6 +178,32 @@
 
 .vpg-filter-info svg { color: #4f46e5; }
 
+/* Reset to Full Data Button */
+.vpg-reset-data-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-reset-data-btn:hover {
+  background: #fde68a;
+  border-color: #f59e0b;
+}
+
+.vpg-reset-data-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 /* Search */
 .vpg-search-container { display: flex; align-items: center; }
 
@@ -617,6 +643,18 @@
   color: #cbd5e1;
   background: linear-gradient(135deg, #334155 0%, #475569 100%);
   border-color: #64748b;
+}
+
+/* Reset Data Button Dark Mode */
+.vpg-theme-dark .vpg-reset-data-btn {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+}
+
+.vpg-theme-dark .vpg-reset-data-btn:hover {
+  background: rgba(251, 191, 36, 0.25);
+  border-color: rgba(251, 191, 36, 0.6);
 }
 
 /* Demo Banner */
@@ -3027,6 +3065,37 @@
 .vpg-chart-hint strong {
   color: #8b5cf6;
 }
+
+/* Chart loading state (async component loading) */
+.vpg-chart-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  height: 100%;
+  color: #64748b;
+}
+
+.vpg-chart-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #e2e8f0;
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  animation: vpg-chart-spin 0.8s linear infinite;
+}
+
+@keyframes vpg-chart-spin {
+  to { transform: rotate(360deg); }
+}
+
+.vpg-chart-loading span {
+  font-size: 0.875rem;
+}
+
+.vpg-theme-dark .vpg-chart-loading { color: #94a3b8; }
+.vpg-theme-dark .vpg-chart-spinner { border-color: #334155; border-top-color: #8b5cf6; }
 
 /* Dark mode support */
 .vpg-theme-dark .vpg-chart-filter-bar { background: #1e1b4b; border-color: #4c1d95; color: #a5b4fc; }

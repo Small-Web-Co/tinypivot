@@ -5,6 +5,40 @@
  * @packageDocumentation
  */
 
+// AI Data Analyst
+export {
+  // Session management
+  addMessageToConversation,
+  // Prompt engineering
+  buildResultsSummary,
+  buildSystemPrompt,
+  buildUserMessage,
+  createAssistantMessage,
+  createConversation,
+  createSystemMessage,
+  createUserMessage,
+  // Demo mode
+  DEMO_DATA_SOURCES,
+  DEMO_SCENARIOS,
+  DEMO_SCHEMAS,
+  deserializeConversation,
+  extractSQLFromResponse,
+  findDemoResponse,
+  generateMessageId,
+  generateSessionId,
+  getConversationStats,
+  getDefaultDemoResponse,
+  getDemoSchema,
+  getInitialDemoData,
+  getMessagesForAPI,
+  serializeConversation,
+  setConversationDataSource,
+  stripSQLFromContent,
+  trimConversation,
+  validateSQLSafety,
+} from './ai'
+export type { DemoScenario, DemoTrigger } from './ai'
+
 // Chart Utilities
 export {
   aggregateValues,
@@ -26,6 +60,7 @@ export {
   processChartDataForScatter,
   saveChartConfig,
 } from './chart'
+
 export type { HeatmapSeriesData, ScatterPoint, ScatterSeriesData } from './chart'
 
 // Export Utilities
@@ -37,9 +72,9 @@ export {
 } from './export'
 
 export type { PivotExportData } from './export'
-
 // License Management
 export {
+  canUseAIAnalyst,
   canUseCharts,
   canUsePivot,
   configureLicenseSecret,
@@ -83,6 +118,7 @@ export {
   validateFormula,
   validateSimpleFormula,
 } from './pivot'
+
 export type { FormulaFunction } from './pivot'
 
 // Types
@@ -90,16 +126,35 @@ export type {
   ActiveFilter,
   // Pivot Types
   AggregationFunction,
+  // AI Data Analyst Types
+  AIAnalystConfig,
+  AIColumnOverride,
+
+  AIColumnSchema,
+  AIConversation,
+  AIConversationUpdateEvent,
+  AIDataLoadedEvent,
+  AIDataSource,
+  AIErrorEvent,
+  AIMessage,
+  AIMessageMetadata,
+  AIProvider,
+
+  AIProxyRequest,
+  AIProxyResponse,
+  AIQueryExecutedEvent,
+  AITableSchema,
   CalculatedField,
   CellClickEvent,
-
   // Chart Types
   ChartAggregation,
   ChartConfig,
   ChartData,
   ChartField,
+
   ChartFieldInfo,
   ChartOptions,
+
   ChartSeries,
   ChartType,
   ChartTypeInfo,
@@ -110,22 +165,24 @@ export type {
   ColumnStats,
   CopyEvent,
   CustomAggregationFn,
+  // Unified Database Endpoint Types
+  DatabaseEndpointRequest,
   // Component Props Types
   DataGridProps,
+
   ExportEvent,
   ExportOptions,
   FieldRole,
   FieldStats,
-
   // Event Types
   FilterEvent,
-  GridOptions,
 
+  GridOptions,
   LicenseFeatures,
   LicenseInfo,
   // License Types
   LicenseType,
-
+  ListTablesResponse,
   NumericRange,
   // Feature Types
   PaginationOptions,
@@ -134,14 +191,16 @@ export type {
   PivotField,
   PivotResult,
   PivotTableProps,
-
   PivotValueField,
+  QueryRequest,
+  QueryResponse,
   RowSelectionChangeEvent,
+  SchemaRequest,
+  SchemaResponse,
   SelectionBounds,
   SelectionChangeEvent,
   SortEvent,
 } from './types'
-
 // Type Guards
 export { isNumericRange } from './types'
 // Utility Functions

@@ -6,7 +6,7 @@
  */
 
 // Components
-export { ColumnFilter, DataGrid, PivotConfig, PivotSkeleton } from './components'
+export { AIAnalyst, ColumnFilter, DataGrid, PivotConfig, PivotSkeleton } from './components'
 
 // Hooks
 export {
@@ -20,6 +20,7 @@ export {
   getAggregationLabel,
   getColumnUniqueValues,
   setLicenseKey,
+  useAIAnalyst,
   useColumnResize,
   useExcelGrid,
   useGlobalSearch,
@@ -28,11 +29,25 @@ export {
   usePivotTable,
   useRowSelection,
 } from './hooks'
+export type { UseAIAnalystOptions } from './hooks'
 
 // Re-export types from core
 export type {
   // Pivot Types
   AggregationFunction,
+  // AI Data Analyst Types
+  AIAnalystConfig,
+  AIColumnSchema,
+  AIConversation,
+  AIConversationUpdateEvent,
+  AIDataLoadedEvent,
+  AIDataSource,
+  AIErrorEvent,
+  AIMessage,
+  AIMessageMetadata,
+  AIQueryExecutedEvent,
+
+  AITableSchema,
   CellClickEvent,
 
   // Grid Types

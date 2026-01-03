@@ -16,6 +16,13 @@ interface FieldStats {
   isNumeric: boolean
 }
 
+interface ExtendedFieldStats extends FieldStats {
+  isCalculated: boolean
+  calcId?: string
+  calcName?: string
+  calcFormula?: string
+}
+
 const props = defineProps<{
   availableFields: FieldStats[]
   rowFields: string[]
@@ -93,7 +100,7 @@ function handleTotalsToggle(checked: boolean) {
 }
 
 // Convert calculated fields to virtual FieldStats for display
-const calculatedFieldsAsStats = computed(() => {
+const calculatedFieldsAsStats = computed<ExtendedFieldStats[]>(() => {
   if (!props.calculatedFields)
     return []
   return props.calculatedFields.map(calc => ({
@@ -109,8 +116,8 @@ const calculatedFieldsAsStats = computed(() => {
 })
 
 // Combined available fields (data fields + calculated fields)
-const allAvailableFields = computed(() => [
-  ...props.availableFields.map(f => ({ ...f, isCalculated: false })),
+const allAvailableFields = computed<ExtendedFieldStats[]>(() => [
+  ...props.availableFields.map(f => ({ ...f, isCalculated: false as const })),
   ...calculatedFieldsAsStats.value,
 ])
 
@@ -366,7 +373,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
             <button
               class="vpg-field-delete"
               title="Delete calculated field"
-              @click.stop="emit('removeCalculatedField', field.calcId)"
+              @click.stop="field.calcId && emit('removeCalculatedField', field.calcId)"
             >
               ×
             </button>

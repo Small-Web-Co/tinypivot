@@ -1,8 +1,15 @@
 # @smallwebco/tinypivot-vue
 
-A powerful Excel-like data grid and pivot table component for Vue 3.
+A lightweight, AI-ready data grid with pivot tables and charts for Vue 3. **Under 50KB gzipped** — 10x smaller than AG Grid.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
+
+## Why TinyPivot?
+
+- **Lightweight**: Under 50KB gzipped vs 500KB+ for AG Grid
+- **AI-Ready**: Natural language data exploration with your own API key (BYOK)
+- **Batteries Included**: Pivot tables, charts, and Excel-like features out of the box
+- **One-Time License**: No subscriptions — pay once, use forever
 
 ## Installation
 
@@ -49,6 +56,8 @@ const data = [
 | Column resizing | ✅ | ✅ |
 | Clipboard (Ctrl+C) | ✅ | ✅ |
 | Dark mode | ✅ | ✅ |
+| **AI Data Analyst** (natural language, BYOK) | ❌ | ✅ |
+| **Chart Builder** (6 chart types) | ❌ | ✅ |
 | Pivot table | ❌ | ✅ |
 | Aggregations (Sum, Avg, etc.) | ❌ | ✅ |
 | Row/column totals | ❌ | ✅ |
@@ -78,6 +87,87 @@ const data = [
 | `@selection-change` | `{ cells, values }` | Selection changed |
 | `@export` | `{ rowCount, filename }` | CSV exported |
 | `@copy` | `{ text, cellCount }` | Cells copied |
+
+## AI Data Analyst (Pro)
+
+Enable natural language data exploration with your own AI API key (BYOK).
+
+```vue
+<script setup lang="ts">
+import { DataGrid } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
+
+const data = [/* your data */]
+
+const aiConfig = {
+  enabled: true,
+  aiEndpoint: '/api/ai-proxy',           // Your AI proxy endpoint
+  databaseEndpoint: '/api/tp-database',  // Optional: auto-discover tables
+  aiModelName: 'Claude Sonnet 4',        // Optional: display in UI
+  persistToLocalStorage: true,           // Preserve conversation on tab switch
+}
+</script>
+
+<template>
+  <DataGrid
+    :data="data"
+    :ai-analyst="aiConfig"
+  />
+</template>
+```
+
+### AI Analyst Config Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `enabled` | `boolean` | Enable the AI Analyst tab |
+| `aiEndpoint` | `string` | Your AI proxy endpoint (keeps API keys secure) |
+| `databaseEndpoint` | `string` | Unified endpoint for table discovery and queries |
+| `dataSources` | `AIDataSource[]` | Manual list of available tables |
+| `queryExecutor` | `function` | Custom query executor (e.g., client-side DuckDB) |
+| `aiModelName` | `string` | Display name for the AI model in UI |
+| `persistToLocalStorage` | `boolean` | Persist conversation across tab switches |
+| `sessionId` | `string` | Unique session ID for conversation isolation |
+| `maxRows` | `number` | Max rows to return (default: 10000) |
+| `demoMode` | `boolean` | Use canned responses (no real AI calls) |
+
+### AI Analyst Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `@ai-data-loaded` | `{ data, query, rowCount }` | Query results loaded |
+| `@ai-conversation-update` | `{ conversation }` | Conversation state changed |
+| `@ai-query-executed` | `{ query, rowCount, duration, success }` | SQL query executed |
+| `@ai-error` | `{ message, type }` | Error occurred |
+
+### State Preservation
+
+The AI Analyst preserves state when switching between tabs (Grid, Pivot, Chart, AI):
+
+- **Conversation history** is maintained in memory
+- **Query results** are preserved
+- **SQL queries** remain accessible via the SQL panel
+
+To persist across page refreshes, enable `persistToLocalStorage: true`. The conversation will be saved to localStorage using the `sessionId` as the key.
+
+For production apps, listen to `@ai-conversation-update` to implement your own persistence:
+
+```vue
+<template>
+  <DataGrid
+    :data="data"
+    :ai-analyst="aiConfig"
+    @ai-conversation-update="saveConversation"
+  />
+</template>
+
+<script setup>
+function saveConversation({ conversation }) {
+  // Save to your backend
+  api.saveConversation(userId, conversation)
+}
+</script>
+```
 
 ## Documentation
 

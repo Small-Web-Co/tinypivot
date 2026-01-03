@@ -1,10 +1,10 @@
 {
   "name": "tinypivot-monorepo",
   "type": "module",
-  "version": "1.0.53",
+  "version": "1.0.54",
   "private": true,
   "packageManager": "pnpm@9.0.0+sha512.b4106707c7225b1748b61595953ccbebff97b54ad05d002aa3635f633b9c53cd666f7ce9b8bc44704f1fa048b9a49b55371ab2d9e9d667d1efe2ef1514bcd513",
-  "description": "TinyPivot Monorepo - Excel-like data grid and pivot table components for Vue 3 and React",
+  "description": "TinyPivot Monorepo - AI-ready data grid, pivot table, and chart builder for Vue 3 and React. Natural language data exploration with BYOK.",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://github.com/Small-Web-Co/tinypivot",
@@ -16,6 +16,11 @@
     "url": "https://github.com/Small-Web-Co/tinypivot/issues"
   },
   "keywords": [
+    "ai-data-analyst",
+    "natural-language-query",
+    "byok",
+    "bring-your-own-key",
+    "ai-data-exploration",
     "vue",
     "vue3",
     "react",
@@ -33,7 +38,9 @@
     "filtering",
     "sorting",
     "aggregation",
-    "csv-export"
+    "csv-export",
+    "chart-builder",
+    "lightweight"
   ],
   "engines": {
     "node": ">=18"
@@ -64,6 +71,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@duckdb/duckdb-wasm": "1.33.1-dev13.0",
     "@tanstack/vue-table": "^8.20.0",
     "@vercel/analytics": "^1.6.1",
     "vue-router": "^4.6.4"

@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import type { CalculatedField, ChartConfig } from '@smallwebco/tinypivot-core'
+import type {
+  AIAnalystConfig,
+  AIConversationUpdateEvent,
+  AIDataLoadedEvent,
+  AIErrorEvent,
+  AIQueryExecutedEvent,
+  CalculatedField,
+  ChartConfig,
+} from '@smallwebco/tinypivot-core'
 import { loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
@@ -15,6 +23,7 @@ import {
 } from '../composables/useGridFeatures'
 import { useLicense } from '../composables/useLicense'
 import { usePivotTable } from '../composables/usePivotTable'
+import AIAnalyst from './AIAnalyst.vue'
 import ChartBuilder from './ChartBuilder.vue'
 import ColumnFilter from './ColumnFilter.vue'
 import PivotConfig from './PivotConfig.vue'
@@ -41,6 +50,8 @@ const props = withDefaults(defineProps<{
   initialHeight?: number
   minHeight?: number
   maxHeight?: number
+  /** AI Data Analyst configuration (Pro feature, disabled by default) */
+  aiAnalyst?: AIAnalystConfig
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -61,6 +72,7 @@ const props = withDefaults(defineProps<{
   initialHeight: 600,
   minHeight: 300,
   maxHeight: 1200,
+  aiAnalyst: undefined,
 })
 
 const emit = defineEmits<{
@@ -68,9 +80,19 @@ const emit = defineEmits<{
   (e: 'selectionChange', payload: { cells: Array<{ row: number, col: number }>, values: unknown[] }): void
   (e: 'export', payload: { rowCount: number, filename: string }): void
   (e: 'copy', payload: { text: string, cellCount: number }): void
+  // AI Analyst events
+  (e: 'aiDataLoaded', payload: AIDataLoadedEvent): void
+  (e: 'aiConversationUpdate', payload: AIConversationUpdateEvent): void
+  (e: 'aiQueryExecuted', payload: AIQueryExecutedEvent): void
+  (e: 'aiError', payload: AIErrorEvent): void
 }>()
 
-const { showWatermark, canUsePivot, canUseCharts, isDemo, isPro } = useLicense()
+const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro } = useLicense()
+
+// Check if AI Analyst should be shown (enabled in config + licensed)
+const showAIAnalyst = computed(() =>
+  props.aiAnalyst?.enabled && canUseAIAnalyst.value,
+)
 
 // Theme handling
 const currentTheme = computed(() => {
@@ -110,8 +132,15 @@ const fontSizeOptions = [
   { value: 'base', label: 'L' },
 ] as const
 
-// Grid composable
-const dataRef = computed(() => props.data)
+// AI-loaded data (replaces current data when AI loads results)
+// Must be defined before displayData and dataRef
+const aiLoadedData = ref<Record<string, unknown>[] | null>(null)
+
+// Data to display - AI loaded data takes precedence
+const displayData = computed(() => aiLoadedData.value || props.data)
+
+// Grid composable - uses displayData which may be AI-loaded or original props.data
+const dataRef = computed(() => displayData.value)
 const {
   table,
   columnKeys,
@@ -230,11 +259,6 @@ const paginationStart = computed(() => {
 const paginationEnd = computed(() =>
   Math.min(currentPage.value * props.pageSize, totalSearchedRows.value),
 )
-
-// Pagination methods (kept for potential future use)
-function _goToPage(page: number) {
-  currentPage.value = Math.max(1, Math.min(page, totalPages.value))
-}
 
 function nextPage() {
   if (currentPage.value < totalPages.value)
@@ -392,7 +416,38 @@ function copySelectionToClipboard() {
 }
 
 // View mode
-const viewMode = ref<'grid' | 'pivot' | 'chart'>('grid')
+const viewMode = ref<'ai' | 'grid' | 'pivot' | 'chart'>('grid')
+
+function handleAIDataLoaded(payload: AIDataLoadedEvent) {
+  aiLoadedData.value = payload.data
+  // Don't auto-switch to grid - let user decide when to view results
+  emit('aiDataLoaded', payload)
+}
+
+// Track if we're showing AI-shaped data (filtered/aggregated by AI queries)
+const isShowingAIData = computed(() => aiLoadedData.value !== null)
+
+// Reset to full original dataset
+function resetToFullData() {
+  aiLoadedData.value = null
+}
+
+function handleAIConversationUpdate(payload: AIConversationUpdateEvent) {
+  emit('aiConversationUpdate', payload)
+}
+
+function handleAIQueryExecuted(payload: AIQueryExecutedEvent) {
+  emit('aiQueryExecuted', payload)
+}
+
+function handleAIError(payload: AIErrorEvent) {
+  emit('aiError', payload)
+}
+
+function handleAIViewResults(payload: { data: Record<string, unknown>[], query: string }) {
+  aiLoadedData.value = payload.data
+  viewMode.value = 'grid' // Switch to grid to show the results
+}
 const chartConfig = ref<ChartConfig | null>(null)
 
 function handleChartConfigChange(config: ChartConfig) {
@@ -466,11 +521,11 @@ function calculateColumnWidths() {
   if (typeof document === 'undefined')
     return
 
-  if (props.data.length === 0)
+  if (displayData.value.length === 0)
     return
 
   const widths: Record<string, number> = {}
-  const sampleSize = Math.min(100, props.data.length)
+  const sampleSize = Math.min(100, displayData.value.length)
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   if (!ctx)
@@ -482,7 +537,7 @@ function calculateColumnWidths() {
     let maxWidth = ctx.measureText(key).width + 56
 
     for (let i = 0; i < sampleSize; i++) {
-      const value = props.data[i][key]
+      const value = displayData.value[i][key]
       const text = value === null || value === undefined ? '' : String(value)
       const width = ctx.measureText(text).width + 28
       maxWidth = Math.max(maxWidth, width)
@@ -853,7 +908,8 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleWindowScroll, { capture: true })
 })
 
-watch(() => props.data, () => {
+// Watch both props.data and aiLoadedData for recalculating column widths
+watch([() => props.data, aiLoadedData], () => {
   nextTick(calculateColumnWidths)
 }, { immediate: true })
 
@@ -899,6 +955,30 @@ function handleContainerClick(event: MouseEvent) {
       <div class="vpg-toolbar-left">
         <!-- View mode toggle -->
         <div v-if="showPivot" class="vpg-view-toggle">
+          <!-- AI Analyst button (first, only if enabled) -->
+          <button
+            v-if="showAIAnalyst"
+            class="vpg-view-btn vpg-ai-btn"
+            :class="{ active: viewMode === 'ai' }"
+            @click="viewMode = 'ai'"
+          >
+            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+            </svg>
+            AI Analyst
+          </button>
+          <button
+            v-else-if="aiAnalyst?.enabled && !canUseAIAnalyst"
+            class="vpg-view-btn vpg-ai-btn vpg-pro-feature"
+            title="AI Analyst (Pro feature)"
+            @click.prevent
+          >
+            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+            </svg>
+            AI Analyst
+            <span class="vpg-pro-badge">Pro</span>
+          </button>
           <button
             class="vpg-view-btn"
             :class="{ active: viewMode === 'grid' }"
@@ -992,6 +1072,19 @@ function handleContainerClick(event: MouseEvent) {
             <span>{{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }}</span>
           </div>
 
+          <!-- Reset to full data button (when showing AI-filtered results) -->
+          <button
+            v-if="isShowingAIData"
+            class="vpg-reset-data-btn"
+            title="Reset to full dataset"
+            @click="resetToFullData"
+          >
+            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Full Data</span>
+          </button>
+
           <div v-if="globalSearchTerm" class="vpg-search-info">
             <span>{{ totalSearchedRows }} match{{ totalSearchedRows !== 1 ? 'es' : '' }}</span>
           </div>
@@ -1065,6 +1158,19 @@ function handleContainerClick(event: MouseEvent) {
           Export Pivot{{ !isPro ? ' (Pro)' : '' }}
         </button>
       </div>
+    </div>
+
+    <!-- AI Analyst View - use v-show to preserve state when switching tabs -->
+    <div v-if="showAIAnalyst && aiAnalyst" v-show="viewMode === 'ai'" class="vpg-ai-view">
+      <AIAnalyst
+        :config="aiAnalyst"
+        :theme="currentTheme"
+        @data-loaded="handleAIDataLoaded"
+        @conversation-update="handleAIConversationUpdate"
+        @query-executed="handleAIQueryExecuted"
+        @error="handleAIError"
+        @view-results="handleAIViewResults"
+      />
     </div>
 
     <!-- Grid View -->
@@ -1547,6 +1653,31 @@ function handleContainerClick(event: MouseEvent) {
 
 .vpg-filter-info svg {
   color: #4f46e5;
+}
+
+.vpg-reset-data-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-reset-data-btn:hover {
+  background: #fde68a;
+  border-color: #f59e0b;
+}
+
+.vpg-reset-data-btn svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .vpg-config-toggle {
@@ -2519,6 +2650,17 @@ function handleContainerClick(event: MouseEvent) {
   color: #34d399;
 }
 
+.vpg-theme-dark .vpg-reset-data-btn {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+}
+
+.vpg-theme-dark .vpg-reset-data-btn:hover {
+  background: rgba(251, 191, 36, 0.25);
+  border-color: rgba(251, 191, 36, 0.6);
+}
+
 .vpg-theme-dark .vpg-watermark-inline a {
   color: #94a3b8;
   background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
@@ -2551,5 +2693,76 @@ function handleContainerClick(event: MouseEvent) {
 .vpg-theme-dark:not(.vpg-striped) .vpg-row:nth-child(odd),
 .vpg-theme-dark:not(.vpg-striped) .vpg-row:nth-child(even) {
   background: #1e293b;
+}
+
+/* AI Analyst View */
+.vpg-ai-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* AI Analyst Button */
+.vpg-view-btn.vpg-ai-btn.active {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.vpg-view-btn.vpg-ai-btn.vpg-pro-feature {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.vpg-pro-badge {
+  display: inline-flex;
+  padding: 0.0625rem 0.25rem;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  color: white;
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Chart View */
+.vpg-chart-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.vpg-chart-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #fef3c7;
+  border-bottom: 1px solid #fde68a;
+  font-size: 0.75rem;
+  color: #92400e;
+}
+
+.vpg-chart-clear-filters {
+  margin-left: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #b45309;
+  background: transparent;
+  border: 1px solid #fcd34d;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-chart-clear-filters:hover {
+  background: #fef3c7;
+}
+
+.vpg-chart-label {
+  color: #f59e0b;
+  font-weight: 500;
 }
 </style>

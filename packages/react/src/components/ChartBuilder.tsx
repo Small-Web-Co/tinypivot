@@ -22,8 +22,10 @@ import {
   processChartDataForPie,
   processChartDataForScatter,
 } from '@smallwebco/tinypivot-core'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import Chart from 'react-apexcharts'
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+
+// Lazy load ApexCharts to avoid SSR issues (window not defined in Node.js)
+const Chart = React.lazy(() => import('react-apexcharts'))
 
 interface ChartBuilderProps {
   data: Record<string, unknown>[]
@@ -838,13 +840,21 @@ export function ChartBuilder({
           {chartIsValid
             ? (
                 <div className="vpg-chart-container">
-                  <Chart
-                    key={`${chartConfig.type}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}`}
-                    type={getApexChartType(chartConfig.type)}
-                    options={chartOptionsWithCategories}
-                    series={chartSeries}
-                    height="100%"
-                  />
+                  <Suspense fallback={(
+                    <div className="vpg-chart-loading">
+                      <div className="vpg-chart-spinner" />
+                      <span>Loading chart...</span>
+                    </div>
+                  )}
+                  >
+                    <Chart
+                      key={`${chartConfig.type}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}`}
+                      type={getApexChartType(chartConfig.type)}
+                      options={chartOptionsWithCategories}
+                      series={chartSeries}
+                      height="100%"
+                    />
+                  </Suspense>
                 </div>
               )
             : (
