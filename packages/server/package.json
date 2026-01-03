@@ -1,7 +1,7 @@
 {
   "name": "@smallwebco/tinypivot-server",
   "type": "module",
-  "version": "1.0.60",
+  "version": "1.0.61",
   "description": "Server handlers for TinyPivot Embedded AI Data Analyst - PostgreSQL integration, AI chat proxy, and natural language to SQL",
   "license": "MIT",
   "homepage": "https://tiny-pivot.com",

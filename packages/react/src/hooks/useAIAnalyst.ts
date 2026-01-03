@@ -213,6 +213,51 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
   }, [])
 
   /**
+   * Fetch sample data (first 100 rows) from the unified endpoint
+   */
+  const fetchSampleData = useCallback(async (dataSource: AIDataSource) => {
+    if (!configRef.current.endpoint)
+      return
+
+    try {
+      const sql = `SELECT * FROM ${dataSource.table} LIMIT 100`
+      const response = await fetch(configRef.current.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'query',
+          sql,
+          table: dataSource.table,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch sample data: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      if (result.data && result.data.length > 0) {
+        setLastLoadedData(result.data)
+        onDataLoaded?.({
+          data: result.data,
+          query: sql,
+          dataSourceId: dataSource.id,
+          rowCount: result.data.length,
+        })
+      }
+    }
+    catch (err) {
+      // Sample data fetch is optional - continue without it
+      console.warn('Failed to fetch sample data:', err)
+    }
+  }, [onDataLoaded])
+
+  /**
    * Select a data source and fetch its schema
    */
   const selectDataSource = useCallback(async (dataSourceId: string) => {
@@ -275,11 +320,12 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
         })
       }
     }
-    // Use endpoint for schema discovery
+    // Use endpoint for schema discovery and sample data
     else if (configRef.current.endpoint) {
       await fetchSchema(dataSource)
+      await fetchSampleData(dataSource)
     }
-  }, [effectiveDataSources, fetchSchema, onConversationUpdate, onDataLoaded])
+  }, [effectiveDataSources, fetchSchema, fetchSampleData, onConversationUpdate, onDataLoaded])
 
   /**
    * Call the AI endpoint

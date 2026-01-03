@@ -225,9 +225,10 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
         })
       }
     }
-    // Use endpoint for schema discovery
+    // Use endpoint for schema discovery and sample data
     else if (config.endpoint) {
       await fetchSchema(dataSource)
+      await fetchSampleData(dataSource)
     }
 
     emitConversationUpdate()
@@ -267,6 +268,51 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     catch (err) {
       // Schema fetch is optional - continue without it
       console.warn('Failed to fetch schema:', err)
+    }
+  }
+
+  /**
+   * Fetch sample data (first 100 rows) from the unified endpoint
+   */
+  async function fetchSampleData(dataSource: AIDataSource) {
+    if (!config.endpoint)
+      return
+
+    try {
+      const sql = `SELECT * FROM ${dataSource.table} LIMIT 100`
+      const response = await fetch(config.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'query',
+          sql,
+          table: dataSource.table,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch sample data: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      if (result.data && result.data.length > 0) {
+        lastLoadedData.value = result.data
+        onDataLoaded?.({
+          data: result.data,
+          query: sql,
+          dataSourceId: dataSource.id,
+          rowCount: result.data.length,
+        })
+      }
+    }
+    catch (err) {
+      // Sample data fetch is optional - continue without it
+      console.warn('Failed to fetch sample data:', err)
     }
   }
 
