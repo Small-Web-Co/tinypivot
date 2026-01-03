@@ -242,6 +242,44 @@ function getProviderConfig(provider: AIProvider): ProviderConfig {
   }
 }
 
+/**
+ * Normalize model name for OpenRouter
+ * OpenRouter requires provider/model format (e.g., "anthropic/claude-3-haiku")
+ * If user provides just a model name, try to infer the provider
+ */
+function normalizeModelForOpenRouter(model: string): string {
+  // Already has provider prefix
+  if (model.includes('/')) {
+    return model
+  }
+
+  // Map common model prefixes to providers
+  if (model.startsWith('claude')) {
+    return `anthropic/${model}`
+  }
+  if (model.startsWith('gpt-') || model.startsWith('o1') || model.startsWith('o3')) {
+    return `openai/${model}`
+  }
+  if (model.startsWith('gemini')) {
+    return `google/${model}`
+  }
+  if (model.startsWith('llama') || model.startsWith('codellama')) {
+    return `meta-llama/${model}`
+  }
+  if (model.startsWith('mistral') || model.startsWith('mixtral') || model.startsWith('codestral')) {
+    return `mistralai/${model}`
+  }
+  if (model.startsWith('deepseek')) {
+    return `deepseek/${model}`
+  }
+  if (model.startsWith('qwen')) {
+    return `qwen/${model}`
+  }
+
+  // If we can't infer, return as-is and let OpenRouter handle the error
+  return model
+}
+
 // ============================================================================
 // PostgreSQL Type Mapping
 // ============================================================================
@@ -743,7 +781,12 @@ async function handleChat(
   // Detect provider and get config
   const provider = detectProvider(apiKey)
   const config = getProviderConfig(provider)
-  const model = modelOverride || config.defaultModel
+  let model = modelOverride || config.defaultModel
+
+  // Normalize model name for OpenRouter (requires provider/model format)
+  if (provider === 'openrouter') {
+    model = normalizeModelForOpenRouter(model)
+  }
 
   try {
     // Build request body based on provider

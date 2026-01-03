@@ -503,6 +503,18 @@ The server handler includes built-in protections:
 
 See [@smallwebco/tinypivot-server](./packages/server/README.md) for full documentation
 
+### Complete Example
+
+For a complete working example with PostgreSQL backend, see the [AI Analyst Demo](./examples/ai-analyst-demo/):
+
+```bash
+cd examples/ai-analyst-demo
+cp .env.example .env
+# Edit .env with your DATABASE_URL and AI_API_KEY
+pnpm install
+pnpm dev:all
+```
+
 ## Chart Builder (Pro)
 
 TinyPivot Pro includes a drag-and-drop chart builder with 6 chart types. Simply drag fields to configure your visualization — dimensions go to the X-axis and measures to the Y-axis.

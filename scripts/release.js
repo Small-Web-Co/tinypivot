@@ -19,6 +19,7 @@ const rootDir = join(__dirname, '..')
 const packagePaths = [
   join(rootDir, 'package.json'),
   join(rootDir, 'packages/core/package.json'),
+  join(rootDir, 'packages/server/package.json'),
   join(rootDir, 'packages/vue/package.json'),
   join(rootDir, 'packages/react/package.json'),
 ]
@@ -660,6 +661,7 @@ async function main() {
     // Publish packages locally (requires npm token configured)
     console.log('\n🚀 Publishing to npm locally...')
     run('pnpm release:core')
+    run('pnpm release:server')
     run('pnpm release:vue')
     run('pnpm release:react')
   }

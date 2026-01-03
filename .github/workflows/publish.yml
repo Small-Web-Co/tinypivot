@@ -75,6 +75,12 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Publish @smallwebco/tinypivot-server
+        if: ${{ inputs.dry_run != 'true' }}
+        run: pnpm --filter @smallwebco/tinypivot-server publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish @smallwebco/tinypivot-vue
         if: ${{ inputs.dry_run != 'true' }}
         run: pnpm --filter @smallwebco/tinypivot-vue publish --access public --no-git-checks
@@ -93,5 +99,6 @@ jobs:
           echo "Dry run complete - packages built but not published"
           echo "Packages that would be published:"
           echo "  - @smallwebco/tinypivot-core"
+          echo "  - @smallwebco/tinypivot-server"
           echo "  - @smallwebco/tinypivot-vue"
           echo "  - @smallwebco/tinypivot-react"
