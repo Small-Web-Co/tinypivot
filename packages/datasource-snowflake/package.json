@@ -53,8 +53,8 @@
     "@smallwebco/tinypivot-studio": "workspace:*"
   },
   "devDependencies": {
-    "snowflake-sdk": "^1.6.0",
     "@types/snowflake-sdk": "^1.6.0",
+    "snowflake-sdk": "^1.6.0",
     "tsup": "^8.0.0",
     "typescript": "~5.3.3"
   }

@@ -47,8 +47,8 @@
     "react-dom": "^18.0.0"
   },
   "dependencies": {
-    "@smallwebco/tinypivot-studio": "workspace:*",
-    "@smallwebco/tinypivot-react": "workspace:*"
+    "@smallwebco/tinypivot-react": "workspace:*",
+    "@smallwebco/tinypivot-studio": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
