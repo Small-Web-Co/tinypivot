@@ -1,14 +1,14 @@
 {
   "name": "studio-react-demo",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build"
   },
   "dependencies": {
-    "@smallwebco/tinypivot-studio-react": "workspace:*",
     "@smallwebco/tinypivot-storage-indexeddb": "workspace:*",
+    "@smallwebco/tinypivot-studio-react": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

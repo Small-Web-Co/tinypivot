@@ -3,6 +3,7 @@ import type { Page, WidgetConfig } from '@smallwebco/tinypivot-studio-vue'
 import { createIndexedDBStorage } from '@smallwebco/tinypivot-storage-indexeddb'
 import { TinyPivotStudio } from '@smallwebco/tinypivot-studio-vue'
 import { ref } from 'vue'
+import '@smallwebco/tinypivot-studio-vue/style.css'
 
 const storage = createIndexedDBStorage()
 const theme = ref<'light' | 'dark'>('light')

@@ -1,14 +1,14 @@
 {
   "name": "studio-vue-demo",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build"
   },
   "dependencies": {
-    "@smallwebco/tinypivot-studio-vue": "workspace:*",
     "@smallwebco/tinypivot-storage-indexeddb": "workspace:*",
+    "@smallwebco/tinypivot-studio-vue": "workspace:*",
     "vue": "^3.4.0"
   },
   "devDependencies": {
