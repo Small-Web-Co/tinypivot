@@ -5,16 +5,20 @@
  * @packageDocumentation
  */
 
+// Components
+export { TinyPivotStudio } from './components'
+export type { TinyPivotStudioProps } from './components'
+
 // Context and provider
 export { StudioProvider, useStudioContext } from './context'
-
 export type { StudioConfig, StudioContextValue, StudioProviderProps } from './context'
-
-// Placeholder exports - components will be implemented in subsequent tasks
-export const STUDIO_REACT_VERSION = '1.0.64'
 
 // Hooks
 export { useStudio } from './hooks'
+
+// Package version
+export const STUDIO_REACT_VERSION = '1.0.64'
+
 // Re-export core studio types
 export type {
   ColumnInfo,
@@ -23,10 +27,12 @@ export type {
   DashboardWidget,
   DatasourceAdapter,
   DatasourceConfig,
+  Page,
   QueryResult,
   SavedView,
   StorageAdapter,
   TableInfo,
+  WidgetConfig,
   WidgetPosition,
   WidgetSize,
 } from '@smallwebco/tinypivot-studio'
@@ -36,8 +42,3 @@ export {
   createEmptyView,
   generateId,
 } from '@smallwebco/tinypivot-studio'
-
-// Components will be added here
-// export { TinyPivotStudio } from './components/TinyPivotStudio'
-// export { ViewEditor } from './components/ViewEditor'
-// export { DashboardEditor } from './components/DashboardEditor'
