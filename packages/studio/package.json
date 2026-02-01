@@ -28,7 +28,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./style.css": "./dist/style.css"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -37,7 +38,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean && cp src/style.css dist/style.css",
     "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"

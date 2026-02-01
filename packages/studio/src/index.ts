@@ -11,6 +11,20 @@ export * from './types'
 // Export all utilities from the utils directory
 export * from './utils'
 
+/**
+ * CSS Styles
+ *
+ * Import the CSS file in your application to style the Studio components:
+ *
+ * @example
+ * ```ts
+ * import '@smallwebco/tinypivot-studio/style.css'
+ * ```
+ *
+ * The styles use the `tps-` prefix (TinyPivot Studio) for all CSS classes.
+ * Dark mode is supported via the `.tps-theme-dark` class.
+ */
+
 // Re-export core types that are extended by studio
 export type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
 
