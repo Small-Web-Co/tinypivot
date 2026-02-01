@@ -5,6 +5,9 @@
  * @packageDocumentation
  */
 
+// Components
+export * from './components'
+
 // Composables
 export * from './composables'
 
@@ -25,8 +28,3 @@ export {
 
 // Package version
 export const STUDIO_VUE_VERSION = '1.0.64'
-
-// Components will be added here
-// export { TinyPivotStudio } from './components/TinyPivotStudio.vue'
-// export { ViewEditor } from './components/ViewEditor.vue'
-// export { DashboardEditor } from './components/DashboardEditor.vue'

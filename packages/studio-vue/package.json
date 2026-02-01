@@ -27,19 +27,20 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/tinypivot-studio-vue.js",
+      "require": "./dist/tinypivot-studio-vue.cjs"
     }
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "main": "./dist/tinypivot-studio-vue.cjs",
+  "module": "./dist/tinypivot-studio-vue.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
-    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "build": "vite build",
+    "build:typecheck": "vue-tsc --noEmit && vite build",
+    "dev": "vite build --watch",
     "lint": "eslint src",
     "typecheck": "vue-tsc --noEmit"
   },
@@ -51,8 +52,10 @@
     "@smallwebco/tinypivot-vue": "workspace:*"
   },
   "devDependencies": {
-    "tsup": "^8.0.0",
+    "@vitejs/plugin-vue": "^4.5.0",
     "typescript": "~5.3.3",
+    "vite": "^5.0.0",
+    "vite-plugin-dts": "^3.6.0",
     "vue": "^3.3.8",
     "vue-tsc": "^1.8.27"
   }
