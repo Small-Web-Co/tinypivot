@@ -15,7 +15,10 @@ import type {
   WidgetBlock,
   WidgetConfig,
 } from '@smallwebco/tinypivot-studio'
-import { generateId, isWidgetBlock } from '@smallwebco/tinypivot-studio'
+import {
+  generateId,
+  isWidgetBlock,
+} from '@smallwebco/tinypivot-studio'
 import { DataGrid } from '@smallwebco/tinypivot-vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { provideStudio, type StudioConfig } from '../composables'
@@ -556,6 +559,20 @@ function createBlock(type: Block['type']): Block {
       return { id, type: 'divider' }
     case 'widget':
       return { id, type: 'widget', widgetId: '', showTitle: true } as WidgetBlock
+    case 'image':
+      return { id, type: 'image', src: '', alt: '', caption: '', align: 'center' }
+    case 'callout':
+      return { id, type: 'callout', content: '', style: 'info', title: '' }
+    case 'columns':
+      return {
+        id,
+        type: 'columns',
+        columns: [
+          { id: generateId(), width: 1, blocks: [] },
+          { id: generateId(), width: 1, blocks: [] },
+        ],
+        gap: 16,
+      }
     default:
       return { id, type: 'text', content: '' }
   }
@@ -926,6 +943,221 @@ defineExpose({
                 </div>
               </div>
 
+              <!-- Image Block -->
+              <div v-else-if="block.type === 'image'" class="tps-block tps-block-image">
+                <div class="tps-block-actions">
+                  <button
+                    type="button"
+                    class="tps-block-action tps-block-delete"
+                    title="Delete block"
+                    @click="handleBlockDelete(block.id)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Image placeholder when no src -->
+                <div v-if="!block.src" class="tps-image-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                  </svg>
+                  <span>Add image URL</span>
+                  <input
+                    type="text"
+                    class="tps-input tps-image-url-input"
+                    placeholder="https://example.com/image.jpg"
+                    @blur="(e) => handleBlockUpdate(block.id, { src: (e.target as HTMLInputElement).value })"
+                    @keyup.enter="(e) => handleBlockUpdate(block.id, { src: (e.target as HTMLInputElement).value })"
+                  >
+                </div>
+
+                <!-- Image preview when src exists -->
+                <div v-else class="tps-image-preview">
+                  <div
+                    class="tps-image-preview-container"
+                    :class="[`tps-align-${block.align || 'center'}`]"
+                  >
+                    <img
+                      :src="block.src"
+                      :alt="block.alt || ''"
+                      :class="{ 'tps-image-full': block.width === 'full' }"
+                      :style="block.width && block.width !== 'full' ? { width: typeof block.width === 'number' ? `${block.width}px` : block.width } : {}"
+                    >
+                  </div>
+                  <input
+                    :value="block.caption || ''"
+                    type="text"
+                    class="tps-image-caption"
+                    placeholder="Add a caption..."
+                    @input="handleBlockUpdate(block.id, { caption: ($event.target as HTMLInputElement).value })"
+                  >
+                  <div class="tps-image-controls">
+                    <button
+                      type="button"
+                      class="tps-image-align-btn"
+                      :class="{ 'tps-active': block.align === 'left' }"
+                      title="Align left"
+                      @click="handleBlockUpdate(block.id, { align: 'left' })"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 10H3M21 6H3M21 14H3M17 18H3" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="tps-image-align-btn"
+                      :class="{ 'tps-active': block.align === 'center' || !block.align }"
+                      title="Align center"
+                      @click="handleBlockUpdate(block.id, { align: 'center' })"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 10H6M21 6H3M21 14H3M18 18H6" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="tps-image-align-btn"
+                      :class="{ 'tps-active': block.align === 'right' }"
+                      title="Align right"
+                      @click="handleBlockUpdate(block.id, { align: 'right' })"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10H7M21 6H3M21 14H3M21 18H7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Callout Block -->
+              <div
+                v-else-if="block.type === 'callout'"
+                class="tps-block tps-block-callout"
+                :data-style="block.style || 'info'"
+              >
+                <div class="tps-block-actions">
+                  <button
+                    type="button"
+                    class="tps-block-action tps-block-delete"
+                    title="Delete block"
+                    @click="handleBlockDelete(block.id)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="tps-callout-content">
+                  <div class="tps-callout-icon">
+                    <svg v-if="block.style === 'info' || !block.style" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                    <svg v-else-if="block.style === 'warning'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <path d="M12 9v4M12 17h.01" />
+                    </svg>
+                    <svg v-else-if="block.style === 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    <svg v-else-if="block.style === 'error'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M15 9l-6 6M9 9l6 6" />
+                    </svg>
+                    <svg v-else-if="block.style === 'note'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    <svg v-else-if="block.style === 'tip'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+                    </svg>
+                  </div>
+                  <div class="tps-callout-body">
+                    <input
+                      :value="block.title || ''"
+                      type="text"
+                      class="tps-callout-title-input"
+                      placeholder="Title (optional)"
+                      @input="handleBlockUpdate(block.id, { title: ($event.target as HTMLInputElement).value })"
+                    >
+                    <textarea
+                      :value="block.content"
+                      class="tps-callout-text-input"
+                      placeholder="Write your callout content..."
+                      rows="1"
+                      @input="(e) => { handleTextareaInput(e); handleBlockUpdate(block.id, { content: (e.target as HTMLTextAreaElement).value }) }"
+                    />
+                  </div>
+                </div>
+                <div class="tps-callout-style-selector">
+                  <button
+                    v-for="style in ['info', 'warning', 'success', 'error', 'note', 'tip'] as const"
+                    :key="style"
+                    type="button"
+                    class="tps-callout-style-btn"
+                    :class="{ 'tps-active': block.style === style }"
+                    :data-style="style"
+                    :title="style.charAt(0).toUpperCase() + style.slice(1)"
+                    @click="handleBlockUpdate(block.id, { style })"
+                  />
+                </div>
+              </div>
+
+              <!-- Columns Block -->
+              <div v-else-if="block.type === 'columns'" class="tps-block tps-block-columns">
+                <div class="tps-block-actions">
+                  <button
+                    type="button"
+                    class="tps-block-action tps-block-delete"
+                    title="Delete block"
+                    @click="handleBlockDelete(block.id)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="tps-columns-container" :data-gap="block.gap ? (block.gap <= 8 ? 'small' : block.gap <= 16 ? 'medium' : 'large') : 'medium'">
+                  <div
+                    v-for="(column, idx) in block.columns"
+                    :key="column.id"
+                    class="tps-column"
+                    :style="{ flex: column.width }"
+                  >
+                    <div class="tps-column-placeholder">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      <div>Column {{ idx + 1 }}</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="tps-columns-controls">
+                  <span class="tps-columns-label">Columns:</span>
+                  <button
+                    v-for="num in [2, 3, 4] as const"
+                    :key="num"
+                    type="button"
+                    class="tps-columns-btn"
+                    :class="{ 'tps-active': block.columns.length === num }"
+                    @click="handleBlockUpdate(block.id, {
+                      columns: Array.from({ length: num }, (_, i) =>
+                        i < block.columns.length
+                          ? block.columns[i]
+                          : { id: generateId(), width: 1, blocks: [] },
+                      ),
+                    })"
+                  >
+                    {{ num }}
+                  </button>
+                </div>
+              </div>
+
               <!-- Unknown Block -->
               <div v-else class="tps-block">
                 <span>Unknown block type: {{ block.type }}</span>
@@ -975,6 +1207,40 @@ defineExpose({
                   <path d="M9 21V9" />
                 </svg>
                 Widget
+              </button>
+              <button
+                type="button"
+                class="tps-add-block-option"
+                @click="handleAddBlock('image')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Image
+              </button>
+              <button
+                type="button"
+                class="tps-add-block-option"
+                @click="handleAddBlock('callout')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                  <path d="M12 16v-4M12 8h.01" />
+                </svg>
+                Callout
+              </button>
+              <button
+                type="button"
+                class="tps-add-block-option"
+                @click="handleAddBlock('columns')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M9 3v18M15 3v18" />
+                </svg>
+                Columns
               </button>
               <button
                 type="button"

@@ -952,6 +952,40 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
               </button>
               <button
                 type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('image')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Image
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('callout')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                  <path d="M12 16v-4M12 8h.01" />
+                </svg>
+                Callout
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('columns')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M9 3v18M15 3v18" />
+                </svg>
+                Columns
+              </button>
+              <button
+                type="button"
                 className="tps-btn tps-btn-ghost tps-btn-sm"
                 onClick={() => setShowBlockMenu(false)}
                 style={{ marginLeft: 'auto' }}
@@ -1026,6 +1060,36 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget }: 
         onUpdate={onUpdate}
         onDelete={onDelete}
         onConfigure={onConfigureWidget}
+      />
+    )
+  }
+
+  if (block.type === 'image') {
+    return (
+      <ImageBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (block.type === 'callout') {
+    return (
+      <CalloutBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (block.type === 'columns') {
+    return (
+      <ColumnsBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
       />
     )
   }
@@ -1291,6 +1355,310 @@ function WidgetBlockComponent({
           />
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Image block component
+ */
+function ImageBlockComponent({
+  block,
+  onUpdate,
+  onDelete,
+}: {
+  block: Block & { type: 'image', src: string, alt?: string, caption?: string, align?: string, width?: string | number }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}) {
+  const [urlInput, setUrlInput] = useState('')
+
+  const handleUrlSubmit = () => {
+    if (urlInput.trim()) {
+      onUpdate(block.id, { src: urlInput.trim() })
+    }
+  }
+
+  return (
+    <div className="tps-block tps-block-image">
+      <div className="tps-block-actions">
+        <button
+          type="button"
+          className="tps-block-action tps-block-delete"
+          onClick={() => onDelete(block.id)}
+          title="Delete block"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Image placeholder when no src */}
+      {!block.src ? (
+        <div className="tps-image-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="M21 15l-5-5L5 21" />
+          </svg>
+          <span>Add image URL</span>
+          <input
+            type="text"
+            className="tps-input tps-image-url-input"
+            placeholder="https://example.com/image.jpg"
+            value={urlInput}
+            onChange={e => setUrlInput(e.target.value)}
+            onBlur={handleUrlSubmit}
+            onKeyDown={e => e.key === 'Enter' && handleUrlSubmit()}
+          />
+        </div>
+      ) : (
+        <div className="tps-image-preview">
+          <div className={`tps-image-preview-container tps-align-${block.align || 'center'}`}>
+            <img
+              src={block.src}
+              alt={block.alt || ''}
+              className={block.width === 'full' ? 'tps-image-full' : ''}
+              style={block.width && block.width !== 'full' ? { width: typeof block.width === 'number' ? `${block.width}px` : block.width } : undefined}
+            />
+          </div>
+          <input
+            type="text"
+            className="tps-image-caption"
+            value={block.caption || ''}
+            onChange={e => onUpdate(block.id, { caption: e.target.value })}
+            placeholder="Add a caption..."
+          />
+          <div className="tps-image-controls">
+            <button
+              type="button"
+              className={`tps-image-align-btn ${block.align === 'left' ? 'tps-active' : ''}`}
+              title="Align left"
+              onClick={() => onUpdate(block.id, { align: 'left' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 10H3M21 6H3M21 14H3M17 18H3" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`tps-image-align-btn ${block.align === 'center' || !block.align ? 'tps-active' : ''}`}
+              title="Align center"
+              onClick={() => onUpdate(block.id, { align: 'center' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 10H6M21 6H3M21 14H3M18 18H6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`tps-image-align-btn ${block.align === 'right' ? 'tps-active' : ''}`}
+              title="Align right"
+              onClick={() => onUpdate(block.id, { align: 'right' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 10H7M21 6H3M21 14H3M21 18H7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Callout block component
+ */
+function CalloutBlockComponent({
+  block,
+  onUpdate,
+  onDelete,
+}: {
+  block: Block & { type: 'callout', content: string, style: string, title?: string }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}) {
+  const getCalloutIcon = (style: string) => {
+    switch (style) {
+      case 'warning':
+        return (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <path d="M12 9v4M12 17h.01" />
+          </svg>
+        )
+      case 'success':
+        return (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+        )
+      case 'error':
+        return (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M15 9l-6 6M9 9l6 6" />
+          </svg>
+        )
+      case 'note':
+        return (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+        )
+      case 'tip':
+        return (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+          </svg>
+        )
+      default:
+        return (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+        )
+    }
+  }
+
+  return (
+    <div className="tps-block tps-block-callout" data-style={block.style || 'info'}>
+      <div className="tps-block-actions">
+        <button
+          type="button"
+          className="tps-block-action tps-block-delete"
+          onClick={() => onDelete(block.id)}
+          title="Delete block"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
+      </div>
+      <div className="tps-callout-content">
+        <div className="tps-callout-icon">
+          {getCalloutIcon(block.style)}
+        </div>
+        <div className="tps-callout-body">
+          <input
+            type="text"
+            className="tps-callout-title-input"
+            value={block.title || ''}
+            onChange={e => onUpdate(block.id, { title: e.target.value })}
+            placeholder="Title (optional)"
+          />
+          <textarea
+            className="tps-callout-text-input"
+            value={block.content}
+            onChange={e => onUpdate(block.id, { content: e.target.value })}
+            placeholder="Write your callout content..."
+            rows={1}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement
+              target.style.height = 'auto'
+              target.style.height = `${target.scrollHeight}px`
+            }}
+          />
+        </div>
+      </div>
+      <div className="tps-callout-style-selector">
+        {(['info', 'warning', 'success', 'error', 'note', 'tip'] as const).map(style => (
+          <button
+            key={style}
+            type="button"
+            className={`tps-callout-style-btn ${block.style === style ? 'tps-active' : ''}`}
+            data-style={style}
+            title={style.charAt(0).toUpperCase() + style.slice(1)}
+            onClick={() => onUpdate(block.id, { style })}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Columns block component
+ */
+function ColumnsBlockComponent({
+  block,
+  onUpdate,
+  onDelete,
+}: {
+  block: Block & { type: 'columns', columns: Array<{ id: string, width: number, blocks: Block[] }>, gap?: number }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}) {
+  const getGapClass = (gap?: number) => {
+    if (!gap)
+      return 'medium'
+    if (gap <= 8)
+      return 'small'
+    if (gap <= 16)
+      return 'medium'
+    return 'large'
+  }
+
+  const handleColumnCountChange = (count: number) => {
+    const newColumns = Array.from({ length: count }, (_, i) =>
+      i < block.columns.length
+        ? block.columns[i]
+        : { id: generateId(), width: 1, blocks: [] })
+    onUpdate(block.id, { columns: newColumns })
+  }
+
+  return (
+    <div className="tps-block tps-block-columns">
+      <div className="tps-block-actions">
+        <button
+          type="button"
+          className="tps-block-action tps-block-delete"
+          onClick={() => onDelete(block.id)}
+          title="Delete block"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
+      </div>
+      <div className="tps-columns-container" data-gap={getGapClass(block.gap)}>
+        {block.columns.map((column, idx) => (
+          <div
+            key={column.id}
+            className="tps-column"
+            style={{ flex: column.width }}
+          >
+            <div className="tps-column-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <div>
+                Column
+                {' '}
+                {idx + 1}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="tps-columns-controls">
+        <span className="tps-columns-label">Columns:</span>
+        {([2, 3, 4] as const).map(num => (
+          <button
+            key={num}
+            type="button"
+            className={`tps-columns-btn ${block.columns.length === num ? 'tps-active' : ''}`}
+            onClick={() => handleColumnCountChange(num)}
+          >
+            {num}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1762,6 +2130,20 @@ function createBlock(type: Block['type']): Block {
       return { id, type: 'divider' }
     case 'widget':
       return { id, type: 'widget', widgetId: '', showTitle: true } as WidgetBlock
+    case 'image':
+      return { id, type: 'image', src: '', alt: '', caption: '', align: 'center' }
+    case 'callout':
+      return { id, type: 'callout', content: '', style: 'info', title: '' }
+    case 'columns':
+      return {
+        id,
+        type: 'columns',
+        columns: [
+          { id: generateId(), width: 1, blocks: [] },
+          { id: generateId(), width: 1, blocks: [] },
+        ],
+        gap: 16,
+      }
     default:
       return { id, type: 'text', content: '' }
   }
