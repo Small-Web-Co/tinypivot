@@ -5,15 +5,19 @@
 import type {
   Block,
   DatasourceConfig,
+  GridPosition,
   HeadingBlock,
+  LayoutMode,
   Page,
   PageListItem,
   PageTemplate,
+  PageVersionSummary,
   StorageAdapter,
   TextBlock,
   WidgetBlock,
   WidgetConfig,
 } from '@smallwebco/tinypivot-studio'
+import type { GridStackNode } from 'gridstack'
 import {
   closestCenter,
   DndContext,
@@ -32,17 +36,29 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { DataGrid } from '@smallwebco/tinypivot-react'
-import { generateId, isWidgetBlock } from '@smallwebco/tinypivot-studio'
+import { calculateContentHash, generateId, isHeadingBlock, isTextBlock, isWidgetBlock, MAX_VERSIONS_PER_PAGE } from '@smallwebco/tinypivot-studio'
+import { GridStack } from 'gridstack'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
+import { RichTextEditor } from './RichTextEditor'
 
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
 import '@smallwebco/tinypivot-react/style.css'
+import 'gridstack/dist/gridstack.min.css'
 
 // LocalStorage key for datasources
 const DATASOURCES_STORAGE_KEY = 'tinypivot-datasources'
+
+// Version storage key prefix
+const VERSION_STORAGE_PREFIX = 'tinypivot-versions-'
+
+// Resize constraints
+const MIN_HEIGHT = 200
+const MAX_HEIGHT = 1000
+const MIN_WIDTH = 200
 
 // Widget sample data - used when no data source is configured
 const widgetSampleData = [
@@ -85,6 +101,71 @@ function getDatasourceTypeLabel(type: string): string {
     default:
       return type
   }
+}
+
+// ============================================================================
+// Version History Helpers
+// ============================================================================
+
+// Load versions for a page
+function loadVersions(pageId: string): PageVersionSummary[] {
+  try {
+    const stored = localStorage.getItem(`${VERSION_STORAGE_PREFIX}${pageId}`)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      return parsed.map((v: PageVersionSummary) => ({
+        ...v,
+        createdAt: new Date(v.createdAt),
+      }))
+    }
+  }
+  catch (error) {
+    console.error('Failed to load versions:', error)
+  }
+  return []
+}
+
+// Save versions for a page
+function saveVersions(pageId: string, versionList: PageVersionSummary[]) {
+  try {
+    localStorage.setItem(`${VERSION_STORAGE_PREFIX}${pageId}`, JSON.stringify(versionList))
+  }
+  catch (error) {
+    console.error('Failed to save versions:', error)
+  }
+}
+
+// Get full version data (with blocks)
+function getFullVersion(pageId: string, versionId: string) {
+  try {
+    const stored = localStorage.getItem(`${VERSION_STORAGE_PREFIX}${pageId}-${versionId}`)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  }
+  catch (error) {
+    console.error('Failed to load version:', error)
+  }
+  return null
+}
+
+// Format relative time
+function formatRelativeTime(date: Date): string {
+  const now = new Date()
+  const diff = now.getTime() - new Date(date).getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1)
+    return 'Just now'
+  if (minutes < 60)
+    return `${minutes}m ago`
+  if (hours < 24)
+    return `${hours}h ago`
+  if (days < 7)
+    return `${days}d ago`
+  return new Date(date).toLocaleDateString()
 }
 
 /**
@@ -852,10 +933,458 @@ interface PageEditorProps {
   onConfigureWidget: (block: WidgetBlock) => void
 }
 
+interface ActiveFilter {
+  id: string
+  field: string
+  value: string
+  sourceWidgetId?: string
+}
+
 function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
   const [blocks, setBlocks] = useState<Block[]>(page.blocks)
   const [showBlockMenu, setShowBlockMenu] = useState(false)
+  const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([])
+
+  // Layout mode state
+  const [layoutMode, setLayoutModeState] = useState<LayoutMode>(page.layoutMode || 'linear')
+  const gridInstanceRef = useRef<GridStack | null>(null)
+  const gridContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // Check if there are any widget blocks in the editor
+  const hasWidgetBlocks = blocks.some(block => block.type === 'widget' || block.type === 'widgetGrid')
+
+  // Filter management functions
+  const addFilter = useCallback((field: string, value: string, sourceWidgetId?: string) => {
+    setActiveFilters((prevFilters) => {
+      const existingIndex = prevFilters.findIndex(f => f.field === field)
+      if (existingIndex >= 0) {
+        const newFilters = [...prevFilters]
+        newFilters[existingIndex] = { ...newFilters[existingIndex], value, sourceWidgetId }
+        return newFilters
+      }
+      return [...prevFilters, { id: generateId(), field, value, sourceWidgetId }]
+    })
+  }, [])
+
+  const removeFilter = useCallback((filterId: string) => {
+    setActiveFilters(prev => prev.filter(f => f.id !== filterId))
+  }, [])
+
+  const clearAllFilters = useCallback(() => {
+    setActiveFilters([])
+  }, [])
+
+  // Handle click on a row in a widget - enables click-to-filter
+  const handleWidgetRowClick = useCallback((widgetBlockId: string, row: Record<string, unknown>) => {
+    const filterableFields = Object.keys(row).filter(key => key !== 'id')
+    if (filterableFields.length === 0)
+      return
+
+    const filterField = filterableFields.includes('category') ? 'category' : filterableFields[0]
+    const filterValue = String(row[filterField] ?? '')
+
+    if (filterValue) {
+      addFilter(filterField, filterValue, widgetBlockId)
+    }
+  }, [addFilter])
+
+  // ============================================================================
+  // Grid Layout Mode
+  // ============================================================================
+
+  // Get grid position for a block (with defaults)
+  const getBlockGridPosition = useCallback((block: Block): GridPosition => {
+    return block.gridPosition ?? { x: 0, y: 0, w: 12, h: 2 }
+  }, [])
+
+  // Initialize gridstack when switching to grid mode
+  const initGrid = useCallback(() => {
+    if (gridInstanceRef.current)
+      return
+    if (!gridContainerRef.current)
+      return
+
+    // Initialize gridstack with auto: false so we can manually add widgets
+    gridInstanceRef.current = GridStack.init({
+      column: 12,
+      cellHeight: 80,
+      margin: 8,
+      animate: true,
+      draggable: { handle: '.tps-block-drag-handle' },
+      resizable: { handles: 'e,se,s,sw,w' },
+      float: true,
+      auto: false,
+    }, gridContainerRef.current)
+
+    // Manually make each React-rendered element a gridstack widget
+    const items = gridContainerRef.current.querySelectorAll('.grid-stack-item')
+    items.forEach((el) => {
+      gridInstanceRef.current!.makeWidget(el as HTMLElement)
+    })
+
+    gridInstanceRef.current.on('change', (_event: Event, items: GridStackNode[]) => {
+      if (!items)
+        return
+      setBlocks((prevBlocks) => {
+        const newBlocks = prevBlocks.map((block) => {
+          const item = items.find(i => i.id === block.id)
+          if (item) {
+            return {
+              ...block,
+              gridPosition: {
+                x: item.x ?? 0,
+                y: item.y ?? 0,
+                w: item.w ?? 12,
+                h: item.h ?? 2,
+              },
+            }
+          }
+          return block
+        })
+        onUpdatePage({ ...page, title, blocks: newBlocks, layoutMode: 'grid' })
+        return newBlocks
+      })
+    })
+  }, [page, title, onUpdatePage])
+
+  // Destroy gridstack instance
+  const destroyGrid = useCallback(() => {
+    if (gridInstanceRef.current) {
+      gridInstanceRef.current.destroy(false)
+      gridInstanceRef.current = null
+    }
+  }, [])
+
+  // Convert blocks from linear to grid positions
+  const convertLinearToGrid = useCallback(() => {
+    let yPos = 0
+    let currentRow: Block[] = []
+
+    const placeRow = () => {
+      if (currentRow.length === 0)
+        return
+
+      const itemWidth = Math.floor(12 / currentRow.length)
+
+      currentRow.forEach((block, idx) => {
+        const defaultHeight = isWidgetBlock(block) ? 4 : 2
+        block.gridPosition = {
+          x: idx * itemWidth,
+          y: yPos,
+          w: itemWidth,
+          h: defaultHeight,
+        }
+      })
+
+      const maxHeight = Math.max(...currentRow.map(b => isWidgetBlock(b) ? 4 : 2))
+      yPos += maxHeight
+      currentRow = []
+    }
+
+    blocks.forEach((block) => {
+      if (isWidgetBlock(block)) {
+        currentRow.push(block)
+        if (currentRow.length >= 2) {
+          placeRow()
+        }
+      }
+      else {
+        placeRow()
+        const defaultHeight = 2
+        block.gridPosition = {
+          x: 0,
+          y: yPos,
+          w: 12,
+          h: defaultHeight,
+        }
+        yPos += defaultHeight
+      }
+    })
+
+    placeRow()
+  }, [blocks])
+
+  // Convert blocks from grid to linear (sort by y, then x)
+  const convertGridToLinear = useCallback(() => {
+    setBlocks((prevBlocks) => {
+      const sorted = [...prevBlocks].sort((a, b) => {
+        const aY = a.gridPosition?.y ?? 0
+        const bY = b.gridPosition?.y ?? 0
+        if (aY !== bY)
+          return aY - bY
+        const aX = a.gridPosition?.x ?? 0
+        const bX = b.gridPosition?.x ?? 0
+        return aX - bX
+      })
+      return sorted
+    })
+  }, [])
+
+  // Set layout mode
+  const setLayoutMode = useCallback(async (newMode: LayoutMode) => {
+    if (layoutMode === newMode)
+      return
+
+    if (newMode === 'grid') {
+      convertLinearToGrid()
+      setLayoutModeState('grid')
+      // Wait for React to render, then initialize grid
+      setTimeout(() => {
+        initGrid()
+      }, 100)
+    }
+    else {
+      destroyGrid()
+      convertGridToLinear()
+      setLayoutModeState('linear')
+    }
+
+    onUpdatePage({ ...page, title, blocks, layoutMode: newMode })
+  }, [layoutMode, convertLinearToGrid, convertGridToLinear, initGrid, destroyGrid, page, title, blocks, onUpdatePage])
+
+  // Initialize grid on mount if in grid mode
+  useEffect(() => {
+    if (layoutMode === 'grid' && gridContainerRef.current && !gridInstanceRef.current) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        initGrid()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [layoutMode, initGrid])
+
+  // Cleanup grid on unmount
+  useEffect(() => {
+    return () => {
+      destroyGrid()
+    }
+  }, [destroyGrid])
+
+  // ============================================================================
+  // Undo/Redo System
+  // ============================================================================
+  const MAX_HISTORY_SIZE = 50
+
+  interface HistoryEntry {
+    blocks: Block[]
+    title: string
+    timestamp: number
+  }
+
+  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const isUndoRedoRef = useRef(false) // Flag to prevent recording during undo/redo
+
+  // Check if undo/redo is available
+  const canUndo = historyIndex > 0
+  const canRedo = historyIndex < history.length - 1
+
+  // Record a state change to history
+  const recordHistory = useCallback(() => {
+    if (isUndoRedoRef.current)
+      return
+
+    const entry: HistoryEntry = {
+      blocks: JSON.parse(JSON.stringify(blocks)),
+      title,
+      timestamp: Date.now(),
+    }
+
+    setHistory((prev) => {
+      // If we're not at the end of history, remove future entries
+      const newHistory = historyIndex < prev.length - 1
+        ? prev.slice(0, historyIndex + 1)
+        : prev
+
+      // Add new entry
+      const updated = [...newHistory, entry]
+
+      // Trim history if too large
+      if (updated.length > MAX_HISTORY_SIZE) {
+        return updated.slice(-MAX_HISTORY_SIZE)
+      }
+      return updated
+    })
+
+    setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY_SIZE - 1))
+  }, [blocks, title, historyIndex])
+
+  // Perform undo
+  const undo = useCallback(() => {
+    if (historyIndex <= 0)
+      return
+
+    isUndoRedoRef.current = true
+    const newIndex = historyIndex - 1
+    const entry = history[newIndex]
+    setBlocks(JSON.parse(JSON.stringify(entry.blocks)))
+    setTitle(entry.title)
+    setHistoryIndex(newIndex)
+    onUpdatePage({ ...page, title: entry.title, blocks: entry.blocks })
+    isUndoRedoRef.current = false
+  }, [historyIndex, history, page, onUpdatePage])
+
+  // Perform redo
+  const redo = useCallback(() => {
+    if (historyIndex >= history.length - 1)
+      return
+
+    isUndoRedoRef.current = true
+    const newIndex = historyIndex + 1
+    const entry = history[newIndex]
+    setBlocks(JSON.parse(JSON.stringify(entry.blocks)))
+    setTitle(entry.title)
+    setHistoryIndex(newIndex)
+    onUpdatePage({ ...page, title: entry.title, blocks: entry.blocks })
+    isUndoRedoRef.current = false
+  }, [historyIndex, history, page, onUpdatePage])
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC')
+      const ctrlOrCmd = isMac ? event.metaKey : event.ctrlKey
+
+      if (ctrlOrCmd && event.key === 'z') {
+        if (event.shiftKey) {
+          event.preventDefault()
+          redo()
+        }
+        else {
+          event.preventDefault()
+          undo()
+        }
+      }
+      else if (ctrlOrCmd && event.key === 'y') {
+        event.preventDefault()
+        redo()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [undo, redo])
+
+  // ============================================================================
+  // Version History
+  // ============================================================================
+  const [showVersionPanel, setShowVersionPanel] = useState(false)
+  const [versions, setVersions] = useState<PageVersionSummary[]>([])
+  const [previewingVersionId, setPreviewingVersionId] = useState<string | null>(null)
+  // previewBlocks stores the blocks of the version being previewed (for future use)
+  const [, setPreviewBlocks] = useState<Block[] | null>(null)
+  const [newVersionDescription, setNewVersionDescription] = useState('')
+
+  // Load versions when page changes
+  useEffect(() => {
+    setVersions(loadVersions(page.id))
+    setPreviewingVersionId(null)
+    setPreviewBlocks(null)
+  }, [page.id])
+
+  // Create a new version
+  const createVersion = useCallback((description?: string) => {
+    const existingVersions = loadVersions(page.id)
+
+    // Calculate content hash to check if anything changed
+    const currentHash = calculateContentHash(blocks)
+    const latestVersionSummary = existingVersions[0]
+
+    // Check if content has changed by comparing with latest full version
+    if (latestVersionSummary && !description) {
+      const latestFullVersion = getFullVersion(page.id, latestVersionSummary.id)
+      if (latestFullVersion?.contentHash === currentHash) {
+        return // No changes, skip creating version
+      }
+    }
+
+    const newVersion: PageVersionSummary = {
+      id: generateId(),
+      pageId: page.id,
+      version: (existingVersions[0]?.version || 0) + 1,
+      title,
+      createdAt: new Date(),
+      changeDescription: description || undefined,
+      blockCount: blocks.length,
+      widgetCount: blocks.filter(b => b.type === 'widget' || b.type === 'widgetGrid').length,
+    }
+
+    // Store full blocks separately for this version
+    const fullVersion = {
+      ...newVersion,
+      blocks: JSON.parse(JSON.stringify(blocks)),
+      contentHash: currentHash,
+    }
+    localStorage.setItem(`${VERSION_STORAGE_PREFIX}${page.id}-${newVersion.id}`, JSON.stringify(fullVersion))
+
+    // Update versions list (newest first)
+    const updatedVersions = [newVersion, ...existingVersions]
+
+    // Prune old versions if exceeding max
+    if (updatedVersions.length > MAX_VERSIONS_PER_PAGE) {
+      const removed = updatedVersions.splice(MAX_VERSIONS_PER_PAGE)
+      // Clean up storage for removed versions
+      removed.forEach((v) => {
+        localStorage.removeItem(`${VERSION_STORAGE_PREFIX}${page.id}-${v.id}`)
+      })
+    }
+
+    saveVersions(page.id, updatedVersions)
+    setVersions(updatedVersions)
+    setNewVersionDescription('')
+  }, [blocks, title, page.id])
+
+  // Preview a version
+  const previewVersion = useCallback((versionId: string) => {
+    const fullVersion = getFullVersion(page.id, versionId)
+    if (fullVersion) {
+      setPreviewingVersionId(versionId)
+      setPreviewBlocks(fullVersion.blocks)
+    }
+  }, [page.id])
+
+  // Cancel preview
+  const cancelPreview = useCallback(() => {
+    setPreviewingVersionId(null)
+    setPreviewBlocks(null)
+  }, [])
+
+  // Restore a version
+  const restoreVersion = useCallback((versionId: string) => {
+    const fullVersion = getFullVersion(page.id, versionId)
+    if (!fullVersion)
+      return
+
+    // Create a backup of current state before restoring
+    createVersion('Auto-backup before restore')
+
+    // Restore the blocks
+    const restoredBlocks = JSON.parse(JSON.stringify(fullVersion.blocks))
+    setBlocks(restoredBlocks)
+    if (fullVersion.title) {
+      setTitle(fullVersion.title)
+    }
+
+    // Save the restored state
+    onUpdatePage({ ...page, title: fullVersion.title || title, blocks: restoredBlocks })
+
+    // Clear preview state
+    cancelPreview()
+
+    // Create a new version marking this as a restore point
+    setTimeout(() => {
+      createVersion(`Restored from version ${fullVersion.version}`)
+    }, 100)
+  }, [page, title, createVersion, cancelPreview, onUpdatePage])
+
+  // Check if currently previewing
+  const isPreviewMode = previewingVersionId !== null
+
+  // Toggle version panel
+  const toggleVersionPanel = useCallback(() => {
+    setShowVersionPanel(prev => !prev)
+  }, [])
 
   // dnd-kit sensors for pointer and keyboard
   const sensors = useSensors(
@@ -884,6 +1413,7 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
 
   // Handle block update
   const handleBlockUpdate = (blockId: string, updates: Partial<Block>) => {
+    recordHistory() // Save state before change for undo
     const newBlocks = blocks.map((block): Block =>
       block.id === blockId ? { ...block, ...updates } as Block : block,
     )
@@ -893,6 +1423,16 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
 
   // Handle block deletion
   const handleBlockDelete = (blockId: string) => {
+    recordHistory() // Save state before change for undo
+
+    // Remove from gridstack if in grid mode
+    if (layoutMode === 'grid' && gridInstanceRef.current && gridContainerRef.current) {
+      const el = gridContainerRef.current.querySelector(`[gs-id="${blockId}"]`)
+      if (el) {
+        gridInstanceRef.current.removeWidget(el as HTMLElement, false)
+      }
+    }
+
     const newBlocks = blocks.filter(block => block.id !== blockId)
     setBlocks(newBlocks)
     onUpdatePage({ ...page, title, blocks: newBlocks })
@@ -900,11 +1440,41 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
 
   // Handle add block
   const handleAddBlock = (type: Block['type']) => {
+    recordHistory() // Save state before change for undo
     const newBlock = createBlock(type)
+
+    // Assign grid position if in grid mode
+    if (layoutMode === 'grid') {
+      const maxY = blocks.reduce((max, b) => {
+        const pos = b.gridPosition
+        if (pos) {
+          return Math.max(max, pos.y + pos.h)
+        }
+        return max
+      }, 0)
+
+      newBlock.gridPosition = {
+        x: 0,
+        y: maxY,
+        w: isWidgetBlock(newBlock) ? 6 : 12,
+        h: isWidgetBlock(newBlock) ? 4 : 2,
+      }
+    }
+
     const newBlocks = [...blocks, newBlock]
     setBlocks(newBlocks)
     setShowBlockMenu(false)
     onUpdatePage({ ...page, title, blocks: newBlocks })
+
+    // Tell gridstack about the new React-rendered element
+    if (layoutMode === 'grid' && gridInstanceRef.current) {
+      setTimeout(() => {
+        const newEl = gridContainerRef.current?.querySelector(`[gs-id="${newBlock.id}"]`) as HTMLElement
+        if (newEl) {
+          gridInstanceRef.current!.makeWidget(newEl)
+        }
+      }, 50)
+    }
   }
 
   // Handle drag end for reordering blocks
@@ -912,6 +1482,7 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
     const { active, over } = event
 
     if (over && active.id !== over.id) {
+      recordHistory() // Save state before change for undo
       const oldIndex = blocks.findIndex(b => b.id === active.id)
       const newIndex = blocks.findIndex(b => b.id === over.id)
 
@@ -934,133 +1505,529 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
             placeholder="Untitled"
           />
         </div>
+        <div className="tps-editor-actions">
+          {/* Undo/Redo Buttons */}
+          <button
+            type="button"
+            className={`tps-editor-action ${!canUndo ? 'tps-disabled' : ''}`}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            onClick={undo}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 7v6h6" />
+              <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.9 3.2L3 13" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`tps-editor-action ${!canRedo ? 'tps-disabled' : ''}`}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Y)"
+            onClick={redo}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 7v6h-6" />
+              <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.9 3.2L21 13" />
+            </svg>
+          </button>
+          {/* Layout Mode Toggle */}
+          <div className="tps-layout-toggle">
+            <button
+              type="button"
+              className={`tps-layout-btn ${layoutMode === 'linear' ? 'tps-active' : ''}`}
+              title="Linear Layout"
+              onClick={() => setLayoutMode('linear')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`tps-layout-btn ${layoutMode === 'grid' ? 'tps-active' : ''}`}
+              title="Grid Layout"
+              onClick={() => setLayoutMode('grid')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            </button>
+          </div>
+          {/* Version History Toggle */}
+          <button
+            type="button"
+            className={`tps-version-toggle ${showVersionPanel ? 'tps-active' : ''}`}
+            title="Version History"
+            onClick={toggleVersionPanel}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            {versions.length > 0 && (
+              <span className="tps-version-count">{versions.length}</span>
+            )}
+          </button>
+        </div>
       </div>
 
+      {/* Preview Mode Banner */}
+      {isPreviewMode && (
+        <div className="tps-preview-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span className="tps-preview-banner-text">
+            Previewing version
+            {' '}
+            {versions.find(v => v.id === previewingVersionId)?.version}
+          </span>
+          <div className="tps-preview-banner-actions">
+            <button
+              type="button"
+              className="tps-preview-banner-btn tps-restore"
+              onClick={() => restoreVersion(previewingVersionId!)}
+            >
+              Restore this version
+            </button>
+            <button
+              type="button"
+              className="tps-preview-banner-btn tps-cancel"
+              onClick={cancelPreview}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Bar - Reactive Field Linking */}
+      {(activeFilters.length > 0 || hasWidgetBlocks) && (
+        <div className="tps-filter-bar">
+          <span className="tps-filter-bar-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46" />
+            </svg>
+            Filters
+          </span>
+          <div className="tps-filter-pills">
+            {activeFilters.map(filter => (
+              <div key={filter.id} className="tps-filter-pill">
+                <span className="tps-filter-pill-field">
+                  {filter.field}
+                  :
+                </span>
+                <span className="tps-filter-pill-value">{filter.value}</span>
+                <button
+                  type="button"
+                  className="tps-filter-pill-remove"
+                  title="Remove filter"
+                  onClick={() => removeFilter(filter.id)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+          {activeFilters.length > 0 && (
+            <button
+              type="button"
+              className="tps-filter-clear-all"
+              onClick={clearAllFilters}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="tps-editor-content">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={blocks.map(b => b.id)}
-            strategy={verticalListSortingStrategy}
+        {/* Linear Layout Mode */}
+        {layoutMode === 'linear' ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <div className="tps-blocks">
-              {blocks.map(block => (
-                <SortableBlockWrapper key={block.id} id={block.id}>
-                  <BlockRenderer
+            <SortableContext
+              items={blocks.map(b => b.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="tps-blocks">
+                {blocks.map(block => (
+                  <SortableBlockWrapper key={block.id} id={block.id}>
+                    <BlockRenderer
+                      block={block}
+                      theme={theme}
+                      onUpdate={handleBlockUpdate}
+                      onDelete={handleBlockDelete}
+                      onConfigureWidget={onConfigureWidget}
+                      activeFilters={activeFilters}
+                      onWidgetRowClick={handleWidgetRowClick}
+                    />
+                  </SortableBlockWrapper>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          /* Grid Layout Mode */
+          <div
+            ref={gridContainerRef}
+            className="grid-stack tps-blocks-grid"
+          >
+            {blocks.map(block => (
+              <div
+                key={block.id}
+                className="grid-stack-item"
+                gs-id={block.id}
+                gs-x={getBlockGridPosition(block).x}
+                gs-y={getBlockGridPosition(block).y}
+                gs-w={getBlockGridPosition(block).w}
+                gs-h={getBlockGridPosition(block).h}
+                gs-min-w={2}
+                gs-min-h={1}
+              >
+                <div className="grid-stack-item-content">
+                  <GridBlockRenderer
                     block={block}
                     theme={theme}
                     onUpdate={handleBlockUpdate}
                     onDelete={handleBlockDelete}
                     onConfigureWidget={onConfigureWidget}
+                    activeFilters={activeFilters}
+                    onWidgetRowClick={handleWidgetRowClick}
                   />
-                </SortableBlockWrapper>
-              ))}
-
-              {showBlockMenu ? (
-                <div className="tps-add-block-menu">
-                  <button
-                    type="button"
-                    className="tps-add-block-option"
-                    onClick={() => handleAddBlock('text')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M4 7V4h16v3M9 20h6M12 4v16" />
-                    </svg>
-                    Text
-                  </button>
-                  <button
-                    type="button"
-                    className="tps-add-block-option"
-                    onClick={() => handleAddBlock('heading')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M6 4v16M18 4v16M6 12h12" />
-                    </svg>
-                    Heading
-                  </button>
-                  <button
-                    type="button"
-                    className="tps-add-block-option"
-                    onClick={() => handleAddBlock('divider')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M3 12h18" />
-                    </svg>
-                    Divider
-                  </button>
-                  <button
-                    type="button"
-                    className="tps-add-block-option"
-                    onClick={() => handleAddBlock('widget')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M3 9h18" />
-                      <path d="M9 21V9" />
-                    </svg>
-                    Widget
-                  </button>
-                  <button
-                    type="button"
-                    className="tps-add-block-option"
-                    onClick={() => handleAddBlock('image')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <path d="M21 15l-5-5L5 21" />
-                    </svg>
-                    Image
-                  </button>
-                  <button
-                    type="button"
-                    className="tps-add-block-option"
-                    onClick={() => handleAddBlock('callout')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-                      <path d="M12 16v-4M12 8h.01" />
-                    </svg>
-                    Callout
-                  </button>
-                  <button
-                    type="button"
-                    className="tps-add-block-option"
-                    onClick={() => handleAddBlock('columns')}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 3v18M15 3v18" />
-                    </svg>
-                    Columns
-                  </button>
-                  <button
-                    type="button"
-                    className="tps-btn tps-btn-ghost tps-btn-sm"
-                    onClick={() => setShowBlockMenu(false)}
-                    style={{ marginLeft: 'auto' }}
-                  >
-                    Cancel
-                  </button>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  className="tps-add-block"
-                  onClick={() => setShowBlockMenu(true)}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Add block
-                </button>
-              )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add Block Menu - shared between both modes */}
+        <div className="tps-blocks">
+          {showBlockMenu ? (
+            <div className="tps-add-block-menu">
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('text')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M4 7V4h16v3M9 20h6M12 4v16" />
+                </svg>
+                Text
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('heading')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M6 4v16M18 4v16M6 12h12" />
+                </svg>
+                Heading
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('divider')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M3 12h18" />
+                </svg>
+                Divider
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('widget')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 9h18" />
+                  <path d="M9 21V9" />
+                </svg>
+                Widget
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('image')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Image
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('callout')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                  <path d="M12 16v-4M12 8h.01" />
+                </svg>
+                Callout
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('columns')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M9 3v18M15 3v18" />
+                </svg>
+                Columns
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('stat')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M4 20V10" />
+                  <path d="M12 20V4" />
+                  <path d="M20 20v-6" />
+                </svg>
+                Stat
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('progress')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="2" y="10" width="20" height="4" rx="2" />
+                  <rect x="2" y="10" width="12" height="4" rx="2" fill="currentColor" opacity="0.3" />
+                </svg>
+                Progress
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('spacer')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M4 6h16" />
+                  <path d="M4 18h16" />
+                  <path d="M12 9v6" />
+                  <path d="M9 11l3-3 3 3" />
+                  <path d="M9 13l3 3 3-3" />
+                </svg>
+                Spacer
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('quote')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" />
+                  <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
+                </svg>
+                Quote
+              </button>
+              <button
+                type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('grid')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                Grid
+              </button>
+              <button
+                type="button"
+                className="tps-btn tps-btn-ghost tps-btn-sm"
+                onClick={() => setShowBlockMenu(false)}
+                style={{ marginLeft: 'auto' }}
+              >
+                Cancel
+              </button>
             </div>
-          </SortableContext>
-        </DndContext>
+          ) : (
+            <button
+              type="button"
+              className="tps-add-block"
+              onClick={() => setShowBlockMenu(true)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add block
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Version History Panel */}
+      <div className={`tps-version-panel ${showVersionPanel ? 'tps-open' : ''}`}>
+        <div className="tps-version-panel-header">
+          <h3 className="tps-version-panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            Version History
+          </h3>
+          <button
+            type="button"
+            className="tps-version-panel-close"
+            title="Close"
+            onClick={() => setShowVersionPanel(false)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="tps-version-panel-content">
+          {/* Create Version */}
+          {!isPreviewMode && (
+            <div style={{ marginBottom: '1rem' }}>
+              <textarea
+                className="tps-version-description-input"
+                placeholder="Describe your changes (optional)..."
+                rows={2}
+                value={newVersionDescription}
+                onChange={e => setNewVersionDescription(e.target.value)}
+              />
+              <button
+                type="button"
+                className="tps-version-create"
+                onClick={() => createVersion(newVersionDescription || undefined)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Save Version
+              </button>
+            </div>
+          )}
+
+          {/* Version List */}
+          {versions.length > 0 ? (
+            <div className="tps-version-list">
+              {versions.map((version, index) => (
+                <div
+                  key={version.id}
+                  className={`tps-version-item ${
+                    index === 0 && !isPreviewMode ? 'tps-current' : ''
+                  } ${previewingVersionId === version.id ? 'tps-previewing' : ''}`}
+                >
+                  <div className="tps-version-item-header">
+                    <span className="tps-version-number">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      Version
+                      {' '}
+                      {version.version}
+                    </span>
+                    {index === 0 && !isPreviewMode && (
+                      <span className="tps-version-badge tps-current">Current</span>
+                    )}
+                    {previewingVersionId === version.id && (
+                      <span className="tps-version-badge tps-preview">Preview</span>
+                    )}
+                  </div>
+                  <div className="tps-version-time">
+                    {formatRelativeTime(version.createdAt)}
+                  </div>
+                  {version.changeDescription && (
+                    <div className="tps-version-description">
+                      {version.changeDescription}
+                    </div>
+                  )}
+                  <div className="tps-version-stats">
+                    <span className="tps-version-stat">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                      </svg>
+                      {version.blockCount}
+                      {' '}
+                      blocks
+                    </span>
+                    {version.widgetCount > 0 && (
+                      <span className="tps-version-stat">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <path d="M3 9h18" />
+                          <path d="M9 21V9" />
+                        </svg>
+                        {version.widgetCount}
+                        {' '}
+                        widgets
+                      </span>
+                    )}
+                  </div>
+                  {(index !== 0 || isPreviewMode) && (
+                    <div className="tps-version-actions">
+                      {previewingVersionId !== version.id && (
+                        <button
+                          type="button"
+                          className="tps-version-action"
+                          onClick={() => previewVersion(version.id)}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                          Preview
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="tps-version-action tps-primary"
+                        onClick={() => restoreVersion(version.id)}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 7v6h6" />
+                          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.9 3.2L3 13" />
+                        </svg>
+                        Restore
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="tps-version-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span className="tps-version-empty-text">No versions saved yet</span>
+              <span className="tps-version-empty-hint">
+                Click &quot;Save Version&quot; to create a checkpoint
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1117,9 +2084,15 @@ interface BlockRendererProps {
   onUpdate: (blockId: string, updates: Partial<Block>) => void
   onDelete: (blockId: string) => void
   onConfigureWidget: (block: WidgetBlock) => void
+  /** For nested blocks inside columns */
+  isNested?: boolean
+  /** Filter state for reactive field linking */
+  activeFilters?: ActiveFilter[]
+  /** Callback when row is clicked in a widget */
+  onWidgetRowClick?: (widgetBlockId: string, row: Record<string, unknown>) => void
 }
 
-function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget }: BlockRendererProps) {
+function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick }: BlockRendererProps) {
   if (block.type === 'text') {
     return (
       <TextBlockComponent
@@ -1157,6 +2130,8 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget }: 
         onUpdate={onUpdate}
         onDelete={onDelete}
         onConfigure={onConfigureWidget}
+        activeFilters={activeFilters}
+        onRowClick={onWidgetRowClick}
       />
     )
   }
@@ -1185,6 +2160,59 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget }: 
     return (
       <ColumnsBlockComponent
         block={block}
+        theme={theme}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        onConfigureWidget={onConfigureWidget}
+        isNested={isNested}
+      />
+    )
+  }
+
+  if (block.type === 'stat') {
+    return (
+      <StatBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (block.type === 'progress') {
+    return (
+      <ProgressBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (block.type === 'spacer') {
+    return (
+      <SpacerBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (block.type === 'quote') {
+    return (
+      <QuoteBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (block.type === 'grid') {
+    return (
+      <GridBlockComponent
+        block={block}
         onUpdate={onUpdate}
         onDelete={onDelete}
       />
@@ -1193,6 +2221,355 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget }: 
 
   return (
     <div className="tps-block">
+      <span>
+        Unknown block type:
+        {block.type}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Grid block renderer - renders blocks with drag handles for grid mode
+ */
+function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, activeFilters, onWidgetRowClick: _onWidgetRowClick }: BlockRendererProps) {
+  const DragHandle = () => (
+    <div className="tps-block-drag-handle" title="Drag to reorder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="9" cy="6" r="1" />
+        <circle cx="15" cy="6" r="1" />
+        <circle cx="9" cy="12" r="1" />
+        <circle cx="15" cy="12" r="1" />
+        <circle cx="9" cy="18" r="1" />
+        <circle cx="15" cy="18" r="1" />
+      </svg>
+    </div>
+  )
+
+  const DeleteButton = () => (
+    <button
+      type="button"
+      className="tps-block-action tps-block-delete"
+      title="Delete"
+      onClick={() => onDelete(block.id)}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      </svg>
+    </button>
+  )
+
+  if (isTextBlock(block)) {
+    return (
+      <div className="tps-block tps-block-text tps-grid-block">
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <textarea
+          value={block.content}
+          className="tps-block-input"
+          placeholder="Type some text..."
+          onChange={e => onUpdate(block.id, { content: e.target.value })}
+        />
+      </div>
+    )
+  }
+
+  if (isHeadingBlock(block)) {
+    return (
+      <div className="tps-block tps-block-heading tps-grid-block">
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <input
+          value={block.content}
+          type="text"
+          className={`tps-block-input tps-heading-${block.level}`}
+          placeholder="Heading..."
+          onChange={e => onUpdate(block.id, { content: e.target.value })}
+        />
+      </div>
+    )
+  }
+
+  if (isWidgetBlock(block)) {
+    const widgetSampleData = [
+      { id: 1, product: 'Widget A', category: 'Electronics', sales: 1250, revenue: 31250 },
+      { id: 2, product: 'Widget B', category: 'Electronics', sales: 980, revenue: 24500 },
+      { id: 3, product: 'Gadget X', category: 'Home', sales: 750, revenue: 18750 },
+      { id: 4, product: 'Gadget Y', category: 'Home', sales: 620, revenue: 15500 },
+      { id: 5, product: 'Device Z', category: 'Office', sales: 1100, revenue: 27500 },
+    ]
+
+    const filteredData = activeFilters?.length
+      ? widgetSampleData.filter(row =>
+          activeFilters.every(filter => String(row[filter.field as keyof typeof row] ?? '') === filter.value),
+        )
+      : widgetSampleData
+
+    const hasData = block.widgetId && block.widgetId !== ''
+
+    return (
+      <div className="tps-block tps-block-widget tps-grid-block">
+        <DragHandle />
+        <div className="tps-block-actions">
+          <button
+            type="button"
+            className="tps-block-action"
+            title="Configure"
+            onClick={() => onConfigureWidget(block)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+            </svg>
+          </button>
+          <DeleteButton />
+        </div>
+        {block.showTitle !== false && (
+          <div className="tps-widget-header">
+            <input
+              value={block.titleOverride || ''}
+              type="text"
+              className="tps-widget-title-input"
+              placeholder="Widget Title"
+              onChange={e => onUpdate(block.id, { titleOverride: e.target.value })}
+            />
+          </div>
+        )}
+        {!hasData ? (
+          <div className="tps-widget-placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18" />
+              <path d="M9 21V9" />
+            </svg>
+            <span>No data configured</span>
+            <button type="button" className="tps-btn tps-btn-sm tps-btn-primary" onClick={() => onConfigureWidget(block)}>
+              Configure Widget
+            </button>
+          </div>
+        ) : (
+          <div className="tps-widget-content">
+            <DataGrid
+              data={filteredData}
+              theme={theme}
+              enableExport={false}
+              enablePagination={false}
+              enableSearch
+              stripedRows
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (block.type === 'divider') {
+    return (
+      <div className="tps-block tps-block-divider tps-grid-block">
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <hr />
+      </div>
+    )
+  }
+
+  if (block.type === 'stat') {
+    const statBlock = block as Block & { type: 'stat', value: string | number, label: string, prefix?: string, suffix?: string, size?: string, color?: string }
+    return (
+      <div className="tps-block tps-block-stat tps-grid-block" data-size={statBlock.size || 'medium'}>
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <div className="tps-stat-content">
+          <div className="tps-stat-value-wrapper">
+            {statBlock.prefix && <span className="tps-stat-prefix">{statBlock.prefix}</span>}
+            <input
+              type="text"
+              className="tps-stat-value-input"
+              value={statBlock.value}
+              style={{ color: statBlock.color || undefined }}
+              onChange={e => onUpdate(block.id, { value: e.target.value })}
+            />
+            {statBlock.suffix && <span className="tps-stat-suffix">{statBlock.suffix}</span>}
+          </div>
+          <input
+            type="text"
+            className="tps-stat-label-input"
+            value={statBlock.label}
+            placeholder="Label"
+            onChange={e => onUpdate(block.id, { label: e.target.value })}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (block.type === 'callout') {
+    const calloutBlock = block as Block & { type: 'callout', content: string, style?: string, title?: string }
+    return (
+      <div className="tps-block tps-block-callout tps-grid-block" data-style={calloutBlock.style || 'info'}>
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <div className="tps-callout-content">
+          {calloutBlock.title && <div className="tps-callout-title">{calloutBlock.title}</div>}
+          <textarea
+            value={calloutBlock.content}
+            className="tps-callout-text"
+            placeholder="Callout content..."
+            onChange={e => onUpdate(block.id, { content: e.target.value })}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (block.type === 'image') {
+    const imageBlock = block as Block & { type: 'image', src: string, alt?: string, align?: string }
+    return (
+      <div className="tps-block tps-block-image tps-grid-block">
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        {!imageBlock.src ? (
+          <div className="tps-image-placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+            <span>Add image URL</span>
+            <input
+              type="text"
+              className="tps-input tps-image-url-input"
+              placeholder="https://example.com/image.jpg"
+              onBlur={e => onUpdate(block.id, { src: e.target.value })}
+              onKeyUp={e => e.key === 'Enter' && onUpdate(block.id, { src: (e.target as HTMLInputElement).value })}
+            />
+          </div>
+        ) : (
+          <div className="tps-image-preview">
+            <div className={`tps-image-preview-container tps-align-${imageBlock.align || 'center'}`}>
+              <img src={imageBlock.src} alt={imageBlock.alt || ''} />
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (block.type === 'progress') {
+    const progressBlock = block as Block & { type: 'progress', value: number, max?: number, label?: string, showValue?: boolean, color?: string, variant?: string, size?: string }
+    const percentage = Math.round((progressBlock.value / (progressBlock.max || 100)) * 100)
+    return (
+      <div className="tps-block tps-block-progress tps-grid-block" data-variant={progressBlock.variant || 'bar'} data-size={progressBlock.size || 'medium'}>
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <div className="tps-progress-content">
+          {progressBlock.label && <div className="tps-progress-label">{progressBlock.label}</div>}
+          <div className="tps-progress-bar-container">
+            <div
+              className="tps-progress-bar-fill"
+              style={{ width: `${percentage}%`, backgroundColor: progressBlock.color }}
+            />
+          </div>
+          {progressBlock.showValue !== false && (
+            <div className="tps-progress-value">
+              {percentage}
+              %
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (block.type === 'spacer') {
+    const spacerBlock = block as Block & { type: 'spacer', height: number }
+    return (
+      <div className="tps-block tps-block-spacer tps-grid-block" style={{ height: spacerBlock.height }}>
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <div className="tps-spacer-indicator">
+          <span>
+            {spacerBlock.height}
+            px
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (block.type === 'quote') {
+    const quoteBlock = block as Block & { type: 'quote', content: string, author?: string, source?: string, style?: string }
+    return (
+      <div className="tps-block tps-block-quote tps-grid-block" data-style={quoteBlock.style || 'simple'}>
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <div className="tps-quote-content">
+          <textarea
+            value={quoteBlock.content}
+            className="tps-quote-text"
+            placeholder="Quote text..."
+            onChange={e => onUpdate(block.id, { content: e.target.value })}
+          />
+          {(quoteBlock.author || quoteBlock.source) && (
+            <div className="tps-quote-attribution">
+              {quoteBlock.author && (
+                <span className="tps-quote-author">
+                  —
+                  {quoteBlock.author}
+                </span>
+              )}
+              {quoteBlock.source && (
+                <span className="tps-quote-source">
+                  ,
+                  {quoteBlock.source}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (block.type === 'columns') {
+    return (
+      <div className="tps-block tps-block-columns tps-grid-block">
+        <DragHandle />
+        <div className="tps-block-actions">
+          <DeleteButton />
+        </div>
+        <div className="tps-columns-placeholder">
+          <span>Columns block (nested editing not supported in grid mode)</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Fallback for unknown block types
+  return (
+    <div className="tps-block tps-grid-block">
+      <DragHandle />
+      <div className="tps-block-actions">
+        <DeleteButton />
+      </div>
       <span>
         Unknown block type:
         {block.type}
@@ -1227,17 +2604,10 @@ function TextBlockComponent({
           </svg>
         </button>
       </div>
-      <textarea
-        className="tps-block-input"
-        value={block.content}
-        onChange={e => onUpdate(block.id, { content: e.target.value })}
-        placeholder="Type some text..."
-        rows={1}
-        onInput={(e) => {
-          const target = e.target as HTMLTextAreaElement
-          target.style.height = 'auto'
-          target.style.height = `${target.scrollHeight}px`
-        }}
+      <RichTextEditor
+        content={block.content}
+        onChange={html => onUpdate(block.id, { content: html })}
+        placeholder="Type something, or press / for commands..."
       />
     </div>
   )
@@ -1318,15 +2688,21 @@ function WidgetBlockComponent({
   onUpdate,
   onDelete,
   onConfigure,
+  activeFilters = [],
+  onRowClick,
 }: {
   block: WidgetBlock
   theme: 'light' | 'dark'
   onUpdate: (blockId: string, updates: Partial<Block>) => void
   onDelete: (blockId: string) => void
   onConfigure: (block: WidgetBlock) => void
+  activeFilters?: ActiveFilter[]
+  onRowClick?: (widgetBlockId: string, row: Record<string, unknown>) => void
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isResizing, setIsResizing] = useState(false)
+  const blockRef = useRef<HTMLDivElement>(null)
 
   // Get widget height style
   const heightStyle = useMemo(() => {
@@ -1337,6 +2713,26 @@ function WidgetBlockComponent({
 
   // Check if widget has data configured
   const hasWidgetData = Boolean(block.widgetId)
+
+  // Filter data based on active filters
+  const filteredData = useMemo(() => {
+    if (!activeFilters || activeFilters.length === 0) {
+      return widgetSampleData
+    }
+    return widgetSampleData.filter((row) => {
+      return activeFilters.every((filter) => {
+        const fieldValue = String(row[filter.field as keyof typeof row] ?? '')
+        return fieldValue.toLowerCase().includes(filter.value.toLowerCase())
+      })
+    })
+  }, [activeFilters])
+
+  // Handle row click for filtering
+  const handleRowClick = useCallback((row: Record<string, unknown>) => {
+    if (onRowClick) {
+      onRowClick(block.id, row)
+    }
+  }, [block.id, onRowClick])
 
   // Handle configure button click - open modal
   const handleConfigure = () => {
@@ -1351,8 +2747,46 @@ function WidgetBlockComponent({
     setTimeout(() => setIsLoading(false), 500)
   }
 
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    setIsResizing(true)
+    document.body.classList.add('tps-resizing')
+
+    const startY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const startHeight = blockRef.current?.offsetHeight || 400
+
+    const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY
+      const deltaY = currentY - startY
+      const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeight + deltaY))
+      onUpdate(block.id, { height: newHeight })
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      document.body.classList.remove('tps-resizing')
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchmove', handleMouseMove)
+      document.removeEventListener('touchend', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('touchmove', handleMouseMove)
+    document.addEventListener('touchend', handleMouseUp)
+  }, [block.id, onUpdate])
+
   return (
-    <div className="tps-block tps-block-widget" style={{ minHeight: heightStyle }}>
+    <div
+      ref={blockRef}
+      data-block-id={block.id}
+      className={`tps-block tps-block-widget tps-block-resizable ${isResizing ? 'tps-block-resizing' : ''}`}
+      style={{ minHeight: heightStyle, height: heightStyle }}
+    >
       <div className="tps-block-actions">
         <button
           type="button"
@@ -1436,11 +2870,11 @@ function WidgetBlockComponent({
         </div>
       )}
 
-      {/* Widget with Data (using sample data for now) */}
+      {/* Widget with Data (using sample data for now, filtered by active filters) */}
       {!isLoading && !error && hasWidgetData && (
-        <div className="tps-widget-content">
+        <div className={`tps-widget-content ${activeFilters && activeFilters.length > 0 ? 'tps-widget-linked' : ''}`}>
           <DataGrid
-            data={widgetSampleData}
+            data={filteredData}
             theme={theme}
             enableExport={false}
             enablePagination={false}
@@ -1449,26 +2883,51 @@ function WidgetBlockComponent({
             initialHeight={350}
             minHeight={200}
             maxHeight={600}
+            onCellClick={({ rowData }) => handleRowClick(rowData)}
           />
         </div>
       )}
+
+      {/* Resize Handle */}
+      <div
+        className="tps-resize-handle-bottom"
+        title="Drag to resize"
+        onMouseDown={handleResizeStart}
+        onTouchStart={handleResizeStart}
+      />
     </div>
   )
 }
 
 /**
- * Image block component
+ * Image block component with drag-drop upload, shape, and aspect ratio controls
  */
 function ImageBlockComponent({
   block,
   onUpdate,
   onDelete,
 }: {
-  block: Block & { type: 'image', src: string, alt?: string, caption?: string, align?: string, width?: string | number }
+  block: Block & {
+    type: 'image'
+    src: string
+    alt?: string
+    caption?: string
+    align?: string
+    width?: string | number
+    height?: number
+    shape?: 'rectangle' | 'circle' | 'rounded'
+    aspectRatio?: 'free' | '1:1' | '16:9' | '4:3'
+    objectFit?: 'cover' | 'contain' | 'fill'
+  }
   onUpdate: (blockId: string, updates: Partial<Block>) => void
   onDelete: (blockId: string) => void
 }) {
   const [urlInput, setUrlInput] = useState('')
+  const [isResizing, setIsResizing] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const blockRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleUrlSubmit = () => {
     if (urlInput.trim()) {
@@ -1476,8 +2935,144 @@ function ImageBlockComponent({
     }
   }
 
+  // Handle file drop
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const file = e.dataTransfer?.files[0]
+    if (file && file.type.startsWith('image/')) {
+      setIsLoading(true)
+      const reader = new FileReader()
+      reader.onload = () => {
+        onUpdate(block.id, { src: reader.result as string })
+        setIsLoading(false)
+      }
+      reader.onerror = () => {
+        setIsLoading(false)
+      }
+      reader.readAsDataURL(file)
+    }
+  }, [block.id, onUpdate])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  // Handle file input change
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      setIsLoading(true)
+      const reader = new FileReader()
+      reader.onload = () => {
+        onUpdate(block.id, { src: reader.result as string })
+        setIsLoading(false)
+      }
+      reader.onerror = () => {
+        setIsLoading(false)
+      }
+      reader.readAsDataURL(file)
+    }
+  }, [block.id, onUpdate])
+
+  // Get height style
+  const heightStyle = useMemo(() => {
+    if (!block.height)
+      return undefined
+    return typeof block.height === 'number' ? `${block.height}px` : block.height
+  }, [block.height])
+
+  // Get image container classes based on shape and aspect ratio
+  const getImageContainerClasses = useMemo(() => {
+    const classes = [`tps-image-preview-container`, `tps-align-${block.align || 'center'}`]
+
+    if (block.shape === 'circle') {
+      classes.push('tps-image-circle')
+    }
+    else if (block.shape === 'rounded') {
+      classes.push('tps-image-rounded')
+    }
+
+    if (block.aspectRatio && block.aspectRatio !== 'free') {
+      classes.push(`tps-image-aspect-${block.aspectRatio.replace(':', '-')}`)
+    }
+
+    if (block.objectFit) {
+      classes.push(`tps-image-fit-${block.objectFit}`)
+    }
+
+    return classes.join(' ')
+  }, [block.align, block.shape, block.aspectRatio, block.objectFit])
+
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    setIsResizing(true)
+    document.body.classList.add('tps-resizing')
+
+    const startY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const startHeight = blockRef.current?.offsetHeight || 300
+    const startWidth = blockRef.current?.offsetWidth || 400
+    const aspectRatio = startWidth / startHeight
+
+    const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY
+      const deltaY = currentY - startY
+      const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeight + deltaY))
+
+      // For images with shift key, maintain aspect ratio
+      if (moveEvent.shiftKey) {
+        const newWidth = newHeight * aspectRatio
+        onUpdate(block.id, {
+          height: newHeight,
+          width: Math.max(MIN_WIDTH, newWidth),
+        })
+      }
+      else {
+        onUpdate(block.id, { height: newHeight })
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      document.body.classList.remove('tps-resizing')
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchmove', handleMouseMove)
+      document.removeEventListener('touchend', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('touchmove', handleMouseMove)
+    document.addEventListener('touchend', handleMouseUp)
+  }, [block.id, onUpdate])
+
+  // Clear image
+  const handleClearImage = useCallback(() => {
+    onUpdate(block.id, { src: '' })
+    setUrlInput('')
+  }, [block.id, onUpdate])
+
   return (
-    <div className="tps-block tps-block-image">
+    <div
+      ref={blockRef}
+      data-block-id={block.id}
+      className={`tps-block tps-block-image tps-block-resizable ${isResizing ? 'tps-block-resizing' : ''}`}
+      style={{ height: heightStyle }}
+    >
       <div className="tps-block-actions">
         <button
           type="button"
@@ -1491,28 +3086,61 @@ function ImageBlockComponent({
         </button>
       </div>
 
-      {/* Image placeholder when no src */}
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      {/* Image dropzone when no src */}
       {!block.src ? (
-        <div className="tps-image-placeholder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="M21 15l-5-5L5 21" />
-          </svg>
-          <span>Add image URL</span>
-          <input
-            type="text"
-            className="tps-input tps-image-url-input"
-            placeholder="https://example.com/image.jpg"
-            value={urlInput}
-            onChange={e => setUrlInput(e.target.value)}
-            onBlur={handleUrlSubmit}
-            onKeyDown={e => e.key === 'Enter' && handleUrlSubmit()}
-          />
-        </div>
+        isLoading ? (
+          <div className="tps-image-loading">
+            <svg className="tps-image-loading-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+            <span className="tps-image-loading-text">Loading image...</span>
+          </div>
+        ) : (
+          <div
+            className={`tps-image-dropzone ${isDragging ? 'tps-dragging' : ''}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <svg className="tps-image-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+            <div className="tps-image-dropzone-text">
+              <strong>Drop an image</strong>
+              {' '}
+              or click to browse
+            </div>
+            <div className="tps-image-dropzone-hint">
+              Supports JPG, PNG, GIF, WebP
+            </div>
+            <div className="tps-image-dropzone-or">or</div>
+            <input
+              type="text"
+              className="tps-input tps-image-url-input"
+              placeholder="Paste image URL..."
+              value={urlInput}
+              onChange={e => setUrlInput(e.target.value)}
+              onBlur={handleUrlSubmit}
+              onKeyDown={e => e.key === 'Enter' && handleUrlSubmit()}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+        )
       ) : (
         <div className="tps-image-preview">
-          <div className={`tps-image-preview-container tps-align-${block.align || 'center'}`}>
+          <div className={getImageContainerClasses}>
             <img
               src={block.src}
               alt={block.alt || ''}
@@ -1527,7 +3155,10 @@ function ImageBlockComponent({
             onChange={e => onUpdate(block.id, { caption: e.target.value })}
             placeholder="Add a caption..."
           />
-          <div className="tps-image-controls">
+
+          {/* Image Toolbar */}
+          <div className="tps-image-toolbar">
+            {/* Alignment buttons */}
             <button
               type="button"
               className={`tps-image-align-btn ${block.align === 'left' ? 'tps-active' : ''}`}
@@ -1558,9 +3189,102 @@ function ImageBlockComponent({
                 <path d="M21 10H7M21 6H3M21 14H3M21 18H7" />
               </svg>
             </button>
+
+            <div className="tps-image-toolbar-divider" />
+
+            {/* Shape buttons */}
+            <button
+              type="button"
+              className={`tps-image-shape-btn ${!block.shape || block.shape === 'rectangle' ? 'tps-active' : ''}`}
+              title="Rectangle"
+              onClick={() => onUpdate(block.id, { shape: 'rectangle' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="5" width="18" height="14" rx="1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`tps-image-shape-btn ${block.shape === 'rounded' ? 'tps-active' : ''}`}
+              title="Rounded"
+              onClick={() => onUpdate(block.id, { shape: 'rounded' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="5" width="18" height="14" rx="4" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`tps-image-shape-btn ${block.shape === 'circle' ? 'tps-active' : ''}`}
+              title="Circle"
+              onClick={() => onUpdate(block.id, { shape: 'circle' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            </button>
+
+            <div className="tps-image-toolbar-divider" />
+
+            {/* Aspect ratio buttons */}
+            <button
+              type="button"
+              className={`tps-image-aspect-btn ${!block.aspectRatio || block.aspectRatio === 'free' ? 'tps-active' : ''}`}
+              title="Free aspect ratio"
+              onClick={() => onUpdate(block.id, { aspectRatio: 'free' })}
+            >
+              Free
+            </button>
+            <button
+              type="button"
+              className={`tps-image-aspect-btn ${block.aspectRatio === '1:1' ? 'tps-active' : ''}`}
+              title="Square (1:1)"
+              onClick={() => onUpdate(block.id, { aspectRatio: '1:1' })}
+            >
+              1:1
+            </button>
+            <button
+              type="button"
+              className={`tps-image-aspect-btn ${block.aspectRatio === '16:9' ? 'tps-active' : ''}`}
+              title="Widescreen (16:9)"
+              onClick={() => onUpdate(block.id, { aspectRatio: '16:9' })}
+            >
+              16:9
+            </button>
+            <button
+              type="button"
+              className={`tps-image-aspect-btn ${block.aspectRatio === '4:3' ? 'tps-active' : ''}`}
+              title="Standard (4:3)"
+              onClick={() => onUpdate(block.id, { aspectRatio: '4:3' })}
+            >
+              4:3
+            </button>
+
+            <div className="tps-image-toolbar-divider" />
+
+            {/* Clear button */}
+            <button
+              type="button"
+              className="tps-image-clear-btn"
+              title="Remove image"
+              onClick={handleClearImage}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+              Clear
+            </button>
           </div>
         </div>
       )}
+
+      {/* Resize Handle */}
+      <div
+        className="tps-resize-handle"
+        title="Drag to resize (hold Shift for aspect ratio)"
+        onMouseDown={handleResizeStart}
+        onTouchStart={handleResizeStart}
+      />
     </div>
   )
 }
@@ -1680,17 +3404,27 @@ function CalloutBlockComponent({
 }
 
 /**
- * Columns block component
+ * Columns block component with nested block support
  */
 function ColumnsBlockComponent({
   block,
+  theme,
   onUpdate,
   onDelete,
+  onConfigureWidget,
+  isNested,
 }: {
-  block: Block & { type: 'columns', columns: Array<{ id: string, width: number, blocks: Block[] }>, gap?: number }
+  block: Block & { type: 'columns', columns: Array<{ id: string, width: number, blocks: Block[] }>, gap?: number, height?: number }
+  theme: 'light' | 'dark'
   onUpdate: (blockId: string, updates: Partial<Block>) => void
   onDelete: (blockId: string) => void
+  onConfigureWidget: (block: WidgetBlock) => void
+  isNested?: boolean
 }) {
+  const [isResizing, setIsResizing] = useState(false)
+  const [activeColumnMenu, setActiveColumnMenu] = useState<number | null>(null)
+  const blockRef = useRef<HTMLDivElement>(null)
+
   const getGapClass = (gap?: number) => {
     if (!gap)
       return 'medium'
@@ -1701,6 +3435,13 @@ function ColumnsBlockComponent({
     return 'large'
   }
 
+  // Get height style
+  const heightStyle = useMemo(() => {
+    if (!block.height)
+      return undefined
+    return typeof block.height === 'number' ? `${block.height}px` : block.height
+  }, [block.height])
+
   const handleColumnCountChange = (count: number) => {
     const newColumns = Array.from({ length: count }, (_, i) =>
       i < block.columns.length
@@ -1709,8 +3450,152 @@ function ColumnsBlockComponent({
     onUpdate(block.id, { columns: newColumns })
   }
 
+  // Handle adding a block to a specific column
+  const handleAddBlockToColumn = (columnIndex: number, blockType: Block['type']) => {
+    const newBlock = createBlock(blockType)
+    const newColumns = block.columns.map((col, idx) => {
+      if (idx === columnIndex) {
+        return { ...col, blocks: [...col.blocks, newBlock] }
+      }
+      return col
+    })
+    onUpdate(block.id, { columns: newColumns })
+    setActiveColumnMenu(null)
+  }
+
+  // Handle updating a nested block
+  const handleNestedBlockUpdate = (columnIndex: number, blockId: string, updates: Partial<Block>) => {
+    const newColumns = block.columns.map((col, idx) => {
+      if (idx === columnIndex) {
+        return {
+          ...col,
+          blocks: col.blocks.map((b): Block =>
+            b.id === blockId ? { ...b, ...updates } as Block : b,
+          ),
+        }
+      }
+      return col
+    })
+    onUpdate(block.id, { columns: newColumns })
+  }
+
+  // Handle deleting a nested block
+  const handleNestedBlockDelete = (columnIndex: number, blockId: string) => {
+    const newColumns = block.columns.map((col, idx) => {
+      if (idx === columnIndex) {
+        return {
+          ...col,
+          blocks: col.blocks.filter(b => b.id !== blockId),
+        }
+      }
+      return col
+    })
+    onUpdate(block.id, { columns: newColumns })
+  }
+
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    setIsResizing(true)
+    document.body.classList.add('tps-resizing')
+
+    const startY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const startHeight = blockRef.current?.offsetHeight || 200
+
+    const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY
+      const deltaY = currentY - startY
+      const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeight + deltaY))
+      onUpdate(block.id, { height: newHeight })
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      document.body.classList.remove('tps-resizing')
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchmove', handleMouseMove)
+      document.removeEventListener('touchend', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('touchmove', handleMouseMove)
+    document.addEventListener('touchend', handleMouseUp)
+  }, [block.id, onUpdate])
+
+  // Block type options for add block menu (excluding columns to prevent deep nesting)
+  const blockTypeOptions: Array<{ type: Block['type'], label: string, icon: React.ReactNode }> = [
+    {
+      type: 'text',
+      label: 'Text',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M4 7V4h16v3M9 20h6M12 4v16" />
+        </svg>
+      ),
+    },
+    {
+      type: 'heading',
+      label: 'Heading',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M6 4v16M18 4v16M6 12h12" />
+        </svg>
+      ),
+    },
+    {
+      type: 'widget',
+      label: 'Widget',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M9 21V9" />
+        </svg>
+      ),
+    },
+    {
+      type: 'image',
+      label: 'Image',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <path d="M21 15l-5-5L5 21" />
+        </svg>
+      ),
+    },
+    {
+      type: 'callout',
+      label: 'Callout',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+      ),
+    },
+    {
+      type: 'divider',
+      label: 'Divider',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M3 12h18" />
+        </svg>
+      ),
+    },
+  ]
+
   return (
-    <div className="tps-block tps-block-columns">
+    <div
+      ref={blockRef}
+      data-block-id={block.id}
+      className={`tps-block tps-block-columns tps-block-resizable ${isResizing ? 'tps-block-resizing' : ''} ${isNested ? 'tps-block-nested' : ''}`}
+      style={{ height: heightStyle }}
+    >
       <div className="tps-block-actions">
         <button
           type="button"
@@ -1724,22 +3609,67 @@ function ColumnsBlockComponent({
         </button>
       </div>
       <div className="tps-columns-container" data-gap={getGapClass(block.gap)}>
-        {block.columns.map((column, idx) => (
+        {block.columns.map((column, colIndex) => (
           <div
             key={column.id}
-            className="tps-column"
+            className="tps-column tps-column-dropzone"
             style={{ flex: column.width }}
           >
-            <div className="tps-column-placeholder">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              <div>
-                Column
-                {' '}
-                {idx + 1}
+            {/* Render nested blocks */}
+            {column.blocks.length > 0 ? (
+              <div className="tps-column-blocks">
+                {column.blocks.map(childBlock => (
+                  <div key={childBlock.id} className="tps-nested-block-wrapper">
+                    <BlockRenderer
+                      block={childBlock}
+                      theme={theme}
+                      onUpdate={(blockId, updates) => handleNestedBlockUpdate(colIndex, blockId, updates)}
+                      onDelete={blockId => handleNestedBlockDelete(colIndex, blockId)}
+                      onConfigureWidget={onConfigureWidget}
+                      isNested
+                    />
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : null}
+
+            {/* Add block button/menu for this column */}
+            {activeColumnMenu === colIndex ? (
+              <div className="tps-column-add-block-menu">
+                {blockTypeOptions.map(opt => (
+                  <button
+                    key={opt.type}
+                    type="button"
+                    className="tps-column-block-option"
+                    onClick={() => handleAddBlockToColumn(colIndex, opt.type)}
+                    title={opt.label}
+                  >
+                    {opt.icon}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="tps-column-block-option tps-column-block-cancel"
+                  onClick={() => setActiveColumnMenu(null)}
+                  title="Cancel"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="tps-column-add-block"
+                onClick={() => setActiveColumnMenu(colIndex)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span>Add block</span>
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -1755,6 +3685,673 @@ function ColumnsBlockComponent({
             {num}
           </button>
         ))}
+      </div>
+
+      {/* Resize Handle */}
+      <div
+        className="tps-resize-handle-bottom"
+        title="Drag to resize"
+        onMouseDown={handleResizeStart}
+        onTouchStart={handleResizeStart}
+      />
+    </div>
+  )
+}
+
+/**
+ * Stat block component - Big number display for infographics
+ */
+interface StatBlockProps {
+  block: Block & { type: 'stat' }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}
+
+function StatBlockComponent({ block, onUpdate, onDelete }: StatBlockProps) {
+  const statBlock = block as Block & {
+    type: 'stat'
+    value: string | number
+    label: string
+    prefix?: string
+    suffix?: string
+    size?: 'small' | 'medium' | 'large' | 'xlarge'
+    color?: string
+    trend?: { direction: 'up' | 'down' | 'flat', value?: string, positive?: boolean }
+  }
+
+  return (
+    <div className="tps-block tps-block-stat" data-size={statBlock.size || 'medium'}>
+      <div className="tps-block-actions">
+        <button type="button" className="tps-block-action tps-block-delete" onClick={() => onDelete(block.id)} title="Delete block">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+          </svg>
+        </button>
+      </div>
+      <div className="tps-stat-content">
+        <div className="tps-stat-value-wrapper">
+          <input
+            type="text"
+            className="tps-stat-prefix-input"
+            value={statBlock.prefix || ''}
+            placeholder="$"
+            onChange={e => onUpdate(block.id, { prefix: e.target.value })}
+          />
+          <input
+            type="text"
+            className="tps-stat-value-input"
+            value={String(statBlock.value)}
+            style={{ color: statBlock.color || undefined }}
+            onChange={e => onUpdate(block.id, { value: e.target.value })}
+          />
+          <input
+            type="text"
+            className="tps-stat-suffix-input"
+            value={statBlock.suffix || ''}
+            placeholder="%"
+            onChange={e => onUpdate(block.id, { suffix: e.target.value })}
+          />
+        </div>
+        <input
+          type="text"
+          className="tps-stat-label-input"
+          value={statBlock.label}
+          placeholder="Label"
+          onChange={e => onUpdate(block.id, { label: e.target.value })}
+        />
+        {statBlock.trend && (
+          <div
+            className={`tps-stat-trend ${
+              statBlock.trend.direction === 'up' ? 'tps-stat-trend-up'
+                : statBlock.trend.direction === 'down' ? 'tps-stat-trend-down' : 'tps-stat-trend-flat'
+            } ${statBlock.trend.positive === false ? 'tps-stat-trend-negative' : ''}`}
+          >
+            {statBlock.trend.direction === 'up' && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 15l-6-6-6 6" />
+              </svg>
+            )}
+            {statBlock.trend.direction === 'down' && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            )}
+            {statBlock.trend.direction === 'flat' && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 12h14" />
+              </svg>
+            )}
+            <input
+              type="text"
+              className="tps-stat-trend-input"
+              value={statBlock.trend.value || ''}
+              placeholder="12%"
+              onChange={e => onUpdate(block.id, { trend: { ...statBlock.trend!, value: e.target.value } })}
+            />
+          </div>
+        )}
+      </div>
+      <div className="tps-stat-controls">
+        <span className="tps-stat-controls-label">Size:</span>
+        <div className="tps-stat-size-controls">
+          {(['small', 'medium', 'large', 'xlarge'] as const).map(size => (
+            <button
+              key={size}
+              type="button"
+              className={`tps-stat-size-btn ${(statBlock.size || 'medium') === size ? 'tps-active' : ''}`}
+              onClick={() => onUpdate(block.id, { size })}
+            >
+              {size.charAt(0).toUpperCase()}
+            </button>
+          ))}
+        </div>
+        <span className="tps-stat-controls-label" style={{ marginLeft: '0.5rem' }}>Trend:</span>
+        <div className="tps-stat-trend-controls">
+          <button
+            type="button"
+            className={`tps-stat-trend-btn ${!statBlock.trend ? 'tps-active' : ''}`}
+            onClick={() => onUpdate(block.id, { trend: undefined })}
+          >
+            None
+          </button>
+          <button
+            type="button"
+            className={`tps-stat-trend-btn ${statBlock.trend?.direction === 'up' ? 'tps-active' : ''}`}
+            onClick={() => onUpdate(block.id, { trend: { direction: 'up', value: statBlock.trend?.value || '', positive: true } })}
+          >
+            Up
+          </button>
+          <button
+            type="button"
+            className={`tps-stat-trend-btn ${statBlock.trend?.direction === 'down' ? 'tps-active' : ''}`}
+            onClick={() => onUpdate(block.id, { trend: { direction: 'down', value: statBlock.trend?.value || '', positive: false } })}
+          >
+            Down
+          </button>
+          <button
+            type="button"
+            className={`tps-stat-trend-btn ${statBlock.trend?.direction === 'flat' ? 'tps-active' : ''}`}
+            onClick={() => onUpdate(block.id, { trend: { direction: 'flat', value: statBlock.trend?.value || '' } })}
+          >
+            Flat
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Progress block component - Progress indicators
+ */
+interface ProgressBlockProps {
+  block: Block & { type: 'progress' }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}
+
+function ProgressBlockComponent({ block, onUpdate, onDelete }: ProgressBlockProps) {
+  const progressBlock = block as Block & {
+    type: 'progress'
+    value: number
+    max?: number
+    label?: string
+    showValue?: boolean
+    color?: string
+    variant?: 'bar' | 'circle' | 'semicircle'
+    size?: 'small' | 'medium' | 'large'
+  }
+
+  const variant = progressBlock.variant || 'bar'
+  const size = progressBlock.size || 'medium'
+  const max = progressBlock.max || 100
+  const percentage = Math.min(100, Math.max(0, (progressBlock.value / max) * 100))
+
+  const circleSize = size === 'small' ? 80 : size === 'large' ? 160 : 120
+  const circleCircumference = 339.292
+
+  return (
+    <div className="tps-block tps-block-progress" data-variant={variant} data-size={size}>
+      <div className="tps-block-actions">
+        <button type="button" className="tps-block-action tps-block-delete" onClick={() => onDelete(block.id)} title="Delete block">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+          </svg>
+        </button>
+      </div>
+      <div className="tps-progress-content">
+        <input
+          type="text"
+          className="tps-progress-label-input"
+          value={progressBlock.label || ''}
+          placeholder="Progress Label"
+          onChange={e => onUpdate(block.id, { label: e.target.value })}
+        />
+
+        {/* Bar variant */}
+        {variant === 'bar' && (
+          <div className="tps-progress-bar-container">
+            <div className="tps-progress-bar">
+              <div
+                className="tps-progress-fill"
+                style={{
+                  width: `${percentage}%`,
+                  background: progressBlock.color || undefined,
+                }}
+              />
+            </div>
+            {progressBlock.showValue !== false && (
+              <>
+                <input
+                  type="number"
+                  className="tps-progress-value-input"
+                  value={progressBlock.value}
+                  min={0}
+                  max={max}
+                  onChange={e => onUpdate(block.id, { value: Number(e.target.value) })}
+                />
+                <span className="tps-progress-value">%</span>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Circle variant */}
+        {variant === 'circle' && (
+          <div className="tps-progress-circle-container">
+            <div className="tps-progress-circle">
+              <svg width={circleSize} height={circleSize} viewBox="0 0 120 120">
+                <circle
+                  className="tps-progress-circle-bg"
+                  cx="60"
+                  cy="60"
+                  r="54"
+                  strokeWidth="12"
+                />
+                <circle
+                  className="tps-progress-circle-fill"
+                  cx="60"
+                  cy="60"
+                  r="54"
+                  strokeWidth="12"
+                  stroke={progressBlock.color || undefined}
+                  strokeDasharray={circleCircumference}
+                  strokeDashoffset={circleCircumference * (1 - progressBlock.value / max)}
+                />
+              </svg>
+              <span className="tps-progress-circle-value">
+                {progressBlock.value}
+                %
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Semicircle variant */}
+        {variant === 'semicircle' && (
+          <div className="tps-progress-semicircle-container">
+            <div className="tps-progress-semicircle">
+              <svg
+                width={size === 'small' ? 100 : size === 'large' ? 200 : 150}
+                height={size === 'small' ? 50 : size === 'large' ? 100 : 75}
+                viewBox="0 0 150 75"
+              >
+                <path
+                  className="tps-progress-circle-bg"
+                  d="M 15 75 A 60 60 0 0 1 135 75"
+                  fill="none"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                />
+                <path
+                  className="tps-progress-circle-fill"
+                  d="M 15 75 A 60 60 0 0 1 135 75"
+                  fill="none"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  stroke={progressBlock.color || undefined}
+                  strokeDasharray="188.5"
+                  strokeDashoffset={188.5 * (1 - progressBlock.value / max)}
+                />
+              </svg>
+              <span className="tps-progress-semicircle-value">
+                {progressBlock.value}
+                %
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="tps-progress-controls">
+        <span className="tps-progress-controls-label">Style:</span>
+        <div className="tps-progress-variant-controls">
+          {(['bar', 'circle', 'semicircle'] as const).map(v => (
+            <button
+              key={v}
+              type="button"
+              className={`tps-progress-variant-btn ${variant === v ? 'tps-active' : ''}`}
+              onClick={() => onUpdate(block.id, { variant: v })}
+            >
+              {v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
+        </div>
+        <span className="tps-progress-controls-label" style={{ marginLeft: '0.5rem' }}>Size:</span>
+        <div className="tps-progress-size-controls">
+          {(['small', 'medium', 'large'] as const).map(s => (
+            <button
+              key={s}
+              type="button"
+              className={`tps-progress-size-btn ${size === s ? 'tps-active' : ''}`}
+              onClick={() => onUpdate(block.id, { size: s })}
+            >
+              {s.charAt(0).toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Spacer block component - Vertical spacing
+ */
+interface SpacerBlockProps {
+  block: Block & { type: 'spacer' }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}
+
+function SpacerBlockComponent({ block, onUpdate, onDelete }: SpacerBlockProps) {
+  const spacerBlock = block as Block & { type: 'spacer', height: number }
+
+  return (
+    <div className="tps-block tps-block-spacer" style={{ height: `${spacerBlock.height}px` }}>
+      <div className="tps-block-actions">
+        <button type="button" className="tps-block-action tps-block-delete" onClick={() => onDelete(block.id)} title="Delete block">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+          </svg>
+        </button>
+      </div>
+      <div className="tps-spacer-content">
+        <span className="tps-spacer-label">
+          <input
+            type="number"
+            className="tps-spacer-height-input"
+            value={spacerBlock.height}
+            min={8}
+            max={500}
+            onChange={e => onUpdate(block.id, { height: Number(e.target.value) })}
+          />
+          px
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Quote block component - Testimonials and pull quotes
+ */
+interface QuoteBlockProps {
+  block: Block & { type: 'quote' }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}
+
+function QuoteBlockComponent({ block, onUpdate, onDelete }: QuoteBlockProps) {
+  const quoteBlock = block as Block & {
+    type: 'quote'
+    content: string
+    author?: string
+    source?: string
+    style?: 'simple' | 'bordered' | 'highlighted'
+  }
+
+  return (
+    <div className="tps-block tps-block-quote" data-style={quoteBlock.style || 'simple'}>
+      <div className="tps-block-actions">
+        <button type="button" className="tps-block-action tps-block-delete" onClick={() => onDelete(block.id)} title="Delete block">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+          </svg>
+        </button>
+      </div>
+      <div className="tps-quote-content">
+        <svg className="tps-quote-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+        </svg>
+        <textarea
+          className="tps-quote-text-input"
+          value={quoteBlock.content}
+          placeholder="Enter your quote here..."
+          onChange={e => onUpdate(block.id, { content: e.target.value })}
+        />
+        <div className="tps-quote-attribution">
+          <input
+            type="text"
+            className="tps-quote-author-input"
+            value={quoteBlock.author || ''}
+            placeholder="Author name"
+            onChange={e => onUpdate(block.id, { author: e.target.value })}
+          />
+          <input
+            type="text"
+            className="tps-quote-source-input"
+            value={quoteBlock.source || ''}
+            placeholder="Title, Company"
+            onChange={e => onUpdate(block.id, { source: e.target.value })}
+          />
+        </div>
+      </div>
+      <div className="tps-quote-style-selector">
+        <span className="tps-quote-style-label">Style:</span>
+        {(['simple', 'bordered', 'highlighted'] as const).map(style => (
+          <button
+            key={style}
+            type="button"
+            className={`tps-quote-style-btn ${(quoteBlock.style || 'simple') === style ? 'tps-active' : ''}`}
+            onClick={() => onUpdate(block.id, { style })}
+          >
+            {style.charAt(0).toUpperCase() + style.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Grid block component - Masonry-style flexible layout
+ */
+interface GridBlockProps {
+  block: Block & { type: 'grid' }
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}
+
+type GridBlockType = Block & {
+  type: 'grid'
+  columns: number
+  gap?: number
+  rowHeight?: 'auto' | number
+  items: Array<{ block: Block, colSpan?: number, rowSpan?: number }>
+  dense?: boolean
+}
+
+function GridBlockComponent({ block, onUpdate, onDelete }: GridBlockProps) {
+  const gridBlock = block as GridBlockType
+
+  const handleAddItem = () => {
+    const newBlock: Block = { id: generateId(), type: 'stat', value: '0', label: 'New Stat', size: 'medium' } as Block
+    const newItem = { block: newBlock, colSpan: 1, rowSpan: 1 }
+    onUpdate(block.id, { items: [...gridBlock.items, newItem] })
+  }
+
+  const handleItemSpan = (itemIndex: number, spanType: 'colSpan' | 'rowSpan', delta: number) => {
+    const newItems = gridBlock.items.map((item, idx) => {
+      if (idx === itemIndex) {
+        const currentSpan = item[spanType] || 1
+        const newSpan = Math.max(1, Math.min(gridBlock.columns, currentSpan + delta))
+        return { ...item, [spanType]: newSpan }
+      }
+      return item
+    })
+    onUpdate(block.id, { items: newItems })
+  }
+
+  const handleItemDelete = (itemIndex: number) => {
+    const newItems = gridBlock.items.filter((_, idx) => idx !== itemIndex)
+    onUpdate(block.id, { items: newItems })
+  }
+
+  const handleItemBlockUpdate = (itemIndex: number, updates: Partial<Block>) => {
+    const newItems = gridBlock.items.map((item, idx) => {
+      if (idx === itemIndex) {
+        return { ...item, block: { ...item.block, ...updates } as Block }
+      }
+      return item
+    })
+    onUpdate(block.id, { items: newItems })
+  }
+
+  return (
+    <div className="tps-block tps-block-grid-container" data-block-id={block.id}>
+      <div className="tps-block-actions">
+        <button type="button" className="tps-block-action tps-block-delete" onClick={() => onDelete(block.id)} title="Delete block">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+          </svg>
+        </button>
+      </div>
+      {/* Grid Configuration Bar */}
+      <div className="tps-grid-config">
+        <label className="tps-grid-config-label">Columns:</label>
+        <input
+          type="number"
+          className="tps-grid-config-input"
+          value={gridBlock.columns}
+          min={1}
+          max={6}
+          onChange={e => onUpdate(block.id, { columns: Math.min(6, Math.max(1, Number.parseInt(e.target.value) || 3)) })}
+        />
+        <label className="tps-grid-config-label">Gap:</label>
+        <input
+          type="number"
+          className="tps-grid-config-input"
+          value={gridBlock.gap || 16}
+          min={0}
+          max={48}
+          onChange={e => onUpdate(block.id, { gap: Number.parseInt(e.target.value) || 16 })}
+        />
+        <label className="tps-grid-config-checkbox">
+          <input
+            type="checkbox"
+            checked={gridBlock.dense || false}
+            onChange={e => onUpdate(block.id, { dense: e.target.checked })}
+          />
+          Dense packing
+        </label>
+      </div>
+      {/* Grid Layout */}
+      <div
+        className="tps-block-grid"
+        data-columns={gridBlock.columns}
+        data-dense={gridBlock.dense || false}
+        style={{ gap: `${gridBlock.gap || 16}px` }}
+      >
+        {/* Grid Items */}
+        {gridBlock.items.map((item, itemIndex) => (
+          <div
+            key={item.block.id}
+            className="tps-grid-item"
+            data-col-span={item.colSpan || 1}
+            data-row-span={item.rowSpan || 1}
+          >
+            <div className="tps-grid-item-controls">
+              <button
+                type="button"
+                className="tps-grid-item-btn"
+                title="Decrease column span"
+                onClick={() => handleItemSpan(itemIndex, 'colSpan', -1)}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                className="tps-grid-item-btn"
+                title="Increase column span"
+                onClick={() => handleItemSpan(itemIndex, 'colSpan', 1)}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="tps-grid-item-btn"
+                title="Delete item"
+                onClick={() => handleItemDelete(itemIndex)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="tps-grid-item-content">
+              {/* Nested block content (simplified inline rendering) */}
+              {item.block.type === 'text' && (
+                <textarea
+                  className="tps-text-input"
+                  value={(item.block as { content: string }).content}
+                  placeholder="Type your text here..."
+                  onChange={e => handleItemBlockUpdate(itemIndex, { content: e.target.value })}
+                />
+              )}
+              {item.block.type === 'heading' && (
+                <input
+                  type="text"
+                  className={`tps-heading-input tps-heading-${(item.block as { level: number }).level}`}
+                  value={(item.block as { content: string }).content}
+                  placeholder="Heading..."
+                  onChange={e => handleItemBlockUpdate(itemIndex, { content: e.target.value })}
+                />
+              )}
+              {item.block.type === 'stat' && (
+                <div className="tps-stat-content" data-size={(item.block as { size?: string }).size || 'medium'}>
+                  <div className="tps-stat-value" style={(item.block as { color?: string }).color ? { color: (item.block as { color?: string }).color } : {}}>
+                    {(item.block as { prefix?: string }).prefix && <span className="tps-stat-prefix">{(item.block as { prefix?: string }).prefix}</span>}
+                    <input
+                      type="text"
+                      className="tps-stat-value-input"
+                      value={String((item.block as { value: string | number }).value)}
+                      placeholder="0"
+                      onChange={e => handleItemBlockUpdate(itemIndex, { value: e.target.value })}
+                    />
+                    {(item.block as { suffix?: string }).suffix && <span className="tps-stat-suffix">{(item.block as { suffix?: string }).suffix}</span>}
+                  </div>
+                  <input
+                    type="text"
+                    className="tps-stat-label-input"
+                    value={(item.block as { label: string }).label}
+                    placeholder="Label"
+                    onChange={e => handleItemBlockUpdate(itemIndex, { label: e.target.value })}
+                  />
+                </div>
+              )}
+              {item.block.type === 'progress' && (
+                <div className="tps-progress-content" data-size={(item.block as { size?: string }).size || 'medium'}>
+                  {(item.block as { variant?: string }).variant !== 'circle' && (item.block as { variant?: string }).variant !== 'semicircle' && (
+                    <div className="tps-progress-bar-container">
+                      <div
+                        className="tps-progress-bar"
+                        style={{
+                          width: `${((item.block as { value: number }).value / ((item.block as { max?: number }).max || 100)) * 100}%`,
+                          background: (item.block as { color?: string }).color || '#6366f1',
+                        }}
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="range"
+                    min={0}
+                    max={(item.block as { max?: number }).max || 100}
+                    value={(item.block as { value: number }).value}
+                    onChange={e => handleItemBlockUpdate(itemIndex, { value: Number.parseInt(e.target.value) })}
+                  />
+                </div>
+              )}
+              {item.block.type === 'image' && (
+                (item.block as { src: string }).src ? (
+                  <div className="tps-image-preview">
+                    <img src={(item.block as { src: string }).src} alt={(item.block as { alt?: string }).alt || ''} style={{ maxWidth: '100%', height: 'auto' }} />
+                  </div>
+                ) : (
+                  <div className="tps-image-placeholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="32" height="32">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="M21 15l-5-5L5 21" />
+                    </svg>
+                    <span>Image</span>
+                  </div>
+                )
+              )}
+              {!['text', 'heading', 'stat', 'progress', 'image'].includes(item.block.type) && (
+                <div className="tps-grid-item-type-label">
+                  {item.block.type}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {/* Add Item Button */}
+        <div className="tps-grid-add-item" onClick={handleAddItem}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Add Item
+        </div>
       </div>
     </div>
   )
@@ -2228,7 +4825,7 @@ function createBlock(type: Block['type']): Block {
     case 'widget':
       return { id, type: 'widget', widgetId: '', showTitle: true } as WidgetBlock
     case 'image':
-      return { id, type: 'image', src: '', alt: '', caption: '', align: 'center' }
+      return { id, type: 'image', src: '', alt: '', caption: '', align: 'center', shape: 'rectangle', aspectRatio: 'free' }
     case 'callout':
       return { id, type: 'callout', content: '', style: 'info', title: '' }
     case 'columns':
@@ -2240,6 +4837,24 @@ function createBlock(type: Block['type']): Block {
           { id: generateId(), width: 1, blocks: [] },
         ],
         gap: 16,
+      }
+    case 'stat':
+      return { id, type: 'stat', value: '0', label: 'Label', size: 'medium' }
+    case 'progress':
+      return { id, type: 'progress', value: 50, label: 'Progress', showValue: true, variant: 'bar', size: 'medium' }
+    case 'spacer':
+      return { id, type: 'spacer', height: 48 }
+    case 'quote':
+      return { id, type: 'quote', content: '', author: '', source: '', style: 'simple' }
+    case 'grid':
+      return {
+        id,
+        type: 'grid',
+        columns: 3,
+        gap: 16,
+        rowHeight: 'auto',
+        items: [],
+        dense: false,
       }
     default:
       return { id, type: 'text', content: '' }
