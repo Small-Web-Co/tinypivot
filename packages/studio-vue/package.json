@@ -29,7 +29,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/tinypivot-studio-vue.js",
       "require": "./dist/tinypivot-studio-vue.cjs"
-    }
+    },
+    "./style.css": "./dist/style.css"
   },
   "main": "./dist/tinypivot-studio-vue.cjs",
   "module": "./dist/tinypivot-studio-vue.js",

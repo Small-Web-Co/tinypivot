@@ -12,9 +12,11 @@ import type {
   PageTemplate,
   StorageAdapter,
   TextBlock,
+  WidgetBlock,
   WidgetConfig,
 } from '@smallwebco/tinypivot-studio'
-import { generateId } from '@smallwebco/tinypivot-studio'
+import { generateId, isWidgetBlock } from '@smallwebco/tinypivot-studio'
+import { DataGrid } from '@smallwebco/tinypivot-vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { provideStudio, type StudioConfig } from '../composables'
 
@@ -102,6 +104,19 @@ const editorTitle = ref('')
 const editorBlocks = ref<Block[]>([])
 const showBlockMenu = ref(false)
 
+// Widget sample data - used when no data source is configured
+const widgetSampleData = [
+  { id: 1, product: 'Widget A', category: 'Electronics', sales: 1250, revenue: 31250 },
+  { id: 2, product: 'Widget B', category: 'Electronics', sales: 980, revenue: 24500 },
+  { id: 3, product: 'Gadget X', category: 'Home', sales: 750, revenue: 18750 },
+  { id: 4, product: 'Gadget Y', category: 'Home', sales: 620, revenue: 15500 },
+  { id: 5, product: 'Device Z', category: 'Office', sales: 1100, revenue: 27500 },
+]
+
+// Widget loading state per block
+const widgetLoadingStates = ref<Record<string, boolean>>({})
+const widgetErrorStates = ref<Record<string, string | null>>({})
+
 // Load pages on mount
 onMounted(async () => {
   if (!storage.value) {
@@ -175,10 +190,12 @@ async function handleCreatePage() {
     return
 
   try {
+    // Deep clone blocks to avoid IndexedDB serialization issues
+    const blocksForStorage = JSON.parse(JSON.stringify(getTemplateBlocks(newPageTemplate.value)))
     const page = await storage.value.createPage({
       title: newPageTitle.value.trim(),
       template: newPageTemplate.value,
-      blocks: getTemplateBlocks(newPageTemplate.value),
+      blocks: blocksForStorage,
     })
 
     pages.value = [...pages.value, {
@@ -210,9 +227,11 @@ async function handleUpdatePage() {
     return
 
   try {
+    // Deep clone blocks to avoid IndexedDB serialization issues with Vue proxies
+    const blocksForStorage = JSON.parse(JSON.stringify(editorBlocks.value))
     const page = await storage.value.updatePage(currentPage.value.id, {
       title: editorTitle.value,
-      blocks: editorBlocks.value,
+      blocks: blocksForStorage,
     })
 
     currentPage.value = page
@@ -302,6 +321,8 @@ function createBlock(type: Block['type']): Block {
       return { id, type: 'heading', content: '', level: 2 }
     case 'divider':
       return { id, type: 'divider' }
+    case 'widget':
+      return { id, type: 'widget', widgetId: '', showTitle: true } as WidgetBlock
     default:
       return { id, type: 'text', content: '' }
   }
@@ -345,6 +366,18 @@ function isTextBlock(block: Block): block is TextBlock {
 
 function isHeadingBlock(block: Block): block is HeadingBlock {
   return block.type === 'heading'
+}
+
+// Get widget height style
+function getWidgetHeightStyle(block: WidgetBlock): string {
+  if (!block.height)
+    return '400px'
+  return typeof block.height === 'number' ? `${block.height}px` : block.height
+}
+
+// Check if widget has data configured
+function hasWidgetData(block: WidgetBlock): boolean {
+  return Boolean(block.widgetId)
 }
 
 // Expose save handlers for child components
@@ -516,6 +549,99 @@ defineExpose({
                 <hr>
               </div>
 
+              <!-- Widget Block -->
+              <div v-else-if="isWidgetBlock(block)" class="tps-block tps-block-widget" :style="{ minHeight: getWidgetHeightStyle(block) }">
+                <div class="tps-block-actions">
+                  <button
+                    type="button"
+                    class="tps-block-action"
+                    title="Configure widget"
+                    @click="handleBlockUpdate(block.id, { widgetId: block.widgetId ? '' : 'sample' })"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="tps-block-action tps-block-delete"
+                    title="Delete block"
+                    @click="handleBlockDelete(block.id)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Widget Title -->
+                <div v-if="block.showTitle !== false" class="tps-widget-header">
+                  <input
+                    :value="block.titleOverride || ''"
+                    type="text"
+                    class="tps-widget-title-input"
+                    placeholder="Widget Title"
+                    @input="handleBlockUpdate(block.id, { titleOverride: ($event.target as HTMLInputElement).value })"
+                  >
+                </div>
+
+                <!-- Widget Loading State -->
+                <div v-if="widgetLoadingStates[block.id]" class="tps-widget-loading">
+                  <div class="tps-spinner" />
+                  <span>Loading widget...</span>
+                </div>
+
+                <!-- Widget Error State -->
+                <div v-else-if="widgetErrorStates[block.id]" class="tps-widget-error">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>{{ widgetErrorStates[block.id] }}</span>
+                  <button type="button" class="tps-btn tps-btn-sm tps-btn-secondary" @click="widgetErrorStates[block.id] = null">
+                    Retry
+                  </button>
+                </div>
+
+                <!-- Widget Placeholder (no data configured) -->
+                <div v-else-if="!hasWidgetData(block)" class="tps-widget-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M3 9h18" />
+                    <path d="M9 21V9" />
+                  </svg>
+                  <span>No data configured</span>
+                  <button
+                    type="button"
+                    class="tps-btn tps-btn-sm tps-btn-primary"
+                    @click="handleBlockUpdate(block.id, { widgetId: 'sample' })"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    Configure Widget
+                  </button>
+                </div>
+
+                <!-- Widget with Data (using sample data for now) -->
+                <div v-else class="tps-widget-content">
+                  <DataGrid
+                    :data="widgetSampleData"
+                    :theme="resolvedTheme"
+                    :enable-export="false"
+                    :enable-pagination="false"
+                    :enable-search="true"
+                    :striped-rows="true"
+                    :initial-height="350"
+                    :min-height="200"
+                    :max-height="600"
+                  />
+                </div>
+              </div>
+
               <!-- Unknown Block -->
               <div v-else class="tps-block">
                 <span>Unknown block type: {{ block.type }}</span>
@@ -553,6 +679,18 @@ defineExpose({
                   <path d="M3 12h18" />
                 </svg>
                 Divider
+              </button>
+              <button
+                type="button"
+                class="tps-add-block-option"
+                @click="handleAddBlock('widget')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 9h18" />
+                  <path d="M9 21V9" />
+                </svg>
+                Widget
               </button>
               <button
                 type="button"
