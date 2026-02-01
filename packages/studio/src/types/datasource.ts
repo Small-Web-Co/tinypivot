@@ -151,6 +151,8 @@ export interface DatasourceConfig {
   port?: number
   /** Database name */
   database?: string
+  /** Schema name (for databases that support it) */
+  schema?: string
   /** Username for authentication */
   username?: string
   /** Password (should be stored securely) */
@@ -162,6 +164,12 @@ export interface DatasourceConfig {
     cert?: string
     key?: string
   }
+  /** Snowflake-specific: account identifier */
+  account?: string
+  /** Snowflake-specific: warehouse name */
+  warehouse?: string
+  /** Snowflake-specific: role name */
+  role?: string
   /** Additional connection options */
   options?: Record<string, unknown>
   /** Whether this is a read-only connection */

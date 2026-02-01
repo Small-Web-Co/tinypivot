@@ -24,6 +24,9 @@ import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
 import '@smallwebco/tinypivot-studio/style.css'
 import '@smallwebco/tinypivot-react/style.css'
 
+// LocalStorage key for datasources
+const DATASOURCES_STORAGE_KEY = 'tinypivot-datasources'
+
 // Widget sample data - used when no data source is configured
 const widgetSampleData = [
   { id: 1, product: 'Widget A', category: 'Electronics', sales: 1250, revenue: 31250 },
@@ -32,6 +35,40 @@ const widgetSampleData = [
   { id: 4, product: 'Gadget Y', category: 'Home', sales: 620, revenue: 15500 },
   { id: 5, product: 'Device Z', category: 'Office', sales: 1100, revenue: 27500 },
 ]
+
+// Helper functions for localStorage
+function loadDatasources(): DatasourceConfig[] {
+  try {
+    const stored = localStorage.getItem(DATASOURCES_STORAGE_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  }
+  catch (error) {
+    console.error('Failed to load datasources:', error)
+  }
+  return []
+}
+
+function saveDatasources(ds: DatasourceConfig[]) {
+  try {
+    localStorage.setItem(DATASOURCES_STORAGE_KEY, JSON.stringify(ds))
+  }
+  catch (error) {
+    console.error('Failed to save datasources:', error)
+  }
+}
+
+function getDatasourceTypeLabel(type: string): string {
+  switch (type) {
+    case 'postgres':
+      return 'PostgreSQL'
+    case 'snowflake':
+      return 'Snowflake'
+    default:
+      return type
+  }
+}
 
 /**
  * Props for the TinyPivotStudio component
@@ -170,6 +207,48 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
   const [widgetConfigUseSampleData, setWidgetConfigUseSampleData] = useState(true)
   const [widgetConfigVisualizationType, setWidgetConfigVisualizationType] = useState<'table' | 'pivot' | 'chart'>('table')
   const [widgetConfigShowTitle, setWidgetConfigShowTitle] = useState(true)
+
+  // Data source state
+  const [datasources, setDatasources] = useState<DatasourceConfig[]>([])
+  const [showDatasourceModal, setShowDatasourceModal] = useState(false)
+  const [editingDatasource, setEditingDatasource] = useState<DatasourceConfig | null>(null)
+
+  // Load datasources on mount
+  useEffect(() => {
+    setDatasources(loadDatasources())
+  }, [])
+
+  // Handle datasource deletion
+  const handleDeleteDatasource = useCallback((dsId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!window.confirm('Are you sure you want to delete this data source?')) {
+      return
+    }
+    const updated = datasources.filter(d => d.id !== dsId)
+    setDatasources(updated)
+    saveDatasources(updated)
+  }, [datasources])
+
+  // Handle datasource save
+  const handleSaveDatasource = useCallback((dsConfig: DatasourceConfig) => {
+    let updated: DatasourceConfig[]
+    if (editingDatasource) {
+      updated = datasources.map(d => d.id === dsConfig.id ? dsConfig : d)
+    }
+    else {
+      updated = [...datasources, dsConfig]
+    }
+    setDatasources(updated)
+    saveDatasources(updated)
+    setShowDatasourceModal(false)
+    setEditingDatasource(null)
+  }, [datasources, editingDatasource])
+
+  // Open datasource modal for editing
+  const openEditDatasource = useCallback((ds: DatasourceConfig) => {
+    setEditingDatasource(ds)
+    setShowDatasourceModal(true)
+  }, [])
 
   // Load pages on mount
   useEffect(() => {
@@ -330,6 +409,10 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
         onCreatePage={() => setShowCreateModal(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        datasources={datasources}
+        onCreateDatasource={() => { setEditingDatasource(null); setShowDatasourceModal(true) }}
+        onEditDatasource={openEditDatasource}
+        onDeleteDatasource={handleDeleteDatasource}
       />
 
       <main className="tps-main">
@@ -389,6 +472,14 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
           }}
         />
       )}
+
+      {showDatasourceModal && (
+        <DatasourceModal
+          datasource={editingDatasource}
+          onClose={() => { setShowDatasourceModal(false); setEditingDatasource(null) }}
+          onSave={handleSaveDatasource}
+        />
+      )}
     </>
   )
 }
@@ -405,6 +496,10 @@ interface SidebarProps {
   onCreatePage: () => void
   theme: 'light' | 'dark'
   onToggleTheme: () => void
+  datasources: DatasourceConfig[]
+  onCreateDatasource: () => void
+  onEditDatasource: (ds: DatasourceConfig) => void
+  onDeleteDatasource: (dsId: string, e: React.MouseEvent) => void
 }
 
 function Sidebar({
@@ -414,6 +509,10 @@ function Sidebar({
   onSelectPage,
   onDeletePage,
   onCreatePage,
+  datasources,
+  onCreateDatasource,
+  onEditDatasource,
+  onDeleteDatasource,
 }: SidebarProps) {
   return (
     <aside className="tps-sidebar">
@@ -467,6 +566,58 @@ function Sidebar({
                   className="tps-page-item-delete"
                   onClick={e => onDeletePage(page.id, e)}
                   title="Delete page"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* Data Sources Section */}
+      <div className="tps-sidebar-section">
+        <span className="tps-sidebar-section-title">Data Sources</span>
+        <button
+          type="button"
+          className="tps-btn tps-btn-ghost tps-btn-sm tps-btn-icon"
+          onClick={onCreateDatasource}
+          title="Add data source"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="tps-datasource-list">
+        {datasources.length === 0 ? (
+          <div className="tps-page-list-empty">No data sources</div>
+        ) : (
+          datasources.map(ds => (
+            <button
+              key={ds.id}
+              type="button"
+              className="tps-page-item"
+              onClick={() => onEditDatasource(ds)}
+            >
+              <svg className="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+              </svg>
+              <div className="tps-datasource-item-content">
+                <span className="tps-page-item-title">{ds.name}</span>
+                <span className="tps-datasource-item-type">{getDatasourceTypeLabel(ds.type)}</span>
+              </div>
+              <div className="tps-page-item-actions">
+                <button
+                  type="button"
+                  className="tps-page-item-delete"
+                  onClick={e => onDeleteDatasource(ds.id, e)}
+                  title="Delete data source"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
                     <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -1275,6 +1426,319 @@ function WidgetConfigModal({
             </button>
             <button type="submit" className="tps-btn tps-btn-primary">
               Save Configuration
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Data source connection modal
+ */
+interface DatasourceModalProps {
+  datasource: DatasourceConfig | null
+  onClose: () => void
+  onSave: (ds: DatasourceConfig) => void
+}
+
+function DatasourceModal({ datasource, onClose, onSave }: DatasourceModalProps) {
+  const [name, setName] = useState(datasource?.name || '')
+  const [type, setType] = useState<'postgres' | 'snowflake'>(
+    (datasource?.type as 'postgres' | 'snowflake') || 'postgres',
+  )
+  // Postgres fields
+  const [host, setHost] = useState(datasource?.host || '')
+  const [port, setPort] = useState(datasource?.port || 5432)
+  const [database, setDatabase] = useState(datasource?.database || '')
+  const [username, setUsername] = useState(datasource?.username || '')
+  const [password, setPassword] = useState(datasource?.password || '')
+  // Snowflake fields
+  const [account, setAccount] = useState(datasource?.account || '')
+  const [warehouse, setWarehouse] = useState(datasource?.warehouse || '')
+  const [schema, setSchema] = useState(datasource?.schema || '')
+  const [role, setRole] = useState(datasource?.role || '')
+  // Test connection state
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  const [testMessage, setTestMessage] = useState('')
+
+  const handleTestConnection = async () => {
+    setTestStatus('testing')
+    setTestMessage('Testing connection...')
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    // Simulate success
+    setTestStatus('success')
+    setTestMessage('Connection successful!')
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const now = new Date()
+    const dsConfig: DatasourceConfig = {
+      id: datasource?.id || generateId(),
+      name: name.trim(),
+      type,
+      host: type === 'postgres' ? host : undefined,
+      port: type === 'postgres' ? port : undefined,
+      database: database || undefined,
+      schema: schema || undefined,
+      username: username || undefined,
+      password: password || undefined,
+      account: type === 'snowflake' ? account : undefined,
+      warehouse: type === 'snowflake' ? warehouse : undefined,
+      role: type === 'snowflake' ? role : undefined,
+      createdAt: datasource?.createdAt || now,
+      updatedAt: now,
+    }
+    onSave(dsConfig)
+  }
+
+  return (
+    <div className="tps-modal-overlay" onClick={onClose}>
+      <div className="tps-modal tps-modal-wide" onClick={e => e.stopPropagation()}>
+        <div className="tps-modal-header">
+          <h3 className="tps-modal-title">
+            {datasource ? 'Edit Data Source' : 'Add Data Source'}
+          </h3>
+          <button type="button" className="tps-modal-close" onClick={onClose}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="tps-modal-body">
+            <div className="tps-form-group">
+              <label className="tps-label" htmlFor="ds-name">Connection Name</label>
+              <input
+                id="ds-name"
+                type="text"
+                className="tps-input"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="My Database"
+                autoFocus
+              />
+            </div>
+
+            <div className="tps-form-group">
+              <label className="tps-label" htmlFor="ds-type">Database Type</label>
+              <select
+                id="ds-type"
+                className="tps-select"
+                value={type}
+                onChange={e => setType(e.target.value as 'postgres' | 'snowflake')}
+              >
+                <option value="postgres">PostgreSQL</option>
+                <option value="snowflake">Snowflake</option>
+              </select>
+            </div>
+
+            {/* PostgreSQL Fields */}
+            {type === 'postgres' && (
+              <>
+                <div className="tps-form-row">
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-host">Host</label>
+                    <input
+                      id="ds-host"
+                      type="text"
+                      className="tps-input"
+                      value={host}
+                      onChange={e => setHost(e.target.value)}
+                      placeholder="localhost"
+                    />
+                  </div>
+                  <div className="tps-form-group tps-form-group-small">
+                    <label className="tps-label" htmlFor="ds-port">Port</label>
+                    <input
+                      id="ds-port"
+                      type="number"
+                      className="tps-input"
+                      value={port}
+                      onChange={e => setPort(Number(e.target.value))}
+                      placeholder="5432"
+                    />
+                  </div>
+                </div>
+
+                <div className="tps-form-group">
+                  <label className="tps-label" htmlFor="ds-database">Database</label>
+                  <input
+                    id="ds-database"
+                    type="text"
+                    className="tps-input"
+                    value={database}
+                    onChange={e => setDatabase(e.target.value)}
+                    placeholder="mydb"
+                  />
+                </div>
+
+                <div className="tps-form-row">
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-username">Username</label>
+                    <input
+                      id="ds-username"
+                      type="text"
+                      className="tps-input"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
+                      placeholder="postgres"
+                    />
+                  </div>
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-password">Password</label>
+                    <input
+                      id="ds-password"
+                      type="password"
+                      className="tps-input"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="********"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Snowflake Fields */}
+            {type === 'snowflake' && (
+              <>
+                <div className="tps-form-group">
+                  <label className="tps-label" htmlFor="ds-account">Account Identifier</label>
+                  <input
+                    id="ds-account"
+                    type="text"
+                    className="tps-input"
+                    value={account}
+                    onChange={e => setAccount(e.target.value)}
+                    placeholder="xy12345.us-east-1"
+                  />
+                  <p className="tps-form-hint">
+                    Your Snowflake account identifier (e.g., xy12345.us-east-1)
+                  </p>
+                </div>
+
+                <div className="tps-form-row">
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-warehouse">Warehouse</label>
+                    <input
+                      id="ds-warehouse"
+                      type="text"
+                      className="tps-input"
+                      value={warehouse}
+                      onChange={e => setWarehouse(e.target.value)}
+                      placeholder="COMPUTE_WH"
+                    />
+                  </div>
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-sf-database">Database</label>
+                    <input
+                      id="ds-sf-database"
+                      type="text"
+                      className="tps-input"
+                      value={database}
+                      onChange={e => setDatabase(e.target.value)}
+                      placeholder="MY_DATABASE"
+                    />
+                  </div>
+                </div>
+
+                <div className="tps-form-row">
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-schema">Schema</label>
+                    <input
+                      id="ds-schema"
+                      type="text"
+                      className="tps-input"
+                      value={schema}
+                      onChange={e => setSchema(e.target.value)}
+                      placeholder="PUBLIC"
+                    />
+                  </div>
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-role">Role (optional)</label>
+                    <input
+                      id="ds-role"
+                      type="text"
+                      className="tps-input"
+                      value={role}
+                      onChange={e => setRole(e.target.value)}
+                      placeholder="ACCOUNTADMIN"
+                    />
+                  </div>
+                </div>
+
+                <div className="tps-form-row">
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-sf-username">Username</label>
+                    <input
+                      id="ds-sf-username"
+                      type="text"
+                      className="tps-input"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
+                      placeholder="my_user"
+                    />
+                  </div>
+                  <div className="tps-form-group tps-form-group-flex">
+                    <label className="tps-label" htmlFor="ds-sf-password">Password</label>
+                    <input
+                      id="ds-sf-password"
+                      type="password"
+                      className="tps-input"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="********"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Test Connection Section */}
+            <div className="tps-form-group">
+              <div className="tps-test-connection">
+                <button
+                  type="button"
+                  className="tps-btn tps-btn-secondary"
+                  disabled={testStatus === 'testing'}
+                  onClick={handleTestConnection}
+                >
+                  {testStatus === 'testing' ? (
+                    <svg className="tps-spinner-inline" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="31.4" strokeDashoffset="10" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  )}
+                  Test Connection
+                </button>
+                {testMessage && (
+                  <span
+                    className={`tps-test-result ${
+                      testStatus === 'success' ? 'tps-test-success' : ''
+                    }${testStatus === 'error' ? 'tps-test-error' : ''}`}
+                  >
+                    {testMessage}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="tps-modal-footer">
+            <button type="button" className="tps-btn tps-btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="tps-btn tps-btn-primary" disabled={!name.trim()}>
+              {datasource ? 'Save Changes' : 'Add Data Source'}
             </button>
           </div>
         </form>

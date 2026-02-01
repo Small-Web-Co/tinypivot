@@ -24,6 +24,20 @@ import { provideStudio, type StudioConfig } from '../composables'
 import '@smallwebco/tinypivot-studio/style.css'
 import '@smallwebco/tinypivot-vue/style.css'
 
+const props = withDefaults(defineProps<TinyPivotStudioProps>(), {
+  theme: 'light',
+})
+
+const emit = defineEmits<{
+  /** Emitted when a page is saved */
+  pageSave: [page: Page]
+  /** Emitted when a widget is saved */
+  widgetSave: [widget: WidgetConfig]
+}>()
+
+// LocalStorage key for datasources
+const DATASOURCES_STORAGE_KEY = 'tinypivot-datasources'
+
 /**
  * Props for TinyPivotStudio component
  */
@@ -50,17 +64,6 @@ export interface TinyPivotStudioProps {
   /** Theme setting */
   theme?: 'light' | 'dark' | 'auto'
 }
-
-const props = withDefaults(defineProps<TinyPivotStudioProps>(), {
-  theme: 'light',
-})
-
-const emit = defineEmits<{
-  /** Emitted when a page is saved */
-  pageSave: [page: Page]
-  /** Emitted when a widget is saved */
-  widgetSave: [widget: WidgetConfig]
-}>()
 
 // Provide studio context to child components
 const config: StudioConfig = {
@@ -347,6 +350,183 @@ function handleSaveWidgetConfig() {
   closeWidgetConfigModal()
 }
 
+// ============================================================================
+// Data Source Management
+// ============================================================================
+
+// Data source state
+const datasources = ref<DatasourceConfig[]>([])
+const showDatasourceModal = ref(false)
+const editingDatasource = ref<DatasourceConfig | null>(null)
+const datasourceTestStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
+const datasourceTestMessage = ref('')
+
+// Form state for new/edit datasource
+const dsFormName = ref('')
+const dsFormType = ref<'postgres' | 'snowflake'>('postgres')
+// Postgres fields
+const dsFormHost = ref('')
+const dsFormPort = ref(5432)
+const dsFormDatabase = ref('')
+const dsFormUsername = ref('')
+const dsFormPassword = ref('')
+// Snowflake fields
+const dsFormAccount = ref('')
+const dsFormWarehouse = ref('')
+const dsFormSchema = ref('')
+const dsFormRole = ref('')
+
+// Load datasources from localStorage
+function loadDatasources(): DatasourceConfig[] {
+  try {
+    const stored = localStorage.getItem(DATASOURCES_STORAGE_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  }
+  catch (error) {
+    console.error('Failed to load datasources:', error)
+  }
+  return []
+}
+
+// Save datasources to localStorage
+function saveDatasources(ds: DatasourceConfig[]) {
+  try {
+    localStorage.setItem(DATASOURCES_STORAGE_KEY, JSON.stringify(ds))
+  }
+  catch (error) {
+    console.error('Failed to save datasources:', error)
+  }
+}
+
+// Initialize datasources on mount
+onMounted(() => {
+  datasources.value = loadDatasources()
+})
+
+// Open datasource modal for creating new
+function openDatasourceModal() {
+  editingDatasource.value = null
+  resetDatasourceForm()
+  showDatasourceModal.value = true
+}
+
+// Open datasource modal for editing
+function openEditDatasource(ds: DatasourceConfig) {
+  editingDatasource.value = ds
+  dsFormName.value = ds.name
+  dsFormType.value = ds.type as 'postgres' | 'snowflake'
+  dsFormHost.value = ds.host || ''
+  dsFormPort.value = ds.port || 5432
+  dsFormDatabase.value = ds.database || ''
+  dsFormUsername.value = ds.username || ''
+  dsFormPassword.value = ds.password || ''
+  dsFormAccount.value = ds.account || ''
+  dsFormWarehouse.value = ds.warehouse || ''
+  dsFormSchema.value = ds.schema || ''
+  dsFormRole.value = ds.role || ''
+  showDatasourceModal.value = true
+}
+
+// Reset form to defaults
+function resetDatasourceForm() {
+  dsFormName.value = ''
+  dsFormType.value = 'postgres'
+  dsFormHost.value = ''
+  dsFormPort.value = 5432
+  dsFormDatabase.value = ''
+  dsFormUsername.value = ''
+  dsFormPassword.value = ''
+  dsFormAccount.value = ''
+  dsFormWarehouse.value = ''
+  dsFormSchema.value = ''
+  dsFormRole.value = ''
+  datasourceTestStatus.value = 'idle'
+  datasourceTestMessage.value = ''
+}
+
+// Close datasource modal
+function closeDatasourceModal() {
+  showDatasourceModal.value = false
+  editingDatasource.value = null
+  resetDatasourceForm()
+}
+
+// Test connection (simulated)
+async function handleTestConnection() {
+  datasourceTestStatus.value = 'testing'
+  datasourceTestMessage.value = 'Testing connection...'
+
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 1500))
+
+  // Simulate success (in real implementation, this would call the backend)
+  datasourceTestStatus.value = 'success'
+  datasourceTestMessage.value = 'Connection successful!'
+}
+
+// Save datasource
+function handleSaveDatasource() {
+  const now = new Date()
+  const dsConfig: DatasourceConfig = {
+    id: editingDatasource.value?.id || generateId(),
+    name: dsFormName.value.trim(),
+    type: dsFormType.value,
+    host: dsFormType.value === 'postgres' ? dsFormHost.value : undefined,
+    port: dsFormType.value === 'postgres' ? dsFormPort.value : undefined,
+    database: dsFormDatabase.value || undefined,
+    schema: dsFormSchema.value || undefined,
+    username: dsFormUsername.value || undefined,
+    password: dsFormPassword.value || undefined,
+    account: dsFormType.value === 'snowflake' ? dsFormAccount.value : undefined,
+    warehouse: dsFormType.value === 'snowflake' ? dsFormWarehouse.value : undefined,
+    role: dsFormType.value === 'snowflake' ? dsFormRole.value : undefined,
+    createdAt: editingDatasource.value?.createdAt || now,
+    updatedAt: now,
+  }
+
+  if (editingDatasource.value) {
+    // Update existing
+    datasources.value = datasources.value.map(d =>
+      d.id === dsConfig.id ? dsConfig : d,
+    )
+  }
+  else {
+    // Add new
+    datasources.value = [...datasources.value, dsConfig]
+  }
+
+  saveDatasources(datasources.value)
+  closeDatasourceModal()
+}
+
+// Delete datasource
+function handleDeleteDatasource(dsId: string, event: MouseEvent) {
+  event.stopPropagation()
+  if (!window.confirm('Are you sure you want to delete this data source?')) {
+    return
+  }
+  datasources.value = datasources.value.filter(d => d.id !== dsId)
+  saveDatasources(datasources.value)
+}
+
+// Get datasource type label
+function getDatasourceTypeLabel(type: string): string {
+  switch (type) {
+    case 'postgres':
+      return 'PostgreSQL'
+    case 'snowflake':
+      return 'Snowflake'
+    default:
+      return type
+  }
+}
+
+// ============================================================================
+// Template Helpers
+// ============================================================================
+
 // Get template icon path
 function getTemplateIconPath(template: PageTemplate): string {
   switch (template) {
@@ -493,6 +673,57 @@ defineExpose({
               class="tps-page-item-delete"
               title="Delete page"
               @click="handleDeletePage(page.id, $event)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
+        </button>
+      </div>
+
+      <!-- Data Sources Section -->
+      <div class="tps-sidebar-section">
+        <span class="tps-sidebar-section-title">Data Sources</span>
+        <button
+          type="button"
+          class="tps-btn tps-btn-ghost tps-btn-sm tps-btn-icon"
+          title="Add data source"
+          @click="openDatasourceModal"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="tps-datasource-list">
+        <div v-if="datasources.length === 0" class="tps-page-list-empty">
+          No data sources
+        </div>
+        <button
+          v-for="ds in datasources"
+          v-else
+          :key="ds.id"
+          type="button"
+          class="tps-page-item"
+          @click="openEditDatasource(ds)"
+        >
+          <svg class="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+          </svg>
+          <div class="tps-datasource-item-content">
+            <span class="tps-page-item-title">{{ ds.name }}</span>
+            <span class="tps-datasource-item-type">{{ getDatasourceTypeLabel(ds.type) }}</span>
+          </div>
+          <div class="tps-page-item-actions">
+            <button
+              type="button"
+              class="tps-page-item-delete"
+              title="Delete data source"
+              @click="handleDeleteDatasource(ds.id, $event)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                 <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -970,6 +1201,240 @@ defineExpose({
             </button>
             <button type="submit" class="tps-btn tps-btn-primary">
               Save Configuration
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Data Source Connection Modal -->
+    <div v-if="showDatasourceModal" class="tps-modal-overlay" @click="closeDatasourceModal">
+      <div class="tps-modal tps-modal-wide" @click.stop>
+        <div class="tps-modal-header">
+          <h3 class="tps-modal-title">
+            {{ editingDatasource ? 'Edit Data Source' : 'Add Data Source' }}
+          </h3>
+          <button type="button" class="tps-modal-close" @click="closeDatasourceModal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form @submit.prevent="handleSaveDatasource">
+          <div class="tps-modal-body">
+            <div class="tps-form-group">
+              <label class="tps-label" for="ds-name">Connection Name</label>
+              <input
+                id="ds-name"
+                v-model="dsFormName"
+                type="text"
+                class="tps-input"
+                placeholder="My Database"
+                autofocus
+              >
+            </div>
+
+            <div class="tps-form-group">
+              <label class="tps-label" for="ds-type">Database Type</label>
+              <select
+                id="ds-type"
+                v-model="dsFormType"
+                class="tps-select"
+              >
+                <option value="postgres">
+                  PostgreSQL
+                </option>
+                <option value="snowflake">
+                  Snowflake
+                </option>
+              </select>
+            </div>
+
+            <!-- PostgreSQL Fields -->
+            <template v-if="dsFormType === 'postgres'">
+              <div class="tps-form-row">
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-host">Host</label>
+                  <input
+                    id="ds-host"
+                    v-model="dsFormHost"
+                    type="text"
+                    class="tps-input"
+                    placeholder="localhost"
+                  >
+                </div>
+                <div class="tps-form-group tps-form-group-small">
+                  <label class="tps-label" for="ds-port">Port</label>
+                  <input
+                    id="ds-port"
+                    v-model.number="dsFormPort"
+                    type="number"
+                    class="tps-input"
+                    placeholder="5432"
+                  >
+                </div>
+              </div>
+
+              <div class="tps-form-group">
+                <label class="tps-label" for="ds-database">Database</label>
+                <input
+                  id="ds-database"
+                  v-model="dsFormDatabase"
+                  type="text"
+                  class="tps-input"
+                  placeholder="mydb"
+                >
+              </div>
+
+              <div class="tps-form-row">
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-username">Username</label>
+                  <input
+                    id="ds-username"
+                    v-model="dsFormUsername"
+                    type="text"
+                    class="tps-input"
+                    placeholder="postgres"
+                  >
+                </div>
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-password">Password</label>
+                  <input
+                    id="ds-password"
+                    v-model="dsFormPassword"
+                    type="password"
+                    class="tps-input"
+                    placeholder="********"
+                  >
+                </div>
+              </div>
+            </template>
+
+            <!-- Snowflake Fields -->
+            <template v-if="dsFormType === 'snowflake'">
+              <div class="tps-form-group">
+                <label class="tps-label" for="ds-account">Account Identifier</label>
+                <input
+                  id="ds-account"
+                  v-model="dsFormAccount"
+                  type="text"
+                  class="tps-input"
+                  placeholder="xy12345.us-east-1"
+                >
+                <p class="tps-form-hint">
+                  Your Snowflake account identifier (e.g., xy12345.us-east-1)
+                </p>
+              </div>
+
+              <div class="tps-form-row">
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-warehouse">Warehouse</label>
+                  <input
+                    id="ds-warehouse"
+                    v-model="dsFormWarehouse"
+                    type="text"
+                    class="tps-input"
+                    placeholder="COMPUTE_WH"
+                  >
+                </div>
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-sf-database">Database</label>
+                  <input
+                    id="ds-sf-database"
+                    v-model="dsFormDatabase"
+                    type="text"
+                    class="tps-input"
+                    placeholder="MY_DATABASE"
+                  >
+                </div>
+              </div>
+
+              <div class="tps-form-row">
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-schema">Schema</label>
+                  <input
+                    id="ds-schema"
+                    v-model="dsFormSchema"
+                    type="text"
+                    class="tps-input"
+                    placeholder="PUBLIC"
+                  >
+                </div>
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-role">Role (optional)</label>
+                  <input
+                    id="ds-role"
+                    v-model="dsFormRole"
+                    type="text"
+                    class="tps-input"
+                    placeholder="ACCOUNTADMIN"
+                  >
+                </div>
+              </div>
+
+              <div class="tps-form-row">
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-sf-username">Username</label>
+                  <input
+                    id="ds-sf-username"
+                    v-model="dsFormUsername"
+                    type="text"
+                    class="tps-input"
+                    placeholder="my_user"
+                  >
+                </div>
+                <div class="tps-form-group tps-form-group-flex">
+                  <label class="tps-label" for="ds-sf-password">Password</label>
+                  <input
+                    id="ds-sf-password"
+                    v-model="dsFormPassword"
+                    type="password"
+                    class="tps-input"
+                    placeholder="********"
+                  >
+                </div>
+              </div>
+            </template>
+
+            <!-- Test Connection Section -->
+            <div class="tps-form-group">
+              <div class="tps-test-connection">
+                <button
+                  type="button"
+                  class="tps-btn tps-btn-secondary"
+                  :disabled="datasourceTestStatus === 'testing'"
+                  @click="handleTestConnection"
+                >
+                  <svg v-if="datasourceTestStatus === 'testing'" class="tps-spinner-inline" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4" stroke-dashoffset="10" />
+                  </svg>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  Test Connection
+                </button>
+                <span
+                  v-if="datasourceTestMessage"
+                  class="tps-test-result"
+                  :class="{
+                    'tps-test-success': datasourceTestStatus === 'success',
+                    'tps-test-error': datasourceTestStatus === 'error',
+                  }"
+                >
+                  {{ datasourceTestMessage }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="tps-modal-footer">
+            <button type="button" class="tps-btn tps-btn-secondary" @click="closeDatasourceModal">
+              Cancel
+            </button>
+            <button type="submit" class="tps-btn tps-btn-primary" :disabled="!dsFormName.trim()">
+              {{ editingDatasource ? 'Save Changes' : 'Add Data Source' }}
             </button>
           </div>
         </form>

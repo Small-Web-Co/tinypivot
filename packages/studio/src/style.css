@@ -1572,3 +1572,93 @@
 .tps-theme-dark .tps-widget-error span {
   color: #fecaca;
 }
+
+/* ==========================================================================
+   Data Source List
+   ========================================================================== */
+.tps-datasource-list {
+  padding: 0 0.5rem 0.5rem;
+}
+
+.tps-datasource-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tps-datasource-item-type {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  margin-top: 0.125rem;
+}
+
+.tps-theme-dark .tps-datasource-item-type {
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Modal - Wide Variant
+   ========================================================================== */
+.tps-modal-wide {
+  max-width: 560px;
+}
+
+/* ==========================================================================
+   Form Row (side-by-side inputs)
+   ========================================================================== */
+.tps-form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.tps-form-group-flex {
+  flex: 1;
+  min-width: 0;
+}
+
+.tps-form-group-small {
+  flex: 0 0 100px;
+}
+
+/* ==========================================================================
+   Test Connection
+   ========================================================================== */
+.tps-test-connection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.5rem;
+}
+
+.tps-test-result {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.tps-test-success {
+  color: #059669;
+}
+
+.tps-test-error {
+  color: #dc2626;
+}
+
+.tps-theme-dark .tps-test-success {
+  color: #34d399;
+}
+
+.tps-theme-dark .tps-test-error {
+  color: #f87171;
+}
+
+/* Inline spinner for buttons */
+.tps-spinner-inline {
+  width: 1rem;
+  height: 1rem;
+  animation: tps-spin 0.8s linear infinite;
+}
+
+.tps-spinner-inline circle {
+  stroke: currentColor;
+}
