@@ -46,12 +46,24 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "peerDependencies": {
-    "vue": "^3.3.0"
+    "vue": "^3.3.0",
+    "vuedraggable": "^4"
   },
   "dependencies": {
     "@smallwebco/tinypivot-studio": "workspace:*",
     "@smallwebco/tinypivot-vue": "workspace:*",
-    "vuedraggable": "^4"
+    "@tiptap/extension-image": "^2.2.0",
+    "@tiptap/extension-link": "^2.2.0",
+    "@tiptap/extension-placeholder": "^2.2.0",
+    "@tiptap/extension-table": "^2.2.0",
+    "@tiptap/extension-table-cell": "^2.2.0",
+    "@tiptap/extension-table-header": "^2.2.0",
+    "@tiptap/extension-table-row": "^2.2.0",
+    "@tiptap/extension-text-align": "^2.2.0",
+    "@tiptap/extension-underline": "^2.2.0",
+    "@tiptap/starter-kit": "^2.2.0",
+    "@tiptap/vue-3": "^2.2.0",
+    "gridstack": "^12.4.2"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",

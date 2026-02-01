@@ -51,7 +51,19 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@smallwebco/tinypivot-react": "workspace:*",
-    "@smallwebco/tinypivot-studio": "workspace:*"
+    "@smallwebco/tinypivot-studio": "workspace:*",
+    "@tiptap/extension-image": "^2.2.0",
+    "@tiptap/extension-link": "^2.2.0",
+    "@tiptap/extension-placeholder": "^2.2.0",
+    "@tiptap/extension-table": "^2.2.0",
+    "@tiptap/extension-table-cell": "^2.2.0",
+    "@tiptap/extension-table-header": "^2.2.0",
+    "@tiptap/extension-table-row": "^2.2.0",
+    "@tiptap/extension-text-align": "^2.2.0",
+    "@tiptap/extension-underline": "^2.2.0",
+    "@tiptap/react": "^2.2.0",
+    "@tiptap/starter-kit": "^2.2.0",
+    "gridstack": "^10.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
