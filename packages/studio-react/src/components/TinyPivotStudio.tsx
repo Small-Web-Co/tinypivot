@@ -11,15 +11,26 @@ import type {
   PageTemplate,
   StorageAdapter,
   TextBlock,
+  WidgetBlock,
   WidgetConfig,
 } from '@smallwebco/tinypivot-studio'
-import { generateId } from '@smallwebco/tinypivot-studio'
+import { DataGrid } from '@smallwebco/tinypivot-react'
+import { generateId, isWidgetBlock } from '@smallwebco/tinypivot-studio'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
 
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
+
+// Widget sample data - used when no data source is configured
+const widgetSampleData = [
+  { id: 1, product: 'Widget A', category: 'Electronics', sales: 1250, revenue: 31250 },
+  { id: 2, product: 'Widget B', category: 'Electronics', sales: 980, revenue: 24500 },
+  { id: 3, product: 'Gadget X', category: 'Home', sales: 750, revenue: 18750 },
+  { id: 4, product: 'Gadget Y', category: 'Home', sales: 620, revenue: 15500 },
+  { id: 5, product: 'Device Z', category: 'Office', sales: 1100, revenue: 27500 },
+]
 
 /**
  * Props for the TinyPivotStudio component
@@ -296,6 +307,7 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
         ) : currentPage ? (
           <PageEditor
             page={currentPage}
+            theme={theme}
             onUpdatePage={handleUpdatePage}
           />
         ) : (
@@ -599,10 +611,11 @@ function TemplateIcon({ template }: { template: PageTemplate }) {
  */
 interface PageEditorProps {
   page: Page
+  theme: 'light' | 'dark'
   onUpdatePage: (page: Page) => void
 }
 
-function PageEditor({ page, onUpdatePage }: PageEditorProps) {
+function PageEditor({ page, theme, onUpdatePage }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
   const [blocks, setBlocks] = useState<Block[]>(page.blocks)
   const [showBlockMenu, setShowBlockMenu] = useState(false)
@@ -666,6 +679,7 @@ function PageEditor({ page, onUpdatePage }: PageEditorProps) {
             <BlockRenderer
               key={block.id}
               block={block}
+              theme={theme}
               onUpdate={handleBlockUpdate}
               onDelete={handleBlockDelete}
             />
@@ -705,6 +719,18 @@ function PageEditor({ page, onUpdatePage }: PageEditorProps) {
               </button>
               <button
                 type="button"
+                className="tps-add-block-option"
+                onClick={() => handleAddBlock('widget')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 9h18" />
+                  <path d="M9 21V9" />
+                </svg>
+                Widget
+              </button>
+              <button
+                type="button"
                 className="tps-btn tps-btn-ghost tps-btn-sm"
                 onClick={() => setShowBlockMenu(false)}
                 style={{ marginLeft: 'auto' }}
@@ -735,45 +761,60 @@ function PageEditor({ page, onUpdatePage }: PageEditorProps) {
  */
 interface BlockRendererProps {
   block: Block
+  theme: 'light' | 'dark'
   onUpdate: (blockId: string, updates: Partial<Block>) => void
   onDelete: (blockId: string) => void
 }
 
-function BlockRenderer({ block, onUpdate, onDelete }: BlockRendererProps) {
-  switch (block.type) {
-    case 'text':
-      return (
-        <TextBlockComponent
-          block={block}
-          onUpdate={onUpdate}
-          onDelete={onDelete}
-        />
-      )
-    case 'heading':
-      return (
-        <HeadingBlockComponent
-          block={block}
-          onUpdate={onUpdate}
-          onDelete={onDelete}
-        />
-      )
-    case 'divider':
-      return (
-        <DividerBlockComponent
-          block={block}
-          onDelete={onDelete}
-        />
-      )
-    default:
-      return (
-        <div className="tps-block">
-          <span>
-            Unknown block type:
-            {block.type}
-          </span>
-        </div>
-      )
+function BlockRenderer({ block, theme, onUpdate, onDelete }: BlockRendererProps) {
+  if (block.type === 'text') {
+    return (
+      <TextBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
   }
+
+  if (block.type === 'heading') {
+    return (
+      <HeadingBlockComponent
+        block={block}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (block.type === 'divider') {
+    return (
+      <DividerBlockComponent
+        block={block}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  if (isWidgetBlock(block)) {
+    return (
+      <WidgetBlockComponent
+        block={block}
+        theme={theme}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
+    )
+  }
+
+  return (
+    <div className="tps-block">
+      <span>
+        Unknown block type:
+        {block.type}
+      </span>
+    </div>
+  )
 }
 
 /**
@@ -885,6 +926,151 @@ function DividerBlockComponent({
 }
 
 /**
+ * Widget block component
+ */
+function WidgetBlockComponent({
+  block,
+  theme,
+  onUpdate,
+  onDelete,
+}: {
+  block: WidgetBlock
+  theme: 'light' | 'dark'
+  onUpdate: (blockId: string, updates: Partial<Block>) => void
+  onDelete: (blockId: string) => void
+}) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Get widget height style
+  const heightStyle = useMemo(() => {
+    if (!block.height)
+      return '400px'
+    return typeof block.height === 'number' ? `${block.height}px` : block.height
+  }, [block.height])
+
+  // Check if widget has data configured
+  const hasWidgetData = Boolean(block.widgetId)
+
+  // Handle configure button click - toggle sample data
+  const handleConfigure = () => {
+    onUpdate(block.id, { widgetId: block.widgetId ? '' : 'sample' })
+  }
+
+  // Handle retry on error
+  const handleRetry = () => {
+    setError(null)
+    setIsLoading(true)
+    // Simulate retry - in real implementation this would refetch data
+    setTimeout(() => setIsLoading(false), 500)
+  }
+
+  return (
+    <div className="tps-block tps-block-widget" style={{ minHeight: heightStyle }}>
+      <div className="tps-block-actions">
+        <button
+          type="button"
+          className="tps-block-action"
+          onClick={handleConfigure}
+          title="Configure widget"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="tps-block-action tps-block-delete"
+          onClick={() => onDelete(block.id)}
+          title="Delete block"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Widget Title */}
+      {block.showTitle !== false && (
+        <div className="tps-widget-header">
+          <input
+            type="text"
+            className="tps-widget-title-input"
+            value={block.titleOverride || ''}
+            onChange={e => onUpdate(block.id, { titleOverride: e.target.value })}
+            placeholder="Widget Title"
+          />
+        </div>
+      )}
+
+      {/* Widget Loading State */}
+      {isLoading && (
+        <div className="tps-widget-loading">
+          <div className="tps-spinner" />
+          <span>Loading widget...</span>
+        </div>
+      )}
+
+      {/* Widget Error State */}
+      {!isLoading && error && (
+        <div className="tps-widget-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>{error}</span>
+          <button type="button" className="tps-btn tps-btn-sm tps-btn-secondary" onClick={handleRetry}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Widget Placeholder (no data configured) */}
+      {!isLoading && !error && !hasWidgetData && (
+        <div className="tps-widget-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18" />
+            <path d="M9 21V9" />
+          </svg>
+          <span>No data configured</span>
+          <button
+            type="button"
+            className="tps-btn tps-btn-sm tps-btn-primary"
+            onClick={handleConfigure}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Configure Widget
+          </button>
+        </div>
+      )}
+
+      {/* Widget with Data (using sample data for now) */}
+      {!isLoading && !error && hasWidgetData && (
+        <div className="tps-widget-content">
+          <DataGrid
+            data={widgetSampleData}
+            theme={theme}
+            enableExport={false}
+            enablePagination={false}
+            enableSearch={true}
+            stripedRows={true}
+            initialHeight={350}
+            minHeight={200}
+            maxHeight={600}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * Create a new block of the given type
  */
 function createBlock(type: Block['type']): Block {
@@ -897,6 +1083,8 @@ function createBlock(type: Block['type']): Block {
       return { id, type: 'heading', content: '', level: 2 }
     case 'divider':
       return { id, type: 'divider' }
+    case 'widget':
+      return { id, type: 'widget', widgetId: '', showTitle: true } as WidgetBlock
     default:
       return { id, type: 'text', content: '' }
   }
