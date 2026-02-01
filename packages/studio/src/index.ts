@@ -8,6 +8,9 @@
 // Export all types from the types directory
 export * from './types'
 
+// Export all utilities from the utils directory
+export * from './utils'
+
 // Re-export core types that are extended by studio
 export type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
 
