@@ -5,14 +5,19 @@
  * @packageDocumentation
  */
 
-// Re-export core types that are extended by studio
-// Import types from core for re-export
-import type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
+// Export all types from the types directory
+export * from './types'
 
+// Re-export core types that are extended by studio
 export type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
 
-// Storage adapter interface - to be implemented by storage packages
-export interface StorageAdapter {
+// ============================================================================
+// Legacy Types (kept for backwards compatibility)
+// These will be deprecated in favor of the new types in ./types
+// ============================================================================
+
+// Legacy Storage adapter interface - to be implemented by storage packages
+export interface LegacyStorageAdapter {
   // Views
   getViews: () => Promise<SavedView[]>
   getView: (id: string) => Promise<SavedView | null>
@@ -26,25 +31,25 @@ export interface StorageAdapter {
   deleteDashboard: (id: string) => Promise<void>
 }
 
-// Datasource adapter interface - to be implemented by datasource packages
-export interface DatasourceAdapter {
+// Legacy Datasource adapter interface - to be implemented by datasource packages
+export interface LegacyDatasourceAdapter {
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   isConnected: () => boolean
   listTables: () => Promise<TableInfo[]>
   getTableSchema: (tableName: string) => Promise<ColumnInfo[]>
-  executeQuery: (query: string) => Promise<QueryResult>
+  executeQuery: (query: string) => Promise<LegacyQueryResult>
 }
 
-// Core types
+// Legacy Core types
 export interface SavedView {
   id: string
   name: string
   description?: string
   datasourceId: string
   query?: string
-  pivotConfig?: PivotConfig
-  chartConfig?: ChartConfig
+  pivotConfig?: import('@smallwebco/tinypivot-core').PivotConfig
+  chartConfig?: import('@smallwebco/tinypivot-core').ChartConfig
   createdAt: Date
   updatedAt: Date
   createdBy?: string
@@ -96,18 +101,28 @@ export interface ColumnInfo {
   primaryKey?: boolean
 }
 
-export interface QueryResult {
+export interface LegacyQueryResult {
   columns: string[]
   rows: Record<string, unknown>[]
   rowCount: number
   executionTimeMs: number
 }
 
+// ============================================================================
 // Utility functions
+// ============================================================================
+
+/**
+ * Generate a unique ID for entities
+ */
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
+/**
+ * Create an empty SavedView with default values
+ * @deprecated Use PageCreateInput instead
+ */
 export function createEmptyView(datasourceId: string): SavedView {
   const now = new Date()
   return {
@@ -119,6 +134,10 @@ export function createEmptyView(datasourceId: string): SavedView {
   }
 }
 
+/**
+ * Create an empty Dashboard with default values
+ * @deprecated Use PageCreateInput with dashboard template instead
+ */
 export function createEmptyDashboard(): Dashboard {
   const now = new Date()
   return {
