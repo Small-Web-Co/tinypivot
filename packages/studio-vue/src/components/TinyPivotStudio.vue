@@ -16,7 +16,7 @@ import type {
 } from '@smallwebco/tinypivot-studio'
 import { generateId } from '@smallwebco/tinypivot-studio'
 import { computed, onMounted, ref, watch } from 'vue'
-import { provideStudio, type StudioConfig, useStudio } from '../composables'
+import { provideStudio, type StudioConfig } from '../composables'
 
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
@@ -71,8 +71,8 @@ const config: StudioConfig = {
 
 provideStudio(config)
 
-// Get storage from context
-const { storage } = useStudio()
+// Use storage from props directly (useStudio is for child components)
+const storage = computed(() => props.storage)
 
 // Resolve theme
 const resolvedTheme = computed(() => {
@@ -104,13 +104,13 @@ const showBlockMenu = ref(false)
 
 // Load pages on mount
 onMounted(async () => {
-  if (!storage) {
+  if (!storage.value) {
     isLoading.value = false
     return
   }
 
   try {
-    const result = await storage.listPages()
+    const result = await storage.value.listPages()
     pages.value = result.items
   }
   catch (error) {
@@ -135,11 +135,11 @@ watch(currentPage, (page) => {
 
 // Handle page selection
 async function handleSelectPage(pageId: string) {
-  if (!storage)
+  if (!storage.value)
     return
 
   try {
-    const page = await storage.getPage(pageId)
+    const page = await storage.value.getPage(pageId)
     currentPage.value = page
   }
   catch (error) {
@@ -150,7 +150,7 @@ async function handleSelectPage(pageId: string) {
 // Handle page deletion
 async function handleDeletePage(pageId: string, event: MouseEvent) {
   event.stopPropagation()
-  if (!storage)
+  if (!storage.value)
     return
 
   if (!window.confirm('Are you sure you want to delete this page?')) {
@@ -158,7 +158,7 @@ async function handleDeletePage(pageId: string, event: MouseEvent) {
   }
 
   try {
-    await storage.deletePage(pageId)
+    await storage.value.deletePage(pageId)
     pages.value = pages.value.filter(p => p.id !== pageId)
     if (currentPage.value?.id === pageId) {
       currentPage.value = null
@@ -171,11 +171,11 @@ async function handleDeletePage(pageId: string, event: MouseEvent) {
 
 // Handle page creation
 async function handleCreatePage() {
-  if (!storage || !newPageTitle.value.trim())
+  if (!storage.value || !newPageTitle.value.trim())
     return
 
   try {
-    const page = await storage.createPage({
+    const page = await storage.value.createPage({
       title: newPageTitle.value.trim(),
       template: newPageTemplate.value,
       blocks: getTemplateBlocks(newPageTemplate.value),
@@ -206,11 +206,11 @@ async function handleCreatePage() {
 
 // Handle page update
 async function handleUpdatePage() {
-  if (!storage || !currentPage.value)
+  if (!storage.value || !currentPage.value)
     return
 
   try {
-    const page = await storage.updatePage(currentPage.value.id, {
+    const page = await storage.value.updatePage(currentPage.value.id, {
       title: editorTitle.value,
       blocks: editorBlocks.value,
     })
