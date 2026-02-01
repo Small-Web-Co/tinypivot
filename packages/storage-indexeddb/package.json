@@ -41,7 +41,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@smallwebco/tinypivot-studio": "workspace:*"
+    "@smallwebco/tinypivot-studio": "workspace:*",
+    "idb": "^8.0.3"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

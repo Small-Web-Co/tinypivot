@@ -5,74 +5,28 @@
  * @packageDocumentation
  */
 
-import type {
-  Dashboard,
-  SavedView,
+// Export the main adapter factory
+export { createIndexedDBStorage } from './adapter'
+export type { IndexedDBStorageOptions } from './adapter'
+
+// Export schema constants and types
+export { DB_NAME, DB_VERSION, MAX_VERSIONS_PER_PAGE } from './schema'
+export type { TinyPivotDBSchema } from './schema'
+
+// Re-export storage types for convenience
+export type {
+  Page,
+  PageCreateInput,
+  PageListFilter,
+  PageListItem,
+  PageShare,
+  PageShareSettings,
+  PageSnapshot,
+  PageUpdateInput,
+  PageVersion,
+  PaginatedResult,
   StorageAdapter,
+  WidgetConfig,
+  WidgetCreateInput,
+  WidgetUpdateInput,
 } from '@smallwebco/tinypivot-studio'
-
-// Re-export types for convenience
-export type { Dashboard, SavedView, StorageAdapter }
-
-// Database configuration
-export const DB_NAME = 'tinypivot-studio'
-export const DB_VERSION = 1
-
-export const STORES = {
-  views: 'views',
-  dashboards: 'dashboards',
-} as const
-
-// Placeholder - full implementation in Task 2.1
-export class IndexedDBStorageAdapter implements StorageAdapter {
-  // Will be initialized in init() method - implementation in Task 2.1
-  db: IDBDatabase | null = null
-
-  async init(): Promise<void> {
-    // TODO: Initialize IndexedDB connection
-    void this.db
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async getViews(): Promise<SavedView[]> {
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async getView(id: string): Promise<SavedView | null> {
-    void id
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async saveView(view: SavedView): Promise<SavedView> {
-    void view
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async deleteView(id: string): Promise<void> {
-    void id
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async getDashboards(): Promise<Dashboard[]> {
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async getDashboard(id: string): Promise<Dashboard | null> {
-    void id
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async saveDashboard(dashboard: Dashboard): Promise<Dashboard> {
-    void dashboard
-    throw new Error('Not implemented - see Task 2.1')
-  }
-
-  async deleteDashboard(id: string): Promise<void> {
-    void id
-    throw new Error('Not implemented - see Task 2.1')
-  }
-}
-
-export function createIndexedDBStorage(): IndexedDBStorageAdapter {
-  return new IndexedDBStorageAdapter()
-}
