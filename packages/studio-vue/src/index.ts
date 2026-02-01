@@ -5,32 +5,26 @@
  * @packageDocumentation
  */
 
-// Re-export core studio types
+// Composables
+export * from './composables'
+
+// Re-export useful types from core
 export type {
-  ColumnInfo,
-  Dashboard,
-  DashboardLayout,
-  DashboardWidget,
-  DatasourceAdapter,
-  QueryResult,
-  SavedView,
+  DatasourceConfig,
+  Page,
   StorageAdapter,
-  TableInfo,
-  WidgetPosition,
-  WidgetSize,
+  WidgetConfig,
 } from '@smallwebco/tinypivot-studio'
 
+// Re-export utility functions from core
 export {
   createEmptyDashboard,
   createEmptyView,
   generateId,
 } from '@smallwebco/tinypivot-studio'
 
-// Placeholder exports - components will be implemented in subsequent tasks
+// Package version
 export const STUDIO_VUE_VERSION = '1.0.64'
-
-// Composables will be added here
-// export { useStudio } from './composables/useStudio'
 
 // Components will be added here
 // export { TinyPivotStudio } from './components/TinyPivotStudio.vue'
