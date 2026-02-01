@@ -22,6 +22,7 @@ import { provideStudio, type StudioConfig } from '../composables'
 
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
+import '@smallwebco/tinypivot-vue/style.css'
 
 /**
  * Props for TinyPivotStudio component
@@ -98,6 +99,15 @@ const isLoading = ref(true)
 // Modal state
 const newPageTitle = ref('')
 const newPageTemplate = ref<PageTemplate>('blank')
+
+// Widget configuration modal state
+const showWidgetConfigModal = ref(false)
+const widgetConfigBlockId = ref<string | null>(null)
+const widgetConfigTitle = ref('')
+const widgetConfigHeight = ref<number>(400)
+const widgetConfigUseSampleData = ref(true)
+const widgetConfigVisualizationType = ref<'table' | 'pivot' | 'chart'>('table')
+const widgetConfigShowTitle = ref(true)
 
 // Editor state
 const editorTitle = ref('')
@@ -292,6 +302,49 @@ function closeCreateModal() {
 // Handle modal overlay click
 function handleModalOverlayClick() {
   closeCreateModal()
+}
+
+// Widget configuration modal functions
+function openWidgetConfigModal(block: WidgetBlock) {
+  widgetConfigBlockId.value = block.id
+  widgetConfigTitle.value = block.titleOverride || ''
+  widgetConfigHeight.value = typeof block.height === 'number' ? block.height : 400
+  widgetConfigUseSampleData.value = Boolean(block.widgetId)
+  widgetConfigVisualizationType.value = (block.metadata?.visualizationType as 'table' | 'pivot' | 'chart') || 'table'
+  widgetConfigShowTitle.value = block.showTitle !== false
+  showWidgetConfigModal.value = true
+}
+
+function closeWidgetConfigModal() {
+  showWidgetConfigModal.value = false
+  widgetConfigBlockId.value = null
+  widgetConfigTitle.value = ''
+  widgetConfigHeight.value = 400
+  widgetConfigUseSampleData.value = true
+  widgetConfigVisualizationType.value = 'table'
+  widgetConfigShowTitle.value = true
+}
+
+function handleWidgetConfigOverlayClick() {
+  closeWidgetConfigModal()
+}
+
+function handleSaveWidgetConfig() {
+  if (!widgetConfigBlockId.value)
+    return
+
+  const updates: Partial<WidgetBlock> = {
+    titleOverride: widgetConfigTitle.value || undefined,
+    height: widgetConfigHeight.value,
+    widgetId: widgetConfigUseSampleData.value ? 'sample' : '',
+    showTitle: widgetConfigShowTitle.value,
+    metadata: {
+      visualizationType: widgetConfigVisualizationType.value,
+    },
+  }
+
+  handleBlockUpdate(widgetConfigBlockId.value, updates)
+  closeWidgetConfigModal()
 }
 
 // Get template icon path
@@ -556,7 +609,7 @@ defineExpose({
                     type="button"
                     class="tps-block-action"
                     title="Configure widget"
-                    @click="handleBlockUpdate(block.id, { widgetId: block.widgetId ? '' : 'sample' })"
+                    @click="openWidgetConfigModal(block)"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -616,7 +669,7 @@ defineExpose({
                   <button
                     type="button"
                     class="tps-btn tps-btn-sm tps-btn-primary"
-                    @click="handleBlockUpdate(block.id, { widgetId: 'sample' })"
+                    @click="openWidgetConfigModal(block)"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -816,6 +869,107 @@ defineExpose({
             </button>
             <button type="submit" class="tps-btn tps-btn-primary" :disabled="!newPageTitle.trim()">
               Create Page
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Widget Configuration Modal -->
+    <div v-if="showWidgetConfigModal" class="tps-modal-overlay" @click="handleWidgetConfigOverlayClick">
+      <div class="tps-modal" @click.stop>
+        <div class="tps-modal-header">
+          <h3 class="tps-modal-title">
+            Configure Widget
+          </h3>
+          <button type="button" class="tps-modal-close" @click="closeWidgetConfigModal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form @submit.prevent="handleSaveWidgetConfig">
+          <div class="tps-modal-body">
+            <div class="tps-form-group">
+              <label class="tps-label" for="widget-title">Widget Title</label>
+              <input
+                id="widget-title"
+                v-model="widgetConfigTitle"
+                type="text"
+                class="tps-input"
+                placeholder="Sales Overview"
+              >
+            </div>
+
+            <div class="tps-form-group">
+              <label class="tps-checkbox-label">
+                <input
+                  v-model="widgetConfigShowTitle"
+                  type="checkbox"
+                  class="tps-checkbox"
+                >
+                <span>Show widget title</span>
+              </label>
+            </div>
+
+            <div class="tps-form-group">
+              <label class="tps-label">Data Source</label>
+              <label class="tps-checkbox-label">
+                <input
+                  v-model="widgetConfigUseSampleData"
+                  type="checkbox"
+                  class="tps-checkbox"
+                >
+                <span>Use sample data</span>
+              </label>
+              <p class="tps-form-hint">
+                Sample data shows a demo dataset. Connect a data source in the future to use real data.
+              </p>
+            </div>
+
+            <div class="tps-form-group">
+              <label class="tps-label" for="widget-viz-type">Visualization Type</label>
+              <select
+                id="widget-viz-type"
+                v-model="widgetConfigVisualizationType"
+                class="tps-select"
+              >
+                <option value="table">
+                  Table (DataGrid)
+                </option>
+                <option value="pivot">
+                  Pivot Table
+                </option>
+                <option value="chart">
+                  Chart
+                </option>
+              </select>
+              <p v-if="widgetConfigVisualizationType !== 'table'" class="tps-form-hint tps-form-hint-warning">
+                Only Table visualization is currently available. Other types coming soon.
+              </p>
+            </div>
+
+            <div class="tps-form-group">
+              <label class="tps-label" for="widget-height">Height (pixels)</label>
+              <input
+                id="widget-height"
+                v-model.number="widgetConfigHeight"
+                type="number"
+                class="tps-input"
+                min="200"
+                max="1000"
+                step="50"
+              >
+            </div>
+          </div>
+
+          <div class="tps-modal-footer">
+            <button type="button" class="tps-btn tps-btn-secondary" @click="closeWidgetConfigModal">
+              Cancel
+            </button>
+            <button type="submit" class="tps-btn tps-btn-primary">
+              Save Configuration
             </button>
           </div>
         </form>

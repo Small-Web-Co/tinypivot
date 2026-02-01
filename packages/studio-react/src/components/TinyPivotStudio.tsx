@@ -22,6 +22,7 @@ import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
 
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
+import '@smallwebco/tinypivot-react/style.css'
 
 // Widget sample data - used when no data source is configured
 const widgetSampleData = [
@@ -161,6 +162,15 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Widget configuration modal state
+  const [showWidgetConfigModal, setShowWidgetConfigModal] = useState(false)
+  const [widgetConfigBlockId, setWidgetConfigBlockId] = useState<string | null>(null)
+  const [widgetConfigTitle, setWidgetConfigTitle] = useState('')
+  const [widgetConfigHeight, setWidgetConfigHeight] = useState(400)
+  const [widgetConfigUseSampleData, setWidgetConfigUseSampleData] = useState(true)
+  const [widgetConfigVisualizationType, setWidgetConfigVisualizationType] = useState<'table' | 'pivot' | 'chart'>('table')
+  const [widgetConfigShowTitle, setWidgetConfigShowTitle] = useState(true)
+
   // Load pages on mount
   useEffect(() => {
     async function loadPages() {
@@ -288,6 +298,27 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
     // This could emit an event or call a callback
   }, [])
 
+  // Widget configuration modal functions
+  const openWidgetConfigModal = useCallback((block: WidgetBlock) => {
+    setWidgetConfigBlockId(block.id)
+    setWidgetConfigTitle(block.titleOverride || '')
+    setWidgetConfigHeight(typeof block.height === 'number' ? block.height : 400)
+    setWidgetConfigUseSampleData(Boolean(block.widgetId))
+    setWidgetConfigVisualizationType((block.metadata?.visualizationType as 'table' | 'pivot' | 'chart') || 'table')
+    setWidgetConfigShowTitle(block.showTitle !== false)
+    setShowWidgetConfigModal(true)
+  }, [])
+
+  const closeWidgetConfigModal = useCallback(() => {
+    setShowWidgetConfigModal(false)
+    setWidgetConfigBlockId(null)
+    setWidgetConfigTitle('')
+    setWidgetConfigHeight(400)
+    setWidgetConfigUseSampleData(true)
+    setWidgetConfigVisualizationType('table')
+    setWidgetConfigShowTitle(true)
+  }, [])
+
   return (
     <>
       <Sidebar
@@ -309,6 +340,7 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
             page={currentPage}
             theme={theme}
             onUpdatePage={handleUpdatePage}
+            onConfigureWidget={openWidgetConfigModal}
           />
         ) : (
           <EmptyState onCreatePage={() => setShowCreateModal(true)} />
@@ -319,6 +351,42 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
         <CreatePageModal
           onClose={() => setShowCreateModal(false)}
           onCreate={handleCreatePage}
+        />
+      )}
+
+      {showWidgetConfigModal && (
+        <WidgetConfigModal
+          title={widgetConfigTitle}
+          setTitle={setWidgetConfigTitle}
+          height={widgetConfigHeight}
+          setHeight={setWidgetConfigHeight}
+          useSampleData={widgetConfigUseSampleData}
+          setUseSampleData={setWidgetConfigUseSampleData}
+          visualizationType={widgetConfigVisualizationType}
+          setVisualizationType={setWidgetConfigVisualizationType}
+          showTitle={widgetConfigShowTitle}
+          setShowTitle={setWidgetConfigShowTitle}
+          onClose={closeWidgetConfigModal}
+          onSave={() => {
+            if (!widgetConfigBlockId || !currentPage)
+              return
+
+            const updates: Partial<WidgetBlock> = {
+              titleOverride: widgetConfigTitle || undefined,
+              height: widgetConfigHeight,
+              widgetId: widgetConfigUseSampleData ? 'sample' : '',
+              showTitle: widgetConfigShowTitle,
+              metadata: {
+                visualizationType: widgetConfigVisualizationType,
+              },
+            }
+
+            const newBlocks = currentPage.blocks.map((block): Block =>
+              block.id === widgetConfigBlockId ? { ...block, ...updates } as Block : block,
+            )
+            handleUpdatePage({ ...currentPage, blocks: newBlocks })
+            closeWidgetConfigModal()
+          }}
         />
       )}
     </>
@@ -613,9 +681,10 @@ interface PageEditorProps {
   page: Page
   theme: 'light' | 'dark'
   onUpdatePage: (page: Page) => void
+  onConfigureWidget: (block: WidgetBlock) => void
 }
 
-function PageEditor({ page, theme, onUpdatePage }: PageEditorProps) {
+function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
   const [blocks, setBlocks] = useState<Block[]>(page.blocks)
   const [showBlockMenu, setShowBlockMenu] = useState(false)
@@ -682,6 +751,7 @@ function PageEditor({ page, theme, onUpdatePage }: PageEditorProps) {
               theme={theme}
               onUpdate={handleBlockUpdate}
               onDelete={handleBlockDelete}
+              onConfigureWidget={onConfigureWidget}
             />
           ))}
 
@@ -764,9 +834,10 @@ interface BlockRendererProps {
   theme: 'light' | 'dark'
   onUpdate: (blockId: string, updates: Partial<Block>) => void
   onDelete: (blockId: string) => void
+  onConfigureWidget: (block: WidgetBlock) => void
 }
 
-function BlockRenderer({ block, theme, onUpdate, onDelete }: BlockRendererProps) {
+function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget }: BlockRendererProps) {
   if (block.type === 'text') {
     return (
       <TextBlockComponent
@@ -803,6 +874,7 @@ function BlockRenderer({ block, theme, onUpdate, onDelete }: BlockRendererProps)
         theme={theme}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onConfigure={onConfigureWidget}
       />
     )
   }
@@ -933,11 +1005,13 @@ function WidgetBlockComponent({
   theme,
   onUpdate,
   onDelete,
+  onConfigure,
 }: {
   block: WidgetBlock
   theme: 'light' | 'dark'
   onUpdate: (blockId: string, updates: Partial<Block>) => void
   onDelete: (blockId: string) => void
+  onConfigure: (block: WidgetBlock) => void
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -952,9 +1026,9 @@ function WidgetBlockComponent({
   // Check if widget has data configured
   const hasWidgetData = Boolean(block.widgetId)
 
-  // Handle configure button click - toggle sample data
+  // Handle configure button click - open modal
   const handleConfigure = () => {
-    onUpdate(block.id, { widgetId: block.widgetId ? '' : 'sample' })
+    onConfigure(block)
   }
 
   // Handle retry on error
@@ -1066,6 +1140,145 @@ function WidgetBlockComponent({
           />
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Widget configuration modal
+ */
+interface WidgetConfigModalProps {
+  title: string
+  setTitle: (title: string) => void
+  height: number
+  setHeight: (height: number) => void
+  useSampleData: boolean
+  setUseSampleData: (value: boolean) => void
+  visualizationType: 'table' | 'pivot' | 'chart'
+  setVisualizationType: (type: 'table' | 'pivot' | 'chart') => void
+  showTitle: boolean
+  setShowTitle: (value: boolean) => void
+  onClose: () => void
+  onSave: () => void
+}
+
+function WidgetConfigModal({
+  title,
+  setTitle,
+  height,
+  setHeight,
+  useSampleData,
+  setUseSampleData,
+  visualizationType,
+  setVisualizationType,
+  showTitle,
+  setShowTitle,
+  onClose,
+  onSave,
+}: WidgetConfigModalProps) {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave()
+  }
+
+  return (
+    <div className="tps-modal-overlay" onClick={onClose}>
+      <div className="tps-modal" onClick={e => e.stopPropagation()}>
+        <div className="tps-modal-header">
+          <h3 className="tps-modal-title">Configure Widget</h3>
+          <button type="button" className="tps-modal-close" onClick={onClose}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="tps-modal-body">
+            <div className="tps-form-group">
+              <label className="tps-label" htmlFor="widget-title">Widget Title</label>
+              <input
+                id="widget-title"
+                type="text"
+                className="tps-input"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Sales Overview"
+              />
+            </div>
+
+            <div className="tps-form-group">
+              <label className="tps-checkbox-label">
+                <input
+                  type="checkbox"
+                  className="tps-checkbox"
+                  checked={showTitle}
+                  onChange={e => setShowTitle(e.target.checked)}
+                />
+                <span>Show widget title</span>
+              </label>
+            </div>
+
+            <div className="tps-form-group">
+              <label className="tps-label">Data Source</label>
+              <label className="tps-checkbox-label">
+                <input
+                  type="checkbox"
+                  className="tps-checkbox"
+                  checked={useSampleData}
+                  onChange={e => setUseSampleData(e.target.checked)}
+                />
+                <span>Use sample data</span>
+              </label>
+              <p className="tps-form-hint">
+                Sample data shows a demo dataset. Connect a data source in the future to use real data.
+              </p>
+            </div>
+
+            <div className="tps-form-group">
+              <label className="tps-label" htmlFor="widget-viz-type">Visualization Type</label>
+              <select
+                id="widget-viz-type"
+                className="tps-select"
+                value={visualizationType}
+                onChange={e => setVisualizationType(e.target.value as 'table' | 'pivot' | 'chart')}
+              >
+                <option value="table">Table (DataGrid)</option>
+                <option value="pivot">Pivot Table</option>
+                <option value="chart">Chart</option>
+              </select>
+              {visualizationType !== 'table' && (
+                <p className="tps-form-hint tps-form-hint-warning">
+                  Only Table visualization is currently available. Other types coming soon.
+                </p>
+              )}
+            </div>
+
+            <div className="tps-form-group">
+              <label className="tps-label" htmlFor="widget-height">Height (pixels)</label>
+              <input
+                id="widget-height"
+                type="number"
+                className="tps-input"
+                value={height}
+                onChange={e => setHeight(Number(e.target.value))}
+                min={200}
+                max={1000}
+                step={50}
+              />
+            </div>
+          </div>
+
+          <div className="tps-modal-footer">
+            <button type="button" className="tps-btn tps-btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="tps-btn tps-btn-primary">
+              Save Configuration
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

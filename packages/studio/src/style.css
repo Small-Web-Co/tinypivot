@@ -572,6 +572,31 @@
   margin-top: 0.375rem;
 }
 
+.tps-form-hint-warning {
+  color: #d97706;
+}
+
+/* Checkbox styles */
+.tps-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #4f46e5;
+  cursor: pointer;
+}
+
+.tps-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #475569;
+  cursor: pointer;
+}
+
+.tps-checkbox-label span {
+  user-select: none;
+}
+
 /* ==========================================================================
    Page Editor
    ========================================================================== */
@@ -1212,6 +1237,18 @@
 
 .tps-theme-dark .tps-form-hint {
   color: #94a3b8;
+}
+
+.tps-theme-dark .tps-form-hint-warning {
+  color: #fbbf24;
+}
+
+.tps-theme-dark .tps-checkbox {
+  accent-color: #818cf8;
+}
+
+.tps-theme-dark .tps-checkbox-label {
+  color: #cbd5e1;
 }
 
 /* Editor - Dark */
