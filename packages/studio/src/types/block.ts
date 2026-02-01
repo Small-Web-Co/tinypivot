@@ -16,6 +16,25 @@ export type BlockType =
   | 'divider'
   | 'image'
   | 'columns'
+  | 'stat'
+  | 'progress'
+  | 'spacer'
+  | 'quote'
+  | 'grid'
+
+/**
+ * Grid position for blocks in grid layout mode
+ */
+export interface GridPosition {
+  /** Column position (0-based) */
+  x: number
+  /** Row position (0-based) */
+  y: number
+  /** Width in grid units (1-12) */
+  w: number
+  /** Height in grid units */
+  h: number
+}
 
 /**
  * Base properties shared by all blocks
@@ -29,6 +48,8 @@ export interface BaseBlock {
   className?: string
   /** Arbitrary metadata for extensibility */
   metadata?: Record<string, unknown>
+  /** Grid position when in grid layout mode */
+  gridPosition?: GridPosition
 }
 
 /**
@@ -137,11 +158,26 @@ export interface DividerBlock extends BaseBlock {
 }
 
 /**
+ * Image shape options
+ */
+export type ImageShape = 'rectangle' | 'circle' | 'rounded'
+
+/**
+ * Image aspect ratio presets
+ */
+export type ImageAspectRatio = 'free' | '1:1' | '16:9' | '4:3'
+
+/**
+ * Image object fit options
+ */
+export type ImageObjectFit = 'cover' | 'contain' | 'fill'
+
+/**
  * Image block for static images
  */
 export interface ImageBlock extends BaseBlock {
   type: 'image'
-  /** Image source URL */
+  /** Image source URL (can be URL or base64 data URL) */
   src: string
   /** Alt text for accessibility */
   alt?: string
@@ -149,8 +185,16 @@ export interface ImageBlock extends BaseBlock {
   caption?: string
   /** Image width (pixels, percent, or 'full') */
   width?: string | number
+  /** Image height in pixels */
+  height?: number
   /** Image alignment */
   align?: 'left' | 'center' | 'right'
+  /** Image shape (rectangle, circle, or rounded corners) */
+  shape?: ImageShape
+  /** Aspect ratio constraint */
+  aspectRatio?: ImageAspectRatio
+  /** How the image should fit within its container */
+  objectFit?: ImageObjectFit
 }
 
 /**
@@ -179,6 +223,120 @@ export interface ColumnsBlock extends BaseBlock {
 }
 
 /**
+ * Stat block for displaying big numbers with labels
+ * Ideal for KPI displays in infographics
+ */
+export interface StatBlock extends BaseBlock {
+  type: 'stat'
+  /** The main value to display (e.g., "1.2M", "42%", "500") */
+  value: string | number
+  /** Label describing the stat (e.g., "Total Revenue") */
+  label: string
+  /** Prefix displayed before the value (e.g., "$") */
+  prefix?: string
+  /** Suffix displayed after the value (e.g., "%", "K", "M") */
+  suffix?: string
+  /** Size of the stat display */
+  size?: 'small' | 'medium' | 'large' | 'xlarge'
+  /** Custom color for the value text */
+  color?: string
+  /** Optional trend indicator */
+  trend?: {
+    /** Direction of the trend */
+    direction: 'up' | 'down' | 'flat'
+    /** Trend value to display (e.g., "12%") */
+    value?: string
+    /** Whether the direction is positive (green for up, red for down when true) */
+    positive?: boolean
+  }
+}
+
+/**
+ * Progress block for showing completion or percentage
+ * Supports bar, circle, and semicircle variants
+ */
+export interface ProgressBlock extends BaseBlock {
+  type: 'progress'
+  /** Current value (0-100 by default) */
+  value: number
+  /** Maximum value (defaults to 100) */
+  max?: number
+  /** Optional label above the progress indicator */
+  label?: string
+  /** Whether to show the percentage value */
+  showValue?: boolean
+  /** Custom color for the progress fill */
+  color?: string
+  /** Visual variant of the progress indicator */
+  variant?: 'bar' | 'circle' | 'semicircle'
+  /** Size of the progress indicator */
+  size?: 'small' | 'medium' | 'large'
+}
+
+/**
+ * Spacer block for adding vertical space
+ */
+export interface SpacerBlock extends BaseBlock {
+  type: 'spacer'
+  /** Height in pixels */
+  height: number
+}
+
+/**
+ * Quote block style options
+ */
+export type QuoteStyle = 'simple' | 'bordered' | 'highlighted'
+
+/**
+ * Quote block for testimonials and pull quotes
+ */
+export interface QuoteBlock extends BaseBlock {
+  type: 'quote'
+  /** The quote content */
+  content: string
+  /** Author of the quote */
+  author?: string
+  /** Source or attribution (e.g., "CEO, Acme Corp") */
+  source?: string
+  /** Visual style of the quote */
+  style?: QuoteStyle
+}
+
+/**
+ * Grid item definition - a block with positioning
+ */
+export interface GridItem {
+  /** The block to display */
+  block: Block
+  /** Column span (defaults to 1) */
+  colSpan?: number
+  /** Row span (defaults to 1) */
+  rowSpan?: number
+  /** Explicit column start position (1-based, for manual placement) */
+  colStart?: number
+  /** Explicit row start position (1-based, for manual placement) */
+  rowStart?: number
+}
+
+/**
+ * Grid block for masonry-style layouts
+ * Supports auto-flow and manual placement of items
+ */
+export interface GridBlock extends BaseBlock {
+  type: 'grid'
+  /** Number of columns in the grid */
+  columns: number
+  /** Gap between grid items in pixels */
+  gap?: number
+  /** Row height ('auto' for content-based, or fixed pixel value) */
+  rowHeight?: 'auto' | number
+  /** Items in the grid with their span configurations */
+  items: GridItem[]
+  /** Whether to use dense packing (fills holes in the grid) */
+  dense?: boolean
+}
+
+/**
  * Union type of all block types
  */
 export type Block =
@@ -190,6 +348,11 @@ export type Block =
   | DividerBlock
   | ImageBlock
   | ColumnsBlock
+  | StatBlock
+  | ProgressBlock
+  | SpacerBlock
+  | QuoteBlock
+  | GridBlock
 
 /**
  * Type guard to check if a block is a TextBlock
@@ -245,4 +408,39 @@ export function isImageBlock(block: Block): block is ImageBlock {
  */
 export function isColumnsBlock(block: Block): block is ColumnsBlock {
   return block.type === 'columns'
+}
+
+/**
+ * Type guard to check if a block is a StatBlock
+ */
+export function isStatBlock(block: Block): block is StatBlock {
+  return block.type === 'stat'
+}
+
+/**
+ * Type guard to check if a block is a ProgressBlock
+ */
+export function isProgressBlock(block: Block): block is ProgressBlock {
+  return block.type === 'progress'
+}
+
+/**
+ * Type guard to check if a block is a SpacerBlock
+ */
+export function isSpacerBlock(block: Block): block is SpacerBlock {
+  return block.type === 'spacer'
+}
+
+/**
+ * Type guard to check if a block is a QuoteBlock
+ */
+export function isQuoteBlock(block: Block): block is QuoteBlock {
+  return block.type === 'quote'
+}
+
+/**
+ * Type guard to check if a block is a GridBlock
+ */
+export function isGridBlock(block: Block): block is GridBlock {
+  return block.type === 'grid'
 }

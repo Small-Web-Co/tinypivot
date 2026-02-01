@@ -1,6 +1,5 @@
 // eslint-disable-next-line ts/consistent-type-imports
 import {
-  bubbleMenuButtons,
   filterSlashCommands,
   type MenuButton,
   menuIcons,
@@ -17,7 +16,7 @@ import TableHeader from '@tiptap/extension-table-header'
 import TableRow from '@tiptap/extension-table-row'
 import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
-import { BubbleMenu, EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 /**
  * RichTextEditor - Tiptap-based rich text editor for React
@@ -322,25 +321,6 @@ export function RichTextEditor({
 
       {/* Editor Content */}
       <EditorContent editor={editor} className="tps-editor-content" />
-
-      {/* Bubble Menu */}
-      {!readOnly && (
-        <BubbleMenu editor={editor} className="tps-bubble-menu">
-          {bubbleMenuButtons.map(btn => (
-            <button
-              key={btn.id}
-              type="button"
-              className={`tps-toolbar-btn ${isActive(btn) ? 'active' : ''}`}
-              onClick={() => executeCommand(btn)}
-              title={btn.label}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d={allIcons[btn.icon]} />
-              </svg>
-            </button>
-          ))}
-        </BubbleMenu>
-      )}
 
       {/* Slash Command Menu */}
       {showSlashMenu && filteredCommands.length > 0 && (

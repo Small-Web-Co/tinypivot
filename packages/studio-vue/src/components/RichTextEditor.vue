@@ -2,7 +2,6 @@
 <script setup lang="ts">
 // eslint-disable-next-line ts/consistent-type-imports
 import {
-  bubbleMenuButtons,
   filterSlashCommands,
   type MenuButton,
   menuIcons,
@@ -20,7 +19,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
-import { BubbleMenu, EditorContent, useEditor } from '@tiptap/vue-3'
+import { EditorContent, useEditor } from '@tiptap/vue-3'
 /**
  * RichTextEditor - Tiptap-based rich text editor for Vue
  */
@@ -319,23 +318,6 @@ function isActive(btn: MenuButton): boolean {
 
     <!-- Editor Content -->
     <EditorContent v-if="editor" :editor="editor" class="tps-editor-content" />
-
-    <!-- Bubble Menu -->
-    <BubbleMenu v-if="editor && !readOnly" :editor="editor" class="tps-bubble-menu">
-      <button
-        v-for="btn in bubbleMenuButtons"
-        :key="btn.id"
-        type="button"
-        class="tps-toolbar-btn"
-        :class="{ active: isActive(btn) }"
-        :title="btn.label"
-        @click="executeCommand(btn)"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path :d="allIcons[btn.icon]" />
-        </svg>
-      </button>
-    </BubbleMenu>
 
     <!-- Slash Command Menu -->
     <div

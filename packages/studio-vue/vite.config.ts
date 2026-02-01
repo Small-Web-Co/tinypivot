@@ -19,10 +19,11 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['vue', '@smallwebco/tinypivot-studio', '@smallwebco/tinypivot-vue'],
+      external: ['vue', 'vuedraggable', '@smallwebco/tinypivot-studio', '@smallwebco/tinypivot-vue'],
       output: {
         globals: {
           'vue': 'Vue',
+          'vuedraggable': 'vuedraggable',
           '@smallwebco/tinypivot-studio': 'TinyPivotStudio',
           '@smallwebco/tinypivot-vue': 'TinyPivotVue',
         },

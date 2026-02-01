@@ -9,7 +9,9 @@
   "dependencies": {
     "@smallwebco/tinypivot-storage-indexeddb": "workspace:*",
     "@smallwebco/tinypivot-studio-vue": "workspace:*",
-    "vue": "^3.4.0"
+    "@smallwebco/tinypivot-vue": "workspace:*",
+    "vue": "^3.4.0",
+    "vuedraggable": "^4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

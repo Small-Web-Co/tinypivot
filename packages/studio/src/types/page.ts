@@ -13,6 +13,11 @@ import type { WidgetConfig } from './widget'
 export type PageTemplate = 'blank' | 'article' | 'dashboard' | 'report' | 'infographic'
 
 /**
+ * Layout mode for page editing
+ */
+export type LayoutMode = 'linear' | 'grid'
+
+/**
  * A field link allows widgets on a page to be connected
  * When a filter is applied to the source widget, it propagates to linked widgets
  */
@@ -63,6 +68,8 @@ export interface Page {
   slug: string
   /** Template this page was created from */
   template?: PageTemplate
+  /** Layout mode: linear (stacked blocks) or grid (masonry layout) */
+  layoutMode?: LayoutMode
   /** Theme configuration for this page */
   theme?: ThemeConfig
   /** Ordered list of content blocks */
@@ -125,6 +132,8 @@ export interface PageUpdateInput {
   description?: string
   /** URL-friendly slug */
   slug?: string
+  /** Layout mode: linear (stacked blocks) or grid (masonry layout) */
+  layoutMode?: LayoutMode
   /** Theme configuration */
   theme?: ThemeConfig
   /** Ordered list of content blocks */

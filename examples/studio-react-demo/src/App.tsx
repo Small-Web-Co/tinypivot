@@ -4,6 +4,11 @@ import { useState } from 'react'
 
 const storage = createIndexedDBStorage()
 
+// AI Analyst configuration with demo bypass
+const aiAnalystConfig = {
+  endpoint: '/api/tinypivot',
+}
+
 function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
@@ -13,6 +18,7 @@ function App() {
         userId="demo-user"
         storage={storage}
         theme={theme}
+        aiAnalyst={aiAnalystConfig}
         onPageSave={page => console.log('Page saved:', page)}
         onWidgetSave={widget => console.log('Widget saved:', widget)}
       />

@@ -6288,27 +6288,33 @@ body.tps-resizing {
 }
 
 /* Tables */
-.tps-editor-table {
+.tps-editor-table,
+.tps-editor-content .ProseMirror table {
   border-collapse: collapse;
   width: 100%;
   margin: 1em 0;
+  border: 1px solid #cbd5e1;
 }
 
 .tps-editor-table td,
-.tps-editor-table th {
-  border: 1px solid #e2e8f0;
+.tps-editor-table th,
+.tps-editor-content .ProseMirror td,
+.tps-editor-content .ProseMirror th {
+  border: 1px solid #cbd5e1;
   padding: 8px 12px;
   text-align: left;
   vertical-align: top;
   min-width: 80px;
 }
 
-.tps-editor-table th {
-  background: #f8fafc;
+.tps-editor-table th,
+.tps-editor-content .ProseMirror th {
+  background: #f1f5f9;
   font-weight: 600;
 }
 
-.tps-editor-table .selectedCell {
+.tps-editor-table .selectedCell,
+.tps-editor-content .ProseMirror .selectedCell {
   background: #e0e7ff;
 }
 

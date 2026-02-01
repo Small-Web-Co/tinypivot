@@ -8,6 +8,11 @@ import '@smallwebco/tinypivot-studio-vue/style.css'
 const storage = createIndexedDBStorage()
 const theme = ref<'light' | 'dark'>('light')
 
+// AI Analyst configuration with demo bypass
+const aiAnalystConfig = {
+  endpoint: '/api/tinypivot',
+}
+
 function handlePageSave(page: Page) {
   console.log('Page saved:', page)
 }
@@ -27,6 +32,7 @@ function toggleTheme() {
       user-id="demo-user"
       :storage="storage"
       :theme="theme"
+      :ai-analyst="aiAnalystConfig"
       @page-save="handlePageSave"
       @widget-save="handleWidgetSave"
     />
