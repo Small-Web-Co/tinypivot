@@ -14,6 +14,23 @@ import type {
   WidgetBlock,
   WidgetConfig,
 } from '@smallwebco/tinypivot-studio'
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { DataGrid } from '@smallwebco/tinypivot-react'
 import { generateId, isWidgetBlock } from '@smallwebco/tinypivot-studio'
 
@@ -840,6 +857,18 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
   const [blocks, setBlocks] = useState<Block[]>(page.blocks)
   const [showBlockMenu, setShowBlockMenu] = useState(false)
 
+  // dnd-kit sensors for pointer and keyboard
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  )
+
   // Update local state when page changes
   useEffect(() => {
     setTitle(page.title)
@@ -878,6 +907,20 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
     onUpdatePage({ ...page, title, blocks: newBlocks })
   }
 
+  // Handle drag end for reordering blocks
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const oldIndex = blocks.findIndex(b => b.id === active.id)
+      const newIndex = blocks.findIndex(b => b.id === over.id)
+
+      const newBlocks = arrayMove(blocks, oldIndex, newIndex)
+      setBlocks(newBlocks)
+      onUpdatePage({ ...page, title, blocks: newBlocks })
+    }
+  }
+
   return (
     <div className="tps-editor">
       <div className="tps-editor-header">
@@ -894,119 +937,173 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
       </div>
 
       <div className="tps-editor-content">
-        <div className="tps-blocks">
-          {blocks.map(block => (
-            <BlockRenderer
-              key={block.id}
-              block={block}
-              theme={theme}
-              onUpdate={handleBlockUpdate}
-              onDelete={handleBlockDelete}
-              onConfigureWidget={onConfigureWidget}
-            />
-          ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={blocks.map(b => b.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="tps-blocks">
+              {blocks.map(block => (
+                <SortableBlockWrapper key={block.id} id={block.id}>
+                  <BlockRenderer
+                    block={block}
+                    theme={theme}
+                    onUpdate={handleBlockUpdate}
+                    onDelete={handleBlockDelete}
+                    onConfigureWidget={onConfigureWidget}
+                  />
+                </SortableBlockWrapper>
+              ))}
 
-          {showBlockMenu ? (
-            <div className="tps-add-block-menu">
-              <button
-                type="button"
-                className="tps-add-block-option"
-                onClick={() => handleAddBlock('text')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 7V4h16v3M9 20h6M12 4v16" />
-                </svg>
-                Text
-              </button>
-              <button
-                type="button"
-                className="tps-add-block-option"
-                onClick={() => handleAddBlock('heading')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M6 4v16M18 4v16M6 12h12" />
-                </svg>
-                Heading
-              </button>
-              <button
-                type="button"
-                className="tps-add-block-option"
-                onClick={() => handleAddBlock('divider')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M3 12h18" />
-                </svg>
-                Divider
-              </button>
-              <button
-                type="button"
-                className="tps-add-block-option"
-                onClick={() => handleAddBlock('widget')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M3 9h18" />
-                  <path d="M9 21V9" />
-                </svg>
-                Widget
-              </button>
-              <button
-                type="button"
-                className="tps-add-block-option"
-                onClick={() => handleAddBlock('image')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <path d="M21 15l-5-5L5 21" />
-                </svg>
-                Image
-              </button>
-              <button
-                type="button"
-                className="tps-add-block-option"
-                onClick={() => handleAddBlock('callout')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-                  <path d="M12 16v-4M12 8h.01" />
-                </svg>
-                Callout
-              </button>
-              <button
-                type="button"
-                className="tps-add-block-option"
-                onClick={() => handleAddBlock('columns')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M9 3v18M15 3v18" />
-                </svg>
-                Columns
-              </button>
-              <button
-                type="button"
-                className="tps-btn tps-btn-ghost tps-btn-sm"
-                onClick={() => setShowBlockMenu(false)}
-                style={{ marginLeft: 'auto' }}
-              >
-                Cancel
-              </button>
+              {showBlockMenu ? (
+                <div className="tps-add-block-menu">
+                  <button
+                    type="button"
+                    className="tps-add-block-option"
+                    onClick={() => handleAddBlock('text')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M4 7V4h16v3M9 20h6M12 4v16" />
+                    </svg>
+                    Text
+                  </button>
+                  <button
+                    type="button"
+                    className="tps-add-block-option"
+                    onClick={() => handleAddBlock('heading')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M6 4v16M18 4v16M6 12h12" />
+                    </svg>
+                    Heading
+                  </button>
+                  <button
+                    type="button"
+                    className="tps-add-block-option"
+                    onClick={() => handleAddBlock('divider')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M3 12h18" />
+                    </svg>
+                    Divider
+                  </button>
+                  <button
+                    type="button"
+                    className="tps-add-block-option"
+                    onClick={() => handleAddBlock('widget')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M3 9h18" />
+                      <path d="M9 21V9" />
+                    </svg>
+                    Widget
+                  </button>
+                  <button
+                    type="button"
+                    className="tps-add-block-option"
+                    onClick={() => handleAddBlock('image')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="M21 15l-5-5L5 21" />
+                    </svg>
+                    Image
+                  </button>
+                  <button
+                    type="button"
+                    className="tps-add-block-option"
+                    onClick={() => handleAddBlock('callout')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                      <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                    Callout
+                  </button>
+                  <button
+                    type="button"
+                    className="tps-add-block-option"
+                    onClick={() => handleAddBlock('columns')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 3v18M15 3v18" />
+                    </svg>
+                    Columns
+                  </button>
+                  <button
+                    type="button"
+                    className="tps-btn tps-btn-ghost tps-btn-sm"
+                    onClick={() => setShowBlockMenu(false)}
+                    style={{ marginLeft: 'auto' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="tps-add-block"
+                  onClick={() => setShowBlockMenu(true)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Add block
+                </button>
+              )}
             </div>
-          ) : (
-            <button
-              type="button"
-              className="tps-add-block"
-              onClick={() => setShowBlockMenu(true)}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Add block
-            </button>
-          )}
-        </div>
+          </SortableContext>
+        </DndContext>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Sortable block wrapper component
+ * Provides drag handle and sortable functionality for blocks
+ */
+interface SortableBlockWrapperProps {
+  id: string
+  children: React.ReactNode
+}
+
+function SortableBlockWrapper({ id, children }: SortableBlockWrapperProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'tps-block-dragging' : ''}>
+      <div className="tps-block-drag-handle" title="Drag to reorder" {...attributes} {...listeners}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="9" cy="6" r="1" />
+          <circle cx="15" cy="6" r="1" />
+          <circle cx="9" cy="12" r="1" />
+          <circle cx="15" cy="12" r="1" />
+          <circle cx="9" cy="18" r="1" />
+          <circle cx="15" cy="18" r="1" />
+        </svg>
+      </div>
+      {children}
     </div>
   )
 }

@@ -2198,3 +2198,131 @@
   border-color: #818cf8;
   color: #818cf8;
 }
+
+/* ==========================================================================
+   Drag and Drop Block Reordering
+   ========================================================================== */
+
+/* Drag Handle */
+.tps-block-drag-handle {
+  position: absolute;
+  left: -2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  color: #94a3b8;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+  touch-action: none;
+}
+
+.tps-block-drag-handle:active {
+  cursor: grabbing;
+}
+
+.tps-block-drag-handle svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Show drag handle on block hover */
+.tps-block:hover .tps-block-drag-handle,
+.tps-block:focus-within .tps-block-drag-handle {
+  opacity: 1;
+}
+
+.tps-block-drag-handle:hover {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+/* Ensure blocks have relative positioning for drag handle */
+.tps-block {
+  position: relative;
+}
+
+/* Ghost state (placeholder while dragging) - Vue/SortableJS */
+.tps-block-ghost {
+  opacity: 0.4;
+  background: #e0e7ff;
+  border-color: #6366f1;
+}
+
+/* Dragging state */
+.tps-block-dragging {
+  box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.1), 0 4px 10px -6px rgb(0 0 0 / 0.1);
+  z-index: 100;
+}
+
+/* Sortable chosen (being dragged) */
+.sortable-chosen.tps-block {
+  box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.1), 0 4px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Sortable drag (the moving element) */
+.sortable-drag.tps-block {
+  opacity: 1 !important;
+}
+
+/* React dnd-kit: wrapper positioning */
+.tps-blocks > div {
+  position: relative;
+}
+
+/* React dnd-kit: drag handle positioning */
+.tps-blocks > div > .tps-block-drag-handle {
+  position: absolute;
+  left: -2rem;
+  top: 1rem;
+  transform: none;
+}
+
+/* Ensure blocks container allows for drag handles */
+.tps-blocks {
+  padding-left: 2.5rem;
+  margin-left: -2.5rem;
+}
+
+/* Drag Handle - Dark Mode */
+.tps-theme-dark .tps-block-drag-handle {
+  color: #64748b;
+}
+
+.tps-theme-dark .tps-block-drag-handle:hover {
+  background: #334155;
+  color: #94a3b8;
+}
+
+.tps-theme-dark .tps-block-ghost {
+  background: #312e81;
+  border-color: #818cf8;
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .tps-block-drag-handle {
+    opacity: 1;
+    width: 2rem;
+    height: 2rem;
+    left: -2.5rem;
+  }
+
+  .tps-block-drag-handle svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .tps-blocks {
+    padding-left: 3rem;
+    margin-left: -3rem;
+  }
+}

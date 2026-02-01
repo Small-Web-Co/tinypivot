@@ -21,6 +21,7 @@ import {
 } from '@smallwebco/tinypivot-studio'
 import { DataGrid } from '@smallwebco/tinypivot-vue'
 import { computed, onMounted, ref, watch } from 'vue'
+import draggable from 'vuedraggable'
 import { provideStudio, type StudioConfig } from '../composables'
 
 // Import styles
@@ -290,6 +291,13 @@ function handleAddBlock(type: Block['type']) {
   const newBlock = createBlock(type)
   editorBlocks.value = [...editorBlocks.value, newBlock]
   showBlockMenu.value = false
+  handleUpdatePage()
+}
+
+// Handle block reorder (called after drag-and-drop)
+function handleBlockReorder() {
+  // vuedraggable already updates editorBlocks via v-model
+  // We just need to persist the new order
   handleUpdatePage()
 }
 
@@ -785,10 +793,26 @@ defineExpose({
         </div>
 
         <div class="tps-editor-content">
-          <div class="tps-blocks">
-            <!-- Text Block -->
-            <template v-for="block in editorBlocks" :key="block.id">
+          <draggable
+            v-model="editorBlocks"
+            item-key="id"
+            handle=".tps-block-drag-handle"
+            ghost-class="tps-block-ghost"
+            drag-class="tps-block-dragging"
+            animation="200"
+            class="tps-blocks"
+            @end="handleBlockReorder"
+          >
+            <template #item="{ element: block }">
+              <!-- Text Block -->
               <div v-if="isTextBlock(block)" class="tps-block tps-block-text">
+                <div class="tps-block-drag-handle" title="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
+                    <circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" />
+                  </svg>
+                </div>
                 <div class="tps-block-actions">
                   <button
                     type="button"
@@ -812,6 +836,13 @@ defineExpose({
 
               <!-- Heading Block -->
               <div v-else-if="isHeadingBlock(block)" class="tps-block tps-block-heading" :data-level="block.level">
+                <div class="tps-block-drag-handle" title="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
+                    <circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" />
+                  </svg>
+                </div>
                 <div class="tps-block-actions">
                   <button
                     type="button"
@@ -835,6 +866,13 @@ defineExpose({
 
               <!-- Divider Block -->
               <div v-else-if="block.type === 'divider'" class="tps-block tps-block-divider">
+                <div class="tps-block-drag-handle" title="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
+                    <circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" />
+                  </svg>
+                </div>
                 <div class="tps-block-actions">
                   <button
                     type="button"
@@ -852,6 +890,13 @@ defineExpose({
 
               <!-- Widget Block -->
               <div v-else-if="isWidgetBlock(block)" class="tps-block tps-block-widget" :style="{ minHeight: getWidgetHeightStyle(block) }">
+                <div class="tps-block-drag-handle" title="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
+                    <circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" />
+                  </svg>
+                </div>
                 <div class="tps-block-actions">
                   <button
                     type="button"
@@ -945,6 +990,13 @@ defineExpose({
 
               <!-- Image Block -->
               <div v-else-if="block.type === 'image'" class="tps-block tps-block-image">
+                <div class="tps-block-drag-handle" title="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
+                    <circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" />
+                  </svg>
+                </div>
                 <div class="tps-block-actions">
                   <button
                     type="button"
@@ -1039,6 +1091,13 @@ defineExpose({
                 class="tps-block tps-block-callout"
                 :data-style="block.style || 'info'"
               >
+                <div class="tps-block-drag-handle" title="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
+                    <circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" />
+                  </svg>
+                </div>
                 <div class="tps-block-actions">
                   <button
                     type="button"
@@ -1110,6 +1169,13 @@ defineExpose({
 
               <!-- Columns Block -->
               <div v-else-if="block.type === 'columns'" class="tps-block tps-block-columns">
+                <div class="tps-block-drag-handle" title="Drag to reorder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
+                    <circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" />
+                  </svg>
+                </div>
                 <div class="tps-block-actions">
                   <button
                     type="button"
@@ -1264,7 +1330,7 @@ defineExpose({
               </svg>
               Add block
             </button>
-          </div>
+          </draggable>
         </div>
       </div>
 

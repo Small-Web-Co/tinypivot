@@ -50,7 +50,8 @@
   },
   "dependencies": {
     "@smallwebco/tinypivot-studio": "workspace:*",
-    "@smallwebco/tinypivot-vue": "workspace:*"
+    "@smallwebco/tinypivot-vue": "workspace:*",
+    "vuedraggable": "^4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",
