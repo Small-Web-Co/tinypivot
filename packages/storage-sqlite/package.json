@@ -1,0 +1,59 @@
+{
+  "name": "@smallwebco/tinypivot-storage-sqlite",
+  "type": "module",
+  "version": "1.0.64",
+  "description": "TinyPivot SQLite Storage - SQLite storage adapter for TinyPivot Studio with Drizzle ORM support",
+  "author": "Small Web, LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git",
+    "directory": "packages/storage-sqlite"
+  },
+  "bugs": {
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
+  },
+  "keywords": [
+    "tinypivot",
+    "storage",
+    "sqlite",
+    "drizzle",
+    "database"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "drizzle-orm": ">=0.29.0"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-studio": "workspace:*"
+  },
+  "devDependencies": {
+    "drizzle-orm": "^0.29.0",
+    "tsup": "^8.0.0",
+    "typescript": "~5.3.3"
+  }
+}

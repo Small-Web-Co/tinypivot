@@ -1,0 +1,61 @@
+{
+  "name": "@smallwebco/tinypivot-studio-react",
+  "type": "module",
+  "version": "1.0.64",
+  "description": "TinyPivot Studio React - React components for building data studio applications with saved views and dashboards",
+  "author": "Small Web, LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git",
+    "directory": "packages/studio-react"
+  },
+  "bugs": {
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
+  },
+  "keywords": [
+    "tinypivot",
+    "studio",
+    "react",
+    "data-studio",
+    "dashboard",
+    "saved-views",
+    "analytics"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-studio": "workspace:*",
+    "@smallwebco/tinypivot-react": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "~5.3.3"
+  }
+}

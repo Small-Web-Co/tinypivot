@@ -1,0 +1,61 @@
+{
+  "name": "@smallwebco/tinypivot-datasource-snowflake",
+  "type": "module",
+  "version": "1.0.64",
+  "description": "TinyPivot Snowflake Datasource - Snowflake data warehouse connector for TinyPivot Studio",
+  "author": "Small Web, LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Small-Web-Co/tinypivot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git",
+    "directory": "packages/datasource-snowflake"
+  },
+  "bugs": {
+    "url": "https://github.com/Small-Web-Co/tinypivot/issues"
+  },
+  "keywords": [
+    "tinypivot",
+    "datasource",
+    "snowflake",
+    "data-warehouse",
+    "analytics",
+    "cloud-data"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "snowflake-sdk": ">=1.6.0"
+  },
+  "peerDependenciesMeta": {
+    "snowflake-sdk": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-studio": "workspace:*"
+  },
+  "devDependencies": {
+    "snowflake-sdk": "^1.6.0",
+    "@types/snowflake-sdk": "^1.6.0",
+    "tsup": "^8.0.0",
+    "typescript": "~5.3.3"
+  }
+}
