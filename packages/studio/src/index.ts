@@ -5,6 +5,9 @@
  * @packageDocumentation
  */
 
+// Export editor configuration
+export * from './editor'
+
 // Export all types from the types directory
 export * from './types'
 
