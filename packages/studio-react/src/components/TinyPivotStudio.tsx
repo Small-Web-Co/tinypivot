@@ -103,6 +103,15 @@ function getDatasourceTypeLabel(type: string): string {
   }
 }
 
+// Check if widget should auto-show AI tab (has datasource but no table selected)
+function shouldAutoShowAI(block: WidgetBlock): boolean {
+  return Boolean(
+    block.metadata?.datasourceId
+    && block.metadata.datasourceId !== 'sample'
+    && !block.metadata?.tableId,
+  )
+}
+
 // ============================================================================
 // Version History Helpers
 // ============================================================================
@@ -178,6 +187,10 @@ export interface TinyPivotStudioProps {
   storage?: StorageAdapter
   /** Data source configuration (e.g., Snowflake endpoint) */
   datasource?: DatasourceConfig
+  /** API endpoint for server-side operations (datasources, queries) */
+  apiEndpoint?: string
+  /** User key for credential encryption (required for server-side datasources) */
+  userKey?: string
   /** AI Analyst configuration */
   aiAnalyst?: {
     endpoint: string
@@ -235,6 +248,8 @@ export function TinyPivotStudio({
   userId,
   storage,
   datasource,
+  apiEndpoint,
+  userKey,
   aiAnalyst,
   cache,
   sampleData,
@@ -247,6 +262,8 @@ export function TinyPivotStudio({
     userId,
     storage,
     datasource,
+    apiEndpoint,
+    userKey,
     aiAnalyst,
     cache,
     sampleData,
@@ -289,7 +306,7 @@ interface StudioLayoutProps {
  * Provides the sidebar and main content area structure
  */
 function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
-  const { storage } = useStudioContext()
+  const { storage, apiEndpoint, userKey, userId, selectedDatasourceId, setSelectedDatasourceId } = useStudioContext()
 
   // State
   const [pages, setPages] = useState<PageListItem[]>([])
@@ -302,9 +319,10 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
   const [widgetConfigBlockId, setWidgetConfigBlockId] = useState<string | null>(null)
   const [widgetConfigTitle, setWidgetConfigTitle] = useState('')
   const [widgetConfigHeight, setWidgetConfigHeight] = useState(400)
-  const [widgetConfigUseSampleData, setWidgetConfigUseSampleData] = useState(true)
   const [widgetConfigVisualizationType, setWidgetConfigVisualizationType] = useState<'table' | 'pivot' | 'chart'>('table')
   const [widgetConfigShowTitle, setWidgetConfigShowTitle] = useState(true)
+  // Datasource selection for widget
+  const [widgetConfigDatasourceId, setWidgetConfigDatasourceId] = useState<string>('sample')
 
   // Data source state
   const [datasources, setDatasources] = useState<DatasourceConfig[]>([])
@@ -480,9 +498,11 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
     setWidgetConfigBlockId(block.id)
     setWidgetConfigTitle(block.titleOverride || '')
     setWidgetConfigHeight(typeof block.height === 'number' ? block.height : 400)
-    setWidgetConfigUseSampleData(Boolean(block.widgetId))
     setWidgetConfigVisualizationType((block.metadata?.visualizationType as 'table' | 'pivot' | 'chart') || 'table')
     setWidgetConfigShowTitle(block.showTitle !== false)
+    // Load datasource from block metadata
+    const dsId = (block.metadata?.datasourceId as string) || 'sample'
+    setWidgetConfigDatasourceId(dsId)
     setShowWidgetConfigModal(true)
   }, [])
 
@@ -491,9 +511,14 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
     setWidgetConfigBlockId(null)
     setWidgetConfigTitle('')
     setWidgetConfigHeight(400)
-    setWidgetConfigUseSampleData(true)
     setWidgetConfigVisualizationType('table')
     setWidgetConfigShowTitle(true)
+    setWidgetConfigDatasourceId('sample')
+  }, [])
+
+  // Handle datasource selection change in widget config
+  const handleWidgetDatasourceChange = useCallback((datasourceId: string) => {
+    setWidgetConfigDatasourceId(datasourceId)
   }, [])
 
   return (
@@ -508,6 +533,8 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
         theme={theme}
         onToggleTheme={handleToggleTheme}
         datasources={datasources}
+        selectedDatasourceId={selectedDatasourceId}
+        onSelectDatasource={ds => setSelectedDatasourceId(ds.id)}
         onCreateDatasource={() => { setEditingDatasource(null); setShowDatasourceModal(true) }}
         onEditDatasource={openEditDatasource}
         onDeleteDatasource={handleDeleteDatasource}
@@ -541,24 +568,27 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
           setTitle={setWidgetConfigTitle}
           height={widgetConfigHeight}
           setHeight={setWidgetConfigHeight}
-          useSampleData={widgetConfigUseSampleData}
-          setUseSampleData={setWidgetConfigUseSampleData}
           visualizationType={widgetConfigVisualizationType}
           setVisualizationType={setWidgetConfigVisualizationType}
           showTitle={widgetConfigShowTitle}
           setShowTitle={setWidgetConfigShowTitle}
+          datasourceId={widgetConfigDatasourceId}
+          onDatasourceChange={handleWidgetDatasourceChange}
+          datasources={datasources}
           onClose={closeWidgetConfigModal}
           onSave={() => {
             if (!widgetConfigBlockId || !currentPage)
               return
 
+            const isSampleData = widgetConfigDatasourceId === 'sample'
             const updates: Partial<WidgetBlock> = {
               titleOverride: widgetConfigTitle || undefined,
               height: widgetConfigHeight,
-              widgetId: widgetConfigUseSampleData ? 'sample' : '',
+              widgetId: isSampleData ? 'sample' : widgetConfigDatasourceId,
               showTitle: widgetConfigShowTitle,
               metadata: {
                 visualizationType: widgetConfigVisualizationType,
+                datasourceId: isSampleData ? undefined : widgetConfigDatasourceId,
               },
             }
 
@@ -576,6 +606,9 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
           datasource={editingDatasource}
           onClose={() => { setShowDatasourceModal(false); setEditingDatasource(null) }}
           onSave={handleSaveDatasource}
+          apiEndpoint={apiEndpoint}
+          userKey={userKey}
+          userId={userId}
         />
       )}
     </>
@@ -595,6 +628,8 @@ interface SidebarProps {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   datasources: DatasourceConfig[]
+  selectedDatasourceId: string | null
+  onSelectDatasource: (ds: DatasourceConfig) => void
   onCreateDatasource: () => void
   onEditDatasource: (ds: DatasourceConfig) => void
   onDeleteDatasource: (dsId: string, e: React.MouseEvent) => void
@@ -608,6 +643,8 @@ function Sidebar({
   onDeletePage,
   onCreatePage,
   datasources,
+  selectedDatasourceId,
+  onSelectDatasource,
   onCreateDatasource,
   onEditDatasource,
   onDeleteDatasource,
@@ -698,8 +735,8 @@ function Sidebar({
             <button
               key={ds.id}
               type="button"
-              className="tps-page-item"
-              onClick={() => onEditDatasource(ds)}
+              className={`tps-page-item ${ds.id === selectedDatasourceId ? 'tps-active' : ''}`}
+              onClick={() => onSelectDatasource(ds)}
             >
               <svg className="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <ellipse cx="12" cy="5" rx="9" ry="3" />
@@ -711,6 +748,17 @@ function Sidebar({
                 <span className="tps-datasource-item-type">{getDatasourceTypeLabel(ds.type)}</span>
               </div>
               <div className="tps-page-item-actions">
+                <button
+                  type="button"
+                  className="tps-page-item-edit"
+                  onClick={(e) => { e.stopPropagation(); onEditDatasource(ds) }}
+                  title="Edit data source"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
                 <button
                   type="button"
                   className="tps-page-item-delete"
@@ -2360,6 +2408,7 @@ function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget
               enablePagination={false}
               enableSearch
               stripedRows
+              initialViewMode={shouldAutoShowAI(block) ? 'ai' : 'grid'}
             />
           </div>
         )}
@@ -2883,6 +2932,7 @@ function WidgetBlockComponent({
             initialHeight={350}
             minHeight={200}
             maxHeight={600}
+            initialViewMode={shouldAutoShowAI(block) ? 'ai' : 'grid'}
             onCellClick={({ rowData }) => handleRowClick(rowData)}
           />
         </div>
@@ -4365,12 +4415,14 @@ interface WidgetConfigModalProps {
   setTitle: (title: string) => void
   height: number
   setHeight: (height: number) => void
-  useSampleData: boolean
-  setUseSampleData: (value: boolean) => void
   visualizationType: 'table' | 'pivot' | 'chart'
   setVisualizationType: (type: 'table' | 'pivot' | 'chart') => void
   showTitle: boolean
   setShowTitle: (value: boolean) => void
+  // Datasource selection
+  datasourceId: string
+  onDatasourceChange: (id: string) => void
+  datasources: DatasourceConfig[]
   onClose: () => void
   onSave: () => void
 }
@@ -4380,12 +4432,13 @@ function WidgetConfigModal({
   setTitle,
   height,
   setHeight,
-  useSampleData,
-  setUseSampleData,
   visualizationType,
   setVisualizationType,
   showTitle,
   setShowTitle,
+  datasourceId,
+  onDatasourceChange,
+  datasources,
   onClose,
   onSave,
 }: WidgetConfigModalProps) {
@@ -4433,19 +4486,34 @@ function WidgetConfigModal({
             </div>
 
             <div className="tps-form-group">
-              <label className="tps-label">Data Source</label>
-              <label className="tps-checkbox-label">
-                <input
-                  type="checkbox"
-                  className="tps-checkbox"
-                  checked={useSampleData}
-                  onChange={e => setUseSampleData(e.target.checked)}
-                />
-                <span>Use sample data</span>
-              </label>
-              <p className="tps-form-hint">
-                Sample data shows a demo dataset. Connect a data source in the future to use real data.
-              </p>
+              <label className="tps-label" htmlFor="widget-datasource">Data Source</label>
+              <select
+                id="widget-datasource"
+                className="tps-select"
+                value={datasourceId}
+                onChange={e => onDatasourceChange(e.target.value)}
+              >
+                <option value="sample">Sample Data (Demo)</option>
+                {datasources.map(ds => (
+                  <option key={ds.id} value={ds.id}>
+                    {ds.name}
+                    {' '}
+                    (
+                    {ds.type}
+                    )
+                  </option>
+                ))}
+              </select>
+              {datasourceId === 'sample' && (
+                <p className="tps-form-hint">
+                  Sample data shows a demo dataset. Select a connected data source to use real data.
+                </p>
+              )}
+              {datasourceId !== 'sample' && datasources.length === 0 && (
+                <p className="tps-form-hint tps-form-hint-warning">
+                  No data sources connected. Add a data source from the sidebar first.
+                </p>
+              )}
             </div>
 
             <div className="tps-form-group">
@@ -4503,9 +4571,12 @@ interface DatasourceModalProps {
   datasource: DatasourceConfig | null
   onClose: () => void
   onSave: (ds: DatasourceConfig) => void
+  apiEndpoint?: string | null
+  userKey?: string | null
+  userId?: string | null
 }
 
-function DatasourceModal({ datasource, onClose, onSave }: DatasourceModalProps) {
+function DatasourceModal({ datasource, onClose, onSave, apiEndpoint, userKey, userId }: DatasourceModalProps) {
   const [name, setName] = useState(datasource?.name || '')
   const [type, setType] = useState<'postgres' | 'snowflake'>(
     (datasource?.type as 'postgres' | 'snowflake') || 'postgres',
@@ -4521,6 +4592,12 @@ function DatasourceModal({ datasource, onClose, onSave }: DatasourceModalProps) 
   const [warehouse, setWarehouse] = useState(datasource?.warehouse || '')
   const [schema, setSchema] = useState(datasource?.schema || '')
   const [role, setRole] = useState(datasource?.role || '')
+  // Snowflake auth method
+  const [authMethod, setAuthMethod] = useState<'password' | 'keypair' | 'externalbrowser'>(
+    (datasource?.authMethod as 'password' | 'keypair' | 'externalbrowser') || 'password',
+  )
+  const [privateKey, setPrivateKey] = useState(datasource?.privateKey || '')
+  const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState(datasource?.privateKeyPassphrase || '')
   // Test connection state
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
@@ -4528,11 +4605,109 @@ function DatasourceModal({ datasource, onClose, onSave }: DatasourceModalProps) 
   const handleTestConnection = async () => {
     setTestStatus('testing')
     setTestMessage('Testing connection...')
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    // Simulate success
-    setTestStatus('success')
-    setTestMessage('Connection successful!')
+
+    // If no API endpoint, simulate for local-only mode
+    if (!apiEndpoint || !userId) {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      setTestStatus('success')
+      setTestMessage('Connection test simulated (no API endpoint configured)')
+      return
+    }
+
+    try {
+      // First create a temporary datasource for testing
+      const tempConfig = {
+        name: name || 'Test Connection',
+        type,
+        authMethod: type === 'snowflake' ? authMethod : 'password',
+        connectionConfig: type === 'postgres'
+          ? { host, port, database, schema: schema || 'public' }
+          : { account, warehouse, database, schema, role },
+        credentials: type === 'postgres' || authMethod === 'password'
+          ? { username, password }
+          : authMethod === 'keypair'
+            ? { username, privateKey, privateKeyPassphrase }
+            : { username },
+      }
+
+      // Create datasource temporarily to test
+      const createResponse = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create-datasource',
+          userId,
+          userKey: userKey || userId, // fallback to userId if no userKey
+          datasourceConfig: tempConfig,
+        }),
+      })
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text()
+        throw new Error(errorText || `Server error: ${createResponse.status}`)
+      }
+      let createData
+      try {
+        createData = await createResponse.json()
+      }
+      catch {
+        throw new Error('Server returned invalid JSON. Is the API server running?')
+      }
+      if (createData.error) {
+        throw new Error(createData.error)
+      }
+
+      const tempDatasourceId = createData.datasourceId || createData.id
+      if (!tempDatasourceId) {
+        throw new Error(`Server did not return datasource ID. Response: ${JSON.stringify(createData)}`)
+      }
+
+      // Test the connection
+      const testResponse = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test-datasource',
+          datasourceId: tempDatasourceId,
+          userId,
+          userKey: userKey || userId,
+        }),
+      })
+      if (!testResponse.ok) {
+        const errorText = await testResponse.text()
+        throw new Error(errorText || `Test failed: ${testResponse.status}`)
+      }
+      let testData
+      try {
+        testData = await testResponse.json()
+      }
+      catch {
+        throw new Error('Server returned invalid response')
+      }
+
+      // Delete the temporary datasource
+      await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete-datasource',
+          datasourceId: tempDatasourceId,
+          userId,
+        }),
+      })
+
+      if (testData.status?.connected) {
+        setTestStatus('success')
+        setTestMessage(`Connection successful! ${testData.status.version ? `(${testData.status.version})` : ''}`)
+      }
+      else {
+        setTestStatus('error')
+        setTestMessage(testData.status?.error || 'Connection failed')
+      }
+    }
+    catch (err) {
+      setTestStatus('error')
+      setTestMessage(err instanceof Error ? err.message : 'Connection test failed')
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -4547,10 +4722,13 @@ function DatasourceModal({ datasource, onClose, onSave }: DatasourceModalProps) 
       database: database || undefined,
       schema: schema || undefined,
       username: username || undefined,
-      password: password || undefined,
+      password: (type === 'postgres' || (type === 'snowflake' && authMethod === 'password')) ? password : undefined,
       account: type === 'snowflake' ? account : undefined,
       warehouse: type === 'snowflake' ? warehouse : undefined,
       role: type === 'snowflake' ? role : undefined,
+      authMethod: type === 'snowflake' ? authMethod : 'password',
+      privateKey: type === 'snowflake' && authMethod === 'keypair' ? privateKey : undefined,
+      privateKeyPassphrase: type === 'snowflake' && authMethod === 'keypair' ? privateKeyPassphrase : undefined,
       createdAt: datasource?.createdAt || now,
       updatedAt: now,
     }
@@ -4734,19 +4912,39 @@ function DatasourceModal({ datasource, onClose, onSave }: DatasourceModalProps) 
                   </div>
                 </div>
 
-                <div className="tps-form-row">
-                  <div className="tps-form-group tps-form-group-flex">
-                    <label className="tps-label" htmlFor="ds-sf-username">Username</label>
-                    <input
-                      id="ds-sf-username"
-                      type="text"
-                      className="tps-input"
-                      value={username}
-                      onChange={e => setUsername(e.target.value)}
-                      placeholder="my_user"
-                    />
-                  </div>
-                  <div className="tps-form-group tps-form-group-flex">
+                <div className="tps-form-group">
+                  <label className="tps-label" htmlFor="ds-auth-method">Authentication Method</label>
+                  <select
+                    id="ds-auth-method"
+                    className="tps-select"
+                    value={authMethod}
+                    onChange={e => setAuthMethod(e.target.value as 'password' | 'keypair' | 'externalbrowser')}
+                  >
+                    <option value="password">Username & Password</option>
+                    <option value="keypair">Key Pair (RSA)</option>
+                    <option value="externalbrowser">External Browser (SSO)</option>
+                  </select>
+                  <p className="tps-form-hint">
+                    {authMethod === 'password' && 'Standard username and password authentication'}
+                    {authMethod === 'keypair' && 'RSA key pair for server-to-server authentication'}
+                    {authMethod === 'externalbrowser' && 'Opens browser for SSO login (local development only)'}
+                  </p>
+                </div>
+
+                <div className="tps-form-group">
+                  <label className="tps-label" htmlFor="ds-sf-username">Username</label>
+                  <input
+                    id="ds-sf-username"
+                    type="text"
+                    className="tps-input"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    placeholder="my_user"
+                  />
+                </div>
+
+                {authMethod === 'password' && (
+                  <div className="tps-form-group">
                     <label className="tps-label" htmlFor="ds-sf-password">Password</label>
                     <input
                       id="ds-sf-password"
@@ -4757,7 +4955,42 @@ function DatasourceModal({ datasource, onClose, onSave }: DatasourceModalProps) 
                       placeholder="********"
                     />
                   </div>
-                </div>
+                )}
+
+                {authMethod === 'keypair' && (
+                  <>
+                    <div className="tps-form-group">
+                      <label className="tps-label" htmlFor="ds-sf-privatekey">Private Key (PEM)</label>
+                      <textarea
+                        id="ds-sf-privatekey"
+                        className="tps-input tps-textarea"
+                        value={privateKey}
+                        onChange={e => setPrivateKey(e.target.value)}
+                        placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                        rows={4}
+                      />
+                      <p className="tps-form-hint">Paste your RSA private key in PEM format</p>
+                    </div>
+                    <div className="tps-form-group">
+                      <label className="tps-label" htmlFor="ds-sf-passphrase">Key Passphrase (optional)</label>
+                      <input
+                        id="ds-sf-passphrase"
+                        type="password"
+                        className="tps-input"
+                        value={privateKeyPassphrase}
+                        onChange={e => setPrivateKeyPassphrase(e.target.value)}
+                        placeholder="Leave empty if key is not encrypted"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {authMethod === 'externalbrowser' && (
+                  <p className="tps-form-hint tps-form-hint-info">
+                    When you test the connection, a browser window will open for SSO authentication.
+                    This method only works in local development environments.
+                  </p>
+                )}
               </>
             )}
 
