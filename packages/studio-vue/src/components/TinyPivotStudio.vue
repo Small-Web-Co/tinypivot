@@ -49,9 +49,6 @@ const emit = defineEmits<{
   widgetSave: [widget: WidgetConfig]
 }>()
 
-// LocalStorage key for datasources
-const DATASOURCES_STORAGE_KEY = 'tinypivot-datasources'
-
 /**
  * Props for TinyPivotStudio component
  */
@@ -62,6 +59,10 @@ export interface TinyPivotStudioProps {
   storage?: StorageAdapter
   /** Data source configuration (e.g., Snowflake endpoint) */
   datasource?: DatasourceConfig
+  /** API endpoint for server-side operations (datasources, queries) */
+  apiEndpoint?: string
+  /** User key for credential encryption (required for server-side datasources) */
+  userKey?: string
   /** AI Analyst configuration */
   aiAnalyst?: {
     endpoint: string
@@ -107,17 +108,41 @@ const resolvedTheme = computed(() => {
 
 const themeClass = computed(() => resolvedTheme.value === 'dark' ? 'tps-theme-dark' : '')
 
-// AI Analyst config for DataGrid components
-const aiAnalystConfig = computed(() => {
+// Get AI Analyst config for a specific widget/datasource
+function getAiAnalystConfigForDatasource(datasourceId?: string) {
   if (!props.aiAnalyst?.endpoint)
     return undefined
+
+  // If using sample data or no datasource, return basic config
+  if (!datasourceId || datasourceId === 'sample') {
+    return {
+      enabled: true,
+      endpoint: props.aiAnalyst.endpoint,
+      persistToLocalStorage: true,
+      sessionId: `studio-${props.userId || 'demo'}`,
+    }
+  }
+
+  // For real datasources, include auth info for datasource-specific queries
   return {
     enabled: true,
     endpoint: props.aiAnalyst.endpoint,
     persistToLocalStorage: true,
-    sessionId: `studio-${props.userId || 'demo'}`,
+    sessionId: `studio-${props.userId || 'demo'}-${datasourceId}`,
+    datasourceId,
+    userId: props.userId,
+    userKey: props.userKey || props.userId,
   }
-})
+}
+
+// Check if widget should auto-show AI tab (has datasource but no table selected)
+function shouldAutoShowAI(block: WidgetBlock): boolean {
+  return Boolean(
+    block.metadata?.datasourceId
+    && block.metadata.datasourceId !== 'sample'
+    && !block.metadata?.tableId,
+  )
+}
 
 // State
 const pages = ref<PageListItem[]>([])
@@ -134,9 +159,10 @@ const showWidgetConfigModal = ref(false)
 const widgetConfigBlockId = ref<string | null>(null)
 const widgetConfigTitle = ref('')
 const widgetConfigHeight = ref<number>(400)
-const widgetConfigUseSampleData = ref(true)
 const widgetConfigVisualizationType = ref<'table' | 'pivot' | 'chart'>('table')
 const widgetConfigShowTitle = ref(true)
+// Datasource selection for widget
+const widgetConfigDatasourceId = ref<string>('sample') // 'sample' or datasource ID
 
 // Editor state
 const editorTitle = ref('')
@@ -996,9 +1022,10 @@ function openWidgetConfigModal(block: WidgetBlock) {
   widgetConfigBlockId.value = block.id
   widgetConfigTitle.value = block.titleOverride || ''
   widgetConfigHeight.value = typeof block.height === 'number' ? block.height : 400
-  widgetConfigUseSampleData.value = Boolean(block.widgetId)
   widgetConfigVisualizationType.value = (block.metadata?.visualizationType as 'table' | 'pivot' | 'chart') || 'table'
   widgetConfigShowTitle.value = block.showTitle !== false
+  // Load datasource from block metadata
+  widgetConfigDatasourceId.value = (block.metadata?.datasourceId as string) || 'sample'
   showWidgetConfigModal.value = true
 }
 
@@ -1007,26 +1034,33 @@ function closeWidgetConfigModal() {
   widgetConfigBlockId.value = null
   widgetConfigTitle.value = ''
   widgetConfigHeight.value = 400
-  widgetConfigUseSampleData.value = true
   widgetConfigVisualizationType.value = 'table'
   widgetConfigShowTitle.value = true
+  widgetConfigDatasourceId.value = 'sample'
 }
 
 function handleWidgetConfigOverlayClick() {
   closeWidgetConfigModal()
 }
 
+// Handle datasource selection change in widget config
+function handleWidgetDatasourceChange(datasourceId: string) {
+  widgetConfigDatasourceId.value = datasourceId
+}
+
 function handleSaveWidgetConfig() {
   if (!widgetConfigBlockId.value)
     return
 
+  const isSampleData = widgetConfigDatasourceId.value === 'sample'
   const updates: Partial<WidgetBlock> = {
     titleOverride: widgetConfigTitle.value || undefined,
     height: widgetConfigHeight.value,
-    widgetId: widgetConfigUseSampleData.value ? 'sample' : '',
+    widgetId: isSampleData ? 'sample' : widgetConfigDatasourceId.value,
     showTitle: widgetConfigShowTitle.value,
     metadata: {
       visualizationType: widgetConfigVisualizationType.value,
+      datasourceId: isSampleData ? undefined : widgetConfigDatasourceId.value,
     },
   }
 
@@ -1040,6 +1074,7 @@ function handleSaveWidgetConfig() {
 
 // Data source state
 const datasources = ref<DatasourceConfig[]>([])
+const selectedDatasourceId = ref<string | null>(null)
 const showDatasourceModal = ref(false)
 const editingDatasource = ref<DatasourceConfig | null>(null)
 const datasourceTestStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
@@ -1059,34 +1094,70 @@ const dsFormAccount = ref('')
 const dsFormWarehouse = ref('')
 const dsFormSchema = ref('')
 const dsFormRole = ref('')
+// Snowflake auth method
+const dsFormAuthMethod = ref<'password' | 'keypair' | 'externalbrowser'>('password')
+const dsFormPrivateKey = ref('')
+const dsFormPrivateKeyPassphrase = ref('')
 
-// Load datasources from localStorage
-function loadDatasources(): DatasourceConfig[] {
+// Load datasources from server
+async function loadDatasourcesFromServer(): Promise<DatasourceConfig[]> {
+  if (!props.apiEndpoint || !props.userId) {
+    return []
+  }
+
   try {
-    const stored = localStorage.getItem(DATASOURCES_STORAGE_KEY)
-    if (stored) {
-      return JSON.parse(stored)
+    const response = await fetch(props.apiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'list-datasources',
+        userId: props.userId,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('Failed to load datasources from server:', response.status)
+      return []
     }
-  }
-  catch (error) {
-    console.error('Failed to load datasources:', error)
-  }
-  return []
-}
 
-// Save datasources to localStorage
-function saveDatasources(ds: DatasourceConfig[]) {
-  try {
-    localStorage.setItem(DATASOURCES_STORAGE_KEY, JSON.stringify(ds))
+    const data = await response.json()
+    if (data.datasources && Array.isArray(data.datasources)) {
+      // Convert server format to local format (no credentials exposed)
+      return data.datasources.map((ds: {
+        id: string
+        name: string
+        type: string
+        authMethod?: string
+        connectionConfig?: Record<string, unknown>
+      }) => ({
+        id: ds.id,
+        name: ds.name,
+        type: ds.type as 'postgres' | 'snowflake',
+        host: ds.connectionConfig?.host as string | undefined,
+        port: ds.connectionConfig?.port as number | undefined,
+        database: ds.connectionConfig?.database as string | undefined,
+        schema: ds.connectionConfig?.schema as string | undefined,
+        account: ds.connectionConfig?.account as string | undefined,
+        warehouse: ds.connectionConfig?.warehouse as string | undefined,
+        role: ds.connectionConfig?.role as string | undefined,
+        authMethod: (ds.authMethod || 'password') as 'password' | 'keypair' | 'externalbrowser',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }))
+    }
+    return []
   }
-  catch (error) {
-    console.error('Failed to save datasources:', error)
+  catch (e) {
+    console.error('Failed to load datasources from server:', e)
+    return []
   }
 }
 
 // Initialize datasources on mount
-onMounted(() => {
-  datasources.value = loadDatasources()
+onMounted(async () => {
+  if (props.apiEndpoint && props.userId) {
+    datasources.value = await loadDatasourcesFromServer()
+  }
 })
 
 // Open datasource modal for creating new
@@ -1110,7 +1181,15 @@ function openEditDatasource(ds: DatasourceConfig) {
   dsFormWarehouse.value = ds.warehouse || ''
   dsFormSchema.value = ds.schema || ''
   dsFormRole.value = ds.role || ''
+  dsFormAuthMethod.value = (ds.authMethod as 'password' | 'keypair' | 'externalbrowser') || 'password'
+  dsFormPrivateKey.value = ds.privateKey || ''
+  dsFormPrivateKeyPassphrase.value = ds.privateKeyPassphrase || ''
   showDatasourceModal.value = true
+}
+
+// Select a datasource for querying
+function selectDatasource(ds: DatasourceConfig) {
+  selectedDatasourceId.value = ds.id
 }
 
 // Reset form to defaults
@@ -1126,6 +1205,9 @@ function resetDatasourceForm() {
   dsFormWarehouse.value = ''
   dsFormSchema.value = ''
   dsFormRole.value = ''
+  dsFormAuthMethod.value = 'password'
+  dsFormPrivateKey.value = ''
+  dsFormPrivateKeyPassphrase.value = ''
   datasourceTestStatus.value = 'idle'
   datasourceTestMessage.value = ''
 }
@@ -1137,62 +1219,260 @@ function closeDatasourceModal() {
   resetDatasourceForm()
 }
 
-// Test connection (simulated)
+// Test connection
 async function handleTestConnection() {
   datasourceTestStatus.value = 'testing'
   datasourceTestMessage.value = 'Testing connection...'
 
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500))
+  // If no API endpoint, simulate for local-only mode
+  if (!props.apiEndpoint || !props.userId) {
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    datasourceTestStatus.value = 'success'
+    datasourceTestMessage.value = 'Connection test simulated (no API endpoint configured)'
+    return
+  }
 
-  // Simulate success (in real implementation, this would call the backend)
-  datasourceTestStatus.value = 'success'
-  datasourceTestMessage.value = 'Connection successful!'
+  try {
+    const isSnowflake = dsFormType.value === 'snowflake'
+    const tempConfig = {
+      name: dsFormName.value || 'Test Connection',
+      type: dsFormType.value,
+      authMethod: isSnowflake ? dsFormAuthMethod.value : 'password',
+      connectionConfig: dsFormType.value === 'postgres'
+        ? { host: dsFormHost.value, port: dsFormPort.value, database: dsFormDatabase.value, schema: dsFormSchema.value || 'public' }
+        : { account: dsFormAccount.value, warehouse: dsFormWarehouse.value, database: dsFormDatabase.value, schema: dsFormSchema.value, role: dsFormRole.value },
+      credentials: dsFormType.value === 'postgres' || dsFormAuthMethod.value === 'password'
+        ? { username: dsFormUsername.value, password: dsFormPassword.value }
+        : dsFormAuthMethod.value === 'keypair'
+          ? { username: dsFormUsername.value, privateKey: dsFormPrivateKey.value, privateKeyPassphrase: dsFormPrivateKeyPassphrase.value }
+          : { username: dsFormUsername.value },
+    }
+
+    // Create datasource temporarily to test
+    const createResponse = await fetch(props.apiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'create-datasource',
+        userId: props.userId,
+        userKey: props.userKey || props.userId,
+        datasourceConfig: tempConfig,
+      }),
+    })
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text()
+      throw new Error(errorText || `Server error: ${createResponse.status}`)
+    }
+    let createData
+    try {
+      createData = await createResponse.json()
+    }
+    catch {
+      throw new Error('Server returned invalid JSON. Is the API server running?')
+    }
+    if (createData.error) {
+      throw new Error(createData.error)
+    }
+
+    const tempDatasourceId = createData.datasourceId || createData.id
+    if (!tempDatasourceId) {
+      throw new Error(`Server did not return datasource ID. Response: ${JSON.stringify(createData)}`)
+    }
+
+    // Test the connection
+    const testResponse = await fetch(props.apiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'test-datasource',
+        datasourceId: tempDatasourceId,
+        userId: props.userId,
+        userKey: props.userKey || props.userId,
+      }),
+    })
+    if (!testResponse.ok) {
+      const errorText = await testResponse.text()
+      throw new Error(errorText || `Test failed: ${testResponse.status}`)
+    }
+    let testData
+    try {
+      testData = await testResponse.json()
+    }
+    catch {
+      throw new Error('Server returned invalid response')
+    }
+
+    // Delete the temporary datasource - wait for it and log errors
+    try {
+      const deleteResponse = await fetch(props.apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete-datasource',
+          datasourceId: tempDatasourceId,
+          userId: props.userId,
+        }),
+      })
+      if (!deleteResponse.ok) {
+        console.warn('Failed to delete temporary test datasource:', await deleteResponse.text())
+      }
+    }
+    catch (deleteErr) {
+      console.warn('Failed to delete temporary test datasource:', deleteErr)
+    }
+
+    if (testData.status?.connected) {
+      datasourceTestStatus.value = 'success'
+      datasourceTestMessage.value = `Connection successful! ${testData.status.version ? `(${testData.status.version})` : ''}`
+    }
+    else {
+      datasourceTestStatus.value = 'error'
+      datasourceTestMessage.value = testData.status?.error || 'Connection failed'
+    }
+  }
+  catch (err) {
+    datasourceTestStatus.value = 'error'
+    datasourceTestMessage.value = err instanceof Error ? err.message : 'Connection test failed'
+  }
 }
 
-// Save datasource
-function handleSaveDatasource() {
+// Save datasource (server-only, no local storage)
+async function handleSaveDatasource() {
+  if (!props.apiEndpoint || !props.userId) {
+    alert('API endpoint not configured. Cannot save datasource.')
+    return
+  }
+
   const now = new Date()
-  const dsConfig: DatasourceConfig = {
-    id: editingDatasource.value?.id || generateId(),
+  const isSnowflake = dsFormType.value === 'snowflake'
+  const isEditing = Boolean(editingDatasource.value)
+
+  // Build the config for the API (credentials are encrypted server-side)
+  const apiConfig = {
     name: dsFormName.value.trim(),
     type: dsFormType.value,
-    host: dsFormType.value === 'postgres' ? dsFormHost.value : undefined,
-    port: dsFormType.value === 'postgres' ? dsFormPort.value : undefined,
-    database: dsFormDatabase.value || undefined,
-    schema: dsFormSchema.value || undefined,
-    username: dsFormUsername.value || undefined,
-    password: dsFormPassword.value || undefined,
-    account: dsFormType.value === 'snowflake' ? dsFormAccount.value : undefined,
-    warehouse: dsFormType.value === 'snowflake' ? dsFormWarehouse.value : undefined,
-    role: dsFormType.value === 'snowflake' ? dsFormRole.value : undefined,
-    createdAt: editingDatasource.value?.createdAt || now,
-    updatedAt: now,
+    authMethod: isSnowflake ? dsFormAuthMethod.value : 'password',
+    connectionConfig: dsFormType.value === 'postgres'
+      ? { host: dsFormHost.value, port: dsFormPort.value, database: dsFormDatabase.value, schema: dsFormSchema.value || 'public' }
+      : { account: dsFormAccount.value, warehouse: dsFormWarehouse.value, database: dsFormDatabase.value, schema: dsFormSchema.value, role: dsFormRole.value },
+    credentials: dsFormType.value === 'postgres' || dsFormAuthMethod.value === 'password'
+      ? { username: dsFormUsername.value, password: dsFormPassword.value }
+      : dsFormAuthMethod.value === 'keypair'
+        ? { username: dsFormUsername.value, privateKey: dsFormPrivateKey.value, privateKeyPassphrase: dsFormPrivateKeyPassphrase.value }
+        : { username: dsFormUsername.value },
   }
 
-  if (editingDatasource.value) {
-    // Update existing
-    datasources.value = datasources.value.map(d =>
-      d.id === dsConfig.id ? dsConfig : d,
-    )
-  }
-  else {
-    // Add new
-    datasources.value = [...datasources.value, dsConfig]
-  }
+  try {
+    let serverId: string
 
-  saveDatasources(datasources.value)
-  closeDatasourceModal()
+    if (isEditing && editingDatasource.value) {
+      // Update existing datasource
+      const response = await fetch(props.apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update-datasource',
+          datasourceId: editingDatasource.value.id,
+          userId: props.userId,
+          userKey: props.userKey || props.userId,
+          datasourceConfig: apiConfig,
+        }),
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `Failed to update: ${response.status}`)
+      }
+      serverId = editingDatasource.value.id
+    }
+    else {
+      // Create new datasource
+      const response = await fetch(props.apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create-datasource',
+          userId: props.userId,
+          userKey: props.userKey || props.userId,
+          datasourceConfig: apiConfig,
+        }),
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `Failed to create: ${response.status}`)
+      }
+      const data = await response.json()
+      serverId = data.datasourceId || data.id
+    }
+
+    // Update local state with non-sensitive info only (no credentials)
+    const dsConfig: DatasourceConfig = {
+      id: serverId,
+      name: dsFormName.value.trim(),
+      type: dsFormType.value,
+      host: dsFormType.value === 'postgres' ? dsFormHost.value : undefined,
+      port: dsFormType.value === 'postgres' ? dsFormPort.value : undefined,
+      database: dsFormDatabase.value || undefined,
+      schema: dsFormSchema.value || undefined,
+      account: isSnowflake ? dsFormAccount.value : undefined,
+      warehouse: isSnowflake ? dsFormWarehouse.value : undefined,
+      role: isSnowflake ? dsFormRole.value : undefined,
+      authMethod: isSnowflake ? dsFormAuthMethod.value : 'password',
+      createdAt: editingDatasource.value?.createdAt || now,
+      updatedAt: now,
+    }
+
+    if (isEditing) {
+      datasources.value = datasources.value.map(d =>
+        d.id === dsConfig.id ? dsConfig : d,
+      )
+    }
+    else {
+      datasources.value = [...datasources.value, dsConfig]
+    }
+
+    closeDatasourceModal()
+  }
+  catch (err) {
+    console.error('Failed to save datasource:', err)
+    alert(`Failed to save datasource: ${err instanceof Error ? err.message : 'Unknown error'}`)
+  }
 }
 
 // Delete datasource
-function handleDeleteDatasource(dsId: string, event: MouseEvent) {
+async function handleDeleteDatasource(dsId: string, event: MouseEvent) {
   event.stopPropagation()
   if (!window.confirm('Are you sure you want to delete this data source?')) {
     return
   }
+
+  // Call server to delete datasource
+  if (props.apiEndpoint && props.userId) {
+    try {
+      const response = await fetch(props.apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete-datasource',
+          datasourceId: dsId,
+          userId: props.userId,
+        }),
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Failed to delete datasource:', errorText)
+        alert(`Failed to delete: ${errorText}`)
+        return
+      }
+    }
+    catch (err) {
+      console.error('Failed to delete datasource:', err)
+      alert(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      return
+    }
+  }
+
+  // Update local state
   datasources.value = datasources.value.filter(d => d.id !== dsId)
-  saveDatasources(datasources.value)
 }
 
 // Get datasource type label
@@ -1791,8 +2071,8 @@ defineExpose({
           v-else
           :key="ds.id"
           type="button"
-          class="tps-page-item"
-          @click="openEditDatasource(ds)"
+          class="tps-page-item" :class="[ds.id === selectedDatasourceId ? 'tps-active' : '']"
+          @click="selectDatasource(ds)"
         >
           <svg class="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <ellipse cx="12" cy="5" rx="9" ry="3" />
@@ -1806,9 +2086,20 @@ defineExpose({
           <div class="tps-page-item-actions">
             <button
               type="button"
+              class="tps-page-item-edit"
+              title="Edit data source"
+              @click.stop="openEditDatasource(ds)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+            <button
+              type="button"
               class="tps-page-item-delete"
               title="Delete data source"
-              @click="handleDeleteDatasource(ds.id, $event)"
+              @click.stop="handleDeleteDatasource(ds.id, $event)"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                 <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -2192,7 +2483,8 @@ defineExpose({
                     :initial-height="350"
                     :min-height="200"
                     :max-height="600"
-                    :ai-analyst="aiAnalystConfig"
+                    :ai-analyst="getAiAnalystConfigForDatasource(block.metadata?.datasourceId as string)"
+                    :initial-view-mode="shouldAutoShowAI(block) ? 'ai' : 'grid'"
                     @cell-click="(payload) => handleWidgetRowClick(block.id, payload.rowData)"
                   />
                 </div>
@@ -2686,7 +2978,8 @@ defineExpose({
                               :initial-height="250"
                               :min-height="150"
                               :max-height="400"
-                              :ai-analyst="aiAnalystConfig"
+                              :ai-analyst="getAiAnalystConfigForDatasource(childBlock.metadata?.datasourceId as string)"
+                              :initial-view-mode="shouldAutoShowAI(childBlock as WidgetBlock) ? 'ai' : 'grid'"
                             />
                           </div>
                         </div>
@@ -3617,7 +3910,8 @@ defineExpose({
                       :enable-pagination="false"
                       :enable-search="true"
                       :striped-rows="true"
-                      :ai-analyst="aiAnalystConfig"
+                      :ai-analyst="getAiAnalystConfigForDatasource(block.metadata?.datasourceId as string)"
+                      :initial-view-mode="shouldAutoShowAI(block) ? 'ai' : 'grid'"
                       style="height: 100%"
                     />
                   </div>
@@ -4202,17 +4496,25 @@ defineExpose({
             </div>
 
             <div class="tps-form-group">
-              <label class="tps-label">Data Source</label>
-              <label class="tps-checkbox-label">
-                <input
-                  v-model="widgetConfigUseSampleData"
-                  type="checkbox"
-                  class="tps-checkbox"
-                >
-                <span>Use sample data</span>
-              </label>
-              <p class="tps-form-hint">
-                Sample data shows a demo dataset. Connect a data source in the future to use real data.
+              <label class="tps-label" for="widget-datasource">Data Source</label>
+              <select
+                id="widget-datasource"
+                :value="widgetConfigDatasourceId"
+                class="tps-select"
+                @change="handleWidgetDatasourceChange(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="sample">
+                  Sample Data (Demo)
+                </option>
+                <option v-for="ds in datasources" :key="ds.id" :value="ds.id">
+                  {{ ds.name }} ({{ ds.type }})
+                </option>
+              </select>
+              <p v-if="widgetConfigDatasourceId === 'sample'" class="tps-form-hint">
+                Sample data shows a demo dataset. Select a connected data source to use real data.
+              </p>
+              <p v-else-if="datasources.length === 0" class="tps-form-hint tps-form-hint-warning">
+                No data sources connected. Add a data source from the sidebar first.
               </p>
             </div>
 
@@ -4430,28 +4732,88 @@ defineExpose({
                 </div>
               </div>
 
-              <div class="tps-form-row">
-                <div class="tps-form-group tps-form-group-flex">
-                  <label class="tps-label" for="ds-sf-username">Username</label>
-                  <input
-                    id="ds-sf-username"
-                    v-model="dsFormUsername"
-                    type="text"
-                    class="tps-input"
-                    placeholder="my_user"
-                  >
+              <div class="tps-form-group">
+                <label class="tps-label" for="ds-auth-method">Authentication Method</label>
+                <select
+                  id="ds-auth-method"
+                  v-model="dsFormAuthMethod"
+                  class="tps-select"
+                >
+                  <option value="password">
+                    Username & Password
+                  </option>
+                  <option value="keypair">
+                    Key Pair (RSA)
+                  </option>
+                  <option value="externalbrowser">
+                    External Browser (SSO)
+                  </option>
+                </select>
+                <p class="tps-form-hint">
+                  <template v-if="dsFormAuthMethod === 'password'">
+                    Standard username and password authentication
+                  </template>
+                  <template v-else-if="dsFormAuthMethod === 'keypair'">
+                    RSA key pair for server-to-server authentication
+                  </template>
+                  <template v-else-if="dsFormAuthMethod === 'externalbrowser'">
+                    Opens browser for SSO login (local development only)
+                  </template>
+                </p>
+              </div>
+
+              <div class="tps-form-group">
+                <label class="tps-label" for="ds-sf-username">Username</label>
+                <input
+                  id="ds-sf-username"
+                  v-model="dsFormUsername"
+                  type="text"
+                  class="tps-input"
+                  placeholder="my_user"
+                >
+              </div>
+
+              <div v-if="dsFormAuthMethod === 'password'" class="tps-form-group">
+                <label class="tps-label" for="ds-sf-password">Password</label>
+                <input
+                  id="ds-sf-password"
+                  v-model="dsFormPassword"
+                  type="password"
+                  class="tps-input"
+                  placeholder="********"
+                >
+              </div>
+
+              <template v-if="dsFormAuthMethod === 'keypair'">
+                <div class="tps-form-group">
+                  <label class="tps-label" for="ds-sf-privatekey">Private Key (PEM)</label>
+                  <textarea
+                    id="ds-sf-privatekey"
+                    v-model="dsFormPrivateKey"
+                    class="tps-input tps-textarea"
+                    placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                    rows="4"
+                  />
+                  <p class="tps-form-hint">
+                    Paste your RSA private key in PEM format
+                  </p>
                 </div>
-                <div class="tps-form-group tps-form-group-flex">
-                  <label class="tps-label" for="ds-sf-password">Password</label>
+                <div class="tps-form-group">
+                  <label class="tps-label" for="ds-sf-passphrase">Key Passphrase (optional)</label>
                   <input
-                    id="ds-sf-password"
-                    v-model="dsFormPassword"
+                    id="ds-sf-passphrase"
+                    v-model="dsFormPrivateKeyPassphrase"
                     type="password"
                     class="tps-input"
-                    placeholder="********"
+                    placeholder="Leave empty if key is not encrypted"
                   >
                 </div>
-              </div>
+              </template>
+
+              <p v-if="dsFormAuthMethod === 'externalbrowser'" class="tps-form-hint tps-form-hint-info">
+                When you test the connection, a browser window will open for SSO authentication.
+                This method only works in local development environments.
+              </p>
             </template>
 
             <!-- Test Connection Section -->
