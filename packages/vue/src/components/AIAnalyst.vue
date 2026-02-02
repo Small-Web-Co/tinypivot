@@ -69,6 +69,44 @@ const selectedMessageId = ref<string | null>(null)
 // Track SQL panel visibility in the right pane
 const showSqlPanel = ref(false)
 
+// Track expanded schema groups (default: expand 'public')
+const expandedSchemas = ref<Set<string>>(new Set(['public']))
+
+// Group data sources by schema for tree view
+const schemaTree = computed(() => {
+  const tree: Record<string, typeof dataSources.value> = {}
+  for (const ds of dataSources.value) {
+    // Extract schema from the table identifier (e.g., "public.users" -> "public")
+    const schema = ds.table?.includes('.')
+      ? ds.table.split('.')[0]
+      : 'default'
+    if (!tree[schema])
+      tree[schema] = []
+    tree[schema].push(ds)
+  }
+  // Sort schemas: 'public' first, then alphabetically
+  return Object.fromEntries(
+    Object.entries(tree).sort(([a], [b]) => {
+      if (a === 'public')
+        return -1
+      if (b === 'public')
+        return 1
+      return a.localeCompare(b)
+    }),
+  )
+})
+
+function toggleSchema(schemaName: string) {
+  const newSet = new Set(expandedSchemas.value)
+  if (newSet.has(schemaName)) {
+    newSet.delete(schemaName)
+  }
+  else {
+    newSet.add(schemaName)
+  }
+  expandedSchemas.value = newSet
+}
+
 // Filter data sources by search
 const filteredDataSources = computed(() => {
   if (!searchQuery.value.trim())
