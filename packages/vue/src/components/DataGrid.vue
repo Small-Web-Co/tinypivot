@@ -52,6 +52,8 @@ const props = withDefaults(defineProps<{
   maxHeight?: number
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
+  /** Initial view mode to display (default: 'grid') */
+  initialViewMode?: 'grid' | 'pivot' | 'chart' | 'ai'
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -73,6 +75,7 @@ const props = withDefaults(defineProps<{
   minHeight: 300,
   maxHeight: 1200,
   aiAnalyst: undefined,
+  initialViewMode: 'grid',
 })
 
 const emit = defineEmits<{
@@ -418,8 +421,8 @@ function copySelectionToClipboard() {
   )
 }
 
-// View mode
-const viewMode = ref<'ai' | 'grid' | 'pivot' | 'chart'>('grid')
+// View mode - initialized from prop or defaults to 'grid'
+const viewMode = ref<'ai' | 'grid' | 'pivot' | 'chart'>(props.initialViewMode || 'grid')
 
 function handleAIDataLoaded(payload: AIDataLoadedEvent) {
   aiLoadedData.value = payload.data
