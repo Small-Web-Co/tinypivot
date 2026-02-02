@@ -4450,3 +4450,124 @@
   color: #a5b4fc;
 }
 
+
+/* ==========================================================================
+   AI Analyst Schema Tree
+   ========================================================================== */
+
+/* Schema Tree */
+.vpg-ai-schema-tree {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.vpg-ai-schema-group {
+  margin-bottom: 0.25rem;
+}
+
+.vpg-ai-schema-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-ai-schema-header:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.vpg-ai-chevron {
+  width: 1rem;
+  height: 1rem;
+  color: #64748b;
+  transition: transform 0.15s;
+}
+
+.vpg-ai-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.vpg-ai-schema-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #6366f1;
+}
+
+.vpg-ai-schema-name {
+  flex: 1;
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.vpg-ai-table-count {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.vpg-ai-table-list {
+  margin-left: 1.5rem;
+  padding-top: 0.25rem;
+}
+
+.vpg-ai-table-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.375rem 0.625rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vpg-ai-table-item:hover {
+  background: #eef2ff;
+}
+
+.vpg-ai-table-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #94a3b8;
+}
+
+.vpg-ai-table-item:hover .vpg-ai-table-icon {
+  color: #6366f1;
+}
+
+.vpg-ai-table-item span {
+  font-size: 0.8125rem;
+  color: #475569;
+}
+
+/* Dark theme overrides */
+.vpg-theme-dark .vpg-ai-schema-header {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-ai-schema-header:hover {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-ai-schema-name {
+  color: #f1f5f9;
+}
+
+.vpg-theme-dark .vpg-ai-table-item:hover {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.vpg-theme-dark .vpg-ai-table-item span {
+  color: #e2e8f0;
+}
