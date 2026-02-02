@@ -35,6 +35,7 @@ const {
   hasMessages,
   isLoading,
   isLoadingTables,
+  error,
   schemas,
   selectedDataSource,
   selectedDataSourceInfo,
@@ -660,14 +661,38 @@ function hasQueryResult(message: AIMessage): boolean {
           </div>
         </div>
 
-        <!-- No schema loaded yet -->
-        <div v-else-if="previewData.length === 0" class="vpg-ai-preview-empty">
+        <!-- Error loading data -->
+        <div v-else-if="error" class="vpg-ai-preview-empty vpg-ai-preview-error">
+          <div class="vpg-ai-preview-empty-icon" style="background: #fee2e2;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <p style="color: #ef4444;">
+            {{ error }}
+          </p>
+        </div>
+
+        <!-- No data yet (still loading) -->
+        <div v-else-if="previewData.length === 0 && lastLoadedData === null" class="vpg-ai-preview-empty">
           <div class="vpg-ai-preview-empty-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </div>
           <p>Loading data source...</p>
+        </div>
+
+        <!-- Empty table -->
+        <div v-else-if="previewData.length === 0" class="vpg-ai-preview-empty">
+          <div class="vpg-ai-preview-empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <p>No data in this table</p>
         </div>
 
         <!-- Data table -->

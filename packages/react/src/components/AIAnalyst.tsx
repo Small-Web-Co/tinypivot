@@ -45,6 +45,7 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
     hasMessages,
     isLoading,
     isLoadingTables,
+    error,
     schemas,
     selectedDataSource,
     selectedDataSourceInfo,
@@ -713,8 +714,20 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
                 Ask a question to explore the data
               </div>
             </div>
-          ) : previewData.length === 0 ? (
-            /* No schema loaded yet */
+          ) : error ? (
+            /* Error loading data */
+            <div className="vpg-ai-preview-empty vpg-ai-preview-error">
+              <div className="vpg-ai-preview-empty-icon" style={{ background: '#fee2e2' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <p style={{ color: '#ef4444' }}>{error}</p>
+            </div>
+          ) : previewData.length === 0 && lastLoadedData === null ? (
+            /* Still loading */
             <div className="vpg-ai-preview-empty">
               <div className="vpg-ai-preview-empty-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -722,6 +735,16 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
                 </svg>
               </div>
               <p>Loading data source...</p>
+            </div>
+          ) : previewData.length === 0 ? (
+            /* Empty table */
+            <div className="vpg-ai-preview-empty">
+              <div className="vpg-ai-preview-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p>No data in this table</p>
             </div>
           ) : (
             /* Data table */

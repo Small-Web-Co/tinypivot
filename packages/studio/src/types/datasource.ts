@@ -170,6 +170,12 @@ export interface DatasourceConfig {
   warehouse?: string
   /** Snowflake-specific: role name */
   role?: string
+  /** Authentication method (default: password) */
+  authMethod?: 'password' | 'keypair' | 'externalbrowser' | 'oauth_sso'
+  /** Private key for keypair authentication (PEM format) */
+  privateKey?: string
+  /** Passphrase for encrypted private key */
+  privateKeyPassphrase?: string
   /** Additional connection options */
   options?: Record<string, unknown>
   /** Whether this is a read-only connection */
@@ -314,4 +320,48 @@ export interface DatasourceRegistry {
   isSupported: (type: DatasourceType) => boolean
   /** Get list of supported datasource types */
   getSupportedTypes: () => DatasourceType[]
+}
+
+/**
+ * Datasource info for UI display (credentials stripped)
+ */
+export interface DatasourceInfo {
+  /** Unique datasource identifier */
+  id: string
+  /** Display name */
+  name: string
+  /** Datasource type */
+  type: DatasourceType | string
+  /** Description */
+  description?: string
+  /** Tier: 'org' (shared) or 'user' (personal) */
+  tier: 'org' | 'user'
+  /** Authentication method */
+  authMethod: 'password' | 'keypair' | 'oauth_sso'
+  /** Non-sensitive connection configuration */
+  connectionConfig?: {
+    host?: string
+    port?: number
+    database?: string
+    schema?: string
+    account?: string
+    warehouse?: string
+    role?: string
+  }
+  /** Owner user ID (null for org-level) */
+  userId?: string
+  /** Whether current user is the owner */
+  isOwner: boolean
+  /** When connection was last tested */
+  lastTestedAt?: Date
+  /** Result of last test */
+  lastTestResult?: 'success' | 'failure'
+  /** Error from last test */
+  lastTestError?: string
+  /** Whether datasource is active */
+  active: boolean
+  /** When created */
+  createdAt: Date
+  /** When last updated */
+  updatedAt: Date
 }

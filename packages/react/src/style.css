@@ -3178,7 +3178,7 @@
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .vpg-ai-picker-header {

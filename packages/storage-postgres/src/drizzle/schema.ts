@@ -200,6 +200,84 @@ export const shares = pgTable(
 )
 
 // =============================================================================
+// Datasources Table
+// =============================================================================
+
+/**
+ * Datasources table - stores data source connections with encrypted credentials
+ * Two-tier model:
+ * - Tier 'org': Shared read-only sources configured via environment variables
+ * - Tier 'user': Personal sources with encrypted credentials in DB
+ */
+export const datasources = pgTable(
+  'tinypivot_datasources',
+  {
+    /** Unique datasource identifier (UUID) */
+    id: varchar('id', { length: 36 }).primaryKey(),
+    /** Display name for the datasource */
+    name: varchar('name', { length: 255 }).notNull(),
+    /** Type of datasource: 'postgres' | 'snowflake' */
+    type: varchar('type', { length: 50 }).notNull(),
+    /** Optional description */
+    description: text('description'),
+
+    /** Tier: 'org' (ENV-based) or 'user' (encrypted in DB) */
+    tier: varchar('tier', { length: 10 }).notNull().default('user'),
+    /** Environment variable prefix for org tier (e.g., 'ANALYTICS' -> ANALYTICS_HOST) */
+    envPrefix: varchar('env_prefix', { length: 100 }),
+
+    /** Connection configuration (non-sensitive JSON: host, port, database, schema, warehouse, role) */
+    connectionConfig: jsonb('connection_config').notNull().default({}),
+
+    /** Encrypted credentials (AES-256-GCM ciphertext, hex-encoded) */
+    encryptedCredentials: text('encrypted_credentials'),
+    /** Initialization vector for credentials encryption (hex, 12 bytes) */
+    credentialsIv: varchar('credentials_iv', { length: 32 }),
+    /** Authentication tag for credentials encryption (hex, 16 bytes) */
+    credentialsAuthTag: varchar('credentials_auth_tag', { length: 32 }),
+    /** Salt for key derivation (hex, 16 bytes) */
+    credentialsSalt: varchar('credentials_salt', { length: 32 }),
+
+    /** Encrypted OAuth refresh token (for SSO) */
+    encryptedRefreshToken: text('encrypted_refresh_token'),
+    /** IV for refresh token encryption */
+    refreshTokenIv: varchar('refresh_token_iv', { length: 32 }),
+    /** Auth tag for refresh token encryption */
+    refreshTokenAuthTag: varchar('refresh_token_auth_tag', { length: 32 }),
+    /** Salt for refresh token key derivation */
+    refreshTokenSalt: varchar('refresh_token_salt', { length: 32 }),
+    /** When the OAuth token expires */
+    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+
+    /** Authentication method: 'password' | 'keypair' | 'oauth_sso' */
+    authMethod: varchar('auth_method', { length: 20 }).notNull().default('password'),
+
+    /** Owner user ID (null for org-level sources) */
+    userId: varchar('user_id', { length: 255 }),
+
+    /** When connection was last tested */
+    lastTestedAt: timestamp('last_tested_at', { withTimezone: true }),
+    /** Result of last test: 'success' | 'failure' */
+    lastTestResult: varchar('last_test_result', { length: 20 }),
+    /** Error message from last failed test */
+    lastTestError: text('last_test_error'),
+
+    /** Whether the datasource is active */
+    active: boolean('active').notNull().default(true),
+    /** When the datasource was created */
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /** When the datasource was last updated */
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  table => ({
+    userIdIdx: index('tinypivot_datasources_user_id_idx').on(table.userId),
+    typeIdx: index('tinypivot_datasources_type_idx').on(table.type),
+    tierIdx: index('tinypivot_datasources_tier_idx').on(table.tier),
+    activeIdx: index('tinypivot_datasources_active_idx').on(table.active),
+  }),
+)
+
+// =============================================================================
 // Type Exports for Drizzle Inference
 // =============================================================================
 
@@ -222,3 +300,8 @@ export type InsertVersion = typeof versions.$inferInsert
 export type SelectShare = typeof shares.$inferSelect
 /** Inferred type for inserting a share record */
 export type InsertShare = typeof shares.$inferInsert
+
+/** Inferred type for selecting a datasource record */
+export type SelectDatasource = typeof datasources.$inferSelect
+/** Inferred type for inserting a datasource record */
+export type InsertDatasource = typeof datasources.$inferInsert

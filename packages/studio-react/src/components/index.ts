@@ -1,3 +1,5 @@
+export { DatasourceDialog } from './DatasourceDialog'
+export type { DatasourceDialogProps } from './DatasourceDialog'
 export { RichTextEditor } from './RichTextEditor'
 export type { RichTextEditorProps } from './RichTextEditor'
 /**

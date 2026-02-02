@@ -18,9 +18,52 @@
  * - `AI_API_KEY` - OpenAI, Anthropic, or OpenRouter API key
  */
 
+// Snowflake OAuth Authentication
+export {
+  createSnowflakeCallbackHandler,
+  createSnowflakeOAuth,
+  generateOAuthState,
+} from './auth/snowflake-oauth'
+
+export type {
+  CallbackHandlerOptions,
+  SnowflakeOAuth,
+  SnowflakeOAuthConfig,
+  TokenResponse,
+} from './auth/snowflake-oauth'
+
+// Credential Encryption
+export { createCredentialService } from './crypto/credential-service'
+
+export type {
+  CredentialService,
+  CredentialServiceConfig,
+  EncryptedPayload,
+} from './crypto/credential-service'
+
+// Datasource Management
+export { createDatasourceManager } from './datasource'
+
+export type {
+  AuthMethod,
+  ConnectionConfig,
+  ConnectionStatus,
+  ConnectionTestResult,
+  CreateDatasourceInput,
+  DatasourceCredentials,
+  DatasourceInfo,
+  DatasourceManager,
+  DatasourceManagerConfig,
+  DatasourceRecord,
+  DatasourceTier,
+  DatasourceType,
+  DatasourceWithCredentials,
+  OrgDatasourceEnvConfig,
+  UpdateDatasourceInput,
+} from './datasource'
+
 // Types
 export type { RequestHandler } from './types'
-
 /**
  * Unified handler - single endpoint for everything
  * Handles: table discovery, schema, queries, and AI chat
@@ -33,7 +76,6 @@ export type {
   TinyPivotHandlerOptions,
   TinyPivotRequest,
 } from './unified-handler'
-
 // SQL Validation (still useful for custom implementations)
 export {
   ensureLimit,
@@ -41,7 +83,6 @@ export {
   sanitizeTableName,
   validateSQL,
 } from './validation'
-
 export type { ValidationResult } from './validation'
 
 // Re-export core types for convenience

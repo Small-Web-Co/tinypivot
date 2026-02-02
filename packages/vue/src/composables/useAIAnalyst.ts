@@ -117,6 +117,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
 
   /**
    * Fetch available tables from endpoint (auto-discovery mode)
+   * If config.datasourceId is set, fetches tables from that specific datasource
    */
   async function fetchTables() {
     if (!config.endpoint)
@@ -124,10 +125,20 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
 
     isLoadingTables.value = true
     try {
+      // Build request body - use datasource-specific action if datasourceId is set
+      const requestBody: Record<string, unknown> = config.datasourceId
+        ? {
+            action: 'list-datasource-tables',
+            datasourceId: config.datasourceId,
+            userId: config.userId,
+            userKey: config.userKey || config.userId,
+          }
+        : { action: 'list-tables' }
+
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list-tables' }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -141,10 +152,10 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
       }
 
       // Convert to AIDataSource format
-      discoveredDataSources.value = data.tables.map((t: { name: string, description?: string }) => ({
-        id: t.name,
-        table: t.name,
-        name: t.name.charAt(0).toUpperCase() + t.name.slice(1), // Capitalize
+      discoveredDataSources.value = data.tables.map((t: { name: string, schema?: string, description?: string }) => ({
+        id: t.schema ? `${t.schema}.${t.name}` : t.name,
+        table: t.schema ? `${t.schema}.${t.name}` : t.name,
+        name: t.schema ? `${t.schema}.${t.name}` : t.name,
         description: t.description,
       }))
 
@@ -171,10 +182,20 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
       return
 
     try {
+      // Build request body - include datasource info if available
+      const requestBody: Record<string, unknown> = {
+        action: 'get-all-schemas',
+      }
+      if (config.datasourceId) {
+        requestBody.datasourceId = config.datasourceId
+        requestBody.userId = config.userId
+        requestBody.userKey = config.userKey || config.userId
+      }
+
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-all-schemas' }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -322,14 +343,27 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
 
     try {
       const sql = `SELECT * FROM ${dataSource.table} LIMIT 100`
+
+      // Build request body - use datasource-specific query if datasourceId is set
+      const requestBody: Record<string, unknown> = config.datasourceId
+        ? {
+            action: 'query-datasource',
+            datasourceId: config.datasourceId,
+            userId: config.userId,
+            userKey: config.userKey || config.userId,
+            sql,
+            maxRows: 100,
+          }
+        : {
+            action: 'query',
+            sql,
+            table: dataSource.table,
+          }
+
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'query',
-          sql,
-          table: dataSource.table,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -351,10 +385,18 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
           rowCount: result.data.length,
         })
       }
+      else {
+        // Empty result - set to empty array so UI knows loading completed
+        lastLoadedData.value = []
+      }
     }
     catch (err) {
-      // Sample data fetch is optional - continue without it
+      // Set error so UI can show it instead of infinite loading
+      const errMsg = err instanceof Error ? err.message : 'Failed to load data'
+      error.value = errMsg
       console.warn('Failed to fetch sample data:', err)
+      // Set to empty array so UI knows loading completed (even with error)
+      lastLoadedData.value = []
     }
   }
 
@@ -590,14 +632,26 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
       }
       // Use unified endpoint
       else if (config.endpoint) {
+        // Build request body - use datasource-specific query if datasourceId is set
+        const requestBody: Record<string, unknown> = config.datasourceId
+          ? {
+              action: 'query-datasource',
+              datasourceId: config.datasourceId,
+              userId: config.userId,
+              userKey: config.userKey || config.userId,
+              sql,
+              maxRows: config.maxRows || 10000,
+            }
+          : {
+              action: 'query',
+              sql,
+              table: dataSource.table,
+            }
+
         const response = await fetch(config.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'query',
-            sql,
-            table: dataSource.table,
-          }),
+          body: JSON.stringify(requestBody),
         })
 
         data = await response.json()

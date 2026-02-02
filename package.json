@@ -84,6 +84,7 @@
     "@duckdb/duckdb-wasm": "1.33.1-dev13.0",
     "@tanstack/vue-table": "^8.20.0",
     "@vercel/analytics": "^1.6.1",
+    "snowflake-sdk": "^1.6.0",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {

@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TinyPivot Datasource Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      border-bottom: 2px solid #4f46e5;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #555;
+      margin-top: 30px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #444;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #4f46e5;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .btn-primary {
+      background: #4f46e5;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #4338ca;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+    .btn-success {
+      background: #22c55e;
+      color: white;
+    }
+    .btn-success:hover {
+      background: #16a34a;
+    }
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    #output {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .datasource-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .datasource-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+    }
+    .datasource-item.selected {
+      border-color: #4f46e5;
+      background: #eef2ff;
+    }
+    .datasource-info {
+      flex: 1;
+    }
+    .datasource-name {
+      font-weight: 600;
+      color: #111;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .datasource-desc {
+      color: #666;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .type-postgres {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .type-snowflake {
+      background: #cffafe;
+      color: #0e7490;
+    }
+    .tier-badge {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .test-result {
+      margin-top: 5px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .test-success {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .test-error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .datasource-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .hidden {
+      display: none;
+    }
+    .loading {
+      color: #666;
+      font-style: italic;
+    }
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 20px;
+      color: #1e40af;
+    }
+    .info-box code {
+      background: #dbeafe;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: #666;
+    }
+    .tab:hover {
+      color: #333;
+    }
+    .tab.active {
+      border-bottom-color: #4f46e5;
+      color: #4f46e5;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <h1>TinyPivot Datasource Demo</h1>
+
+  <div class="info-box">
+    <strong>Demo Configuration:</strong><br>
+    User ID: <code>demo-user-123</code><br>
+    User Key: <code>demo-user-secret-key</code><br>
+    <small>(In production, these would come from your auth system)</small>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="manage">Manage Datasources</div>
+    <div class="tab" data-tab="create">Add Datasource</div>
+    <div class="tab" data-tab="sso">Snowflake SSO</div>
+    <div class="tab" data-tab="api">Raw API</div>
+  </div>
+
+  <!-- Manage Tab -->
+  <div id="manage-tab" class="tab-content">
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="margin: 0;">Your Datasources</h3>
+        <button class="btn-secondary btn-sm" onclick="loadDatasources()">Refresh</button>
+      </div>
+      <div id="datasource-list" class="datasource-list">
+        <div class="loading">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Tab -->
+  <div id="create-tab" class="tab-content hidden">
+    <div class="card">
+      <h3>Add New Datasource</h3>
+      <form id="create-form">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="ds-name" placeholder="My Database" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type</label>
+            <select id="ds-type" onchange="toggleTypeFields()">
+              <option value="postgres">PostgreSQL</option>
+              <option value="snowflake">Snowflake</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="ds-description" placeholder="Optional description">
+          </div>
+        </div>
+
+        <!-- PostgreSQL fields -->
+        <div id="postgres-fields">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Host</label>
+              <input type="text" id="pg-host" placeholder="localhost">
+            </div>
+            <div class="form-group">
+              <label>Port</label>
+              <input type="text" id="pg-port" value="5432">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Database</label>
+              <input type="text" id="pg-database" placeholder="mydb">
+            </div>
+            <div class="form-group">
+              <label>Schema</label>
+              <input type="text" id="pg-schema" value="public">
+            </div>
+          </div>
+        </div>
+
+        <!-- Snowflake fields -->
+        <div id="snowflake-fields" class="hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account</label>
+              <input type="text" id="sf-account" placeholder="xy12345.us-east-1">
+            </div>
+            <div class="form-group">
+              <label>Auth Method</label>
+              <select id="sf-auth-method" onchange="toggleAuthFields()">
+                <option value="password">Password</option>
+                <option value="externalbrowser">External Browser (SSO)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Warehouse</label>
+              <input type="text" id="sf-warehouse" placeholder="COMPUTE_WH">
+            </div>
+            <div class="form-group">
+              <label>Role</label>
+              <input type="text" id="sf-role" placeholder="ACCOUNTADMIN">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Database</label>
+              <input type="text" id="sf-database" placeholder="ANALYTICS">
+            </div>
+            <div class="form-group">
+              <label>Schema</label>
+              <input type="text" id="sf-schema" placeholder="PUBLIC">
+            </div>
+          </div>
+        </div>
+
+        <div id="credentials-section">
+          <h4>Credentials</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Username</label>
+              <input type="text" id="ds-username" placeholder="db_user">
+            </div>
+            <div class="form-group" id="password-field">
+              <label>Password</label>
+              <input type="password" id="ds-password" placeholder="password">
+            </div>
+          </div>
+        </div>
+        <div id="externalbrowser-notice" class="hidden" style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
+          <strong>External Browser Auth:</strong> When you test this connection, your browser will open to Snowflake's SSO page. Only works when the server is running locally.
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Create Datasource</button>
+          <button type="button" class="btn-secondary" onclick="resetForm()">Reset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SSO Tab -->
+  <div id="sso-tab" class="tab-content hidden">
+    <div class="card">
+      <h3>Connect with Snowflake SSO</h3>
+      <p style="color: #666; margin-bottom: 20px;">
+        Connect to Snowflake using browser-based Single Sign-On. This requires the server to be configured with Snowflake OAuth credentials.
+      </p>
+
+      <form id="sso-form">
+        <div class="form-group">
+          <label>Connection Name</label>
+          <input type="text" id="sso-name" placeholder="My Snowflake (SSO)" required>
+        </div>
+
+        <div class="form-group">
+          <label>Description (optional)</label>
+          <input type="text" id="sso-description" placeholder="Connected via SSO">
+        </div>
+
+        <div class="form-group">
+          <label>Account</label>
+          <input type="text" id="sso-account" placeholder="xy12345.us-east-1" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Warehouse</label>
+            <input type="text" id="sso-warehouse" placeholder="COMPUTE_WH">
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <input type="text" id="sso-role" placeholder="ACCOUNTADMIN">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Database</label>
+            <input type="text" id="sso-database" placeholder="ANALYTICS">
+          </div>
+          <div class="form-group">
+            <label>Schema</label>
+            <input type="text" id="sso-schema" placeholder="PUBLIC">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Connect with Snowflake SSO</button>
+        </div>
+      </form>
+
+      <div id="sso-status" style="margin-top: 15px;"></div>
+    </div>
+  </div>
+
+  <!-- API Tab -->
+  <div id="api-tab" class="tab-content hidden">
+    <div class="card">
+      <h3>Raw API Testing</h3>
+      <div class="form-group">
+        <label>Action</label>
+        <select id="api-action" onchange="updateApiPayload()">
+          <option value="list-datasources">list-datasources</option>
+          <option value="get-datasource">get-datasource</option>
+          <option value="create-datasource">create-datasource</option>
+          <option value="test-datasource">test-datasource</option>
+          <option value="delete-datasource">delete-datasource</option>
+          <option value="start-snowflake-oauth">start-snowflake-oauth</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Request Body (JSON)</label>
+        <textarea id="api-payload" rows="12"></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" onclick="sendApiRequest()">Send Request</button>
+      </div>
+    </div>
+  </div>
+
+  <h2>Response</h2>
+  <pre id="output">// Response will appear here</pre>
+
+  <script>
+    const API_URL = '/api/tinypivot'
+    const USER_ID = 'demo-user-123'
+    const USER_KEY = 'demo-user-secret-key'
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'))
+        tab.classList.add('active')
+        document.getElementById(tab.dataset.tab + '-tab').classList.remove('hidden')
+      })
+    })
+
+    // Toggle type-specific fields
+    function toggleTypeFields() {
+      const type = document.getElementById('ds-type').value
+      document.getElementById('postgres-fields').classList.toggle('hidden', type !== 'postgres')
+      document.getElementById('snowflake-fields').classList.toggle('hidden', type !== 'snowflake')
+      // Reset to password auth when switching types
+      if (type === 'postgres') {
+        document.getElementById('sf-auth-method').value = 'password'
+        toggleAuthFields()
+      }
+    }
+
+    // Toggle auth-specific fields (for externalbrowser vs password)
+    function toggleAuthFields() {
+      const type = document.getElementById('ds-type').value
+      const authMethod = document.getElementById('sf-auth-method').value
+      const isExternalBrowser = type === 'snowflake' && authMethod === 'externalbrowser'
+
+      document.getElementById('password-field').classList.toggle('hidden', isExternalBrowser)
+      document.getElementById('externalbrowser-notice').classList.toggle('hidden', !isExternalBrowser)
+    }
+
+    // Load datasources
+    async function loadDatasources() {
+      const listEl = document.getElementById('datasource-list')
+      listEl.innerHTML = '<div class="loading">Loading...</div>'
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'list-datasources',
+            userId: USER_ID
+          })
+        })
+        const data = await response.json()
+        showOutput(data)
+
+        if (data.datasources && data.datasources.length > 0) {
+          listEl.innerHTML = data.datasources.map(ds => `
+            <div class="datasource-item" data-id="${ds.id}">
+              <div class="datasource-info">
+                <div class="datasource-name">
+                  <span class="type-badge type-${ds.type}">${ds.type === 'postgres' ? 'PG' : 'SF'}</span>
+                  ${ds.name}
+                  ${ds.tier === 'org' ? '<span class="tier-badge">ORG</span>' : ''}
+                </div>
+                ${ds.description ? `<div class="datasource-desc">${ds.description}</div>` : ''}
+                <div id="test-result-${ds.id}"></div>
+              </div>
+              <div class="datasource-actions">
+                <button class="btn-success btn-sm" onclick="testDatasource('${ds.id}')">Test</button>
+                ${ds.tier !== 'org' ? `<button class="btn-danger btn-sm" onclick="deleteDatasource('${ds.id}')">Delete</button>` : ''}
+              </div>
+            </div>
+          `).join('')
+        } else {
+          listEl.innerHTML = '<div class="loading">No datasources found. Add one!</div>'
+        }
+      } catch (error) {
+        listEl.innerHTML = `<div class="test-error">${error.message}</div>`
+        showOutput({ error: error.message })
+      }
+    }
+
+    // Test datasource connection
+    async function testDatasource(id) {
+      const resultEl = document.getElementById(`test-result-${id}`)
+      resultEl.innerHTML = '<div class="loading">Testing...</div>'
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'test-datasource',
+            datasourceId: id,
+            userId: USER_ID,
+            userKey: USER_KEY
+          })
+        })
+        const data = await response.json()
+        showOutput(data)
+
+        if (data.status?.connected) {
+          resultEl.innerHTML = `<div class="test-result test-success">Connected! ${data.status.version || ''}</div>`
+        } else {
+          resultEl.innerHTML = `<div class="test-result test-error">${data.status?.error || data.error || 'Connection failed'}</div>`
+        }
+      } catch (error) {
+        resultEl.innerHTML = `<div class="test-result test-error">${error.message}</div>`
+        showOutput({ error: error.message })
+      }
+    }
+
+    // Delete datasource
+    async function deleteDatasource(id) {
+      if (!confirm('Are you sure you want to delete this datasource?')) return
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'delete-datasource',
+            datasourceId: id,
+            userId: USER_ID
+          })
+        })
+        const data = await response.json()
+        showOutput(data)
+        loadDatasources()
+      } catch (error) {
+        showOutput({ error: error.message })
+      }
+    }
+
+    // Create datasource form
+    document.getElementById('create-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+
+      const type = document.getElementById('ds-type').value
+      const authMethod = type === 'snowflake' ? document.getElementById('sf-auth-method').value : 'password'
+
+      const config = type === 'postgres'
+        ? {
+            host: document.getElementById('pg-host').value,
+            port: parseInt(document.getElementById('pg-port').value) || 5432,
+            database: document.getElementById('pg-database').value,
+            schema: document.getElementById('pg-schema').value || 'public'
+          }
+        : {
+            account: document.getElementById('sf-account').value,
+            warehouse: document.getElementById('sf-warehouse').value,
+            database: document.getElementById('sf-database').value,
+            schema: document.getElementById('sf-schema').value,
+            role: document.getElementById('sf-role').value
+          }
+
+      // For externalbrowser auth, password is not needed
+      const credentials = authMethod === 'externalbrowser'
+        ? { username: document.getElementById('ds-username').value }
+        : {
+            username: document.getElementById('ds-username').value,
+            password: document.getElementById('ds-password').value
+          }
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create-datasource',
+            userId: USER_ID,
+            userKey: USER_KEY,
+            datasourceConfig: {
+              name: document.getElementById('ds-name').value,
+              type,
+              description: document.getElementById('ds-description').value || undefined,
+              authMethod,
+              connectionConfig: config,
+              credentials
+            }
+          })
+        })
+        const data = await response.json()
+        showOutput(data)
+
+        if (data.id) {
+          alert('Datasource created!')
+          resetForm()
+          document.querySelector('[data-tab="manage"]').click()
+          loadDatasources()
+        }
+      } catch (error) {
+        showOutput({ error: error.message })
+      }
+    })
+
+    function resetForm() {
+      document.getElementById('create-form').reset()
+      document.getElementById('pg-port').value = '5432'
+      document.getElementById('pg-schema').value = 'public'
+      toggleTypeFields()
+    }
+
+    // Raw API
+    function updateApiPayload() {
+      const action = document.getElementById('api-action').value
+      let payload = { action, userId: USER_ID }
+
+      if (action === 'get-datasource' || action === 'delete-datasource') {
+        payload.datasourceId = 'YOUR_DATASOURCE_ID'
+      } else if (action === 'test-datasource') {
+        payload.datasourceId = 'YOUR_DATASOURCE_ID'
+        payload.userKey = USER_KEY
+      } else if (action === 'create-datasource') {
+        payload.userKey = USER_KEY
+        payload.datasourceConfig = {
+          name: 'My Database',
+          type: 'postgres',
+          connectionConfig: {
+            host: 'localhost',
+            port: 5432,
+            database: 'mydb'
+          },
+          credentials: {
+            username: 'user',
+            password: 'pass'
+          }
+        }
+      } else if (action === 'start-snowflake-oauth') {
+        payload.userKey = USER_KEY
+        payload.snowflakeDatasource = {
+          name: 'My Snowflake (SSO)',
+          account: 'xy12345.us-east-1',
+          warehouse: 'COMPUTE_WH',
+          database: 'ANALYTICS',
+          schema: 'PUBLIC'
+        }
+      }
+
+      document.getElementById('api-payload').value = JSON.stringify(payload, null, 2)
+    }
+
+    async function sendApiRequest() {
+      try {
+        const payload = JSON.parse(document.getElementById('api-payload').value)
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        const data = await response.json()
+        showOutput(data)
+      } catch (error) {
+        showOutput({ error: error.message })
+      }
+    }
+
+    function showOutput(data) {
+      document.getElementById('output').textContent = JSON.stringify(data, null, 2)
+    }
+
+    // Snowflake SSO
+    document.getElementById('sso-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+
+      const statusEl = document.getElementById('sso-status')
+      statusEl.innerHTML = '<div class="loading">Starting OAuth flow...</div>'
+
+      try {
+        // Request authorization URL from server
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'start-snowflake-oauth',
+            userId: USER_ID,
+            userKey: USER_KEY,
+            snowflakeDatasource: {
+              name: document.getElementById('sso-name').value,
+              description: document.getElementById('sso-description').value || undefined,
+              account: document.getElementById('sso-account').value,
+              warehouse: document.getElementById('sso-warehouse').value || undefined,
+              database: document.getElementById('sso-database').value || undefined,
+              schema: document.getElementById('sso-schema').value || undefined,
+              role: document.getElementById('sso-role').value || undefined
+            }
+          })
+        })
+
+        const data = await response.json()
+        showOutput(data)
+
+        if (data.error) {
+          statusEl.innerHTML = `<div class="test-result test-error">${data.error}</div>`
+          return
+        }
+
+        if (data.authorizationUrl) {
+          statusEl.innerHTML = '<div class="loading">Opening Snowflake login popup...</div>'
+
+          // Open OAuth popup
+          openOAuthPopup(data.authorizationUrl, (result) => {
+            if (result.success) {
+              statusEl.innerHTML = `<div class="test-result test-success">Connected! Datasource ID: ${result.datasourceId}</div>`
+              document.getElementById('sso-form').reset()
+              loadDatasources()
+            } else {
+              statusEl.innerHTML = `<div class="test-result test-error">${result.error || 'OAuth failed'}</div>`
+            }
+          })
+        } else {
+          statusEl.innerHTML = '<div class="test-result test-error">No authorization URL returned</div>'
+        }
+      } catch (error) {
+        statusEl.innerHTML = `<div class="test-result test-error">${error.message}</div>`
+        showOutput({ error: error.message })
+      }
+    })
+
+    // OAuth popup helper
+    function openOAuthPopup(url, callback) {
+      const width = 600
+      const height = 700
+      const left = window.screenX + (window.outerWidth - width) / 2
+      const top = window.screenY + (window.outerHeight - height) / 2
+
+      const popup = window.open(
+        url,
+        'oauth-popup',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+      )
+
+      if (!popup) {
+        callback({ success: false, error: 'Failed to open popup. Please allow popups for this site.' })
+        return
+      }
+
+      popup.focus()
+
+      // Listen for OAuth callback message
+      const messageHandler = (event) => {
+        if (!event.data || typeof event.data !== 'object' || !('success' in event.data)) {
+          return
+        }
+
+        window.removeEventListener('message', messageHandler)
+        clearInterval(checkClosed)
+        callback(event.data)
+      }
+
+      window.addEventListener('message', messageHandler)
+
+      // Check if popup was closed
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed)
+          window.removeEventListener('message', messageHandler)
+        }
+      }, 500)
+
+      // Timeout after 10 minutes
+      setTimeout(() => {
+        clearInterval(checkClosed)
+        window.removeEventListener('message', messageHandler)
+        if (!popup.closed) {
+          popup.close()
+          callback({ success: false, error: 'OAuth timed out' })
+        }
+      }, 10 * 60 * 1000)
+    }
+
+    // Initialize
+    loadDatasources()
+    updateApiPayload()
+  </script>
+</body>
+</html>

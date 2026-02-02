@@ -490,6 +490,23 @@ export interface AIAnalystConfig {
    * @example "Claude 3.5 Sonnet"
    */
   aiModelName?: string
+
+  /**
+   * Datasource ID to use for queries (for server-managed datasources)
+   * When set, the AI Analyst will use this datasource for table discovery and queries.
+   * The endpoint must support datasource-aware operations.
+   */
+  datasourceId?: string
+
+  /**
+   * User ID for authenticated datasource operations
+   */
+  userId?: string
+
+  /**
+   * User key for credential decryption (required for user-managed datasources)
+   */
+  userKey?: string
 }
 
 /** A database table/data source available for AI queries */
@@ -664,6 +681,8 @@ export interface ListTablesResponse {
   tables: Array<{
     /** Table name */
     name: string
+    /** Schema name (for databases that support schemas) */
+    schema?: string
     /** Optional description for AI context */
     description?: string
   }>

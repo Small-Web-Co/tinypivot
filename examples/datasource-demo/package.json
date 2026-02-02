@@ -1,0 +1,16 @@
+{
+  "name": "datasource-demo",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup": "node setup-db.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-server": "workspace:*",
+    "pg": "^8.11.0",
+    "snowflake-sdk": "^1.6.0"
+  }
+}

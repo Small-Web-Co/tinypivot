@@ -14,6 +14,13 @@ export type { LinkableWidget } from './field-links'
 // ID generation utilities
 export { generateId, generateUUID } from './id'
 
+// OAuth popup utilities
+export {
+  generateOAuthState,
+  openOAuthPopup,
+} from './oauth-popup'
+export type { OAuthPopupOptions, OAuthSuccessData } from './oauth-popup'
+
 // SQL parsing utilities
 export {
   extractTablesFromSQL,

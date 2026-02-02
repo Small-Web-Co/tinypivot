@@ -51,6 +51,7 @@ export type {
   DatasourceAdapter,
   DatasourceAdapterFactory,
   DatasourceConfig,
+  DatasourceInfo,
   DatasourceRegistry,
   DatasourceType,
   ForeignKeyInfo,

@@ -41,15 +41,19 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
-    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external pg --external snowflake-sdk",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch --external pg --external snowflake-sdk",
     "type-check": "tsc --noEmit"
   },
   "peerDependencies": {
-    "pg": "^8.0.0"
+    "pg": "^8.0.0",
+    "snowflake-sdk": "^1.6.0 || ^2.0.0"
   },
   "peerDependenciesMeta": {
     "pg": {
+      "optional": true
+    },
+    "snowflake-sdk": {
       "optional": true
     }
   },

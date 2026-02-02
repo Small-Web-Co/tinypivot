@@ -4,6 +4,7 @@
  */
 
 export {
+  datasources,
   pages,
   shares,
   versions,
@@ -11,10 +12,12 @@ export {
 } from './schema'
 
 export type {
+  InsertDatasource,
   InsertPage,
   InsertShare,
   InsertVersion,
   InsertWidget,
+  SelectDatasource,
   SelectPage,
   SelectShare,
   SelectVersion,
