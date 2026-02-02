@@ -50,6 +50,8 @@ interface DataGridProps {
   initialHeight?: number
   minHeight?: number
   maxHeight?: number
+  /** Initial view mode to display (default: 'grid') */
+  initialViewMode?: 'grid' | 'pivot' | 'chart' | 'ai'
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
   onCellClick?: (payload: {
@@ -89,6 +91,7 @@ export function DataGrid({
   initialHeight = 600,
   minHeight = 300,
   maxHeight = 1200,
+  initialViewMode = 'grid',
   aiAnalyst,
   onCellClick,
   onExport,
@@ -126,7 +129,7 @@ export function DataGrid({
   const [verticalResizeStartHeight, setVerticalResizeStartHeight] = useState(0)
   const [showCopyToast, setShowCopyToast] = useState(false)
   const [copyToastMessage, setCopyToastMessage] = useState('')
-  const [viewMode, setViewMode] = useState<'ai' | 'grid' | 'pivot' | 'chart'>('grid')
+  const [viewMode, setViewMode] = useState<'ai' | 'grid' | 'pivot' | 'chart'>(initialViewMode)
 
   // AI Analyst ref (for accessing loadFullData)
   const aiAnalystRef = useRef<AIAnalystHandle>(null)
