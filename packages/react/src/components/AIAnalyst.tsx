@@ -72,20 +72,46 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [showSqlPanel, setShowSqlPanel] = useState(false)
+  const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(new Set(['public']))
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Filter data sources by search
-  const filteredDataSources = useMemo(() => {
-    if (!searchQuery.trim())
-      return dataSources
-    const q = searchQuery.toLowerCase()
-    return dataSources.filter((ds: { name: string, description?: string, table: string }) =>
-      ds.name.toLowerCase().includes(q)
-      || ds.description?.toLowerCase().includes(q)
-      || ds.table.toLowerCase().includes(q),
+  // Group data sources by schema for tree view
+  const schemaTree = useMemo(() => {
+    const tree: Record<string, typeof dataSources> = {}
+    for (const ds of dataSources) {
+      // Extract schema from the table identifier (e.g., "public.users" -> "public")
+      const schema = ds.table?.includes('.')
+        ? ds.table.split('.')[0]
+        : 'default'
+      if (!tree[schema])
+        tree[schema] = []
+      tree[schema].push(ds)
+    }
+    // Sort schemas: 'public' first, then alphabetically
+    return Object.fromEntries(
+      Object.entries(tree).sort(([a], [b]) => {
+        if (a === 'public')
+          return -1
+        if (b === 'public')
+          return 1
+        return a.localeCompare(b)
+      }),
     )
-  }, [dataSources, searchQuery])
+  }, [dataSources])
+
+  function toggleSchema(schemaName: string) {
+    setExpandedSchemas((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(schemaName)) {
+        newSet.delete(schemaName)
+      }
+      else {
+        newSet.add(schemaName)
+      }
+      return newSet
+    })
+  }
 
   // Get schema for selected data source
   const currentSchema: AITableSchema | undefined = useMemo(() => {
@@ -306,37 +332,71 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
                     type="text"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search data sources..."
+                    placeholder="Search tables..."
                     className="vpg-ai-search-input"
                   />
                 </div>
-                <div className="vpg-ai-datasource-grid">
-                  {filteredDataSources.map((ds: { id: string, name: string, description?: string }) => (
-                    <button
-                      key={ds.id}
-                      className="vpg-ai-datasource-card"
-                      onClick={() => selectDataSource(ds.id)}
-                    >
-                      <div className="vpg-ai-datasource-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+
+                {/* Schema Tree */}
+                <div className="vpg-ai-schema-tree">
+                  {Object.entries(schemaTree).map(([schemaName, tables]) => (
+                    <div key={schemaName} className="vpg-ai-schema-group">
+                      {/* Schema Header (expandable) */}
+                      <button
+                        type="button"
+                        className="vpg-ai-schema-header"
+                        onClick={() => toggleSchema(schemaName)}
+                      >
+                        <svg
+                          className={`vpg-ai-chevron${expandedSchemas.has(schemaName) ? ' expanded' : ''}`}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                        <svg className="vpg-ai-schema-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <ellipse cx="12" cy="5" rx="9" ry="3" />
                           <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
                         </svg>
-                      </div>
-                      <div className="vpg-ai-datasource-info">
-                        <span className="vpg-ai-datasource-name">{ds.name}</span>
-                        {ds.description && (
-                          <span className="vpg-ai-datasource-desc">{ds.description}</span>
-                        )}
-                      </div>
-                    </button>
+                        <span className="vpg-ai-schema-name">{schemaName}</span>
+                        <span className="vpg-ai-table-count">{tables.length}</span>
+                      </button>
+
+                      {/* Table List (collapsible) */}
+                      {expandedSchemas.has(schemaName) && (
+                        <div className="vpg-ai-table-list">
+                          {tables
+                            .filter((t: { name: string, table: string }) =>
+                              !searchQuery.trim()
+                              || t.name.toLowerCase().includes(searchQuery.toLowerCase())
+                              || t.table.toLowerCase().includes(searchQuery.toLowerCase()),
+                            )
+                            .map((table: { id: string, name: string }) => (
+                              <button
+                                key={table.id}
+                                type="button"
+                                className="vpg-ai-table-item"
+                                onClick={() => selectDataSource(table.id)}
+                              >
+                                <svg className="vpg-ai-table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                                  <line x1="3" y1="9" x2="21" y2="9" />
+                                  <line x1="9" y1="21" x2="9" y2="9" />
+                                </svg>
+                                <span>{table.name.includes('.') ? table.name.split('.')[1] : table.name}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
-                {filteredDataSources.length === 0 && (
+
+                {Object.keys(schemaTree).length === 0 && (
                   <div className="vpg-ai-no-results">
-                    No data sources match "
-                    {searchQuery}
-                    "
+                    No tables available
                   </div>
                 )}
               </>
