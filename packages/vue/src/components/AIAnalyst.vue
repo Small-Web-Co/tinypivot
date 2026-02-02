@@ -107,18 +107,6 @@ function toggleSchema(schemaName: string) {
   expandedSchemas.value = newSet
 }
 
-// Filter data sources by search
-const filteredDataSources = computed(() => {
-  if (!searchQuery.value.trim())
-    return dataSources.value
-  const q = searchQuery.value.toLowerCase()
-  return dataSources.value.filter(ds =>
-    ds.name.toLowerCase().includes(q)
-    || ds.description?.toLowerCase().includes(q)
-    || ds.table.toLowerCase().includes(q),
-  )
-})
-
 // Get schema for selected data source
 const currentSchema = computed((): AITableSchema | undefined => {
   if (!selectedDataSource.value)
@@ -321,7 +309,7 @@ function hasQueryResult(message: AIMessage): boolean {
           </div>
         </template>
 
-        <!-- Data source list -->
+        <!-- Data source list (schema tree) -->
         <template v-else>
           <div class="vpg-ai-search">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -331,33 +319,68 @@ function hasQueryResult(message: AIMessage): boolean {
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="Search data sources..."
+              placeholder="Search tables..."
               class="vpg-ai-search-input"
             >
           </div>
 
-          <div class="vpg-ai-datasource-grid">
-            <button
-              v-for="ds in filteredDataSources"
-              :key="ds.id"
-              class="vpg-ai-datasource-card"
-              @click="selectDataSource(ds.id)"
+          <!-- Schema Tree -->
+          <div class="vpg-ai-schema-tree">
+            <div
+              v-for="(tables, schemaName) in schemaTree"
+              :key="schemaName"
+              class="vpg-ai-schema-group"
             >
-              <div class="vpg-ai-datasource-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <!-- Schema Header (expandable) -->
+              <button
+                type="button"
+                class="vpg-ai-schema-header"
+                @click="toggleSchema(schemaName as string)"
+              >
+                <svg
+                  class="vpg-ai-chevron"
+                  :class="{ expanded: expandedSchemas.has(schemaName as string) }"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+                <svg class="vpg-ai-schema-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <ellipse cx="12" cy="5" rx="9" ry="3" />
                   <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
                 </svg>
+                <span class="vpg-ai-schema-name">{{ schemaName }}</span>
+                <span class="vpg-ai-table-count">{{ tables.length }}</span>
+              </button>
+
+              <!-- Table List (collapsible) -->
+              <div v-show="expandedSchemas.has(schemaName as string)" class="vpg-ai-table-list">
+                <button
+                  v-for="table in tables.filter(t =>
+                    !searchQuery.trim()
+                    || t.name.toLowerCase().includes(searchQuery.toLowerCase())
+                    || t.table.toLowerCase().includes(searchQuery.toLowerCase()),
+                  )"
+                  :key="table.id"
+                  type="button"
+                  class="vpg-ai-table-item"
+                  @click="selectDataSource(table.id)"
+                >
+                  <svg class="vpg-ai-table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="9" y1="21" x2="9" y2="9" />
+                  </svg>
+                  <span>{{ table.name.includes('.') ? table.name.split('.')[1] : table.name }}</span>
+                </button>
               </div>
-              <div class="vpg-ai-datasource-info">
-                <span class="vpg-ai-datasource-name">{{ ds.name }}</span>
-                <span v-if="ds.description" class="vpg-ai-datasource-desc">{{ ds.description }}</span>
-              </div>
-            </button>
+            </div>
           </div>
 
-          <div v-if="filteredDataSources.length === 0" class="vpg-ai-no-results">
-            No data sources match "{{ searchQuery }}"
+          <div v-if="Object.keys(schemaTree).length === 0" class="vpg-ai-no-results">
+            No tables available
           </div>
         </template>
       </div>
