@@ -7,6 +7,7 @@ import type {
   Block,
   CalloutBlock,
   ColumnsBlock,
+  GridPosition,
   HeadingBlock,
   ImageBlock,
   Page,
@@ -21,11 +22,13 @@ import type {
   WidgetGridBlock,
 } from '@smallwebco/tinypivot-studio'
 import { DataGrid } from '@smallwebco/tinypivot-vue'
-import { computed } from 'vue'
+import { GridStack } from 'gridstack'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
 import '@smallwebco/tinypivot-vue/style.css'
+import 'gridstack/dist/gridstack.min.css'
 
 /**
  * Props for PageViewer component
@@ -61,8 +64,168 @@ const allowExport = computed(() => {
   return props.share.settings.allowExport
 })
 
+// Check if using grid layout
+const isGridLayout = computed(() => props.page.layoutMode === 'grid')
+
 // Render blocks in read-only mode
 const renderableBlocks = computed(() => props.page.blocks || [])
+
+// Widget data storage - keyed by block ID
+const widgetData = ref<Record<string, Record<string, unknown>[]>>({})
+const widgetLoading = ref<Record<string, boolean>>({})
+const widgetErrors = ref<Record<string, string>>({})
+
+// GridStack instance for grid layout
+const gridContainerRef = ref<HTMLDivElement | null>(null)
+let gridInstance: GridStack | null = null
+
+// Initialize GridStack for grid layout
+function initGridStack() {
+  if (!gridContainerRef.value || !isGridLayout.value)
+    return
+
+  gridInstance = GridStack.init({
+    column: 12,
+    cellHeight: 80,
+    margin: 8,
+    disableDrag: true,
+    disableResize: true,
+    staticGrid: true,
+    float: true,
+  }, gridContainerRef.value)
+}
+
+// Cleanup GridStack
+function destroyGridStack() {
+  if (gridInstance) {
+    gridInstance.destroy(false)
+    gridInstance = null
+  }
+}
+
+// Get grid position for a block
+function getBlockGridPosition(block: Block): GridPosition {
+  return block.gridPosition || { x: 0, y: 0, w: 12, h: 4 }
+}
+
+// Fetch data for a widget with a datasource
+async function fetchWidgetData(block: WidgetBlock) {
+  const datasourceId = block.metadata?.datasourceId as string
+  if (!datasourceId || datasourceId === 'sample' || !props.apiEndpoint) {
+    // Use sample data if no datasource configured
+    widgetData.value[block.id] = getSampleData()
+    return
+  }
+
+  widgetLoading.value[block.id] = true
+  widgetErrors.value[block.id] = ''
+
+  try {
+    // Get table/query from widget metadata
+    const tableName = block.metadata?.tableName as string
+    const query = block.metadata?.query as string
+
+    // If no table or query specified, use sample data
+    if (!tableName && !query) {
+      widgetData.value[block.id] = getSampleData()
+      return
+    }
+
+    // Build the SQL query
+    const sql = query || `SELECT * FROM ${tableName} LIMIT 1000`
+
+    // Call the API to fetch data
+    const response = await fetch(props.apiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'query-datasource',
+        datasourceId,
+        query: sql,
+        userId: props.userId,
+        userKey: props.userKey,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
+
+    if (result.error) {
+      throw new Error(result.error)
+    }
+
+    widgetData.value[block.id] = result.rows || result.data || []
+  }
+  catch (err) {
+    console.error(`Failed to fetch data for widget ${block.id}:`, err)
+    widgetErrors.value[block.id] = err instanceof Error ? err.message : 'Failed to load data'
+    // Fall back to sample data on error
+    widgetData.value[block.id] = getSampleData()
+  }
+  finally {
+    widgetLoading.value[block.id] = false
+  }
+}
+
+// Get sample data for widgets without datasource
+function getSampleData(): Record<string, unknown>[] {
+  return [
+    { id: 1, product: 'Widget A', category: 'Electronics', sales: 1250, revenue: 31250 },
+    { id: 2, product: 'Widget B', category: 'Electronics', sales: 980, revenue: 24500 },
+    { id: 3, product: 'Gadget X', category: 'Home', sales: 750, revenue: 18750 },
+    { id: 4, product: 'Gadget Y', category: 'Home', sales: 620, revenue: 15500 },
+    { id: 5, product: 'Device Z', category: 'Office', sales: 1100, revenue: 27500 },
+  ]
+}
+
+// Get data for a specific widget block
+function getWidgetData(blockId: string): Record<string, unknown>[] {
+  return widgetData.value[blockId] || []
+}
+
+// Check if widget is loading
+function isWidgetLoading(blockId: string): boolean {
+  return widgetLoading.value[blockId] || false
+}
+
+// Load data for all widgets on mount
+async function loadAllWidgetData() {
+  const widgetBlocks = renderableBlocks.value.filter(isWidgetBlock)
+
+  // Load all widget data in parallel
+  await Promise.all(widgetBlocks.map(block => fetchWidgetData(block)))
+}
+
+// Initialize on mount
+onMounted(async () => {
+  // Load widget data
+  await loadAllWidgetData()
+
+  // Initialize grid if needed
+  if (isGridLayout.value) {
+    await nextTick()
+    initGridStack()
+  }
+})
+
+// Watch for layout mode changes
+watch(isGridLayout, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    initGridStack()
+  }
+  else {
+    destroyGridStack()
+  }
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  destroyGridStack()
+})
 
 // Helper to get heading tag
 function getHeadingTag(level: 1 | 2 | 3 | 4 | 5 | 6): string {
@@ -169,7 +332,7 @@ function handleExportPDF() {
 </script>
 
 <template>
-  <div class="tps-page-viewer">
+  <div class="tps-page-viewer" :class="{ 'tps-page-viewer--grid': isGridLayout }">
     <!-- Header -->
     <header v-if="page.title" class="tps-viewer-header">
       <div class="tps-viewer-header-content">
@@ -187,8 +350,8 @@ function handleExportPDF() {
       </button>
     </header>
 
-    <!-- Content -->
-    <main class="tps-viewer-content">
+    <!-- Content - Linear Layout -->
+    <main v-if="!isGridLayout" class="tps-viewer-content">
       <div
         v-for="block in renderableBlocks"
         :key="block.id"
@@ -218,10 +381,15 @@ function handleExportPDF() {
             {{ block.titleOverride || 'Widget' }}
           </h3>
           <div class="tps-viewer-widget-content" :style="{ height: typeof block.height === 'number' ? `${block.height}px` : block.height }">
+            <div v-if="isWidgetLoading(block.id)" class="tps-viewer-widget-loading">
+              <div class="tps-viewer-spinner" />
+              <span>Loading data...</span>
+            </div>
             <DataGrid
-              :data="[]"
+              v-else
+              :data="getWidgetData(block.id)"
               :show-controls="isInteractive"
-              :show-pivot="false"
+              :show-pivot="isInteractive"
               :enable-export="allowExport"
             />
           </div>
@@ -242,9 +410,9 @@ function handleExportPDF() {
               {{ widget.titleOverride }}
             </h4>
             <DataGrid
-              :data="[]"
+              :data="getWidgetData(widget.widgetId)"
               :show-controls="isInteractive"
-              :show-pivot="false"
+              :show-pivot="isInteractive"
               :enable-export="allowExport"
             />
           </div>
@@ -389,6 +557,110 @@ function handleExportPDF() {
       </div>
     </main>
 
+    <!-- Content - Grid Layout -->
+    <main v-else ref="gridContainerRef" class="tps-viewer-content grid-stack">
+      <div
+        v-for="block in renderableBlocks"
+        :key="block.id"
+        class="grid-stack-item"
+        :gs-id="block.id"
+        :gs-x="getBlockGridPosition(block).x"
+        :gs-y="getBlockGridPosition(block).y"
+        :gs-w="getBlockGridPosition(block).w"
+        :gs-h="getBlockGridPosition(block).h"
+      >
+        <div class="grid-stack-item-content">
+          <!-- Text block -->
+          <div
+            v-if="isTextBlock(block)"
+            class="tps-viewer-text tps-grid-block"
+            :class="{ [`tps-viewer-text--${block.align}`]: block.align }"
+            v-html="block.content"
+          />
+
+          <!-- Heading block -->
+          <div
+            v-else-if="isHeadingBlock(block)"
+            class="tps-viewer-heading-wrapper tps-grid-block"
+          >
+            <component
+              :is="getHeadingTag(block.level)"
+              class="tps-viewer-heading"
+              :class="{ [`tps-viewer-heading--${block.align}`]: block.align }"
+            >
+              {{ block.content }}
+            </component>
+          </div>
+
+          <!-- Widget block -->
+          <div v-else-if="isWidgetBlock(block)" class="tps-viewer-widget tps-grid-block">
+            <h3 v-if="block.showTitle !== false && (block.titleOverride || block.widgetId)" class="tps-viewer-widget-title">
+              {{ block.titleOverride || 'Widget' }}
+            </h3>
+            <div class="tps-viewer-widget-content" style="height: 100%;">
+              <div v-if="isWidgetLoading(block.id)" class="tps-viewer-widget-loading">
+                <div class="tps-viewer-spinner" />
+                <span>Loading data...</span>
+              </div>
+              <DataGrid
+                v-else
+                :data="getWidgetData(block.id)"
+                :show-controls="isInteractive"
+                :show-pivot="isInteractive"
+                :enable-export="allowExport"
+                style="height: 100%;"
+              />
+            </div>
+          </div>
+
+          <!-- Image block -->
+          <figure
+            v-else-if="isImageBlock(block)"
+            class="tps-viewer-image tps-grid-block"
+            :class="{ [`tps-viewer-image--${block.align}`]: block.align }"
+          >
+            <img
+              :src="block.src"
+              :alt="block.alt || ''"
+              :style="{
+                width: '100%',
+                height: '100%',
+                objectFit: block.objectFit || 'cover',
+                borderRadius: block.shape === 'circle' ? '50%' : block.shape === 'rounded' ? '8px' : undefined,
+              }"
+            >
+          </figure>
+
+          <!-- Stat block -->
+          <div
+            v-else-if="isStatBlock(block)"
+            class="tps-viewer-stat tps-grid-block"
+            :class="getStatSizeClass(block.size)"
+          >
+            <div class="tps-viewer-stat-value" :style="{ color: block.color }">
+              <span v-if="block.prefix" class="tps-viewer-stat-prefix">{{ block.prefix }}</span>
+              {{ block.value }}
+              <span v-if="block.suffix" class="tps-viewer-stat-suffix">{{ block.suffix }}</span>
+            </div>
+            <div class="tps-viewer-stat-label">
+              {{ block.label }}
+            </div>
+            <div
+              v-if="block.trend"
+              class="tps-viewer-stat-trend"
+              :class="getTrendClass(block.trend)"
+            >
+              <span class="tps-viewer-stat-trend-arrow">{{ getTrendArrow(block.trend.direction) }}</span>
+              <span v-if="block.trend.value">{{ block.trend.value }}</span>
+            </div>
+          </div>
+
+          <!-- Divider block -->
+          <hr v-else-if="isDividerBlock(block)" class="tps-viewer-divider tps-grid-block">
+        </div>
+      </div>
+    </main>
+
     <!-- Footer -->
     <footer v-if="share?.settings.showAuthor && page.createdBy" class="tps-viewer-footer">
       <span>Created by {{ page.createdBy }}</span>
@@ -402,6 +674,10 @@ function handleExportPDF() {
   margin: 0 auto;
   padding: 2rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.tps-page-viewer--grid {
+  max-width: 100%;
 }
 
 /* Header styles */
@@ -457,6 +733,16 @@ function handleExportPDF() {
   margin-bottom: 1.5rem;
 }
 
+/* Grid block styling */
+.tps-grid-block {
+  height: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow: hidden;
+}
+
 /* Text block */
 .tps-viewer-text {
   line-height: 1.6;
@@ -476,6 +762,15 @@ function handleExportPDF() {
   color: #1e293b;
   margin: 1.5rem 0 0.75rem;
   font-weight: 600;
+}
+
+.tps-viewer-heading-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.tps-viewer-heading-wrapper .tps-viewer-heading {
+  margin: 0;
 }
 
 .tps-viewer-heading--center {
@@ -504,6 +799,31 @@ function handleExportPDF() {
 
 .tps-viewer-widget-content {
   min-height: 200px;
+}
+
+.tps-viewer-widget-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 0.75rem;
+  color: #64748b;
+}
+
+.tps-viewer-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: tps-viewer-spin 0.8s linear infinite;
+}
+
+@keyframes tps-viewer-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Widget Grid */
@@ -758,5 +1078,14 @@ function handleExportPDF() {
   border-top: 1px solid #e2e8f0;
   color: #64748b;
   font-size: 0.875rem;
+}
+
+/* GridStack overrides for viewer */
+.tps-page-viewer--grid .grid-stack {
+  background: transparent;
+}
+
+.tps-page-viewer--grid .grid-stack-item-content {
+  background: transparent;
 }
 </style>

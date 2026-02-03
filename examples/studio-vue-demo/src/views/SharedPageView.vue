@@ -56,7 +56,13 @@ onMounted(async () => {
     <div v-else-if="error" class="error">
       {{ error }}
     </div>
-    <PageViewer v-else-if="page && share" :page="page" :share="share" :storage="storage" />
+    <PageViewer
+      v-else-if="page && share"
+      :page="page"
+      :share="share"
+      :storage="storage"
+      api-endpoint="/api/tinypivot"
+    />
   </div>
 </template>
 
