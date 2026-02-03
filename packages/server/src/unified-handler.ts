@@ -82,6 +82,14 @@ export interface TinyPivotHandlerOptions {
   apiKey?: string
 
   /**
+   * Custom OpenAI-compatible base URL for AI requests.
+   * When set, uses OpenAI chat completions format with optional Bearer auth.
+   * @default process.env.AI_BASE_URL
+   * @example "http://localhost:11434/v1"
+   */
+  aiBaseUrl?: string
+
+  /**
    * Table filtering options
    * By default, all tables in the 'public' schema are exposed.
    */
