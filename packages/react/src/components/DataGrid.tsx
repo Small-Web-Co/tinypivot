@@ -56,6 +56,10 @@ interface DataGridProps {
   initialViewMode?: 'grid' | 'pivot' | 'chart' | 'ai'
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
+  /** Optional widget ID for state persistence */
+  widgetId?: string
+  /** Initial view state from persisted storage */
+  initialViewState?: { activeTab?: 'ai' | 'grid' | 'pivot' | 'chart' }
   onCellClick?: (payload: {
     row: number
     col: number
@@ -70,6 +74,8 @@ interface DataGridProps {
   onAIConversationUpdate?: (payload: AIConversationUpdateEvent) => void
   onAIQueryExecuted?: (payload: AIQueryExecutedEvent) => void
   onAIError?: (payload: AIErrorEvent) => void
+  // View state change event
+  onViewStateChange?: (payload: { activeTab: 'ai' | 'grid' | 'pivot' | 'chart' }) => void
 }
 
 const MIN_COL_WIDTH = 120
@@ -96,6 +102,8 @@ export function DataGrid({
   maxHeight = 1200,
   initialViewMode = 'grid',
   aiAnalyst,
+  widgetId,
+  initialViewState,
   onCellClick,
   onExport,
   onCopy,
@@ -103,6 +111,7 @@ export function DataGrid({
   onAIConversationUpdate,
   onAIQueryExecuted,
   onAIError,
+  onViewStateChange,
 }: DataGridProps) {
   const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro } = useLicense()
 
@@ -132,7 +141,16 @@ export function DataGrid({
   const [verticalResizeStartHeight, setVerticalResizeStartHeight] = useState(0)
   const [showCopyToast, setShowCopyToast] = useState(false)
   const [copyToastMessage, setCopyToastMessage] = useState('')
-  const [viewMode, setViewMode] = useState<'ai' | 'grid' | 'pivot' | 'chart'>(initialViewMode)
+  const [viewMode, setViewMode] = useState<'ai' | 'grid' | 'pivot' | 'chart'>(
+    initialViewState?.activeTab || initialViewMode,
+  )
+
+  // Emit view state changes when widgetId is provided
+  useEffect(() => {
+    if (widgetId && onViewStateChange) {
+      onViewStateChange({ activeTab: viewMode })
+    }
+  }, [viewMode, widgetId, onViewStateChange])
 
   // AI Analyst ref (for accessing loadFullData)
   const aiAnalystRef = useRef<AIAnalystHandle>(null)

@@ -34,6 +34,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import draggable from 'vuedraggable'
 
 import { provideStudio, type StudioConfig } from '../composables'
+import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
 import RichTextEditor from './RichTextEditor.vue'
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
@@ -624,6 +625,15 @@ onMounted(async () => {
   try {
     const result = await storage.value.listPages()
     pages.value = result.items
+
+    // Restore last page if available
+    const lastPageId = getLastPage()
+    if (lastPageId && pages.value.length > 0) {
+      const lastPage = pages.value.find(p => p.id === lastPageId)
+      if (lastPage) {
+        await handleSelectPage(lastPageId)
+      }
+    }
   }
   catch (error) {
     console.error('Failed to load pages:', error)
@@ -675,6 +685,9 @@ async function handleSelectPage(pageId: string) {
   try {
     const page = await storage.value.getPage(pageId)
     currentPage.value = page
+
+    // Save as last page
+    saveLastPage(pageId)
   }
   catch (error) {
     console.error('Failed to load page:', error)
@@ -2610,6 +2623,8 @@ defineExpose({
                 <!-- Widget with Data (using sample data for now, filtered by active filters) -->
                 <div v-else class="tps-widget-content" :class="{ 'tps-widget-linked': activeFilters.length > 0 }">
                   <DataGrid
+                    :widget-id="block.id"
+                    :initial-view-state="getWidgetState(block.id) ?? undefined"
                     :data="getFilteredSampleData()"
                     :theme="resolvedTheme"
                     :show-controls="shouldShowControls(block.id)"
@@ -2624,6 +2639,7 @@ defineExpose({
                     :ai-analyst="getAiAnalystConfigForDatasource(block.metadata?.datasourceId as string)"
                     :initial-view-mode="shouldAutoShowAI(block) ? 'ai' : 'grid'"
                     @cell-click="(payload) => handleWidgetRowClick(block.id, payload.rowData)"
+                    @view-state-change="(state) => saveWidgetState(block.id, state)"
                   />
                 </div>
 
@@ -3107,6 +3123,8 @@ defineExpose({
                           </div>
                           <div v-else class="tps-widget-content">
                             <DataGrid
+                              :widget-id="childBlock.id"
+                              :initial-view-state="getWidgetState(childBlock.id) ?? undefined"
                               :data="widgetSampleData"
                               :theme="resolvedTheme"
                               :show-controls="shouldShowControls(childBlock.id)"
@@ -3120,6 +3138,7 @@ defineExpose({
                               :max-height="400"
                               :ai-analyst="getAiAnalystConfigForDatasource(childBlock.metadata?.datasourceId as string)"
                               :initial-view-mode="shouldAutoShowAI(childBlock as WidgetBlock) ? 'ai' : 'grid'"
+                              @view-state-change="(state) => saveWidgetState(childBlock.id, state)"
                             />
                           </div>
                         </div>
@@ -4044,6 +4063,8 @@ defineExpose({
                   </div>
                   <div v-else class="tps-widget-content">
                     <DataGrid
+                      :widget-id="block.id"
+                      :initial-view-state="getWidgetState(block.id) ?? undefined"
                       :data="getFilteredSampleData()"
                       :theme="resolvedTheme"
                       :show-controls="shouldShowControls(block.id)"
@@ -4055,6 +4076,7 @@ defineExpose({
                       :ai-analyst="getAiAnalystConfigForDatasource(block.metadata?.datasourceId as string)"
                       :initial-view-mode="shouldAutoShowAI(block) ? 'ai' : 'grid'"
                       style="height: 100%"
+                      @view-state-change="(state) => saveWidgetState(block.id, state)"
                     />
                   </div>
                 </div>

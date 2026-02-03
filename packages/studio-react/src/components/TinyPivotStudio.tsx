@@ -44,6 +44,7 @@ import { GridStack } from 'gridstack'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
+import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
 import { RichTextEditor } from './RichTextEditor'
 import { ShareModal } from './ShareModal'
 
@@ -416,6 +417,16 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
       try {
         const result = await storage.listPages()
         setPages(result.items)
+
+        // Restore last page if available
+        const lastPageId = getLastPage()
+        if (lastPageId && result.items.length > 0) {
+          const lastPage = result.items.find(p => p.id === lastPageId)
+          if (lastPage) {
+            const page = await storage.getPage(lastPageId)
+            setCurrentPage(page)
+          }
+        }
       }
       catch (error) {
         console.error('Failed to load pages:', error)
@@ -436,6 +447,9 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
     try {
       const page = await storage.getPage(pageId)
       setCurrentPage(page)
+
+      // Save as last page
+      saveLastPage(pageId)
     }
     catch (error) {
       console.error('Failed to load page:', error)
@@ -2569,6 +2583,8 @@ function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget
         ) : (
           <div className="tps-widget-content">
             <DataGrid
+              widgetId={block.id}
+              initialViewState={getWidgetState(block.id) ?? undefined}
               data={filteredData}
               theme={theme}
               showControls={shouldShowControls?.(block.id)}
@@ -2579,6 +2595,7 @@ function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget
               enableVerticalResize={false}
               initialViewMode={shouldAutoShowAI(block) ? 'ai' : 'grid'}
               aiAnalyst={getAiAnalystConfig?.(block.metadata?.datasourceId as string)}
+              onViewStateChange={state => saveWidgetState(block.id, state)}
             />
           </div>
         )}
@@ -3109,6 +3126,8 @@ function WidgetBlockComponent({
       {!isLoading && !error && hasWidgetData && (
         <div className={`tps-widget-content ${activeFilters && activeFilters.length > 0 ? 'tps-widget-linked' : ''}`}>
           <DataGrid
+            widgetId={block.id}
+            initialViewState={getWidgetState(block.id) ?? undefined}
             data={filteredData}
             theme={theme}
             showControls={showControls}
@@ -3123,6 +3142,7 @@ function WidgetBlockComponent({
             initialViewMode={shouldAutoShowAI(block) ? 'ai' : 'grid'}
             onCellClick={({ rowData }) => handleRowClick(rowData)}
             aiAnalyst={getAiAnalystConfig?.(block.metadata?.datasourceId as string)}
+            onViewStateChange={state => saveWidgetState(block.id, state)}
           />
         </div>
       )}

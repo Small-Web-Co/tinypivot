@@ -56,6 +56,10 @@ const props = withDefaults(defineProps<{
   aiAnalyst?: AIAnalystConfig
   /** Initial view mode to display (default: 'grid') */
   initialViewMode?: 'grid' | 'pivot' | 'chart' | 'ai'
+  /** Optional widget ID for state persistence */
+  widgetId?: string
+  /** Initial view state from persisted storage */
+  initialViewState?: { activeTab?: 'ai' | 'grid' | 'pivot' | 'chart' }
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -91,6 +95,8 @@ const emit = defineEmits<{
   (e: 'aiConversationUpdate', payload: AIConversationUpdateEvent): void
   (e: 'aiQueryExecuted', payload: AIQueryExecutedEvent): void
   (e: 'aiError', payload: AIErrorEvent): void
+  // View state change event
+  (e: 'viewStateChange', payload: { activeTab: 'ai' | 'grid' | 'pivot' | 'chart' }): void
 }>()
 
 const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro } = useLicense()
@@ -424,8 +430,17 @@ function copySelectionToClipboard() {
   )
 }
 
-// View mode - initialized from prop or defaults to 'grid'
-const viewMode = ref<'ai' | 'grid' | 'pivot' | 'chart'>(props.initialViewMode || 'grid')
+// View mode - initialized from persisted state, prop, or defaults to 'grid'
+const viewMode = ref<'ai' | 'grid' | 'pivot' | 'chart'>(
+  props.initialViewState?.activeTab || props.initialViewMode || 'grid',
+)
+
+// Emit view state changes when widgetId is provided
+watch(viewMode, (newMode) => {
+  if (props.widgetId) {
+    emit('viewStateChange', { activeTab: newMode })
+  }
+})
 
 function handleAIDataLoaded(payload: AIDataLoadedEvent) {
   aiLoadedData.value = payload.data
