@@ -186,9 +186,19 @@ const activeColumnMenu = ref<string | null>(null)
 const hoveredBlockId = ref<string | null>(null)
 const focusedBlockId = ref<string | null>(null)
 
-// eslint-disable-next-line unused-imports/no-unused-vars -- Will be used in Tasks 1.2-1.5
 function shouldShowControls(blockId: string): boolean {
   return hoveredBlockId.value === blockId || focusedBlockId.value === blockId
+}
+
+function handleBlockFocusOut(event: FocusEvent, _blockId: string) {
+  const relatedTarget = event.relatedTarget as HTMLElement | null
+  const blockElement = event.currentTarget as HTMLElement
+
+  // Keep focus if the new target is still within the block
+  if (relatedTarget && blockElement.contains(relatedTarget)) {
+    return
+  }
+  focusedBlockId.value = null
 }
 
 // ============================================================================
@@ -2434,8 +2444,12 @@ defineExpose({
                 v-else-if="isWidgetBlock(block)"
                 :data-block-id="block.id"
                 class="tps-block tps-block-widget tps-block-resizable"
-                :class="{ 'tps-block-resizing': resizingBlockId === block.id }"
+                :class="{ 'tps-block-resizing': resizingBlockId === block.id, 'tps-block-controls-visible': shouldShowControls(block.id) }"
                 :style="{ minHeight: getWidgetHeightStyle(block), height: getBlockHeightStyle(block) }"
+                @mouseenter="hoveredBlockId = block.id"
+                @mouseleave="hoveredBlockId = null"
+                @focusin="focusedBlockId = block.id"
+                @focusout="handleBlockFocusOut($event, block.id)"
               >
                 <div class="tps-block-drag-handle" title="Drag to reorder">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

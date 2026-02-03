@@ -1028,16 +1028,24 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
   const [showBlockMenu, setShowBlockMenu] = useState(false)
   const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([])
 
-  // Widget hover state tracking - Will be used in Tasks 1.2-1.5
+  // Widget hover state tracking
+  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null)
+  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null)
 
-  const [hoveredBlockId, _setHoveredBlockId] = useState<string | null>(null)
-
-  const [focusedBlockId, _setFocusedBlockId] = useState<string | null>(null)
-
-  // eslint-disable-next-line unused-imports/no-unused-vars
   const shouldShowControls = useCallback((blockId: string): boolean => {
     return hoveredBlockId === blockId || focusedBlockId === blockId
   }, [hoveredBlockId, focusedBlockId])
+
+  const handleBlockFocusOut = useCallback((event: React.FocusEvent, _blockId: string) => {
+    const relatedTarget = event.relatedTarget as HTMLElement | null
+    const blockElement = event.currentTarget as HTMLElement
+
+    // Keep focus if the new target is still within the block
+    if (relatedTarget && blockElement.contains(relatedTarget)) {
+      return
+    }
+    setFocusedBlockId(null)
+  }, [])
 
   // Layout mode state
   const [layoutMode, setLayoutModeState] = useState<LayoutMode>(page.layoutMode || 'linear')
@@ -1770,6 +1778,11 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
                       activeFilters={activeFilters}
                       onWidgetRowClick={handleWidgetRowClick}
                       getAiAnalystConfig={getAiAnalystConfig}
+                      shouldShowControls={shouldShowControls}
+                      onMouseEnter={setHoveredBlockId}
+                      onMouseLeave={() => setHoveredBlockId(null)}
+                      onFocusIn={setFocusedBlockId}
+                      onFocusOut={handleBlockFocusOut}
                     />
                   </SortableBlockWrapper>
                 ))}
@@ -2187,9 +2200,19 @@ interface BlockRendererProps {
   onWidgetRowClick?: (widgetBlockId: string, row: Record<string, unknown>) => void
   /** Get AI Analyst config for a datasource */
   getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
+  /** Whether controls should be visible for this block */
+  shouldShowControls?: (blockId: string) => boolean
+  /** Callback when mouse enters block */
+  onMouseEnter?: (blockId: string) => void
+  /** Callback when mouse leaves block */
+  onMouseLeave?: () => void
+  /** Callback when block receives focus */
+  onFocusIn?: (blockId: string) => void
+  /** Callback when block loses focus */
+  onFocusOut?: (event: React.FocusEvent, blockId: string) => void
 }
 
-function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick, getAiAnalystConfig }: BlockRendererProps) {
+function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick, getAiAnalystConfig, shouldShowControls, onMouseEnter, onMouseLeave, onFocusIn, onFocusOut }: BlockRendererProps) {
   if (block.type === 'text') {
     return (
       <TextBlockComponent
@@ -2230,6 +2253,11 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
         activeFilters={activeFilters}
         onRowClick={onWidgetRowClick}
         getAiAnalystConfig={getAiAnalystConfig}
+        showControls={shouldShowControls?.(block.id)}
+        onMouseEnter={onMouseEnter ? () => onMouseEnter(block.id) : undefined}
+        onMouseLeave={onMouseLeave}
+        onFocusIn={onFocusIn ? () => onFocusIn(block.id) : undefined}
+        onFocusOut={onFocusOut ? (e: React.FocusEvent) => onFocusOut(e, block.id) : undefined}
       />
     )
   }
@@ -2793,6 +2821,11 @@ function WidgetBlockComponent({
   activeFilters = [],
   onRowClick,
   getAiAnalystConfig,
+  showControls,
+  onMouseEnter,
+  onMouseLeave,
+  onFocusIn,
+  onFocusOut,
 }: {
   block: WidgetBlock
   theme: 'light' | 'dark'
@@ -2802,6 +2835,11 @@ function WidgetBlockComponent({
   activeFilters?: ActiveFilter[]
   onRowClick?: (widgetBlockId: string, row: Record<string, unknown>) => void
   getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
+  showControls?: boolean
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
+  onFocusIn?: () => void
+  onFocusOut?: (event: React.FocusEvent) => void
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -2888,8 +2926,12 @@ function WidgetBlockComponent({
     <div
       ref={blockRef}
       data-block-id={block.id}
-      className={`tps-block tps-block-widget tps-block-resizable ${isResizing ? 'tps-block-resizing' : ''}`}
+      className={`tps-block tps-block-widget tps-block-resizable ${isResizing ? 'tps-block-resizing' : ''} ${showControls ? 'tps-block-controls-visible' : ''}`}
       style={{ minHeight: heightStyle, height: heightStyle }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocus={onFocusIn}
+      onBlur={onFocusOut}
     >
       <div className="tps-block-actions">
         <button
