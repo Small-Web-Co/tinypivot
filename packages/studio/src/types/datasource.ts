@@ -337,7 +337,7 @@ export interface DatasourceInfo {
   /** Tier: 'org' (shared) or 'user' (personal) */
   tier: 'org' | 'user'
   /** Authentication method */
-  authMethod: 'password' | 'keypair' | 'oauth_sso'
+  authMethod: 'password' | 'keypair' | 'oauth_sso' | 'externalbrowser'
   /** Non-sensitive connection configuration */
   connectionConfig?: {
     host?: string
@@ -347,6 +347,8 @@ export interface DatasourceInfo {
     account?: string
     warehouse?: string
     role?: string
+    /** Username for display purposes (not sensitive) */
+    user?: string
   }
   /** Owner user ID (null for org-level) */
   userId?: string

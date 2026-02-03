@@ -19,6 +19,8 @@ import { useAIAnalyst } from '../hooks/useAIAnalyst'
 interface AIAnalystProps {
   config: AIAnalystConfig
   theme?: 'light' | 'dark'
+  /** When true, component fills parent container (for use in studio/embedded contexts) */
+  embedded?: boolean
   onDataLoaded?: (payload: AIDataLoadedEvent) => void
   onConversationUpdate?: (payload: AIConversationUpdateEvent) => void
   onQueryExecuted?: (payload: AIQueryExecutedEvent) => void
@@ -27,13 +29,15 @@ interface AIAnalystProps {
 }
 
 export interface AIAnalystHandle {
-  loadFullData: () => Promise<Record<string, unknown>[] | null>
+  loadFullData: () => Promise<{ data: Record<string, unknown>[] | null, hasMore: boolean, offset: number }>
+  fetchMoreData: (offset: number) => Promise<{ data: Record<string, unknown>[] | null, hasMore: boolean }>
   selectedDataSource: string | undefined
 }
 
 export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
   config,
   theme = 'light',
+  embedded = true,
   onDataLoaded,
   onConversationUpdate,
   onQueryExecuted,
@@ -55,6 +59,7 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
     sendMessage,
     clearConversation,
     loadFullData,
+    fetchMoreData,
   } = useAIAnalyst({
     config,
     onDataLoaded,
@@ -66,16 +71,20 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     loadFullData,
+    fetchMoreData,
     selectedDataSource,
-  }), [loadFullData, selectedDataSource])
+  }), [loadFullData, fetchMoreData, selectedDataSource])
 
   const [inputText, setInputText] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [showSqlPanel, setShowSqlPanel] = useState(false)
-  const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(new Set(['public']))
+  const [currentPage, setCurrentPage] = useState(1)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Pagination constants
+  const rowsPerPage = 50
 
   // Group data sources by schema for tree view
   const schemaTree = useMemo(() => {
@@ -101,38 +110,12 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
     )
   }, [dataSources])
 
-  function toggleSchema(schemaName: string) {
-    setExpandedSchemas((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(schemaName)) {
-        newSet.delete(schemaName)
-      }
-      else {
-        newSet.add(schemaName)
-      }
-      return newSet
-    })
-  }
-
   // Get schema for selected data source
   const currentSchema: AITableSchema | undefined = useMemo(() => {
     if (!selectedDataSource)
       return undefined
     return schemas.get(selectedDataSource)
   }, [selectedDataSource, schemas])
-
-  // Get data for the selected message (or latest)
-  const previewData = useMemo(() => {
-    if (selectedMessageId) {
-      const msg = messages.find((m: AIMessage) => m.id === selectedMessageId)
-      if (msg?.metadata?.data) {
-        return msg.metadata.data.slice(0, 100)
-      }
-    }
-    if (!lastLoadedData)
-      return []
-    return lastLoadedData.slice(0, 100)
-  }, [selectedMessageId, messages, lastLoadedData])
 
   // Get full data for the selected message
   const fullPreviewData = useMemo(() => {
@@ -144,6 +127,25 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
     }
     return lastLoadedData || []
   }, [selectedMessageId, messages, lastLoadedData])
+
+  // Get data for the selected message (or latest) - with pagination
+  const previewData = useMemo(() => {
+    if (!fullPreviewData || fullPreviewData.length === 0)
+      return []
+    const startIndex = (currentPage - 1) * rowsPerPage
+    const endIndex = startIndex + rowsPerPage
+    return fullPreviewData.slice(startIndex, endIndex)
+  }, [fullPreviewData, currentPage, rowsPerPage])
+
+  // Pagination info
+  const totalPages = useMemo(() => Math.ceil(fullPreviewData.length / rowsPerPage), [fullPreviewData.length, rowsPerPage])
+  const canGoPrev = currentPage > 1
+  const canGoNext = currentPage < totalPages
+
+  // Reset page when data changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [fullPreviewData])
 
   // Get column keys from preview data
   const previewColumns = useMemo(() => {
@@ -267,10 +269,10 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
     if (value === null || value === undefined)
       return ''
     if (typeof value === 'number') {
-      if (Math.abs(value) >= 1000) {
-        return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
+      if (Number.isInteger(value)) {
+        return String(value)
       }
-      return String(value)
+      return value.toLocaleString('en-US', { maximumFractionDigits: 4, useGrouping: false })
     }
     return String(value)
   }
@@ -290,116 +292,112 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
   // Render data source picker (full screen)
   if (!selectedDataSource) {
     return (
-      <div className={`vpg-ai-analyst ${theme === 'dark' ? 'vpg-theme-dark' : ''}`}>
-        <div className="vpg-ai-picker-fullscreen">
-          <div className="vpg-ai-picker-content">
-            <div className="vpg-ai-picker-header">
-              <div className="vpg-ai-icon-lg">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
-                  <circle cx="7.5" cy="14.5" r="1.5" fill="currentColor" />
-                  <circle cx="16.5" cy="14.5" r="1.5" fill="currentColor" />
-                </svg>
-              </div>
-              <h2>AI Data Analyst</h2>
-              <p>Select a data source to start exploring with AI</p>
+      <div className={`vpg-ai-analyst ${theme === 'dark' ? 'vpg-theme-dark' : ''} ${embedded ? 'vpg-ai-analyst--embedded' : ''}`}>
+        <div className="vpg-ai-picker">
+          {/* Subtle branding in corner */}
+          <div className="vpg-ai-picker-brand">
+            <div className="vpg-ai-picker-brand-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+                <circle cx="7.5" cy="14.5" r="1.5" fill="currentColor" />
+                <circle cx="16.5" cy="14.5" r="1.5" fill="currentColor" />
+              </svg>
             </div>
+            <span className="vpg-ai-picker-brand-text">AI Analyst</span>
+          </div>
 
+          {/* Main content area */}
+          <div className="vpg-ai-picker-main">
             {dataSources.length === 0 && !isLoadingTables ? (
-              <div className="vpg-ai-empty-state">
-                <p>No data sources configured.</p>
+              <div className="vpg-ai-picker-empty">
+                <h2>No data sources</h2>
+                <p>Configure a data source to start exploring with AI</p>
                 <a
                   href="https://tinypivot.com/docs/ai-analyst"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="vpg-ai-docs-link"
+                  className="vpg-ai-picker-docs-link"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
+                  View documentation
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M7 17L17 7M17 7H7M17 7V17" />
                   </svg>
-                  View Documentation
                 </a>
               </div>
             ) : (
               <>
-                <div className="vpg-ai-search">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search tables..."
-                    className="vpg-ai-search-input"
-                  />
+                {/* Centered search */}
+                <div className="vpg-ai-picker-search-container">
+                  <h2 className="vpg-ai-picker-title">Select a table to explore</h2>
+                  <div className="vpg-ai-picker-search">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Search tables..."
+                      className="vpg-ai-picker-search-input"
+                    />
+                    <kbd className="vpg-ai-picker-kbd">/</kbd>
+                  </div>
                 </div>
 
-                {/* Schema Tree */}
-                <div className="vpg-ai-schema-tree">
-                  {Object.entries(schemaTree).map(([schemaName, tables]) => (
-                    <div key={schemaName} className="vpg-ai-schema-group">
-                      {/* Schema Header (expandable) */}
-                      <button
-                        type="button"
-                        className="vpg-ai-schema-header"
-                        onClick={() => toggleSchema(schemaName)}
-                      >
-                        <svg
-                          className={`vpg-ai-chevron${expandedSchemas.has(schemaName) ? ' expanded' : ''}`}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                        <svg className="vpg-ai-schema-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <ellipse cx="12" cy="5" rx="9" ry="3" />
-                          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                        </svg>
-                        <span className="vpg-ai-schema-name">{schemaName}</span>
-                        <span className="vpg-ai-table-count">{tables.length}</span>
-                      </button>
-
-                      {/* Table List (collapsible) */}
-                      {expandedSchemas.has(schemaName) && (
-                        <div className="vpg-ai-table-list">
-                          {tables
-                            .filter((t: { name: string, table: string }) =>
-                              !searchQuery.trim()
-                              || t.name.toLowerCase().includes(searchQuery.toLowerCase())
-                              || t.table.toLowerCase().includes(searchQuery.toLowerCase()),
-                            )
-                            .map((table: { id: string, name: string }) => (
-                              <button
-                                key={table.id}
-                                type="button"
-                                className="vpg-ai-table-item"
-                                onClick={() => selectDataSource(table.id)}
-                              >
-                                <svg className="vpg-ai-table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {/* Scrollable grid of tables */}
+                <div className="vpg-ai-picker-grid-container">
+                  <div className="vpg-ai-picker-grid">
+                    {Object.entries(schemaTree).map(([schemaName, tables]) => (
+                      <React.Fragment key={schemaName}>
+                        {/* Schema divider (only show if multiple schemas) */}
+                        {Object.keys(schemaTree).length > 1 && (
+                          <div className="vpg-ai-picker-schema-divider vpg-ai-picker-grid-full">
+                            <span>{schemaName}</span>
+                          </div>
+                        )}
+                        {/* Table items */}
+                        {tables
+                          .filter((t: { name: string, table: string }) =>
+                            !searchQuery.trim()
+                            || t.name.toLowerCase().includes(searchQuery.toLowerCase())
+                            || t.table.toLowerCase().includes(searchQuery.toLowerCase()),
+                          )
+                          .map((table: { id: string, name: string }, idx: number) => (
+                            <button
+                              key={table.id}
+                              type="button"
+                              className="vpg-ai-picker-table-item"
+                              style={{ animationDelay: `${idx * 30}ms` }}
+                              onClick={() => selectDataSource(table.id)}
+                            >
+                              <div className="vpg-ai-picker-table-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                   <rect x="3" y="3" width="18" height="18" rx="2" />
                                   <line x1="3" y1="9" x2="21" y2="9" />
                                   <line x1="9" y1="21" x2="9" y2="9" />
                                 </svg>
-                                <span>{table.name.includes('.') ? table.name.split('.')[1] : table.name}</span>
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {Object.keys(schemaTree).length === 0 && (
-                  <div className="vpg-ai-no-results">
-                    No tables available
+                              </div>
+                              <div className="vpg-ai-picker-table-info">
+                                <span className="vpg-ai-picker-table-name">
+                                  {table.name.includes('.') ? table.name.split('.')[1] : table.name}
+                                </span>
+                              </div>
+                              <svg width="16" height="16" className="vpg-ai-picker-table-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          ))}
+                      </React.Fragment>
+                    ))}
                   </div>
-                )}
+
+                  {(Object.keys(schemaTree).length === 0 || (searchQuery.trim() && !Object.values(schemaTree).flat().some((t: { name: string, table: string }) => t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.table.toLowerCase().includes(searchQuery.toLowerCase())))) && (
+                    <div className="vpg-ai-picker-no-results">
+                      No tables found
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -410,7 +408,7 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
 
   // Render split layout
   return (
-    <div className={`vpg-ai-analyst ${theme === 'dark' ? 'vpg-theme-dark' : ''}`}>
+    <div className={`vpg-ai-analyst ${theme === 'dark' ? 'vpg-theme-dark' : ''} ${embedded ? 'vpg-ai-analyst--embedded' : ''}`}>
       <div className="vpg-ai-split-layout">
         {/* Left Panel: Chat */}
         <div className="vpg-ai-chat-panel">
@@ -575,9 +573,7 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
             </form>
             {/* Input footer with model name and actions */}
             <div className="vpg-ai-input-footer">
-              {config.aiModelName && (
-                <span className="vpg-ai-model-name">{config.aiModelName}</span>
-              )}
+              <span className="vpg-ai-model-name">{config.aiModelName || 'AI Model'}</span>
               <div className="vpg-ai-input-actions">
                 {fullPreviewData.length > 0 && (
                   <button
@@ -749,32 +745,71 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
           ) : (
             /* Data table */
             <div className="vpg-ai-preview-table-container">
-              <table className="vpg-ai-preview-table">
-                <thead>
-                  <tr>
-                    {previewColumns.map((col: string) => (
-                      <th key={col}>{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.map((row: Record<string, unknown>, idx: number) => (
-                    <tr key={idx}>
+              <div className="vpg-ai-preview-table-scroll">
+                <table className="vpg-ai-preview-table">
+                  <thead>
+                    <tr>
                       {previewColumns.map((col: string) => (
-                        <td key={col}>{formatCellValue(row[col])}</td>
+                        <th key={col}>{col}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {fullPreviewData.length > 100 && (
-                <div className="vpg-ai-preview-more">
-                  Showing 100 of
-                  {' '}
-                  {fullPreviewData.length.toLocaleString()}
-                  {' '}
-                  rows.
-                  <button onClick={handleViewResults}>View all in Grid</button>
+                  </thead>
+                  <tbody>
+                    {previewData.map((row: Record<string, unknown>, idx: number) => (
+                      <tr key={idx}>
+                        {previewColumns.map((col: string) => (
+                          <td key={col}>{formatCellValue(row[col])}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {fullPreviewData.length > rowsPerPage && (
+                <div className="vpg-ai-preview-pagination">
+                  <div className="vpg-ai-pagination-info">
+                    Showing
+                    {' '}
+                    {((currentPage - 1) * rowsPerPage) + 1}
+                    -
+                    {Math.min(currentPage * rowsPerPage, fullPreviewData.length)}
+                    {' of '}
+                    {fullPreviewData.length.toLocaleString()}
+                    {' '}
+                    rows
+                  </div>
+                  <div className="vpg-ai-pagination-controls">
+                    <button
+                      className="vpg-ai-pagination-btn"
+                      disabled={!canGoPrev}
+                      title="Previous page"
+                      onClick={() => setCurrentPage(p => p - 1)}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="15 18 9 12 15 6" />
+                      </svg>
+                    </button>
+                    <span className="vpg-ai-pagination-page">
+                      {currentPage}
+                      {' '}
+                      /
+                      {' '}
+                      {totalPages}
+                    </span>
+                    <button
+                      className="vpg-ai-pagination-btn"
+                      disabled={!canGoNext}
+                      title="Next page"
+                      onClick={() => setCurrentPage(p => p + 1)}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  </div>
+                  <button className="vpg-ai-view-grid-btn" onClick={handleViewResults}>
+                    View all in Grid
+                  </button>
                 </div>
               )}
             </div>

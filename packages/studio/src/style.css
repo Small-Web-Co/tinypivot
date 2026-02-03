@@ -1473,6 +1473,11 @@
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
+  cursor: grab;
+}
+
+.tps-widget-header:active {
+  cursor: grabbing;
 }
 
 .tps-widget-title-input {
@@ -1497,8 +1502,9 @@
 .tps-widget-content {
   flex: 1;
   min-height: 300px;
-  overflow: hidden;
+  overflow: auto;
   padding: 0.75rem;
+  position: relative;
 }
 
 .tps-widget-placeholder {
@@ -1732,6 +1738,15 @@
    ========================================================================== */
 .tps-block-image {
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.tps-block-image .tps-image-dropzone,
+.tps-block-image .tps-image-loading,
+.tps-block-image .tps-image-preview {
+  flex: 1;
+  min-height: 150px;
 }
 
 .tps-image-placeholder {
@@ -4933,6 +4948,7 @@ body.tps-resizing {
 .tps-grid-block-content .tps-widget-content {
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 .tps-grid-block-content .tps-widget-placeholder {
@@ -5452,45 +5468,14 @@ body.tps-resizing {
   cursor: sw-resize;
 }
 
-/* Visual indicators on hover */
+/* Visual indicators on hover - kept subtle, cursor only */
 .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-e,
-.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-w {
-  background: linear-gradient(to right, transparent 40%, #6366f1 50%, transparent 60%);
-  opacity: 0.5;
-}
-
-.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-s {
-  background: linear-gradient(to bottom, transparent 40%, #6366f1 50%, transparent 60%);
-  opacity: 0.5;
-}
-
+.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-w,
+.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-s,
 .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-se,
 .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-sw {
-  opacity: 1;
-}
-
-.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-se::after,
-.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-sw::after {
-  content: '';
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border: 2px solid #6366f1;
-  border-radius: 2px;
-}
-
-.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-se::after {
-  right: 2px;
-  bottom: 2px;
-  border-left: none;
-  border-top: none;
-}
-
-.tps-blocks-grid .grid-stack-item:hover > .ui-resizable-sw::after {
-  left: 2px;
-  bottom: 2px;
-  border-right: none;
-  border-top: none;
+  /* No visible indicators, just cursor change */
+  background: transparent;
 }
 
 /* Placeholder style when dragging/resizing */
@@ -5506,25 +5491,18 @@ body.tps-resizing {
   border-color: #6366f1;
 }
 
-/* Item being resized */
+/* Item being resized - subtle feedback */
 .tps-blocks-grid .grid-stack-item.ui-resizable-resizing > .grid-stack-item-content {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  /* No visible border change during resize */
 }
 
-/* Dark mode resize handle styles */
+/* Dark mode resize handle styles - kept subtle */
 .tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-e,
-.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-w {
-  background: linear-gradient(to right, transparent 40%, #818cf8 50%, transparent 60%);
-}
-
-.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-s {
-  background: linear-gradient(to bottom, transparent 40%, #818cf8 50%, transparent 60%);
-}
-
-.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-se::after,
-.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-sw::after {
-  border-color: #818cf8;
+.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-w,
+.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-s,
+.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-se,
+.tps-theme-dark .tps-blocks-grid .grid-stack-item:hover > .ui-resizable-sw {
+  background: transparent;
 }
 
 .tps-theme-dark .tps-blocks-grid .grid-stack-placeholder > .placeholder-content {
@@ -5534,7 +5512,7 @@ body.tps-resizing {
 
 .tps-theme-dark .tps-blocks-grid .grid-stack-item.ui-draggable-dragging > .grid-stack-item-content,
 .tps-theme-dark .tps-blocks-grid .grid-stack-item.ui-resizable-resizing > .grid-stack-item-content {
-  border-color: #818cf8;
+  /* No visible border change during resize */
 }
 
 /* ==========================================================================

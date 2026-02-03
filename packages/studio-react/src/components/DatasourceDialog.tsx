@@ -302,7 +302,7 @@ export function DatasourceDialog({
       account: datasource.connectionConfig?.account || '',
       warehouse: datasource.connectionConfig?.warehouse || '',
       role: datasource.connectionConfig?.role || '',
-      username: '', // Don't prefill credentials
+      username: datasource.connectionConfig?.user || '',
       password: '',
     })
     setView('edit')

@@ -4,9 +4,17 @@ import { useState } from 'react'
 
 const storage = createIndexedDBStorage()
 
-// AI Analyst configuration with demo bypass
+// User ID for datasource operations
+// NOTE: These must match what was used when creating datasources
+const userId = 'demo-user'
+// User key for credential encryption (in production, derive from user's auth)
+const userKey = 'demo-user-key-for-encryption'
+// API endpoint for all server operations (datasources, queries, AI)
+const apiEndpoint = '/api/tinypivot'
+
+// AI Analyst configuration
 const aiAnalystConfig = {
-  endpoint: '/api/tinypivot',
+  endpoint: apiEndpoint,
 }
 
 function App() {
@@ -15,7 +23,9 @@ function App() {
   return (
     <div style={{ height: '100vh', position: 'relative' }}>
       <TinyPivotStudio
-        userId="demo-user"
+        userId={userId}
+        userKey={userKey}
+        apiEndpoint={apiEndpoint}
         storage={storage}
         theme={theme}
         aiAnalyst={aiAnalystConfig}

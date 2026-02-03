@@ -4,7 +4,8 @@
  * A simple HTTP server demonstrating the TinyPivot datasource connections API.
  *
  * Usage:
- *   DATABASE_URL=postgresql://... CREDENTIAL_ENCRYPTION_KEY=... node server.js
+ *   node server.js              # Loads .env file automatically
+ *   DATABASE_URL=... node server.js  # Or pass env vars directly
  *
  * For Snowflake SSO testing, also set:
  *   SNOWFLAKE_OAUTH_ACCOUNT=xy12345.us-east-1
@@ -15,6 +16,7 @@
  * Then open http://localhost:3456 in your browser.
  */
 
+import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
@@ -22,6 +24,32 @@ import { fileURLToPath } from 'node:url'
 import { createTinyPivotHandler } from '@smallwebco/tinypivot-server'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// Load .env file if it exists (simple parser, no dependencies)
+const envPath = join(__dirname, '.env')
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, 'utf-8')
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim()
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#'))
+      continue
+    const eqIndex = trimmed.indexOf('=')
+    if (eqIndex === -1)
+      continue
+    const key = trimmed.slice(0, eqIndex).trim()
+    let value = trimmed.slice(eqIndex + 1).trim()
+    // Remove surrounding quotes if present
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\''))) {
+      value = value.slice(1, -1)
+    }
+    // Only set if not already defined (env vars take precedence)
+    if (!(key in process.env)) {
+      process.env[key] = value
+    }
+  }
+}
+
 const PORT = process.env.PORT || 3456
 
 // Check required environment variables
@@ -221,6 +249,16 @@ server.listen(PORT, () => {
   }
   else {
     console.log('    SNOWFLAKE_OAUTH: not configured (set SNOWFLAKE_OAUTH_* env vars for browser SSO)')
+  }
+  // AI configuration
+  if (process.env.AI_API_KEY) {
+    const keyPreview = `${process.env.AI_API_KEY.slice(0, 10)}...`
+    const model = process.env.AI_MODEL || '(provider default)'
+    console.log(`    AI_API_KEY: ${keyPreview}`)
+    console.log(`    AI_MODEL: ${model}`)
+  }
+  else {
+    console.log('    AI: not configured (set AI_API_KEY env var to enable)')
   }
   console.log('')
   console.log('  Open your browser to test the datasource API!')

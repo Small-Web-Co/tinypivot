@@ -436,6 +436,11 @@ const isShowingAIData = computed(() => aiLoadedData.value !== null)
 // Loading state for full data reset
 const isLoadingFullData = ref(false)
 
+// Infinite scroll state
+const isLoadingMore = ref(false)
+const hasMoreData = ref(false)
+const dataOffset = ref(0)
+
 // Reset to full original dataset
 // If AI Analyst is enabled and has a selected data source, load full data from that source
 // Otherwise, just clear the AI loaded data to show original props.data
@@ -444,18 +449,24 @@ async function resetToFullData() {
   if (aiAnalystRef.value?.selectedDataSource) {
     isLoadingFullData.value = true
     try {
-      const fullData = await aiAnalystRef.value.loadFullData()
-      if (fullData && fullData.length > 0) {
-        aiLoadedData.value = fullData
+      const result = await aiAnalystRef.value.loadFullData()
+      if (result.data && result.data.length > 0) {
+        aiLoadedData.value = result.data
+        hasMoreData.value = result.hasMore
+        dataOffset.value = result.offset
       }
       else {
         // Fall back to props.data if loading fails
         aiLoadedData.value = null
+        hasMoreData.value = false
+        dataOffset.value = 0
       }
     }
     catch (err) {
       console.warn('Failed to load full data:', err)
       aiLoadedData.value = null
+      hasMoreData.value = false
+      dataOffset.value = 0
     }
     finally {
       isLoadingFullData.value = false
@@ -464,9 +475,49 @@ async function resetToFullData() {
   else {
     // No AI Analyst or no selected data source - just clear filters by resetting to props.data
     aiLoadedData.value = null
+    hasMoreData.value = false
+    dataOffset.value = 0
   }
   // Also clear any grid filters
   clearAllFilters()
+}
+
+// Load more data for infinite scroll
+async function loadMoreData() {
+  if (isLoadingMore.value || !hasMoreData.value || !aiAnalystRef.value?.fetchMoreData) {
+    return
+  }
+
+  isLoadingMore.value = true
+  try {
+    const result = await aiAnalystRef.value.fetchMoreData(dataOffset.value)
+    if (result.data && result.data.length > 0) {
+      // Append new data to existing
+      aiLoadedData.value = aiLoadedData.value ? [...aiLoadedData.value, ...result.data] : result.data
+      dataOffset.value += result.data.length
+      hasMoreData.value = result.hasMore
+    }
+    else {
+      hasMoreData.value = false
+    }
+  }
+  catch (err) {
+    console.warn('Failed to load more data:', err)
+    hasMoreData.value = false
+  }
+  finally {
+    isLoadingMore.value = false
+  }
+}
+
+// Handle grid scroll for infinite loading
+function handleGridScroll(e: Event) {
+  const target = e.target as HTMLDivElement
+  const { scrollTop, scrollHeight, clientHeight } = target
+  // Load more when within 200px of bottom
+  if (scrollHeight - scrollTop - clientHeight < 200 && hasMoreData.value && !isLoadingMore.value) {
+    loadMoreData()
+  }
 }
 
 function handleAIConversationUpdate(payload: AIConversationUpdateEvent) {
@@ -878,12 +929,6 @@ function isCellSelected(rowIndex: number, colIndex: number): boolean {
 }
 
 // Format cell value
-const noFormatPatterns = /^(?:.*_)?(?:id|code|year|month|quarter|day|week|date|zip|phone|fax|ssn|ein|npi|ndc|gpi|hcpcs|icd|cpt|rx|bin|pcn|group|member|claim|rx_number|script|fill)(?:_.*)?$/i
-
-function shouldFormatNumber(columnId: string): boolean {
-  return !noFormatPatterns.test(columnId)
-}
-
 function formatCellValue(value: unknown, columnId: string): string {
   if (value === null || value === undefined)
     return ''
@@ -895,10 +940,6 @@ function formatCellValue(value: unknown, columnId: string): string {
     const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
     if (Number.isNaN(num))
       return String(value)
-
-    if (shouldFormatNumber(columnId) && Math.abs(num) >= 1000) {
-      return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
-    }
 
     if (Number.isInteger(num)) {
       return String(num)
@@ -973,8 +1014,9 @@ function handleContainerClick(event: MouseEvent) {
       { 'vpg-striped': stripedRows },
       { 'vpg-resizing': resizingColumnId },
       { 'vpg-resizing-vertical': isResizingVertically },
+      { 'vpg-fill-parent': !enableVerticalResize },
     ]"
-    :style="{ height: `${gridHeight}px` }"
+    :style="enableVerticalResize ? { height: `${gridHeight}px` } : undefined"
     @click="handleContainerClick"
   >
     <!-- Copy Toast -->
@@ -1208,6 +1250,7 @@ function handleContainerClick(event: MouseEvent) {
         ref="aiAnalystRef"
         :config="aiAnalyst"
         :theme="currentTheme"
+        :embedded="aiAnalyst.embedded"
         @data-loaded="handleAIDataLoaded"
         @conversation-update="handleAIConversationUpdate"
         @query-executed="handleAIQueryExecuted"
@@ -1218,7 +1261,7 @@ function handleContainerClick(event: MouseEvent) {
 
     <!-- Grid View -->
     <template v-if="viewMode === 'grid'">
-      <div ref="tableContainerRef" class="vpg-grid-container" tabindex="0">
+      <div ref="tableContainerRef" class="vpg-grid-container" tabindex="0" @scroll="handleGridScroll">
         <div v-if="loading" class="vpg-loading">
           <div class="vpg-spinner" />
           <span>Loading data...</span>
@@ -1319,6 +1362,20 @@ function handleContainerClick(event: MouseEvent) {
               </tr>
             </tbody>
           </table>
+
+          <!-- Infinite scroll loading indicator -->
+          <div v-if="isLoadingMore" class="vpg-loading-more">
+            <div class="vpg-spinner-small" />
+            <span>Loading more rows...</span>
+          </div>
+
+          <!-- All data loaded indicator -->
+          <div
+            v-else-if="!hasMoreData && aiLoadedData && aiLoadedData.length > 0 && dataOffset > 0"
+            class="vpg-all-loaded"
+          >
+            All {{ aiLoadedData.length.toLocaleString() }} rows loaded
+          </div>
         </div>
       </div>
     </template>

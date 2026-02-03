@@ -243,16 +243,15 @@ export function analyzeFieldsForChart(
 
 /**
  * Format field name as label
+ * Handles camelCase, snake_case, kebab-case, and ALL_CAPS
  */
 export function formatFieldLabel(field: string): string {
   return field
-    .replace(/([A-Z])/g, ' $1')
+    // Only add space before uppercase if preceded by lowercase (camelCase)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[_-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
 }
 
 /**

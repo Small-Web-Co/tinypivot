@@ -117,21 +117,25 @@ function getAiAnalystConfigForDatasource(datasourceId?: string) {
   if (!datasourceId || datasourceId === 'sample') {
     return {
       enabled: true,
+      embedded: true,
       endpoint: props.aiAnalyst.endpoint,
       persistToLocalStorage: true,
       sessionId: `studio-${props.userId || 'demo'}`,
+      apiKey: props.aiAnalyst.apiKey,
     }
   }
 
   // For real datasources, include auth info for datasource-specific queries
   return {
     enabled: true,
+    embedded: true,
     endpoint: props.aiAnalyst.endpoint,
     persistToLocalStorage: true,
     sessionId: `studio-${props.userId || 'demo'}-${datasourceId}`,
     datasourceId,
     userId: props.userId,
     userKey: props.userKey || props.userId,
+    apiKey: props.aiAnalyst.apiKey,
   }
 }
 
@@ -170,7 +174,7 @@ const editorBlocks = ref<Block[]>([])
 const showBlockMenu = ref(false)
 
 // Layout mode state
-const layoutMode = ref<LayoutMode>('linear')
+const layoutMode = ref<LayoutMode>('grid')
 const gridInstance = ref<GridStack | null>(null)
 const gridContainerRef = ref<HTMLElement | null>(null)
 
@@ -309,7 +313,7 @@ function initGrid() {
     cellHeight: 80,
     margin: 8,
     animate: true,
-    draggable: { handle: '.tps-block-drag-handle' },
+    draggable: { handle: '.tps-block-drag-handle, .tps-widget-header, .tps-block-header' },
     // Enable resizing from all sides for maximum flexibility
     resizable: { handles: 'e,se,s,sw,w' },
     // Float mode allows blocks to be placed anywhere, not just stacked
@@ -361,7 +365,36 @@ function destroyGrid() {
 
 // Convert blocks from linear to grid positions
 // Creates a smart initial layout - widgets side by side, text full width
+// Preserves existing grid positions if they exist
 function convertLinearToGrid() {
+  // Check if any blocks already have grid positions (returning from linear mode)
+  const hasExistingPositions = editorBlocks.value.some(b => b.gridPosition)
+  if (hasExistingPositions) {
+    // Preserve existing positions, only assign new ones to blocks without positions
+    editorBlocks.value.forEach((block) => {
+      if (!block.gridPosition) {
+        // Find the lowest y position to place new block at the bottom
+        const maxY = editorBlocks.value.reduce((max, b) => {
+          const pos = b.gridPosition
+          if (pos) {
+            return Math.max(max, pos.y + pos.h)
+          }
+          return max
+        }, 0)
+        const defaultWidth = isWidgetBlock(block) ? 6 : 12
+        const defaultHeight = isWidgetBlock(block) ? 4 : 2
+        block.gridPosition = {
+          x: 0,
+          y: maxY,
+          w: defaultWidth,
+          h: defaultHeight,
+        }
+      }
+    })
+    return
+  }
+
+  // No existing positions - create initial layout
   let yPos = 0
   let currentRow: Block[] = []
 
@@ -590,7 +623,7 @@ watch(currentPage, async (page, _oldPage) => {
     if (page) {
       editorTitle.value = page.title
       editorBlocks.value = [...page.blocks]
-      layoutMode.value = page.layoutMode || 'linear'
+      layoutMode.value = page.layoutMode || 'grid'
 
       // Initialize grid if page was saved in grid mode
       if (layoutMode.value === 'grid') {
@@ -603,7 +636,7 @@ watch(currentPage, async (page, _oldPage) => {
     else {
       editorTitle.value = ''
       editorBlocks.value = []
-      layoutMode.value = 'linear'
+      layoutMode.value = 'grid'
     }
   }
   // If same page (just an update), don't reset editor state
@@ -1759,6 +1792,12 @@ function triggerImageFileInput(blockId: string) {
   input?.click()
 }
 
+// Trigger file input click for grid mode image upload
+function triggerGridImageFileInput(blockId: string) {
+  const input = document.getElementById(`grid-image-file-${blockId}`) as HTMLInputElement
+  input?.click()
+}
+
 // Get image container classes based on shape and aspect ratio
 function getImageContainerClasses(block: Block & { type: 'image', shape?: string, aspectRatio?: string }): string[] {
   const classes = [`tps-image-preview-container`, `tps-align-${block.align || 'center'}`]
@@ -2480,6 +2519,7 @@ defineExpose({
                     :enable-pagination="false"
                     :enable-search="true"
                     :striped-rows="true"
+                    :enable-vertical-resize="false"
                     :initial-height="350"
                     :min-height="200"
                     :max-height="600"
@@ -2975,6 +3015,7 @@ defineExpose({
                               :enable-pagination="false"
                               :enable-search="true"
                               :striped-rows="true"
+                              :enable-vertical-resize="false"
                               :initial-height="250"
                               :min-height="150"
                               :max-height="400"
@@ -3910,6 +3951,7 @@ defineExpose({
                       :enable-pagination="false"
                       :enable-search="true"
                       :striped-rows="true"
+                      :enable-vertical-resize="false"
                       :ai-analyst="getAiAnalystConfigForDatasource(block.metadata?.datasourceId as string)"
                       :initial-view-mode="shouldAutoShowAI(block) ? 'ai' : 'grid'"
                       style="height: 100%"
@@ -4032,16 +4074,50 @@ defineExpose({
                       </svg>
                     </button>
                   </div>
-                  <div v-if="block.src" class="tps-image-preview">
-                    <img :src="block.src" :alt="block.alt || ''" :style="{ objectFit: block.objectFit || 'cover' }">
-                  </div>
-                  <div v-else class="tps-image-placeholder">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+
+                  <!-- Hidden file input for image upload -->
+                  <input
+                    :id="`grid-image-file-${block.id}`"
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    style="display: none"
+                    @change="(e) => handleImageFileChange(block.id, e)"
+                  >
+
+                  <!-- Image dropzone when no src -->
+                  <div
+                    v-if="!block.src && imageLoadingBlockId !== block.id"
+                    class="tps-image-dropzone"
+                    :class="{ 'tps-dragging': imageDragOverBlockId === block.id }"
+                    @drop="(e) => handleImageDrop(block.id, e)"
+                    @dragover="(e) => handleImageDragOver(block.id, e)"
+                    @dragleave="(e) => handleImageDragLeave(block.id, e)"
+                    @click="triggerGridImageFileInput(block.id)"
+                  >
+                    <svg class="tps-image-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <rect x="3" y="3" width="18" height="18" rx="2" />
                       <circle cx="8.5" cy="8.5" r="1.5" />
                       <path d="M21 15l-5-5L5 21" />
                     </svg>
-                    <span>No image</span>
+                    <div class="tps-image-dropzone-text">
+                      <strong>Drop an image</strong> or click to browse
+                    </div>
+                    <div class="tps-image-dropzone-hint">
+                      Supports JPG, PNG, GIF, WebP
+                    </div>
+                  </div>
+
+                  <!-- Loading state -->
+                  <div v-else-if="imageLoadingBlockId === block.id" class="tps-image-loading">
+                    <svg class="tps-image-loading-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                    <span class="tps-image-loading-text">Loading image...</span>
+                  </div>
+
+                  <!-- Image preview when src exists -->
+                  <div v-else class="tps-image-preview">
+                    <img :src="block.src" :alt="block.alt || ''" :style="{ objectFit: block.objectFit || 'cover' }">
                   </div>
                 </div>
 

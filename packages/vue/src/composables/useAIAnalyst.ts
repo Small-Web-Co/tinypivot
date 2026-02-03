@@ -90,7 +90,6 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
   // State
   const conversation = ref<AIConversation>(loadFromStorage())
   const schemas = ref<Map<string, AITableSchema>>(new Map())
-  const allSchemas = ref<AITableSchema[]>([]) // All table schemas for JOINs
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const lastLoadedData = ref<Record<string, unknown>[] | null>(null)
@@ -159,8 +158,8 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
         description: t.description,
       }))
 
-      // Fetch all schemas for JOIN support
-      await fetchAllSchemas()
+      // Schema is now fetched on-demand when a table is selected via selectDataSource()
+      // This avoids expensive DESCRIBE queries for all tables upfront
     }
     catch (err) {
       console.warn('[TinyPivot] Failed to fetch tables:', err)
@@ -171,54 +170,6 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     }
     finally {
       isLoadingTables.value = false
-    }
-  }
-
-  /**
-   * Fetch schemas for ALL tables at once (enables JOINs)
-   */
-  async function fetchAllSchemas() {
-    if (!config.endpoint)
-      return
-
-    try {
-      // Build request body - include datasource info if available
-      const requestBody: Record<string, unknown> = {
-        action: 'get-all-schemas',
-      }
-      if (config.datasourceId) {
-        requestBody.datasourceId = config.datasourceId
-        requestBody.userId = config.userId
-        requestBody.userKey = config.userKey || config.userId
-      }
-
-      const response = await fetch(config.endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch all schemas: ${response.statusText}`)
-      }
-
-      const data: SchemaResponse = await response.json()
-
-      if (data.error) {
-        throw new Error(data.error)
-      }
-
-      // Store all schemas for JOIN support
-      allSchemas.value = data.schemas
-
-      // Also populate the individual schemas map
-      for (const schema of data.schemas) {
-        schemas.value.set(schema.table, schema)
-      }
-    }
-    catch (err) {
-      // Schema fetch is optional - continue without it
-      console.warn('[TinyPivot] Failed to fetch all schemas:', err)
     }
   }
 
@@ -305,13 +256,21 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
       return
 
     try {
+      // Build request body - include datasource info if available
+      const requestBody: Record<string, unknown> = {
+        action: 'get-schema',
+        tables: [dataSource.table],
+      }
+      if (config.datasourceId) {
+        requestBody.datasourceId = config.datasourceId
+        requestBody.userId = config.userId
+        requestBody.userKey = config.userKey || config.userId
+      }
+
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get-schema',
-          tables: [dataSource.table],
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -562,12 +521,10 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     const dataSourceId = conversation.value.dataSourceId
 
     // Build system prompt using effective data sources
-    // Pass allSchemas to enable JOINs with related tables
     const systemPrompt = buildSystemPrompt(
       effectiveDataSources.value,
       schemas.value,
       dataSourceId,
-      allSchemas.value.length > 0 ? allSchemas.value : undefined,
     )
 
     // Get conversation messages for API
@@ -584,7 +541,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     const response = await fetch(config.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'chat', messages }),
+      body: JSON.stringify({ action: 'chat', messages, apiKey: config.apiKey }),
     })
 
     if (!response.ok) {
@@ -774,25 +731,32 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
 
   /**
    * Load full data for the currently selected data source
-   * Returns the full dataset (not limited) for displaying in the grid
+   * Returns the first batch of data for displaying in the grid (supports infinite scroll)
    */
-  async function loadFullData(): Promise<Record<string, unknown>[] | null> {
+  async function loadFullData(): Promise<{
+    data: Record<string, unknown>[] | null
+    hasMore: boolean
+    offset: number
+  }> {
     const dataSourceId = conversation.value.dataSourceId
     if (!dataSourceId) {
-      return null
+      return { data: null, hasMore: false, offset: 0 }
     }
 
     const dataSource = effectiveDataSources.value.find(ds => ds.id === dataSourceId)
     if (!dataSource) {
-      return null
+      return { data: null, hasMore: false, offset: 0 }
     }
 
-    // Use custom data source loader if provided
+    const batchSize = config.batchSize || 1000
+    const enableInfiniteScroll = config.enableInfiniteScroll !== false
+
+    // Use custom data source loader if provided (no pagination support)
     if (config.dataSourceLoader) {
       try {
         const { data } = await config.dataSourceLoader(dataSourceId)
         if (data && data.length > 0) {
-          return data
+          return { data, hasMore: false, offset: data.length }
         }
       }
       catch (err) {
@@ -802,10 +766,10 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
           type: 'network',
         })
       }
-      return null
+      return { data: null, hasMore: false, offset: 0 }
     }
 
-    // Use query executor to get all data
+    // Use query executor to get all data (no pagination support)
     if (config.queryExecutor) {
       try {
         const result = await config.queryExecutor(
@@ -813,7 +777,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
           dataSource.table,
         )
         if (result.data && result.data.length > 0) {
-          return result.data
+          return { data: result.data, hasMore: false, offset: result.data.length }
         }
       }
       catch (err) {
@@ -823,29 +787,71 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
           type: 'network',
         })
       }
-      return null
+      return { data: null, hasMore: false, offset: 0 }
     }
 
-    // Use endpoint query action
-    if (config.endpoint) {
+    // Use endpoint query action - prefer datasource-specific path if datasourceId is set
+    if (config.endpoint && config.datasourceId) {
       try {
-        const response = await fetch(config.endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'query',
+        // Use paginated query for infinite scroll
+        if (enableInfiniteScroll) {
+          const requestBody = {
+            action: 'query-datasource-paginated',
+            datasourceId: config.datasourceId,
+            userId: config.userId,
+            userKey: config.userKey || config.userId,
             sql: `SELECT * FROM ${dataSource.table}`,
-            table: dataSource.table,
-          }),
-        })
+            offset: 0,
+            limit: batchSize,
+          }
 
-        if (!response.ok) {
-          throw new Error(`Failed to load data: ${response.statusText}`)
+          const response = await fetch(config.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          })
+
+          if (!response.ok) {
+            throw new Error(`Failed to load data: ${response.statusText}`)
+          }
+
+          const result = await response.json()
+          if (result.success && result.data) {
+            return {
+              data: result.data,
+              hasMore: result.hasMore,
+              offset: result.data.length,
+            }
+          }
+          if (result.error) {
+            throw new Error(result.error)
+          }
         }
+        else {
+          // Non-paginated query
+          const requestBody = {
+            action: 'query-datasource',
+            datasourceId: config.datasourceId,
+            userId: config.userId,
+            userKey: config.userKey || config.userId,
+            sql: `SELECT * FROM ${dataSource.table}`,
+            maxRows: config.maxRows || 10000,
+          }
 
-        const data = await response.json()
-        if (data.data && data.data.length > 0) {
-          return data.data
+          const response = await fetch(config.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          })
+
+          if (!response.ok) {
+            throw new Error(`Failed to load data: ${response.statusText}`)
+          }
+
+          const data = await response.json()
+          if (data.data && data.data.length > 0) {
+            return { data: data.data, hasMore: false, offset: data.data.length }
+          }
         }
       }
       catch (err) {
@@ -855,16 +861,119 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
           type: 'network',
         })
       }
-      return null
+      return { data: null, hasMore: false, offset: 0 }
+    }
+
+    // Standard endpoint without datasourceId (DuckDB-style)
+    if (config.endpoint) {
+      try {
+        const requestBody = {
+          action: 'query',
+          sql: `SELECT * FROM ${dataSource.table}`,
+          table: dataSource.table,
+        }
+
+        const response = await fetch(config.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to load data: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        if (data.data && data.data.length > 0) {
+          return { data: data.data, hasMore: false, offset: data.data.length }
+        }
+      }
+      catch (err) {
+        console.warn('Failed to load full data from endpoint:', err)
+        onError?.({
+          message: err instanceof Error ? err.message : 'Failed to load full data',
+          type: 'network',
+        })
+      }
+      return { data: null, hasMore: false, offset: 0 }
     }
 
     // Demo mode - get initial data
     if (config.demoMode) {
       const initialData = getInitialDemoData(dataSourceId)
-      return initialData || null
+      return { data: initialData || null, hasMore: false, offset: initialData?.length || 0 }
     }
 
-    return null
+    return { data: null, hasMore: false, offset: 0 }
+  }
+
+  /**
+   * Fetch more data for infinite scroll
+   * @param offset The current data offset
+   * @returns The next batch of data and pagination info
+   */
+  async function fetchMoreData(offset: number): Promise<{
+    data: Record<string, unknown>[] | null
+    hasMore: boolean
+  }> {
+    const dataSourceId = conversation.value.dataSourceId
+    if (!dataSourceId) {
+      return { data: null, hasMore: false }
+    }
+
+    const dataSource = effectiveDataSources.value.find(ds => ds.id === dataSourceId)
+    if (!dataSource) {
+      return { data: null, hasMore: false }
+    }
+
+    const batchSize = config.batchSize || 1000
+
+    // Only datasource endpoint supports pagination
+    if (!config.endpoint || !config.datasourceId) {
+      return { data: null, hasMore: false }
+    }
+
+    try {
+      const requestBody = {
+        action: 'query-datasource-paginated',
+        datasourceId: config.datasourceId,
+        userId: config.userId,
+        userKey: config.userKey || config.userId,
+        sql: `SELECT * FROM ${dataSource.table}`,
+        offset,
+        limit: batchSize,
+      }
+
+      const response = await fetch(config.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to load more data: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      if (result.success && result.data) {
+        return {
+          data: result.data,
+          hasMore: result.hasMore,
+        }
+      }
+      if (result.error) {
+        throw new Error(result.error)
+      }
+    }
+    catch (err) {
+      console.warn('Failed to fetch more data:', err)
+      onError?.({
+        message: err instanceof Error ? err.message : 'Failed to load more data',
+        type: 'network',
+      })
+    }
+
+    return { data: null, hasMore: false }
   }
 
   /**
@@ -923,7 +1032,9 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     importConversation,
     /** Refresh table list from endpoint */
     fetchTables,
-    /** Load full data for the currently selected data source */
+    /** Load full data for the currently selected data source (first batch) */
     loadFullData,
+    /** Fetch more data for infinite scroll */
+    fetchMoreData,
   }
 }

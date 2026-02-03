@@ -306,7 +306,39 @@ interface StudioLayoutProps {
  * Provides the sidebar and main content area structure
  */
 function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
-  const { storage, apiEndpoint, userKey, userId, selectedDatasourceId, setSelectedDatasourceId } = useStudioContext()
+  const { storage, apiEndpoint, userKey, userId, aiAnalyst, selectedDatasourceId, setSelectedDatasourceId } = useStudioContext()
+
+  // Get AI Analyst config for a specific widget/datasource
+
+  const getAiAnalystConfigForDatasource = useCallback((datasourceId?: string) => {
+    if (!aiAnalyst?.endpoint)
+      return undefined
+
+    // If using sample data or no datasource, return basic config
+    if (!datasourceId || datasourceId === 'sample') {
+      return {
+        enabled: true,
+        embedded: true,
+        endpoint: aiAnalyst.endpoint,
+        persistToLocalStorage: true,
+        sessionId: `studio-${userId || 'demo'}`,
+        apiKey: aiAnalyst.apiKey,
+      }
+    }
+
+    // For real datasources, include auth info for datasource-specific queries
+    return {
+      enabled: true,
+      embedded: true,
+      endpoint: aiAnalyst.endpoint,
+      persistToLocalStorage: true,
+      sessionId: `studio-${userId || 'demo'}-${datasourceId}`,
+      datasourceId,
+      userId,
+      userKey: userKey || userId,
+      apiKey: aiAnalyst.apiKey,
+    }
+  }, [aiAnalyst, userId, userKey])
 
   // State
   const [pages, setPages] = useState<PageListItem[]>([])
@@ -549,6 +581,7 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
             theme={theme}
             onUpdatePage={handleUpdatePage}
             onConfigureWidget={openWidgetConfigModal}
+            getAiAnalystConfig={getAiAnalystConfigForDatasource}
           />
         ) : (
           <EmptyState onCreatePage={() => setShowCreateModal(true)} />
@@ -979,6 +1012,7 @@ interface PageEditorProps {
   theme: 'light' | 'dark'
   onUpdatePage: (page: Page) => void
   onConfigureWidget: (block: WidgetBlock) => void
+  getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
 }
 
 interface ActiveFilter {
@@ -988,7 +1022,7 @@ interface ActiveFilter {
   sourceWidgetId?: string
 }
 
-function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditorProps) {
+function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalystConfig }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
   const [blocks, setBlocks] = useState<Block[]>(page.blocks)
   const [showBlockMenu, setShowBlockMenu] = useState(false)
@@ -1724,6 +1758,7 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
                       onConfigureWidget={onConfigureWidget}
                       activeFilters={activeFilters}
                       onWidgetRowClick={handleWidgetRowClick}
+                      getAiAnalystConfig={getAiAnalystConfig}
                     />
                   </SortableBlockWrapper>
                 ))}
@@ -1757,6 +1792,7 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget }: PageEditor
                     onConfigureWidget={onConfigureWidget}
                     activeFilters={activeFilters}
                     onWidgetRowClick={handleWidgetRowClick}
+                    getAiAnalystConfig={getAiAnalystConfig}
                   />
                 </div>
               </div>
@@ -2138,9 +2174,11 @@ interface BlockRendererProps {
   activeFilters?: ActiveFilter[]
   /** Callback when row is clicked in a widget */
   onWidgetRowClick?: (widgetBlockId: string, row: Record<string, unknown>) => void
+  /** Get AI Analyst config for a datasource */
+  getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
 }
 
-function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick }: BlockRendererProps) {
+function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick, getAiAnalystConfig }: BlockRendererProps) {
   if (block.type === 'text') {
     return (
       <TextBlockComponent
@@ -2180,6 +2218,7 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
         onConfigure={onConfigureWidget}
         activeFilters={activeFilters}
         onRowClick={onWidgetRowClick}
+        getAiAnalystConfig={getAiAnalystConfig}
       />
     )
   }
@@ -2213,6 +2252,7 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
         onDelete={onDelete}
         onConfigureWidget={onConfigureWidget}
         isNested={isNested}
+        getAiAnalystConfig={getAiAnalystConfig}
       />
     )
   }
@@ -2280,7 +2320,7 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
 /**
  * Grid block renderer - renders blocks with drag handles for grid mode
  */
-function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, activeFilters, onWidgetRowClick: _onWidgetRowClick }: BlockRendererProps) {
+function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, activeFilters, onWidgetRowClick: _onWidgetRowClick, getAiAnalystConfig }: BlockRendererProps) {
   const DragHandle = () => (
     <div className="tps-block-drag-handle" title="Drag to reorder">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2408,7 +2448,9 @@ function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget
               enablePagination={false}
               enableSearch
               stripedRows
+              enableVerticalResize={false}
               initialViewMode={shouldAutoShowAI(block) ? 'ai' : 'grid'}
+              aiAnalyst={getAiAnalystConfig?.(block.metadata?.datasourceId as string)}
             />
           </div>
         )}
@@ -2739,6 +2781,7 @@ function WidgetBlockComponent({
   onConfigure,
   activeFilters = [],
   onRowClick,
+  getAiAnalystConfig,
 }: {
   block: WidgetBlock
   theme: 'light' | 'dark'
@@ -2747,6 +2790,7 @@ function WidgetBlockComponent({
   onConfigure: (block: WidgetBlock) => void
   activeFilters?: ActiveFilter[]
   onRowClick?: (widgetBlockId: string, row: Record<string, unknown>) => void
+  getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -2929,11 +2973,13 @@ function WidgetBlockComponent({
             enablePagination={false}
             enableSearch={true}
             stripedRows={true}
+            enableVerticalResize={false}
             initialHeight={350}
             minHeight={200}
             maxHeight={600}
             initialViewMode={shouldAutoShowAI(block) ? 'ai' : 'grid'}
             onCellClick={({ rowData }) => handleRowClick(rowData)}
+            aiAnalyst={getAiAnalystConfig?.(block.metadata?.datasourceId as string)}
           />
         </div>
       )}
@@ -3463,6 +3509,7 @@ function ColumnsBlockComponent({
   onDelete,
   onConfigureWidget,
   isNested,
+  getAiAnalystConfig,
 }: {
   block: Block & { type: 'columns', columns: Array<{ id: string, width: number, blocks: Block[] }>, gap?: number, height?: number }
   theme: 'light' | 'dark'
@@ -3470,6 +3517,7 @@ function ColumnsBlockComponent({
   onDelete: (blockId: string) => void
   onConfigureWidget: (block: WidgetBlock) => void
   isNested?: boolean
+  getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
 }) {
   const [isResizing, setIsResizing] = useState(false)
   const [activeColumnMenu, setActiveColumnMenu] = useState<number | null>(null)
@@ -3677,6 +3725,7 @@ function ColumnsBlockComponent({
                       onDelete={blockId => handleNestedBlockDelete(colIndex, blockId)}
                       onConfigureWidget={onConfigureWidget}
                       isNested
+                      getAiAnalystConfig={getAiAnalystConfig}
                     />
                   </div>
                 ))}

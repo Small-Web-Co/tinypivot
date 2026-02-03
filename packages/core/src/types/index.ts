@@ -474,6 +474,19 @@ export interface AIAnalystConfig {
   maxRows?: number
 
   /**
+   * Enable infinite scroll for "Full Data" feature
+   * When enabled, data is fetched in batches as user scrolls
+   * @default true
+   */
+  enableInfiniteScroll?: boolean
+
+  /**
+   * Number of rows to fetch per batch when infinite scroll is enabled
+   * @default 1000
+   */
+  batchSize?: number
+
+  /**
    * Session ID for conversation continuity
    */
   sessionId?: string
@@ -492,6 +505,21 @@ export interface AIAnalystConfig {
   aiModelName?: string
 
   /**
+   * AI API key for LLM requests (client-provided)
+   *
+   * When provided, this key is sent with chat requests and takes precedence
+   * over the server's AI_API_KEY environment variable.
+   *
+   * Auto-detects provider from key format:
+   * - `sk-ant-...` → Anthropic (Claude)
+   * - `sk-or-...` → OpenRouter
+   * - `sk-...` → OpenAI
+   *
+   * @example "sk-ant-api03-..."
+   */
+  apiKey?: string
+
+  /**
    * Datasource ID to use for queries (for server-managed datasources)
    * When set, the AI Analyst will use this datasource for table discovery and queries.
    * The endpoint must support datasource-aware operations.
@@ -507,6 +535,13 @@ export interface AIAnalystConfig {
    * User key for credential decryption (required for user-managed datasources)
    */
   userKey?: string
+
+  /**
+   * When true, the component fills its parent container (for studio/embedded contexts).
+   * Removes standalone sizing and makes the component adapt to parent dimensions.
+   * @default true
+   */
+  embedded?: boolean
 }
 
 /** A database table/data source available for AI queries */
@@ -625,6 +660,26 @@ export interface QueryResponse {
   truncated?: boolean
   /** Query execution time in ms */
   duration?: number
+}
+
+/** Response from a paginated SQL query execution */
+export interface PaginatedQueryResponse {
+  /** Whether the query succeeded */
+  success: boolean
+  /** Query result data */
+  data: Record<string, unknown>[]
+  /** Number of rows returned in this batch */
+  rowCount: number
+  /** Offset used for this query */
+  offset: number
+  /** Limit used for this query */
+  limit: number
+  /** Whether there are more rows to fetch */
+  hasMore: boolean
+  /** Query execution time in ms */
+  duration?: number
+  /** Error message if query failed */
+  error?: string
 }
 
 /** Request to the AI proxy endpoint */

@@ -181,3 +181,21 @@ export function ensureLimit(sql: string, maxRows: number): string {
   const trimmed = sql.replace(/;\s*$/, '').trim()
   return `${trimmed} LIMIT ${maxRows}`
 }
+
+/**
+ * Build a paginated query by removing existing LIMIT/OFFSET and adding new ones
+ * Fetches limit + 1 rows to detect if there are more results
+ */
+export function buildPaginatedQuery(sql: string, offset: number, limit: number): string {
+  // Remove any trailing semicolon and whitespace
+  let trimmed = sql.replace(/;\s*$/, '').trim()
+
+  // Remove existing LIMIT and OFFSET clauses (case insensitive)
+  // Handle both "LIMIT x" and "LIMIT x OFFSET y" patterns
+  trimmed = trimmed.replace(/\bLIMIT\s+\d+(?:\s+OFFSET\s+\d+)?/gi, '').trim()
+  // Also handle "OFFSET x LIMIT y" pattern (some SQL variants)
+  trimmed = trimmed.replace(/\bOFFSET\s+\d+(?:\s+LIMIT\s+\d+)?/gi, '').trim()
+
+  // Add LIMIT (limit + 1 to detect hasMore) and OFFSET
+  return `${trimmed} LIMIT ${limit + 1} OFFSET ${offset}`
+}

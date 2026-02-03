@@ -9,6 +9,7 @@ const storage = createIndexedDBStorage()
 const theme = ref<'light' | 'dark'>('light')
 
 // User ID for datasource operations
+// NOTE: These must match what was used when creating datasources
 const userId = 'demo-user'
 // User key for credential encryption (in production, derive from user's auth)
 const userKey = 'demo-user-key-for-encryption'

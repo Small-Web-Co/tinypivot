@@ -286,7 +286,7 @@ function handleEdit(datasource: DatasourceInfo) {
     account: datasource.connectionConfig?.account || '',
     warehouse: datasource.connectionConfig?.warehouse || '',
     role: datasource.connectionConfig?.role || '',
-    username: '',
+    username: datasource.connectionConfig?.user || '',
     password: '',
   }
   view.value = 'edit'

@@ -213,6 +213,8 @@ export interface TinyPivotRequest {
     | 'connect-datasource'
     | 'query-datasource'
     | 'list-datasource-tables'
+    // Paginated query action
+    | 'query-datasource-paginated'
     // Snowflake OAuth SSO
     | 'start-snowflake-oauth'
     | 'snowflake-oauth-callback'
@@ -226,6 +228,8 @@ export interface TinyPivotRequest {
 
   // For chat
   messages?: Array<{ role: 'user' | 'assistant' | 'system', content: string }>
+  /** Client-provided API key for LLM requests (overrides server AI_API_KEY) */
+  apiKey?: string
 
   // For datasource management
   /** Datasource ID */
@@ -256,6 +260,12 @@ export interface TinyPivotRequest {
   // For query-datasource
   /** Maximum number of rows to return */
   maxRows?: number
+
+  // For query-datasource-paginated
+  /** Offset for paginated queries */
+  offset?: number
+  /** Limit for paginated queries (batch size) */
+  limit?: number
 
   // Authentication context (should be set by your auth middleware)
   /** User ID from authentication */
@@ -468,6 +478,55 @@ const PG_TYPE_MAP: Record<string, AIColumnSchema['type']> = {
 }
 
 // ============================================================================
+// Snowflake Type Mapping
+// ============================================================================
+
+const SNOWFLAKE_TYPE_MAP: Record<string, AIColumnSchema['type']> = {
+  'VARCHAR': 'string',
+  'CHAR': 'string',
+  'CHARACTER': 'string',
+  'STRING': 'string',
+  'TEXT': 'string',
+  'BINARY': 'string',
+  'VARBINARY': 'string',
+  'NUMBER': 'number',
+  'DECIMAL': 'number',
+  'NUMERIC': 'number',
+  'INT': 'number',
+  'INTEGER': 'number',
+  'BIGINT': 'number',
+  'SMALLINT': 'number',
+  'TINYINT': 'number',
+  'BYTEINT': 'number',
+  'FLOAT': 'number',
+  'FLOAT4': 'number',
+  'FLOAT8': 'number',
+  'DOUBLE': 'number',
+  'DOUBLE PRECISION': 'number',
+  'REAL': 'number',
+  'BOOLEAN': 'boolean',
+  'DATE': 'date',
+  'DATETIME': 'date',
+  'TIME': 'date',
+  'TIMESTAMP': 'date',
+  'TIMESTAMP_LTZ': 'date',
+  'TIMESTAMP_NTZ': 'date',
+  'TIMESTAMP_TZ': 'date',
+}
+
+/**
+ * Map a database type to AIColumnSchema type
+ */
+function mapDbType(dbType: string, isSnowflake: boolean): AIColumnSchema['type'] {
+  if (isSnowflake) {
+    // Snowflake types are usually uppercase, and may include precision like "NUMBER(38,0)"
+    const baseType = dbType.toUpperCase().split('(')[0].trim()
+    return SNOWFLAKE_TYPE_MAP[baseType] || 'unknown'
+  }
+  return PG_TYPE_MAP[dbType.toLowerCase()] || 'unknown'
+}
+
+// ============================================================================
 // Table Filtering
 // ============================================================================
 
@@ -616,9 +675,30 @@ export function createTinyPivotHandler(options: TinyPivotHandlerOptions = {}): R
           return handleListTables(connectionString, schemas, tableOptions, descriptions, onError)
 
         case 'get-schema':
+          // If datasourceId is provided, use datasource-aware schema fetching
+          if (body.datasourceId) {
+            return handleGetDatasourceSchema(
+              await getDatasourceManager(),
+              body.datasourceId,
+              body.userId,
+              body.userKey,
+              body.tables || [],
+              onError,
+            )
+          }
           return handleGetSchema(body.tables || [], connectionString, schemas, tableOptions, onError)
 
         case 'get-all-schemas':
+          // If datasourceId is provided, use datasource-aware schema fetching
+          if (body.datasourceId) {
+            return handleGetAllDatasourceSchemas(
+              await getDatasourceManager(),
+              body.datasourceId,
+              body.userId,
+              body.userKey,
+              onError,
+            )
+          }
           return handleGetAllSchemas(connectionString, schemas, tableOptions, onError)
 
         case 'query':
@@ -634,7 +714,8 @@ export function createTinyPivotHandler(options: TinyPivotHandlerOptions = {}): R
           )
 
         case 'chat':
-          return handleChat(body.messages || [], apiKey, modelOverride, maxTokens, onError)
+          // Client-provided apiKey takes precedence over server config
+          return handleChat(body.messages || [], body.apiKey || apiKey, modelOverride, maxTokens, onError)
 
         // Datasource management actions
         case 'list-datasources':
@@ -675,6 +756,18 @@ export function createTinyPivotHandler(options: TinyPivotHandlerOptions = {}): R
             body.datasourceId,
             body.userId,
             body.userKey,
+            onError,
+          )
+
+        case 'query-datasource-paginated':
+          return handleQueryDatasourcePaginated(
+            await getDatasourceManager(),
+            body.datasourceId,
+            body.userId,
+            body.userKey,
+            body.sql,
+            body.offset ?? 0,
+            body.limit ?? 1000,
             onError,
           )
 
@@ -1561,6 +1654,52 @@ async function handleQueryDatasource(
 }
 
 /**
+ * Handle query-datasource-paginated action
+ * Execute a paginated SQL query against a datasource for infinite scroll
+ */
+async function handleQueryDatasourcePaginated(
+  manager: ReturnType<typeof createDatasourceManager>,
+  datasourceId: string | undefined,
+  userId: string | undefined,
+  userKey: string | undefined,
+  sql: string | undefined,
+  offset: number,
+  limit: number,
+  onError?: (error: Error) => void,
+): Promise<Response> {
+  if (!datasourceId) {
+    return createErrorResponse('datasourceId is required', 400)
+  }
+  if (!userId) {
+    return createErrorResponse('userId is required', 400)
+  }
+  if (!userKey) {
+    return createErrorResponse('userKey is required for executing queries', 400)
+  }
+  if (!sql) {
+    return createErrorResponse('sql is required', 400)
+  }
+
+  try {
+    const result = await manager.executePaginatedQuery(datasourceId, userId, userKey, sql, offset, limit)
+
+    if (!result.success) {
+      return createErrorResponse(result.error || 'Query execution failed', 400)
+    }
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    onError?.(err)
+    return createErrorResponse(`Failed to execute paginated query: ${sanitizeErrorMessage(err.message)}`, 500)
+  }
+}
+
+/**
  * Handle list-datasource-tables action
  * Get available tables from a datasource
  */
@@ -1593,6 +1732,111 @@ async function handleListDatasourceTables(
     const err = error instanceof Error ? error : new Error(String(error))
     onError?.(err)
     return createErrorResponse(`Failed to list tables: ${sanitizeErrorMessage(err.message)}`, 500)
+  }
+}
+
+/**
+ * Handle get-schema action for a managed datasource
+ * Get schema for specific tables from the datasource connection
+ */
+async function handleGetDatasourceSchema(
+  manager: ReturnType<typeof createDatasourceManager>,
+  datasourceId: string | undefined,
+  userId: string | undefined,
+  userKey: string | undefined,
+  tableNames: string[],
+  onError?: (error: Error) => void,
+): Promise<Response> {
+  if (!datasourceId) {
+    return createErrorResponse('datasourceId is required', 400)
+  }
+  if (!userId) {
+    return createErrorResponse('userId is required', 400)
+  }
+  if (!userKey) {
+    return createErrorResponse('userKey is required for fetching schema', 400)
+  }
+
+  try {
+    // Get datasource info to determine type for type mapping
+    const dsInfo = await manager.getDatasource(datasourceId, userId)
+    const isSnowflake = dsInfo?.type === 'snowflake'
+
+    const schemas = await manager.getTableSchemas(datasourceId, userId, userKey, tableNames)
+
+    // Convert to the expected SchemaResponse format with proper type mapping
+    const response: SchemaResponse = {
+      schemas: schemas.map(s => ({
+        table: s.table,
+        columns: s.columns.map(c => ({
+          name: c.name,
+          type: mapDbType(c.type, isSnowflake),
+          nullable: c.nullable,
+        })),
+      })),
+    }
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    onError?.(err)
+    return createErrorResponse(`Failed to fetch schema: ${sanitizeErrorMessage(err.message)}`, 500)
+  }
+}
+
+/**
+ * Handle get-all-schemas action for a managed datasource
+ * Get schema for all tables from the datasource connection
+ */
+async function handleGetAllDatasourceSchemas(
+  manager: ReturnType<typeof createDatasourceManager>,
+  datasourceId: string | undefined,
+  userId: string | undefined,
+  userKey: string | undefined,
+  onError?: (error: Error) => void,
+): Promise<Response> {
+  if (!datasourceId) {
+    return createErrorResponse('datasourceId is required', 400)
+  }
+  if (!userId) {
+    return createErrorResponse('userId is required', 400)
+  }
+  if (!userKey) {
+    return createErrorResponse('userKey is required for fetching all schemas', 400)
+  }
+
+  try {
+    // Get datasource info to determine type for type mapping
+    const dsInfo = await manager.getDatasource(datasourceId, userId)
+    const isSnowflake = dsInfo?.type === 'snowflake'
+
+    const schemas = await manager.getAllTableSchemas(datasourceId, userId, userKey)
+
+    // Convert to the expected SchemaResponse format with proper type mapping
+    const response: SchemaResponse = {
+      schemas: schemas.map(s => ({
+        table: s.table,
+        columns: s.columns.map(c => ({
+          name: c.name,
+          type: mapDbType(c.type, isSnowflake),
+          nullable: c.nullable,
+        })),
+      })),
+    }
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    onError?.(err)
+    return createErrorResponse(`Failed to fetch all schemas: ${sanitizeErrorMessage(err.message)}`, 500)
   }
 }
 

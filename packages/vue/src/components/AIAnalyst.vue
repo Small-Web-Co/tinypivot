@@ -20,6 +20,8 @@ import { useAIAnalyst } from '../composables/useAIAnalyst'
 const props = defineProps<{
   config: AIAnalystConfig
   theme?: 'light' | 'dark'
+  /** When true, component fills parent container (for use in studio/embedded contexts) */
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -45,6 +47,7 @@ const {
   sendMessage,
   clearConversation,
   loadFullData,
+  fetchMoreData,
 } = useAIAnalyst({
   config: props.config,
   onDataLoaded: payload => emit('dataLoaded', payload),
@@ -53,9 +56,10 @@ const {
   onError: payload => emit('error', payload),
 })
 
-// Expose loadFullData for parent component access
+// Expose loadFullData and fetchMoreData for parent component access
 defineExpose({
   loadFullData,
+  fetchMoreData,
   selectedDataSource,
 })
 
@@ -70,8 +74,9 @@ const selectedMessageId = ref<string | null>(null)
 // Track SQL panel visibility in the right pane
 const showSqlPanel = ref(false)
 
-// Track expanded schema groups (default: expand 'public')
-const expandedSchemas = ref<Set<string>>(new Set(['public']))
+// Pagination state for preview table
+const currentPage = ref(1)
+const rowsPerPage = 50
 
 // Group data sources by schema for tree view
 const schemaTree = computed(() => {
@@ -97,36 +102,11 @@ const schemaTree = computed(() => {
   )
 })
 
-function toggleSchema(schemaName: string) {
-  const newSet = new Set(expandedSchemas.value)
-  if (newSet.has(schemaName)) {
-    newSet.delete(schemaName)
-  }
-  else {
-    newSet.add(schemaName)
-  }
-  expandedSchemas.value = newSet
-}
-
 // Get schema for selected data source
 const currentSchema = computed((): AITableSchema | undefined => {
   if (!selectedDataSource.value)
     return undefined
   return schemas.value.get(selectedDataSource.value)
-})
-
-// Get data for the selected message (or latest)
-const previewData = computed(() => {
-  if (selectedMessageId.value) {
-    const msg = messages.value.find(m => m.id === selectedMessageId.value)
-    if (msg?.metadata?.data) {
-      return msg.metadata.data.slice(0, 100)
-    }
-  }
-  // Fall back to lastLoadedData
-  if (!lastLoadedData.value)
-    return []
-  return lastLoadedData.value.slice(0, 100)
 })
 
 // Get full data for the selected message
@@ -138,6 +118,39 @@ const fullPreviewData = computed(() => {
     }
   }
   return lastLoadedData.value || []
+})
+
+// Get data for the selected message (or latest) - with pagination
+const previewData = computed(() => {
+  const data = fullPreviewData.value
+  if (!data || data.length === 0)
+    return []
+
+  const startIndex = (currentPage.value - 1) * rowsPerPage
+  const endIndex = startIndex + rowsPerPage
+  return data.slice(startIndex, endIndex)
+})
+
+// Pagination info
+const totalPages = computed(() => Math.ceil(fullPreviewData.value.length / rowsPerPage))
+const canGoPrev = computed(() => currentPage.value > 1)
+const canGoNext = computed(() => currentPage.value < totalPages.value)
+
+function goToPrevPage() {
+  if (canGoPrev.value) {
+    currentPage.value--
+  }
+}
+
+function goToNextPage() {
+  if (canGoNext.value) {
+    currentPage.value++
+  }
+}
+
+// Reset page when data changes
+watch(fullPreviewData, () => {
+  currentPage.value = 1
 })
 
 // Get column keys from preview data
@@ -246,10 +259,10 @@ function formatCellValue(value: unknown): string {
   if (value === null || value === undefined)
     return ''
   if (typeof value === 'number') {
-    if (Math.abs(value) >= 1000) {
-      return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
+    if (Number.isInteger(value)) {
+      return String(value)
     }
-    return String(value)
+    return value.toLocaleString('en-US', { maximumFractionDigits: 4, useGrouping: false })
   }
   return String(value)
 }
@@ -274,114 +287,105 @@ function hasQueryResult(message: AIMessage): boolean {
 </script>
 
 <template>
-  <div class="vpg-ai-analyst" :class="{ 'vpg-theme-dark': theme === 'dark' }">
+  <div class="vpg-ai-analyst" :class="{ 'vpg-theme-dark': theme === 'dark', 'vpg-ai-analyst--embedded': embedded !== false }">
     <!-- Data Source Picker (full width when no data source selected) -->
-    <div v-if="!selectedDataSource" class="vpg-ai-picker-fullscreen">
-      <div class="vpg-ai-picker-content">
-        <div class="vpg-ai-picker-header">
-          <div class="vpg-ai-icon-lg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
-              <circle cx="7.5" cy="14.5" r="1.5" fill="currentColor" />
-              <circle cx="16.5" cy="14.5" r="1.5" fill="currentColor" />
-            </svg>
-          </div>
-          <h2>AI Data Analyst</h2>
-          <p>Select a data source to start exploring with AI</p>
+    <div v-if="!selectedDataSource" class="vpg-ai-picker">
+      <!-- Subtle branding in corner -->
+      <div class="vpg-ai-picker-brand">
+        <div class="vpg-ai-picker-brand-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+            <circle cx="7.5" cy="14.5" r="1.5" fill="currentColor" />
+            <circle cx="16.5" cy="14.5" r="1.5" fill="currentColor" />
+          </svg>
         </div>
+        <span class="vpg-ai-picker-brand-text">AI Analyst</span>
+      </div>
 
+      <!-- Main content area -->
+      <div class="vpg-ai-picker-main">
         <!-- Empty state -->
         <template v-if="dataSources.length === 0 && !isLoadingTables">
-          <div class="vpg-ai-empty-state">
-            <p>No data sources configured.</p>
+          <div class="vpg-ai-picker-empty">
+            <h2>No data sources</h2>
+            <p>Configure a data source to start exploring with AI</p>
             <a
               href="https://tinypivot.com/docs/ai-analyst"
               target="_blank"
               rel="noopener"
-              class="vpg-ai-docs-link"
+              class="vpg-ai-picker-docs-link"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
+              View documentation
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 17L17 7M17 7H7M17 7V17" />
               </svg>
-              View Documentation
             </a>
           </div>
         </template>
 
-        <!-- Data source list (schema tree) -->
+        <!-- Table selector -->
         <template v-else>
-          <div class="vpg-ai-search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search tables..."
-              class="vpg-ai-search-input"
-            >
+          <!-- Centered search -->
+          <div class="vpg-ai-picker-search-container">
+            <h2 class="vpg-ai-picker-title">
+              Select a table to explore
+            </h2>
+            <div class="vpg-ai-picker-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                v-model="searchQuery"
+                type="text"
+                placeholder="Search tables..."
+                class="vpg-ai-picker-search-input"
+              >
+              <kbd class="vpg-ai-picker-kbd">/</kbd>
+            </div>
           </div>
 
-          <!-- Schema Tree -->
-          <div class="vpg-ai-schema-tree">
-            <div
-              v-for="(tables, schemaName) in schemaTree"
-              :key="schemaName"
-              class="vpg-ai-schema-group"
-            >
-              <!-- Schema Header (expandable) -->
-              <button
-                type="button"
-                class="vpg-ai-schema-header"
-                @click="toggleSchema(schemaName as string)"
-              >
-                <svg
-                  class="vpg-ai-chevron"
-                  :class="{ expanded: expandedSchemas.has(schemaName as string) }"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-                <svg class="vpg-ai-schema-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <ellipse cx="12" cy="5" rx="9" ry="3" />
-                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                </svg>
-                <span class="vpg-ai-schema-name">{{ schemaName }}</span>
-                <span class="vpg-ai-table-count">{{ tables.length }}</span>
-              </button>
-
-              <!-- Table List (collapsible) -->
-              <div v-show="expandedSchemas.has(schemaName as string)" class="vpg-ai-table-list">
+          <!-- Scrollable grid of tables -->
+          <div class="vpg-ai-picker-grid-container">
+            <div class="vpg-ai-picker-grid">
+              <template v-for="(tables, schemaName) in schemaTree" :key="schemaName">
+                <!-- Schema divider (only show if multiple schemas) -->
+                <div v-if="Object.keys(schemaTree).length > 1" class="vpg-ai-picker-schema-divider vpg-ai-picker-grid-full">
+                  <span>{{ schemaName }}</span>
+                </div>
+                <!-- Table items -->
                 <button
-                  v-for="table in tables.filter(t =>
+                  v-for="(table, idx) in tables.filter(t =>
                     !searchQuery.trim()
                     || t.name.toLowerCase().includes(searchQuery.toLowerCase())
                     || t.table.toLowerCase().includes(searchQuery.toLowerCase()),
                   )"
                   :key="table.id"
                   type="button"
-                  class="vpg-ai-table-item"
+                  class="vpg-ai-picker-table-item"
+                  :style="{ animationDelay: `${idx * 30}ms` }"
                   @click="selectDataSource(table.id)"
                 >
-                  <svg class="vpg-ai-table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <line x1="3" y1="9" x2="21" y2="9" />
-                    <line x1="9" y1="21" x2="9" y2="9" />
+                  <div class="vpg-ai-picker-table-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <line x1="3" y1="9" x2="21" y2="9" />
+                      <line x1="9" y1="21" x2="9" y2="9" />
+                    </svg>
+                  </div>
+                  <div class="vpg-ai-picker-table-info">
+                    <span class="vpg-ai-picker-table-name">{{ table.name.includes('.') ? table.name.split('.')[1] : table.name }}</span>
+                  </div>
+                  <svg width="16" height="16" class="vpg-ai-picker-table-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
                   </svg>
-                  <span>{{ table.name.includes('.') ? table.name.split('.')[1] : table.name }}</span>
                 </button>
-              </div>
+              </template>
             </div>
-          </div>
 
-          <div v-if="Object.keys(schemaTree).length === 0" class="vpg-ai-no-results">
-            No tables available
+            <div v-if="Object.keys(schemaTree).length === 0 || (searchQuery.trim() && !Object.values(schemaTree).flat().some(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()) || t.table.toLowerCase().includes(searchQuery.toLowerCase())))" class="vpg-ai-picker-no-results">
+              No tables found
+            </div>
           </div>
         </template>
       </div>
@@ -537,8 +541,8 @@ function hasQueryResult(message: AIMessage): boolean {
           </form>
           <!-- Action buttons and model info -->
           <div class="vpg-ai-input-footer">
-            <span v-if="config.aiModelName" class="vpg-ai-model-name">
-              {{ config.aiModelName }}
+            <span class="vpg-ai-model-name">
+              {{ config.aiModelName || 'AI Model' }}
             </span>
             <div class="vpg-ai-input-actions">
               <button
@@ -697,25 +701,54 @@ function hasQueryResult(message: AIMessage): boolean {
 
         <!-- Data table -->
         <div v-else class="vpg-ai-preview-table-container">
-          <table class="vpg-ai-preview-table">
-            <thead>
-              <tr>
-                <th v-for="col in previewColumns" :key="col">
-                  {{ col }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in previewData" :key="idx">
-                <td v-for="col in previewColumns" :key="col">
-                  {{ formatCellValue(row[col]) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="fullPreviewData.length > 100" class="vpg-ai-preview-more">
-            Showing 100 of {{ fullPreviewData.length.toLocaleString() }} rows.
-            <button @click="handleViewResults">
+          <div class="vpg-ai-preview-table-scroll">
+            <table class="vpg-ai-preview-table">
+              <thead>
+                <tr>
+                  <th v-for="col in previewColumns" :key="col">
+                    {{ col }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, idx) in previewData" :key="idx">
+                  <td v-for="col in previewColumns" :key="col">
+                    {{ formatCellValue(row[col]) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Pagination controls -->
+          <div v-if="fullPreviewData.length > rowsPerPage" class="vpg-ai-preview-pagination">
+            <div class="vpg-ai-pagination-info">
+              Showing {{ ((currentPage - 1) * rowsPerPage) + 1 }}-{{ Math.min(currentPage * rowsPerPage, fullPreviewData.length) }}
+              of {{ fullPreviewData.length.toLocaleString() }} rows
+            </div>
+            <div class="vpg-ai-pagination-controls">
+              <button
+                class="vpg-ai-pagination-btn"
+                :disabled="!canGoPrev"
+                title="Previous page"
+                @click="goToPrevPage"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <span class="vpg-ai-pagination-page">{{ currentPage }} / {{ totalPages }}</span>
+              <button
+                class="vpg-ai-pagination-btn"
+                :disabled="!canGoNext"
+                title="Next page"
+                @click="goToNextPage"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+            <button class="vpg-ai-view-grid-btn" @click="handleViewResults">
               View all in Grid
             </button>
           </div>
@@ -734,69 +767,346 @@ function hasQueryResult(message: AIMessage): boolean {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Full-screen picker */
-.vpg-ai-picker-fullscreen {
+/* ==========================================================================
+   Data Source Picker - Editorial Command Palette Design
+   ========================================================================== */
+
+.vpg-ai-picker {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.vpg-ai-picker-content {
-  max-width: 600px;
-  width: 100%;
-  max-height: 100%;
-  display: flex;
   flex-direction: column;
+  background: linear-gradient(180deg, #fafbfc 0%, #f1f5f9 100%);
+  position: relative;
   overflow: hidden;
 }
 
-.vpg-ai-picker-header {
-  text-align: center;
-  margin-bottom: 2rem;
-  flex-shrink: 0;
+/* Defensive: ensure all SVGs in picker have max dimensions */
+.vpg-ai-picker svg {
+  max-width: 2rem;
+  max-height: 2rem;
 }
 
-.vpg-ai-icon-lg {
-  width: 4rem;
-  height: 4rem;
+/* Subtle corner branding */
+.vpg-ai-picker-brand {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.vpg-ai-picker-brand:hover {
+  opacity: 1;
+}
+
+.vpg-ai-picker-brand-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  max-width: 1.5rem;
+  max-height: 1.5rem;
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  border-radius: 1rem;
+  border-radius: 0.375rem;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  margin: 0 auto 1rem;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.vpg-ai-icon-lg svg {
-  width: 2rem;
-  height: 2rem;
+.vpg-ai-picker-brand-icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  min-width: 0.875rem;
+  min-height: 0.875rem;
+  flex-shrink: 0;
 }
 
-.vpg-ai-picker-header h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.5rem;
+.vpg-ai-picker-brand-text {
+  font-size: 0.6875rem;
   font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Main content */
+.vpg-ai-picker-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Empty state */
+.vpg-ai-picker-empty {
+  text-align: center;
+  padding: 2rem;
+}
+
+.vpg-ai-picker-empty h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.vpg-ai-picker-empty p {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.vpg-ai-picker-docs-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6366f1;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.vpg-ai-picker-docs-link:hover {
+  color: #4f46e5;
+}
+
+.vpg-ai-picker-docs-link svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Search container - compact header */
+.vpg-ai-picker-search-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.625rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.vpg-ai-picker-title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.vpg-ai-picker-search {
+  flex: 1;
+  max-width: 280px;
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  transition: all 0.15s;
+}
+
+.vpg-ai-picker-search:focus-within {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.vpg-ai-picker-search:focus,
+.vpg-ai-picker-search *:focus,
+.vpg-ai-picker-search *:focus-visible,
+.vpg-ai-picker-search-input:focus,
+.vpg-ai-picker-search-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.vpg-ai-picker-search svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-left: 0.5rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.vpg-ai-picker-search-input {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  color: #1e293b;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.vpg-ai-picker-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.vpg-ai-picker-kbd {
+  margin-right: 0.375rem;
+  padding: 0.0625rem 0.25rem;
+  font-size: 0.5625rem;
+  font-family: ui-monospace, monospace;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.1875rem;
+}
+
+/* Scrollable grid container for tables */
+.vpg-ai-picker-grid-container {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Table grid - fluid layout that expands to fit content */
+.vpg-ai-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  width: 100%;
+  align-content: start;
+}
+
+/* Full width items in grid (like schema dividers) */
+.vpg-ai-picker-grid-full {
+  grid-column: 1 / -1;
+}
+
+/* Table list (legacy, kept for backward compatibility) */
+.vpg-ai-picker-tables {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.vpg-ai-picker-schema-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  margin-top: 0.25rem;
+}
+
+.vpg-ai-picker-schema-divider::before,
+.vpg-ai-picker-schema-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.vpg-ai-picker-schema-divider span {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Table item - compact floating pill */
+.vpg-ai-picker-table-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease-out;
+  white-space: nowrap;
+}
+
+.vpg-ai-picker-table-item:hover {
+  border-color: #a5b4fc;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.12);
+}
+
+.vpg-ai-picker-table-item:active {
+  transform: scale(0.98);
+}
+
+.vpg-ai-picker-table-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2ff;
+  border-radius: 0.25rem;
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.vpg-ai-picker-table-icon svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.vpg-ai-picker-table-info {
+  flex: 0 0 auto;
+}
+
+.vpg-ai-picker-table-name {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 500;
   color: #1e293b;
 }
 
-.vpg-ai-picker-header p {
-  margin: 0;
-  color: #64748b;
+.vpg-ai-picker-table-arrow {
+  width: 0.625rem;
+  height: 0.625rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: all 0.12s;
+  opacity: 0;
+  margin-left: -0.25rem;
+}
+
+.vpg-ai-picker-table-item:hover .vpg-ai-picker-table-arrow {
+  color: #6366f1;
+  opacity: 1;
+  margin-left: 0;
+}
+
+.vpg-ai-picker-no-results {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.75rem;
+  color: #94a3b8;
 }
 
 /* Search */
 .vpg-ai-search {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
 }
 
@@ -818,6 +1128,105 @@ function hasQueryResult(message: AIMessage): boolean {
 
 .vpg-ai-search-input::placeholder {
   color: #94a3b8;
+}
+
+/* Schema Tree */
+.vpg-ai-schema-tree {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.vpg-ai-schema-group {
+  margin-bottom: 0.25rem;
+}
+
+.vpg-ai-schema-header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.vpg-ai-schema-header:hover {
+  background: #f1f5f9;
+}
+
+.vpg-ai-chevron {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.vpg-ai-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.vpg-ai-schema-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.vpg-ai-schema-name {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.vpg-ai-table-count {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  padding: 0.0625rem 0.375rem;
+  background: #f1f5f9;
+  border-radius: 0.625rem;
+}
+
+.vpg-ai-table-list {
+  padding-left: 1.25rem;
+}
+
+.vpg-ai-table-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 0.3125rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.75rem;
+  color: #334155;
+  transition: all 0.15s;
+}
+
+.vpg-ai-table-item:hover {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.vpg-ai-table-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.vpg-ai-table-item:hover .vpg-ai-table-icon {
+  color: #6366f1;
 }
 
 /* Data source grid */
@@ -1720,7 +2129,16 @@ function hasQueryResult(message: AIMessage): boolean {
 /* Preview table */
 .vpg-ai-preview-table-container {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vpg-ai-preview-table-scroll {
+  flex: 1;
   overflow: auto;
+  min-height: 0;
 }
 
 .vpg-ai-preview-table {
@@ -1763,26 +2181,107 @@ function hasQueryResult(message: AIMessage): boolean {
   background: #f8fafc;
 }
 
-.vpg-ai-preview-more {
+/* Pagination */
+.vpg-ai-preview-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  text-align: center;
-  font-size: 0.6875rem;
-  color: #64748b;
   background: white;
   border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
-.vpg-ai-preview-more button {
-  color: #4f46e5;
-  background: none;
-  border: none;
+.vpg-ai-pagination-info {
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.vpg-ai-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.vpg-ai-pagination-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  color: #475569;
   cursor: pointer;
-  font-weight: 500;
-  margin-left: 0.25rem;
+  transition: all 0.15s;
 }
 
-.vpg-ai-preview-more button:hover {
-  text-decoration: underline;
+.vpg-ai-pagination-btn:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.vpg-ai-pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vpg-ai-pagination-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.vpg-ai-pagination-page {
+  font-size: 0.6875rem;
+  color: #475569;
+  font-weight: 500;
+  padding: 0 0.5rem;
+  min-width: 3rem;
+  text-align: center;
+}
+
+.vpg-ai-view-grid-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-ai-view-grid-btn:hover {
+  background: #e0e7ff;
+}
+
+/* ==========================================================================
+   Embedded Mode - fills parent container (for studio/embedded contexts)
+   ========================================================================== */
+
+.vpg-ai-analyst--embedded {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.vpg-ai-analyst--embedded .vpg-ai-picker {
+  height: 100%;
+}
+
+.vpg-ai-analyst--embedded .vpg-ai-picker-main {
+  padding: 1rem;
+}
+
+.vpg-ai-analyst--embedded .vpg-ai-picker-brand {
+  display: none;
 }
 
 /* Dark theme */
@@ -1790,11 +2289,76 @@ function hasQueryResult(message: AIMessage): boolean {
   background: #0f172a;
 }
 
-.vpg-theme-dark .vpg-ai-picker-header h2 {
+/* Dark theme - Picker */
+.vpg-theme-dark .vpg-ai-picker {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+.vpg-theme-dark .vpg-ai-picker-brand-text {
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-ai-picker-title {
+  color: #cbd5e1;
+}
+
+.vpg-theme-dark .vpg-ai-picker-search {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-ai-picker-search:focus-within {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.vpg-theme-dark .vpg-ai-picker-search-input {
   color: #f1f5f9;
 }
 
-.vpg-theme-dark .vpg-ai-picker-header p {
+.vpg-theme-dark .vpg-ai-picker-kbd {
+  background: #334155;
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+.vpg-theme-dark .vpg-ai-picker-schema-divider::before,
+.vpg-theme-dark .vpg-ai-picker-schema-divider::after {
+  background: #334155;
+}
+
+.vpg-theme-dark .vpg-ai-picker-table-item {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.vpg-theme-dark .vpg-ai-picker-table-item:hover {
+  background: #2d3a4f;
+  border-color: #475569;
+}
+
+.vpg-theme-dark .vpg-ai-picker-table-icon {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+}
+
+.vpg-theme-dark .vpg-ai-picker-table-name {
+  color: #f1f5f9;
+}
+
+.vpg-theme-dark .vpg-ai-picker-table-arrow {
+  color: #64748b;
+}
+
+.vpg-theme-dark .vpg-ai-picker-table-item:hover .vpg-ai-picker-table-arrow {
+  color: #a5b4fc;
+  opacity: 1;
+}
+
+.vpg-theme-dark .vpg-ai-picker-empty h2 {
+  color: #f1f5f9;
+}
+
+.vpg-theme-dark .vpg-ai-picker-empty p {
   color: #94a3b8;
 }
 

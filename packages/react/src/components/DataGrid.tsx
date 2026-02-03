@@ -140,6 +140,12 @@ export function DataGrid({
   // Loading state for full data reset
   const [isLoadingFullData, setIsLoadingFullData] = useState(false)
 
+  // Infinite scroll state
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMoreData, setHasMoreData] = useState(false)
+  const dataOffsetRef = useRef(0)
+  const currentSqlRef = useRef<string | null>(null)
+
   // Data to display - AI loaded data takes precedence
   const displayData = useMemo(() => aiLoadedData || data, [aiLoadedData, data])
   const [_chartConfig, setChartConfig] = useState<ChartConfig | null>(null)
@@ -587,18 +593,26 @@ export function DataGrid({
     if (aiAnalystRef.current?.selectedDataSource) {
       setIsLoadingFullData(true)
       try {
-        const fullData = await aiAnalystRef.current.loadFullData()
-        if (fullData && fullData.length > 0) {
-          setAiLoadedData(fullData)
+        const result = await aiAnalystRef.current.loadFullData()
+        if (result.data && result.data.length > 0) {
+          setAiLoadedData(result.data)
+          setHasMoreData(result.hasMore)
+          dataOffsetRef.current = result.offset
+          // Store the SQL for fetchMoreData (SELECT * FROM table)
+          currentSqlRef.current = null // Will use default in fetchMoreData
         }
         else {
           // Fall back to props.data if loading fails
           setAiLoadedData(null)
+          setHasMoreData(false)
+          dataOffsetRef.current = 0
         }
       }
       catch (err) {
         console.warn('Failed to load full data:', err)
         setAiLoadedData(null)
+        setHasMoreData(false)
+        dataOffsetRef.current = 0
       }
       finally {
         setIsLoadingFullData(false)
@@ -607,10 +621,49 @@ export function DataGrid({
     else {
       // No AI Analyst or no selected data source - just clear filters by resetting to props.data
       setAiLoadedData(null)
+      setHasMoreData(false)
+      dataOffsetRef.current = 0
     }
     // Also clear any grid filters
     clearAllFilters()
   }, [clearAllFilters])
+
+  // Load more data for infinite scroll
+  const loadMoreData = useCallback(async () => {
+    if (isLoadingMore || !hasMoreData || !aiAnalystRef.current?.fetchMoreData) {
+      return
+    }
+
+    setIsLoadingMore(true)
+    try {
+      const result = await aiAnalystRef.current.fetchMoreData(dataOffsetRef.current)
+      if (result.data && result.data.length > 0) {
+        // Append new data to existing
+        setAiLoadedData(prev => prev ? [...prev, ...result.data!] : result.data)
+        dataOffsetRef.current += result.data.length
+        setHasMoreData(result.hasMore)
+      }
+      else {
+        setHasMoreData(false)
+      }
+    }
+    catch (err) {
+      console.warn('Failed to load more data:', err)
+      setHasMoreData(false)
+    }
+    finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMoreData])
+
+  // Handle grid scroll for infinite loading
+  const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    // Load more when within 200px of bottom
+    if (scrollHeight - scrollTop - clientHeight < 200 && hasMoreData && !isLoadingMore) {
+      loadMoreData()
+    }
+  }, [hasMoreData, isLoadingMore, loadMoreData])
 
   // AI Analyst event handlers
   const handleAIDataLoaded = useCallback(
@@ -777,13 +830,6 @@ export function DataGrid({
   }
 
   // Format cell value
-  const noFormatPatterns
-    = /^(?:.*_)?(?:id|code|year|month|quarter|day|week|date|zip|phone|fax|ssn|ein|npi|ndc|gpi|hcpcs|icd|cpt|rx|bin|pcn|group|member|claim|rx_number|script|fill)(?:_.*)?$/i
-
-  const shouldFormatNumber = (columnId: string): boolean => {
-    return !noFormatPatterns.test(columnId)
-  }
-
   const formatCellValueDisplay = (value: unknown, columnId: string): string => {
     if (value === null || value === undefined)
       return ''
@@ -795,10 +841,6 @@ export function DataGrid({
       const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
       if (Number.isNaN(num))
         return String(value)
-
-      if (shouldFormatNumber(columnId) && Math.abs(num) >= 1000) {
-        return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
-      }
 
       if (Number.isInteger(num)) {
         return String(num)
@@ -817,8 +859,8 @@ export function DataGrid({
 
   return (
     <div
-      className={`vpg-data-grid vpg-font-${currentFontSize} vpg-theme-${currentTheme} ${stripedRows ? 'vpg-striped' : ''} ${resizingColumnId ? 'vpg-resizing' : ''} ${isResizingVertically ? 'vpg-resizing-vertical' : ''}`}
-      style={{ height: `${gridHeight}px` }}
+      className={`vpg-data-grid vpg-font-${currentFontSize} vpg-theme-${currentTheme} ${stripedRows ? 'vpg-striped' : ''} ${resizingColumnId ? 'vpg-resizing' : ''} ${isResizingVertically ? 'vpg-resizing-vertical' : ''} ${!enableVerticalResize ? 'vpg-fill-parent' : ''}`}
+      style={enableVerticalResize ? { height: `${gridHeight}px` } : undefined}
     >
       {/* Copy Toast */}
       {showCopyToast && (
@@ -1164,6 +1206,7 @@ export function DataGrid({
             ref={aiAnalystRef}
             config={aiAnalyst}
             theme={currentTheme}
+            embedded={aiAnalyst.embedded}
             onDataLoaded={handleAIDataLoaded}
             onConversationUpdate={handleAIConversationUpdate}
             onQueryExecuted={handleAIQueryExecuted}
@@ -1174,7 +1217,7 @@ export function DataGrid({
 
       {/* Grid View */}
       {viewMode === 'grid' && (
-        <div ref={tableContainerRef} className="vpg-grid-container" tabIndex={0}>
+        <div ref={tableContainerRef} className="vpg-grid-container" tabIndex={0} onScroll={handleGridScroll}>
           {loading && (
             <div className="vpg-loading">
               <div className="vpg-spinner" />
@@ -1337,6 +1380,25 @@ export function DataGrid({
                   ))}
                 </tbody>
               </table>
+
+              {/* Infinite scroll loading indicator */}
+              {isLoadingMore && (
+                <div className="vpg-loading-more">
+                  <div className="vpg-spinner-small" />
+                  <span>Loading more rows...</span>
+                </div>
+              )}
+
+              {/* All data loaded indicator */}
+              {!hasMoreData && aiLoadedData && aiLoadedData.length > 0 && dataOffsetRef.current > 0 && (
+                <div className="vpg-all-loaded">
+                  All
+                  {' '}
+                  {aiLoadedData.length.toLocaleString()}
+                  {' '}
+                  rows loaded
+                </div>
+              )}
             </div>
           )}
         </div>

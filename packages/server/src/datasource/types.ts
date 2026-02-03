@@ -23,6 +23,9 @@ export interface ConnectionConfig {
   account?: string
   warehouse?: string
   role?: string
+  // Username for display purposes (not sensitive - e.g., email for EXTERNALBROWSER auth)
+  // The actual credentials.username is used for connections, this is for UI display
+  user?: string
 }
 
 /**
@@ -187,6 +190,21 @@ export interface QueryResult {
   data?: Record<string, unknown>[]
   rowCount?: number
   truncated?: boolean
+  duration?: number
+  error?: string
+  columns?: string[]
+}
+
+/**
+ * Paginated query result from datasource (for infinite scroll)
+ */
+export interface PaginatedQueryResult {
+  success: boolean
+  data: Record<string, unknown>[]
+  rowCount: number
+  offset: number
+  limit: number
+  hasMore: boolean
   duration?: number
   error?: string
   columns?: string[]

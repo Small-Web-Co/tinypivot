@@ -233,8 +233,8 @@
 
   <div class="info-box">
     <strong>Demo Configuration:</strong><br>
-    User ID: <code>demo-user-123</code><br>
-    User Key: <code>demo-user-secret-key</code><br>
+    User ID: <code>demo-user</code><br>
+    User Key: <code>demo-user-key-for-encryption</code><br>
     <small>(In production, these would come from your auth system)</small>
   </div>
 
@@ -453,8 +453,9 @@
 
   <script>
     const API_URL = '/api/tinypivot'
-    const USER_ID = 'demo-user-123'
-    const USER_KEY = 'demo-user-secret-key'
+    // NOTE: These must match studio-vue-demo for cross-demo testing
+    const USER_ID = 'demo-user'
+    const USER_KEY = 'demo-user-key-for-encryption'
 
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
