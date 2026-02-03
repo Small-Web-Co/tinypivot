@@ -10,6 +10,8 @@ import type {
   LayoutMode,
   Page,
   PageListItem,
+  PageShare,
+  PageShareSettings,
   PageTemplate,
   PageVersionSummary,
   StorageAdapter,
@@ -167,6 +169,10 @@ const widgetConfigVisualizationType = ref<'table' | 'pivot' | 'chart'>('table')
 const widgetConfigShowTitle = ref(true)
 // Datasource selection for widget
 const widgetConfigDatasourceId = ref<string>('sample') // 'sample' or datasource ID
+
+// Share modal state
+const showShareModal = ref(false)
+const currentPageShare = ref<PageShare | null>(null)
 
 // Editor state
 const editorTitle = ref('')
@@ -1093,6 +1099,57 @@ function closeWidgetConfigModal() {
 
 function handleWidgetConfigOverlayClick() {
   closeWidgetConfigModal()
+}
+
+// Share modal functions
+async function openShareModal() {
+  if (!currentPage.value || !storage.value)
+    return
+  // Try to get existing share settings
+  try {
+    const settings = await storage.value.getShareSettings(currentPage.value.id)
+    if (settings?.enabled) {
+      // For now, open modal and let it show current settings
+      // In production, would fetch active share token
+    }
+  }
+  catch (err) {
+    console.warn('Could not load share settings:', err)
+  }
+  showShareModal.value = true
+}
+
+async function handleShareSave(settings: Partial<PageShareSettings>) {
+  if (!currentPage.value || !storage.value)
+    return
+
+  try {
+    if (currentPageShare.value) {
+      await storage.value.updateShareSettings(currentPage.value.id, settings)
+    }
+    else {
+      const share = await storage.value.createShare(currentPage.value.id, settings)
+      currentPageShare.value = share
+    }
+    // Keep modal open to show the link
+  }
+  catch (err) {
+    console.error('Failed to create share:', err)
+  }
+}
+
+async function handleShareRevoke() {
+  if (!currentPageShare.value || !storage.value)
+    return
+
+  try {
+    await storage.value.revokeShare(currentPageShare.value.token)
+    currentPageShare.value = null
+    showShareModal.value = false
+  }
+  catch (err) {
+    console.error('Failed to revoke share:', err)
+  }
 }
 
 // Handle datasource selection change in widget config
@@ -2270,6 +2327,23 @@ defineExpose({
                 <polyline points="12 6 12 12 16 14" />
               </svg>
               <span v-if="versions.length > 0" class="tps-version-count">{{ versions.length }}</span>
+            </button>
+            <!-- Share Button -->
+            <button
+              v-if="currentPage"
+              type="button"
+              class="tps-btn tps-btn-share"
+              title="Share page"
+              @click="openShareModal"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+              Share
             </button>
           </div>
         </div>
@@ -5096,5 +5170,16 @@ defineExpose({
         </div>
       </div>
     </div>
+
+    <!-- Share Modal -->
+    <ShareModal
+      :is-open="showShareModal"
+      :page-id="currentPage?.id ?? ''"
+      :page-title="currentPage?.title ?? ''"
+      :existing-share="currentPageShare"
+      @close="showShareModal = false"
+      @save="handleShareSave"
+      @revoke="handleShareRevoke"
+    />
   </div>
 </template>

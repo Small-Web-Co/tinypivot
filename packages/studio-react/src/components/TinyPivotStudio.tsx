@@ -10,6 +10,8 @@ import type {
   LayoutMode,
   Page,
   PageListItem,
+  PageShare,
+  PageShareSettings,
   PageTemplate,
   PageVersionSummary,
   StorageAdapter,
@@ -43,6 +45,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
 import { RichTextEditor } from './RichTextEditor'
+import { ShareModal } from './ShareModal'
 
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
@@ -356,6 +359,10 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
   // Datasource selection for widget
   const [widgetConfigDatasourceId, setWidgetConfigDatasourceId] = useState<string>('sample')
 
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [currentPageShare, setCurrentPageShare] = useState<PageShare | null>(null)
+
   // Data source state
   const [datasources, setDatasources] = useState<DatasourceConfig[]>([])
   const [showDatasourceModal, setShowDatasourceModal] = useState(false)
@@ -548,6 +555,57 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
     setWidgetConfigDatasourceId('sample')
   }, [])
 
+  // Share modal functions
+  const openShareModal = useCallback(async () => {
+    if (!currentPage || !storage)
+      return
+    // Try to get existing share settings
+    try {
+      const settings = await storage.getShareSettings(currentPage.id)
+      if (settings?.enabled) {
+        // For now, open modal and let it show current settings
+        // In production, would fetch active share token
+      }
+    }
+    catch (err) {
+      console.warn('Could not load share settings:', err)
+    }
+    setShowShareModal(true)
+  }, [currentPage, storage])
+
+  const handleShareSave = useCallback(async (settings: Partial<PageShareSettings>) => {
+    if (!currentPage || !storage)
+      return
+
+    try {
+      if (currentPageShare) {
+        await storage.updateShareSettings(currentPage.id, settings)
+      }
+      else {
+        const share = await storage.createShare(currentPage.id, settings)
+        setCurrentPageShare(share)
+      }
+      // Keep modal open to show the link
+    }
+    catch (err) {
+      console.error('Failed to create share:', err)
+    }
+  }, [currentPage, storage, currentPageShare])
+
+  const handleShareRevoke = useCallback(async () => {
+    if (!currentPageShare || !storage)
+      return
+
+    try {
+      await storage.revokeShare(currentPageShare.token)
+      setCurrentPageShare(null)
+      setShowShareModal(false)
+    }
+    catch (err) {
+      console.error('Failed to revoke share:', err)
+    }
+  }, [currentPageShare, storage])
+
   // Handle datasource selection change in widget config
   const handleWidgetDatasourceChange = useCallback((datasourceId: string) => {
     setWidgetConfigDatasourceId(datasourceId)
@@ -582,6 +640,7 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
             onUpdatePage={handleUpdatePage}
             onConfigureWidget={openWidgetConfigModal}
             getAiAnalystConfig={getAiAnalystConfigForDatasource}
+            onShare={openShareModal}
           />
         ) : (
           <EmptyState onCreatePage={() => setShowCreateModal(true)} />
@@ -644,6 +703,16 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
           userId={userId}
         />
       )}
+
+      <ShareModal
+        isOpen={showShareModal}
+        pageId={currentPage?.id ?? ''}
+        pageTitle={currentPage?.title ?? ''}
+        existingShare={currentPageShare}
+        onClose={() => setShowShareModal(false)}
+        onSave={handleShareSave}
+        onRevoke={handleShareRevoke}
+      />
     </>
   )
 }
@@ -1013,6 +1082,7 @@ interface PageEditorProps {
   onUpdatePage: (page: Page) => void
   onConfigureWidget: (block: WidgetBlock) => void
   getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
+  onShare?: () => void
 }
 
 interface ActiveFilter {
@@ -1022,7 +1092,7 @@ interface ActiveFilter {
   sourceWidgetId?: string
 }
 
-function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalystConfig }: PageEditorProps) {
+function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalystConfig, onShare }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
   const [blocks, setBlocks] = useState<Block[]>(page.blocks)
   const [showBlockMenu, setShowBlockMenu] = useState(false)
@@ -1675,6 +1745,24 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
               <span className="tps-version-count">{versions.length}</span>
             )}
           </button>
+          {/* Share Button */}
+          {onShare && (
+            <button
+              type="button"
+              className="tps-btn tps-btn-share"
+              title="Share page"
+              onClick={onShare}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+              Share
+            </button>
+          )}
         </div>
       </div>
 
