@@ -1240,7 +1240,7 @@ async function handleQuery(
 async function handleChat(
   messages: Array<{ role: 'user' | 'assistant' | 'system', content: string }>,
   apiKey: string | undefined,
-  _aiBaseUrl: string | undefined, // TODO: Will be used in Task 4 for custom endpoint support
+  aiBaseUrl: string | undefined,
   modelOverride: string | undefined,
   maxTokens: number,
   onError?: (error: Error) => void,
@@ -1249,9 +1249,68 @@ async function handleChat(
     return createErrorResponse('Missing or invalid messages array', 400)
   }
 
+  // Custom endpoint mode: use OpenAI-compatible format
+  if (aiBaseUrl) {
+    const endpoint = aiBaseUrl.endsWith('/chat/completions')
+      ? aiBaseUrl
+      : `${aiBaseUrl.replace(/\/$/, '')}/chat/completions`
+
+    const model = modelOverride || 'default'
+
+    const requestBody = {
+      model,
+      max_tokens: maxTokens,
+      messages,
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`
+    }
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`AI provider error (${response.status}): ${errorText}`)
+      }
+
+      const data = await response.json()
+      // OpenAI-compatible format
+      const content = (data as { choices?: Array<{ message?: { content?: string } }> })
+        .choices?.[0]
+        ?.message
+        ?.content || ''
+
+      const aiResponse: AIProxyResponse = { content }
+
+      return new Response(JSON.stringify(aiResponse), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error))
+      onError?.(err)
+
+      const response: AIProxyResponse = { content: '', error: err.message }
+      return new Response(JSON.stringify(response), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   if (!apiKey) {
     return createErrorResponse(
-      'AI API key not configured. Set AI_API_KEY environment variable.',
+      'AI API key not configured. Set AI_API_KEY environment variable or provide aiBaseUrl for keyless endpoints.',
       500,
     )
   }
