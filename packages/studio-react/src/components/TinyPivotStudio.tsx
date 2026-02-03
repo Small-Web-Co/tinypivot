@@ -45,6 +45,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
 import { calculateResizeWithCollision } from '../utils/gridCollision'
+import { capturePageThumbnail } from '../utils/thumbnail'
 import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
 import { ReportGallery } from './ReportGallery'
 import { RichTextEditor } from './RichTextEditor'
@@ -594,6 +595,19 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
       return
 
     try {
+      // Capture thumbnail before sharing if public
+      let thumbnailUrl: string | undefined
+      const editorContent = document.querySelector('.tps-editor-content') as HTMLElement
+
+      if (editorContent && settings.visibility === 'public') {
+        try {
+          thumbnailUrl = await capturePageThumbnail(editorContent)
+        }
+        catch (err) {
+          console.warn('Failed to capture thumbnail:', err)
+        }
+      }
+
       if (currentPageShare) {
         await storage.updateShareSettings(currentPage.id, settings)
       }
@@ -602,6 +616,10 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
         setCurrentPageShare(share)
       }
       // Keep modal open to show the link
+      // Note: thumbnailUrl is captured but storage schema changes needed to persist it
+      if (thumbnailUrl) {
+        console.log('Thumbnail captured for share:', thumbnailUrl.substring(0, 50))
+      }
     }
     catch (err) {
       console.error('Failed to create share:', err)

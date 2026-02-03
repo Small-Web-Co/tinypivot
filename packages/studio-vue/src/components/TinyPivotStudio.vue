@@ -35,6 +35,7 @@ import draggable from 'vuedraggable'
 
 import { provideStudio, type StudioConfig } from '../composables'
 import { calculateResizeWithCollision } from '../utils/gridCollision'
+import { capturePageThumbnail } from '../utils/thumbnail'
 import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
 import RichTextEditor from './RichTextEditor.vue'
 // Import styles
@@ -1180,6 +1181,19 @@ async function handleShareSave(settings: Partial<PageShareSettings>) {
     return
 
   try {
+    // Capture thumbnail before sharing if public
+    let thumbnailUrl: string | undefined
+    const editorContent = document.querySelector('.tps-editor-content') as HTMLElement
+
+    if (editorContent && settings.visibility === 'public') {
+      try {
+        thumbnailUrl = await capturePageThumbnail(editorContent)
+      }
+      catch (err) {
+        console.warn('Failed to capture thumbnail:', err)
+      }
+    }
+
     if (currentPageShare.value) {
       await storage.value.updateShareSettings(currentPage.value.id, settings)
     }
@@ -1188,6 +1202,10 @@ async function handleShareSave(settings: Partial<PageShareSettings>) {
       currentPageShare.value = share
     }
     // Keep modal open to show the link
+    // Note: thumbnailUrl is captured but storage schema changes needed to persist it
+    if (thumbnailUrl) {
+      console.log('Thumbnail captured for share:', thumbnailUrl.substring(0, 50))
+    }
   }
   catch (err) {
     console.error('Failed to create share:', err)

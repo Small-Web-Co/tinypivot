@@ -63,7 +63,8 @@
     "@tiptap/extension-underline": "^2.2.0",
     "@tiptap/starter-kit": "^2.2.0",
     "@tiptap/vue-3": "^2.2.0",
-    "gridstack": "^12.4.2"
+    "gridstack": "^12.4.2",
+    "html2canvas": "^1.4.1"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",
