@@ -34,6 +34,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import draggable from 'vuedraggable'
 
 import { provideStudio, type StudioConfig } from '../composables'
+import { calculateResizeWithCollision } from '../utils/gridCollision'
 import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
 import RichTextEditor from './RichTextEditor.vue'
 // Import styles
@@ -325,6 +326,41 @@ onUnmounted(() => {
 // Grid Layout Mode (Gridstack)
 // ============================================================================
 
+// Handle collision-aware grid resize
+function handleGridResize(element: HTMLElement, newWidth: number): boolean {
+  const blockId = element.getAttribute('gs-id')
+  if (!blockId)
+    return true
+
+  const result = calculateResizeWithCollision(
+    editorBlocks.value,
+    blockId,
+    newWidth,
+    'right',
+  )
+
+  if (!result.canResize) {
+    return false
+  }
+
+  // Apply neighbor adjustments
+  for (const adj of result.neighborAdjustments) {
+    const block = editorBlocks.value.find(b => b.id === adj.blockId)
+    if (block) {
+      block.gridPosition = adj.newPosition
+      const neighborEl = gridContainerRef.value?.querySelector(`[gs-id="${adj.blockId}"]`)
+      if (neighborEl && gridInstance.value) {
+        gridInstance.value.update(neighborEl as HTMLElement, {
+          x: adj.newPosition.x,
+          w: adj.newPosition.w,
+        })
+      }
+    }
+  }
+
+  return true
+}
+
 // Initialize gridstack when switching to grid mode
 function initGrid() {
   if (gridInstance.value) {
@@ -345,8 +381,6 @@ function initGrid() {
     resizable: { handles: 'e,se,s,sw,w' },
     // Float mode allows blocks to be placed anywhere, not just stacked
     float: true,
-    // Allow blocks to be pushed/swapped when dragging
-    disableOneColumnMode: true,
     // Don't auto-initialize children - we'll do it manually after Vue renders
     auto: false,
   }, gridContainerRef.value)
@@ -372,6 +406,14 @@ function initGrid() {
       }
     })
     handleUpdatePage()
+  })
+
+  // Register resize event listener for collision-aware resizing
+  gridInstance.value.on('resize', (_event: Event, el: HTMLElement) => {
+    const gsW = el.getAttribute('gs-w')
+    if (gsW) {
+      handleGridResize(el, Number.parseInt(gsW, 10))
+    }
   })
 }
 

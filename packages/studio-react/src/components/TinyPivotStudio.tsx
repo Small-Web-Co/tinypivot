@@ -44,6 +44,7 @@ import { GridStack } from 'gridstack'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { type StudioConfig, StudioProvider, useStudioContext } from '../context'
+import { calculateResizeWithCollision } from '../utils/gridCollision'
 import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
 import { ReportGallery } from './ReportGallery'
 import { RichTextEditor } from './RichTextEditor'
@@ -1221,6 +1222,45 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
     return block.gridPosition ?? { x: 0, y: 0, w: 12, h: 2 }
   }, [])
 
+  // Handle collision-aware grid resize
+  const handleGridResize = useCallback((element: HTMLElement, newWidth: number): boolean => {
+    const blockId = element.getAttribute('gs-id')
+    if (!blockId)
+      return true
+
+    const result = calculateResizeWithCollision(
+      blocks,
+      blockId,
+      newWidth,
+      'right',
+    )
+
+    if (!result.canResize) {
+      return false
+    }
+
+    // Apply neighbor adjustments
+    for (const adj of result.neighborAdjustments) {
+      setBlocks((prevBlocks) => {
+        return prevBlocks.map((block) => {
+          if (block.id === adj.blockId) {
+            return { ...block, gridPosition: adj.newPosition }
+          }
+          return block
+        })
+      })
+      const neighborEl = gridContainerRef.current?.querySelector(`[gs-id="${adj.blockId}"]`)
+      if (neighborEl && gridInstanceRef.current) {
+        gridInstanceRef.current.update(neighborEl as HTMLElement, {
+          x: adj.newPosition.x,
+          w: adj.newPosition.w,
+        })
+      }
+    }
+
+    return true
+  }, [blocks])
+
   // Initialize gridstack when switching to grid mode
   const initGrid = useCallback(() => {
     if (gridInstanceRef.current)
@@ -1269,7 +1309,15 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
         return newBlocks
       })
     })
-  }, [page, title, onUpdatePage])
+
+    // Register resize event listener for collision-aware resizing
+    gridInstanceRef.current.on('resize', (_event: Event, el: HTMLElement) => {
+      const gsW = el.getAttribute('gs-w')
+      if (gsW) {
+        handleGridResize(el, Number.parseInt(gsW, 10))
+      }
+    })
+  }, [page, title, onUpdatePage, handleGridResize])
 
   // Destroy gridstack instance
   const destroyGrid = useCallback(() => {
