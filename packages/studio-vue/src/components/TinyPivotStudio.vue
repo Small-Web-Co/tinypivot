@@ -2538,6 +2538,7 @@ defineExpose({
                   <DataGrid
                     :data="getFilteredSampleData()"
                     :theme="resolvedTheme"
+                    :show-controls="shouldShowControls(block.id)"
                     :enable-export="false"
                     :enable-pagination="false"
                     :enable-search="true"
@@ -3034,6 +3035,7 @@ defineExpose({
                             <DataGrid
                               :data="widgetSampleData"
                               :theme="resolvedTheme"
+                              :show-controls="shouldShowControls(childBlock.id)"
                               :enable-export="false"
                               :enable-pagination="false"
                               :enable-search="true"
@@ -3970,6 +3972,7 @@ defineExpose({
                     <DataGrid
                       :data="getFilteredSampleData()"
                       :theme="resolvedTheme"
+                      :show-controls="shouldShowControls(block.id)"
                       :enable-export="false"
                       :enable-pagination="false"
                       :enable-search="true"

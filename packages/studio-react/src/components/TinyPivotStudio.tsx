@@ -2359,7 +2359,7 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
 /**
  * Grid block renderer - renders blocks with drag handles for grid mode
  */
-function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, activeFilters, onWidgetRowClick: _onWidgetRowClick, getAiAnalystConfig }: BlockRendererProps) {
+function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, activeFilters, onWidgetRowClick: _onWidgetRowClick, getAiAnalystConfig, shouldShowControls }: BlockRendererProps) {
   const DragHandle = () => (
     <div className="tps-block-drag-handle" title="Drag to reorder">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2483,6 +2483,7 @@ function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget
             <DataGrid
               data={filteredData}
               theme={theme}
+              showControls={shouldShowControls?.(block.id)}
               enableExport={false}
               enablePagination={false}
               enableSearch
@@ -3022,6 +3023,7 @@ function WidgetBlockComponent({
           <DataGrid
             data={filteredData}
             theme={theme}
+            showControls={showControls}
             enableExport={false}
             enablePagination={false}
             enableSearch={true}
