@@ -1,6 +1,7 @@
 import { enableDemoMode } from '@smallwebco/tinypivot-vue'
 import { createApp } from 'vue'
 import App from './App.vue'
+import router from './router'
 
 async function initApp() {
   // Enable demo mode to unlock all Pro features (charts, AI analyst, etc.)
@@ -10,7 +11,7 @@ async function initApp() {
     await enableDemoMode(demoSecret)
   }
 
-  createApp(App).mount('#app')
+  createApp(App).use(router).mount('#app')
 }
 
 initApp()
