@@ -746,14 +746,19 @@
 
 .tps-block {
   padding: 1rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid transparent;
   border-radius: 0.5rem;
   background: white;
   transition: all 0.15s;
   position: relative;
 }
 
-.tps-block:hover {
+/* Show border only when controls are visible (hovered or focused) */
+.tps-block.tps-block-controls-visible {
+  border-color: #e2e8f0;
+}
+
+.tps-block.tps-block-controls-visible:hover {
   border-color: #cbd5e1;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
 }
@@ -1376,10 +1381,15 @@
 /* Blocks - Dark */
 .tps-theme-dark .tps-block {
   background: #1e293b;
+  border-color: transparent;
+}
+
+/* Show border only when controls are visible (hovered or focused) - Dark */
+.tps-theme-dark .tps-block.tps-block-controls-visible {
   border-color: #334155;
 }
 
-.tps-theme-dark .tps-block:hover {
+.tps-theme-dark .tps-block.tps-block-controls-visible:hover {
   border-color: #475569;
 }
 

@@ -38,6 +38,7 @@ import { calculateResizeWithCollision } from '../utils/gridCollision'
 import { capturePageThumbnail } from '../utils/thumbnail'
 import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
 import RichTextEditor from './RichTextEditor.vue'
+import ShareModal from './ShareModal.vue'
 // Import styles
 import '@smallwebco/tinypivot-studio/style.css'
 import '@smallwebco/tinypivot-vue/style.css'

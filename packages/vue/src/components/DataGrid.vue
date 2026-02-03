@@ -1052,7 +1052,7 @@ function handleContainerClick(event: MouseEvent) {
       <div class="vpg-toolbar-left">
         <!-- View mode toggle -->
         <Transition name="vpg-fade">
-          <div v-if="showPivot && props.showControls" class="vpg-view-toggle">
+          <div v-if="props.showPivot && props.showControls" class="vpg-view-toggle">
             <!-- AI Analyst button (first, only if enabled) -->
             <button
               v-if="showAIAnalyst"
