@@ -2721,7 +2721,7 @@ defineExpose({
                     :initial-view-state="getWidgetState(block.id) ?? undefined"
                     :data="getFilteredSampleData()"
                     :theme="resolvedTheme"
-                    :show-controls="shouldShowControls(block.id)"
+                    :show-controls="!isPreviewMode || shouldShowControls(block.id)"
                     :enable-export="false"
                     :enable-pagination="false"
                     :enable-search="true"
@@ -2751,8 +2751,12 @@ defineExpose({
                 v-else-if="block.type === 'image'"
                 :data-block-id="block.id"
                 class="tps-block tps-block-image tps-block-resizable"
-                :class="{ 'tps-block-resizing': resizingBlockId === block.id }"
+                :class="{ 'tps-block-resizing': resizingBlockId === block.id, 'tps-block-controls-visible': !isPreviewMode || shouldShowControls(block.id) }"
                 :style="{ height: getBlockHeightStyle(block) }"
+                @mouseenter="hoveredBlockId = block.id"
+                @mouseleave="hoveredBlockId = null"
+                @focusin="focusedBlockId = block.id"
+                @focusout="handleBlockFocusOut($event, block.id)"
               >
                 <div class="tps-block-drag-handle" title="Drag to reorder">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3221,7 +3225,7 @@ defineExpose({
                               :initial-view-state="getWidgetState(childBlock.id) ?? undefined"
                               :data="widgetSampleData"
                               :theme="resolvedTheme"
-                              :show-controls="shouldShowControls(childBlock.id)"
+                              :show-controls="!isPreviewMode || shouldShowControls(childBlock.id)"
                               :enable-export="false"
                               :enable-pagination="false"
                               :enable-search="true"
@@ -4115,7 +4119,15 @@ defineExpose({
                 </div>
 
                 <!-- Widget Block -->
-                <div v-else-if="isWidgetBlock(block)" class="tps-block tps-block-widget tps-grid-block">
+                <div
+                  v-else-if="isWidgetBlock(block)"
+                  class="tps-block tps-block-widget tps-grid-block"
+                  :class="{ 'tps-block-controls-visible': !isPreviewMode || shouldShowControls(block.id) }"
+                  @mouseenter="hoveredBlockId = block.id"
+                  @mouseleave="hoveredBlockId = null"
+                  @focusin="focusedBlockId = block.id"
+                  @focusout="handleBlockFocusOut($event, block.id)"
+                >
                   <div class="tps-block-drag-handle" title="Drag to reorder">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />
@@ -4161,7 +4173,7 @@ defineExpose({
                       :initial-view-state="getWidgetState(block.id) ?? undefined"
                       :data="getFilteredSampleData()"
                       :theme="resolvedTheme"
-                      :show-controls="shouldShowControls(block.id)"
+                      :show-controls="!isPreviewMode || shouldShowControls(block.id)"
                       :enable-export="false"
                       :enable-pagination="false"
                       :enable-search="true"
@@ -4275,7 +4287,15 @@ defineExpose({
                 </div>
 
                 <!-- Image Block -->
-                <div v-else-if="block.type === 'image'" class="tps-block tps-block-image tps-grid-block">
+                <div
+                  v-else-if="block.type === 'image'"
+                  class="tps-block tps-block-image tps-grid-block"
+                  :class="{ 'tps-block-controls-visible': !isPreviewMode || shouldShowControls(block.id) }"
+                  @mouseenter="hoveredBlockId = block.id"
+                  @mouseleave="hoveredBlockId = null"
+                  @focusin="focusedBlockId = block.id"
+                  @focusout="handleBlockFocusOut($event, block.id)"
+                >
                   <div class="tps-block-drag-handle" title="Drag to reorder">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" />

@@ -1985,6 +1985,7 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
                       onWidgetRowClick={handleWidgetRowClick}
                       getAiAnalystConfig={getAiAnalystConfig}
                       shouldShowControls={shouldShowControls}
+                      isPreviewMode={isPreviewMode}
                       onMouseEnter={setHoveredBlockId}
                       onMouseLeave={() => setHoveredBlockId(null)}
                       onFocusIn={setFocusedBlockId}
@@ -2023,6 +2024,8 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
                     activeFilters={activeFilters}
                     onWidgetRowClick={handleWidgetRowClick}
                     getAiAnalystConfig={getAiAnalystConfig}
+                    shouldShowControls={shouldShowControls}
+                    isPreviewMode={isPreviewMode}
                   />
                 </div>
               </div>
@@ -2408,6 +2411,8 @@ interface BlockRendererProps {
   getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
   /** Whether controls should be visible for this block */
   shouldShowControls?: (blockId: string) => boolean
+  /** Whether we are in preview mode (viewing a past version) */
+  isPreviewMode?: boolean
   /** Callback when mouse enters block */
   onMouseEnter?: (blockId: string) => void
   /** Callback when mouse leaves block */
@@ -2418,7 +2423,7 @@ interface BlockRendererProps {
   onFocusOut?: (event: React.FocusEvent, blockId: string) => void
 }
 
-function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick, getAiAnalystConfig, shouldShowControls, onMouseEnter, onMouseLeave, onFocusIn, onFocusOut }: BlockRendererProps) {
+function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick, getAiAnalystConfig, shouldShowControls, isPreviewMode, onMouseEnter, onMouseLeave, onFocusIn, onFocusOut }: BlockRendererProps) {
   if (block.type === 'text') {
     return (
       <TextBlockComponent
@@ -2459,7 +2464,7 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
         activeFilters={activeFilters}
         onRowClick={onWidgetRowClick}
         getAiAnalystConfig={getAiAnalystConfig}
-        showControls={shouldShowControls?.(block.id)}
+        showControls={!isPreviewMode || shouldShowControls?.(block.id)}
         onMouseEnter={onMouseEnter ? () => onMouseEnter(block.id) : undefined}
         onMouseLeave={onMouseLeave}
         onFocusIn={onFocusIn ? () => onFocusIn(block.id) : undefined}
@@ -2565,7 +2570,7 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
 /**
  * Grid block renderer - renders blocks with drag handles for grid mode
  */
-function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, activeFilters, onWidgetRowClick: _onWidgetRowClick, getAiAnalystConfig, shouldShowControls }: BlockRendererProps) {
+function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, activeFilters, onWidgetRowClick: _onWidgetRowClick, getAiAnalystConfig, shouldShowControls, isPreviewMode }: BlockRendererProps) {
   const DragHandle = () => (
     <div className="tps-block-drag-handle" title="Drag to reorder">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2691,7 +2696,7 @@ function GridBlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget
               initialViewState={getWidgetState(block.id) ?? undefined}
               data={filteredData}
               theme={theme}
-              showControls={shouldShowControls?.(block.id)}
+              showControls={!isPreviewMode || shouldShowControls?.(block.id)}
               enableExport={false}
               enablePagination={false}
               enableSearch
