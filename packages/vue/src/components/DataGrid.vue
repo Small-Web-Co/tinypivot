@@ -36,6 +36,8 @@ const props = withDefaults(defineProps<{
   headerHeight?: number
   fontSize?: 'xs' | 'sm' | 'base'
   showPivot?: boolean
+  /** Whether to show the view mode controls (AI Analyst, Grid, Pivot, Chart tabs) */
+  showControls?: boolean
   // Feature props
   enableExport?: boolean
   enableSearch?: boolean
@@ -60,6 +62,7 @@ const props = withDefaults(defineProps<{
   headerHeight: 40,
   fontSize: 'xs',
   showPivot: true,
+  showControls: true,
   // Feature defaults
   enableExport: true,
   enableSearch: true,
@@ -1033,64 +1036,66 @@ function handleContainerClick(event: MouseEvent) {
     <div class="vpg-toolbar">
       <div class="vpg-toolbar-left">
         <!-- View mode toggle -->
-        <div v-if="showPivot" class="vpg-view-toggle">
-          <!-- AI Analyst button (first, only if enabled) -->
-          <button
-            v-if="showAIAnalyst"
-            class="vpg-view-btn vpg-ai-btn"
-            :class="{ active: viewMode === 'ai' }"
-            @click="viewMode = 'ai'"
-          >
-            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
-            </svg>
-            AI Analyst
-          </button>
-          <button
-            v-else-if="aiAnalyst?.enabled && !canUseAIAnalyst"
-            class="vpg-view-btn vpg-ai-btn vpg-pro-feature"
-            title="AI Analyst (Pro feature)"
-            @click.prevent
-          >
-            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
-            </svg>
-            AI Analyst
-            <span class="vpg-pro-badge">Pro</span>
-          </button>
-          <button
-            class="vpg-view-btn"
-            :class="{ active: viewMode === 'grid' }"
-            @click="viewMode = 'grid'"
-          >
-            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            Grid
-          </button>
-          <button
-            class="vpg-view-btn vpg-pivot-btn"
-            :class="{ active: viewMode === 'pivot' }"
-            @click="viewMode = 'pivot'"
-          >
-            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-            </svg>
-            Pivot
-          </button>
-          <button
-            class="vpg-view-btn vpg-chart-btn"
-            :class="{ 'active': viewMode === 'chart', 'vpg-pro-feature': !canUseCharts }"
-            :title="canUseCharts ? 'Chart Builder' : 'Chart Builder (Pro feature)'"
-            @click="canUseCharts ? viewMode = 'chart' : null"
-          >
-            <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Chart
-            <span v-if="!canUseCharts" class="vpg-pro-badge">Pro</span>
-          </button>
-        </div>
+        <Transition name="vpg-fade">
+          <div v-if="showPivot && props.showControls" class="vpg-view-toggle">
+            <!-- AI Analyst button (first, only if enabled) -->
+            <button
+              v-if="showAIAnalyst"
+              class="vpg-view-btn vpg-ai-btn"
+              :class="{ active: viewMode === 'ai' }"
+              @click="viewMode = 'ai'"
+            >
+              <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+              </svg>
+              AI Analyst
+            </button>
+            <button
+              v-else-if="aiAnalyst?.enabled && !canUseAIAnalyst"
+              class="vpg-view-btn vpg-ai-btn vpg-pro-feature"
+              title="AI Analyst (Pro feature)"
+              @click.prevent
+            >
+              <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+              </svg>
+              AI Analyst
+              <span class="vpg-pro-badge">Pro</span>
+            </button>
+            <button
+              class="vpg-view-btn"
+              :class="{ active: viewMode === 'grid' }"
+              @click="viewMode = 'grid'"
+            >
+              <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Grid
+            </button>
+            <button
+              class="vpg-view-btn vpg-pivot-btn"
+              :class="{ active: viewMode === 'pivot' }"
+              @click="viewMode = 'pivot'"
+            >
+              <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+              Pivot
+            </button>
+            <button
+              class="vpg-view-btn vpg-chart-btn"
+              :class="{ 'active': viewMode === 'chart', 'vpg-pro-feature': !canUseCharts }"
+              :title="canUseCharts ? 'Chart Builder' : 'Chart Builder (Pro feature)'"
+              @click="canUseCharts ? viewMode = 'chart' : null"
+            >
+              <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Chart
+              <span v-if="!canUseCharts" class="vpg-pro-badge">Pro</span>
+            </button>
+          </div>
+        </Transition>
 
         <!-- Grid mode controls -->
         <template v-if="viewMode === 'grid'">
@@ -2864,5 +2869,16 @@ function handleContainerClick(event: MouseEvent) {
 .vpg-chart-label {
   color: #f59e0b;
   font-weight: 500;
+}
+
+/* Fade transition for view controls */
+.vpg-fade-enter-active,
+.vpg-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.vpg-fade-enter-from,
+.vpg-fade-leave-to {
+  opacity: 0;
 }
 </style>

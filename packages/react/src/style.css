@@ -5171,3 +5171,17 @@
 .vpg-theme-dark .vpg-ai-table-item span {
   color: #e2e8f0;
 }
+
+/* Fade transition for view controls */
+.vpg-fade-in {
+  animation: vpg-fade-in 0.15s ease;
+}
+
+@keyframes vpg-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

@@ -37,6 +37,8 @@ interface DataGridProps {
   headerHeight?: number
   fontSize?: 'xs' | 'sm' | 'base'
   showPivot?: boolean
+  /** Whether to show the view mode controls (AI Analyst, Grid, Pivot, Chart tabs) */
+  showControls?: boolean
   enableExport?: boolean
   enableSearch?: boolean
   enablePagination?: boolean
@@ -78,6 +80,7 @@ export function DataGrid({
   loading = false,
   fontSize: initialFontSize = 'xs',
   showPivot = true,
+  showControls = true,
   enableExport = true,
   enableSearch = true,
   enablePagination = false,
@@ -876,8 +879,8 @@ export function DataGrid({
       <div className="vpg-toolbar">
         <div className="vpg-toolbar-left">
           {/* View mode toggle */}
-          {showPivot && (
-            <div className="vpg-view-toggle">
+          {showPivot && showControls && (
+            <div className="vpg-view-toggle vpg-fade-in">
               {/* AI Analyst button (first, only if enabled) */}
               {showAIAnalyst && (
                 <button
