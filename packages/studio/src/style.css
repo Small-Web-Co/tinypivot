@@ -731,9 +731,15 @@
   display: flex;
   gap: 0.25rem;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s ease;
 }
 
+/* Show actions when block has controls-visible class */
+.tps-block.tps-block-controls-visible .tps-block-actions {
+  opacity: 1;
+}
+
+/* Also show on direct hover as fallback */
 .tps-block:hover .tps-block-actions {
   opacity: 1;
 }
@@ -2829,7 +2835,12 @@
   height: 1rem;
 }
 
-/* Show drag handle on block hover */
+/* Show drag handle when block has controls-visible class */
+.tps-block.tps-block-controls-visible .tps-block-drag-handle {
+  opacity: 1;
+}
+
+/* Also show on direct hover/focus as fallback */
 .tps-block:hover .tps-block-drag-handle,
 .tps-block:focus-within .tps-block-drag-handle {
   opacity: 1;
