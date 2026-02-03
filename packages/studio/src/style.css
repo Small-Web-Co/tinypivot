@@ -6633,3 +6633,58 @@ body.tps-resizing {
 .vpg-theme-dark .vpg-ai-table-item span {
   color: #e2e8f0;
 }
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+@media print {
+  /* Hide all edit chrome */
+  .tps-sidebar,
+  .tps-toolbar,
+  .tps-block-actions,
+  .tps-block-drag-handle,
+  .tps-modal-overlay,
+  .vpg-view-toggle,
+  .tps-btn,
+  .tps-editor-header,
+  .tps-sidebar-tabs {
+    display: none !important;
+  }
+
+  /* Full width content */
+  .tps-editor-content,
+  .tps-page-viewer {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Page breaks */
+  .tps-block {
+    page-break-inside: avoid;
+  }
+
+  .tps-block-widget {
+    page-break-before: auto;
+    page-break-after: auto;
+  }
+
+  /* Remove shadows and borders */
+  .tps-block,
+  .tps-viewer-widget {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  /* Print-friendly colors */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Expand collapsed content */
+  .tps-collapsed {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}

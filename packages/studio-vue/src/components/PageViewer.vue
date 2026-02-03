@@ -161,16 +161,30 @@ function isSpacerBlock(block: Block): block is SpacerBlock {
 function isQuoteBlock(block: Block): block is QuoteBlock {
   return block.type === 'quote'
 }
+
+// Export PDF handler
+function handleExportPDF() {
+  window.print()
+}
 </script>
 
 <template>
   <div class="tps-page-viewer">
     <!-- Header -->
     <header v-if="page.title" class="tps-viewer-header">
-      <h1>{{ page.title }}</h1>
-      <p v-if="page.description" class="tps-viewer-description">
-        {{ page.description }}
-      </p>
+      <div class="tps-viewer-header-content">
+        <h1>{{ page.title }}</h1>
+        <p v-if="page.description" class="tps-viewer-description">
+          {{ page.description }}
+        </p>
+      </div>
+      <button
+        v-if="allowExport"
+        class="tps-btn-export"
+        @click="handleExportPDF"
+      >
+        Export PDF
+      </button>
     </header>
 
     <!-- Content -->
@@ -392,9 +406,16 @@ function isQuoteBlock(block: Block): block is QuoteBlock {
 
 /* Header styles */
 .tps-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.tps-viewer-header-content {
+  flex: 1;
 }
 
 .tps-viewer-header h1 {
@@ -408,6 +429,27 @@ function isQuoteBlock(block: Block): block is QuoteBlock {
   color: #64748b;
   margin: 0;
   font-size: 1rem;
+}
+
+.tps-btn-export {
+  padding: 0.5rem 1rem;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.tps-btn-export:hover {
+  background: #4338ca;
+}
+
+@media print {
+  .tps-btn-export {
+    display: none !important;
+  }
 }
 
 /* Block container */

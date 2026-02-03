@@ -120,6 +120,11 @@ function getTrendArrow(direction: 'up' | 'down' | 'flat'): string {
   return arrows[direction]
 }
 
+// Export PDF handler
+function handleExportPDF() {
+  window.print()
+}
+
 /**
  * PageViewer - Read-only viewer for shared/published pages
  *
@@ -449,9 +454,19 @@ export function PageViewer({
       {/* Header */}
       {page.title && (
         <header className="tps-viewer-header">
-          <h1>{page.title}</h1>
-          {page.description && (
-            <p className="tps-viewer-description">{page.description}</p>
+          <div className="tps-viewer-header-content">
+            <h1>{page.title}</h1>
+            {page.description && (
+              <p className="tps-viewer-description">{page.description}</p>
+            )}
+          </div>
+          {allowExport && (
+            <button
+              className="tps-btn-export"
+              onClick={handleExportPDF}
+            >
+              Export PDF
+            </button>
           )}
         </header>
       )}
@@ -487,9 +502,16 @@ export function PageViewer({
 
         /* Header styles */
         .tps-viewer-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
           margin-bottom: 2rem;
           padding-bottom: 1rem;
           border-bottom: 1px solid #e2e8f0;
+        }
+
+        .tps-viewer-header-content {
+          flex: 1;
         }
 
         .tps-viewer-header h1 {
@@ -503,6 +525,27 @@ export function PageViewer({
           color: #64748b;
           margin: 0;
           font-size: 1rem;
+        }
+
+        .tps-btn-export {
+          padding: 0.5rem 1rem;
+          background: #4f46e5;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.875rem;
+          flex-shrink: 0;
+        }
+
+        .tps-btn-export:hover {
+          background: #4338ca;
+        }
+
+        @media print {
+          .tps-btn-export {
+            display: none !important;
+          }
         }
 
         /* Block container */
