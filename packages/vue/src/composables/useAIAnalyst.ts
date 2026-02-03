@@ -541,7 +541,13 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     const response = await fetch(config.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'chat', messages, apiKey: config.apiKey }),
+      body: JSON.stringify({
+        action: 'chat',
+        messages,
+        apiKey: config.apiKey,
+        aiBaseUrl: config.aiBaseUrl,
+        aiModel: config.aiModel,
+      }),
     })
 
     if (!response.ok) {
