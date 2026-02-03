@@ -520,6 +520,22 @@ export interface AIAnalystConfig {
   apiKey?: string
 
   /**
+   * Custom OpenAI-compatible base URL for AI requests.
+   * When set, uses OpenAI chat completions format regardless of API key prefix.
+   * API key becomes optional (for local LLMs that don't require auth).
+   * @example "http://localhost:11434/v1" (Ollama - no key needed)
+   * @example "https://my-resource.openai.azure.com/openai/deployments/gpt-4" (Azure)
+   */
+  aiBaseUrl?: string
+
+  /**
+   * AI model to use for chat requests.
+   * Overrides server's default model. Optional - endpoint may have a default.
+   * @example "llama3", "mistral", "gpt-4-turbo"
+   */
+  aiModel?: string
+
+  /**
    * Datasource ID to use for queries (for server-managed datasources)
    * When set, the AI Analyst will use this datasource for table discovery and queries.
    * The endpoint must support datasource-aware operations.
