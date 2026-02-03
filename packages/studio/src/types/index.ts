@@ -92,8 +92,10 @@ export {
 
 // Storage types
 export type {
+  ListPublicSharesOptions,
   PageListFilter,
   PaginatedResult,
+  PublicShareListItem,
   StorageAdapter,
   StorageAdapterWithEvents,
   StorageEvents,

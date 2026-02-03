@@ -4,6 +4,7 @@
  */
 
 import type {
+  ListPublicSharesOptions,
   Page,
   PageCreateInput,
   PageListFilter,
@@ -14,6 +15,7 @@ import type {
   PageUpdateInput,
   PageVersion,
   PaginatedResult,
+  PublicShareListItem,
   StorageAdapter,
   WidgetConfig,
   WidgetCreateInput,
@@ -696,6 +698,68 @@ export function createIndexedDBStorage(options: IndexedDBStorageOptions = {}): S
     await database.put('shares', updated)
   }
 
+  async function listPublicShares(options: ListPublicSharesOptions = {}): Promise<PaginatedResult<PublicShareListItem>> {
+    const { sortBy = 'recent', search, limit = 20, offset = 0 } = options
+    const database = await getDB()
+
+    // Get all active, public shares
+    const allShares = await database.getAll('shares')
+    const publicShares = allShares.filter(s =>
+      s.active && s.settings.visibility === 'public',
+    )
+
+    // Load page data for each share
+    const items: PublicShareListItem[] = []
+    for (const share of publicShares) {
+      const page = await database.get('pages', share.pageId)
+      if (!page)
+        continue
+
+      // Search filter
+      if (search) {
+        const searchLower = search.toLowerCase()
+        if (!page.title.toLowerCase().includes(searchLower)
+          && !page.description?.toLowerCase().includes(searchLower)) {
+          continue
+        }
+      }
+
+      items.push({
+        token: share.token,
+        pageTitle: page.title,
+        pageDescription: page.description,
+        authorName: share.settings.showAuthor ? page.createdBy : undefined,
+        viewCount: share.viewCount,
+        publishedAt: new Date(share.createdAt),
+        tags: page.tags,
+      })
+    }
+
+    // Sort
+    items.sort((a, b) => {
+      switch (sortBy) {
+        case 'popular':
+          return b.viewCount - a.viewCount
+        case 'title':
+          return a.pageTitle.localeCompare(b.pageTitle)
+        case 'recent':
+        default:
+          return b.publishedAt.getTime() - a.publishedAt.getTime()
+      }
+    })
+
+    // Paginate
+    const paginated = items.slice(offset, offset + limit)
+
+    return {
+      items: paginated,
+      total: items.length,
+      offset,
+      limit,
+      hasMore: offset + limit < items.length,
+    }
+  }
+
   // ============================================================================
   // Snapshot Operations
   // ============================================================================
@@ -806,6 +870,7 @@ export function createIndexedDBStorage(options: IndexedDBStorageOptions = {}): S
     revokeShare,
     revokeAllShares,
     recordShareView,
+    listPublicShares,
 
     // Snapshot operations
     getSnapshot,

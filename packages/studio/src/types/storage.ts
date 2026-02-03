@@ -49,6 +49,40 @@ export interface PaginatedResult<T> {
 }
 
 /**
+ * A public share item for gallery listing
+ */
+export interface PublicShareListItem {
+  /** Share token */
+  token: string
+  /** Title of the shared page */
+  pageTitle: string
+  /** Description of the shared page */
+  pageDescription?: string
+  /** Author name if showAuthor is enabled */
+  authorName?: string
+  /** Number of times the share has been viewed */
+  viewCount: number
+  /** When the share was published */
+  publishedAt: Date
+  /** Tags from the page */
+  tags?: string[]
+}
+
+/**
+ * Options for listing public shares
+ */
+export interface ListPublicSharesOptions {
+  /** Sort order for results */
+  sortBy?: 'recent' | 'popular' | 'title'
+  /** Search in page title and description */
+  search?: string
+  /** Maximum number of items to return */
+  limit?: number
+  /** Offset for pagination */
+  offset?: number
+}
+
+/**
  * Storage adapter interface for TinyPivot Studio
  * Implement this interface to provide custom storage backends
  * (e.g., IndexedDB for local storage, PostgreSQL for server-side)
@@ -200,6 +234,11 @@ export interface StorageAdapter {
    * Record a view on a shared page
    */
   recordShareView: (token: string) => Promise<void>
+
+  /**
+   * List all active public shares for gallery display
+   */
+  listPublicShares: (options?: ListPublicSharesOptions) => Promise<PaginatedResult<PublicShareListItem>>
 
   // ============================================================================
   // Snapshot Operations (for version restore preview)
