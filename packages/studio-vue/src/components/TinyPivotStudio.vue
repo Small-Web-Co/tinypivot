@@ -182,6 +182,15 @@ const gridContainerRef = ref<HTMLElement | null>(null)
 // Format: "parentBlockId:columnIndex" or null
 const activeColumnMenu = ref<string | null>(null)
 
+// Widget hover state tracking
+const hoveredBlockId = ref<string | null>(null)
+const focusedBlockId = ref<string | null>(null)
+
+// eslint-disable-next-line unused-imports/no-unused-vars -- Will be used in Tasks 1.2-1.5
+function shouldShowControls(blockId: string): boolean {
+  return hoveredBlockId.value === blockId || focusedBlockId.value === blockId
+}
+
 // ============================================================================
 // Undo/Redo System
 // ============================================================================

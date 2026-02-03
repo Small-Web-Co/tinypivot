@@ -1028,6 +1028,17 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
   const [showBlockMenu, setShowBlockMenu] = useState(false)
   const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([])
 
+  // Widget hover state tracking - Will be used in Tasks 1.2-1.5
+
+  const [hoveredBlockId, _setHoveredBlockId] = useState<string | null>(null)
+
+  const [focusedBlockId, _setFocusedBlockId] = useState<string | null>(null)
+
+  // eslint-disable-next-line unused-imports/no-unused-vars
+  const shouldShowControls = useCallback((blockId: string): boolean => {
+    return hoveredBlockId === blockId || focusedBlockId === blockId
+  }, [hoveredBlockId, focusedBlockId])
+
   // Layout mode state
   const [layoutMode, setLayoutModeState] = useState<LayoutMode>(page.layoutMode || 'linear')
   const gridInstanceRef = useRef<GridStack | null>(null)
