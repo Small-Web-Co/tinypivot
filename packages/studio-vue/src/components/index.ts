@@ -1,3 +1,5 @@
 export { default as DatasourceDialog } from './DatasourceDialog.vue'
+export { default as PageViewer } from './PageViewer.vue'
+export type { PageViewerProps } from './PageViewer.vue'
 export { default as RichTextEditor } from './RichTextEditor.vue'
 export { default as TinyPivotStudio } from './TinyPivotStudio.vue'
