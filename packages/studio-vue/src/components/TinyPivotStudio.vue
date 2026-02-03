@@ -156,6 +156,7 @@ const pages = ref<PageListItem[]>([])
 const currentPage = ref<Page | null>(null)
 const showCreateModal = ref(false)
 const isLoading = ref(true)
+const sidebarTab = ref<'pages' | 'explore'>('pages')
 
 // Modal state
 const newPageTitle = ref('')
@@ -2126,115 +2127,146 @@ defineExpose({
         </div>
       </div>
 
-      <div class="tps-sidebar-section">
-        <span class="tps-sidebar-section-title">Pages</span>
+      <!-- Sidebar Tabs -->
+      <div class="tps-sidebar-tabs">
         <button
           type="button"
-          class="tps-btn tps-btn-ghost tps-btn-sm tps-btn-icon"
-          title="New page"
-          @click="openCreateModal"
+          class="tps-sidebar-tab"
+          :class="{ 'tps-active': sidebarTab === 'pages' }"
+          @click="sidebarTab = 'pages'"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          My Pages
+        </button>
+        <button
+          type="button"
+          class="tps-sidebar-tab"
+          :class="{ 'tps-active': sidebarTab === 'explore' }"
+          @click="sidebarTab = 'explore'"
+        >
+          Explore
         </button>
       </div>
 
-      <div class="tps-page-list">
-        <div v-if="isLoading" class="tps-page-list-empty">
-          <div class="tps-spinner tps-spinner-sm" />
+      <!-- Pages Tab Content -->
+      <template v-if="sidebarTab === 'pages'">
+        <div class="tps-sidebar-section">
+          <span class="tps-sidebar-section-title">Pages</span>
+          <button
+            type="button"
+            class="tps-btn tps-btn-ghost tps-btn-sm tps-btn-icon"
+            title="New page"
+            @click="openCreateModal"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
         </div>
-        <div v-else-if="pages.length === 0" class="tps-page-list-empty">
-          No pages yet
-        </div>
-        <button
-          v-for="page in pages"
-          v-else
-          :key="page.id"
-          type="button"
-          class="tps-page-item" :class="[{ 'tps-active': page.id === currentPage?.id }]"
-          @click="handleSelectPage(page.id)"
-        >
-          <svg class="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14,2 14,8 20,8" />
-          </svg>
-          <span class="tps-page-item-title">{{ page.title }}</span>
-          <div class="tps-page-item-actions">
-            <button
-              type="button"
-              class="tps-page-item-delete"
-              title="Delete page"
-              @click="handleDeletePage(page.id, $event)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-            </button>
-          </div>
-        </button>
-      </div>
 
-      <!-- Data Sources Section -->
-      <div class="tps-sidebar-section">
-        <span class="tps-sidebar-section-title">Data Sources</span>
-        <button
-          type="button"
-          class="tps-btn tps-btn-ghost tps-btn-sm tps-btn-icon"
-          title="Add data source"
-          @click="openDatasourceModal"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="tps-datasource-list">
-        <div v-if="datasources.length === 0" class="tps-page-list-empty">
-          No data sources
+        <div class="tps-page-list">
+          <div v-if="isLoading" class="tps-page-list-empty">
+            <div class="tps-spinner tps-spinner-sm" />
+          </div>
+          <div v-else-if="pages.length === 0" class="tps-page-list-empty">
+            No pages yet
+          </div>
+          <button
+            v-for="page in pages"
+            v-else
+            :key="page.id"
+            type="button"
+            class="tps-page-item" :class="[{ 'tps-active': page.id === currentPage?.id }]"
+            @click="handleSelectPage(page.id)"
+          >
+            <svg class="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14,2 14,8 20,8" />
+            </svg>
+            <span class="tps-page-item-title">{{ page.title }}</span>
+            <div class="tps-page-item-actions">
+              <button
+                type="button"
+                class="tps-page-item-delete"
+                title="Delete page"
+                @click="handleDeletePage(page.id, $event)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
+          </button>
         </div>
-        <button
-          v-for="ds in datasources"
-          v-else
-          :key="ds.id"
-          type="button"
-          class="tps-page-item" :class="[ds.id === selectedDatasourceId ? 'tps-active' : '']"
-          @click="selectDatasource(ds)"
-        >
-          <svg class="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <ellipse cx="12" cy="5" rx="9" ry="3" />
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-          </svg>
-          <div class="tps-datasource-item-content">
-            <span class="tps-page-item-title">{{ ds.name }}</span>
-            <span class="tps-datasource-item-type">{{ getDatasourceTypeLabel(ds.type) }}</span>
+
+        <!-- Data Sources Section -->
+        <div class="tps-sidebar-section">
+          <span class="tps-sidebar-section-title">Data Sources</span>
+          <button
+            type="button"
+            class="tps-btn tps-btn-ghost tps-btn-sm tps-btn-icon"
+            title="Add data source"
+            @click="openDatasourceModal"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="tps-datasource-list">
+          <div v-if="datasources.length === 0" class="tps-page-list-empty">
+            No data sources
           </div>
-          <div class="tps-page-item-actions">
-            <button
-              type="button"
-              class="tps-page-item-edit"
-              title="Edit data source"
-              @click.stop="openEditDatasource(ds)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="tps-page-item-delete"
-              title="Delete data source"
-              @click.stop="handleDeleteDatasource(ds.id, $event)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-            </button>
-          </div>
-        </button>
+          <button
+            v-for="ds in datasources"
+            v-else
+            :key="ds.id"
+            type="button"
+            class="tps-page-item" :class="[ds.id === selectedDatasourceId ? 'tps-active' : '']"
+            @click="selectDatasource(ds)"
+          >
+            <svg class="tps-page-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+            </svg>
+            <div class="tps-datasource-item-content">
+              <span class="tps-page-item-title">{{ ds.name }}</span>
+              <span class="tps-datasource-item-type">{{ getDatasourceTypeLabel(ds.type) }}</span>
+            </div>
+            <div class="tps-page-item-actions">
+              <button
+                type="button"
+                class="tps-page-item-edit"
+                title="Edit data source"
+                @click.stop="openEditDatasource(ds)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="tps-page-item-delete"
+                title="Delete data source"
+                @click.stop="handleDeleteDatasource(ds.id, $event)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
+          </button>
+        </div>
+      </template>
+
+      <!-- Explore Tab Content -->
+      <div v-else class="tps-sidebar-gallery">
+        <ReportGallery v-if="storage" :storage="storage" :compact="true" />
+        <div v-else class="tps-page-list-empty">
+          Storage not configured
+        </div>
       </div>
     </aside>
 
