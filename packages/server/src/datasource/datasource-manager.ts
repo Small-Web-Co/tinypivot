@@ -40,6 +40,26 @@ import type {
   UpdateDatasourceInput,
 } from './types'
 import { randomUUID } from 'node:crypto'
+import { existsSync, unlinkSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+
+/**
+ * Clears the Snowflake token cache file used by EXTERNALBROWSER auth.
+ * Called when authentication tokens expire to force re-authentication.
+ */
+function clearSnowflakeTokenCache(): void {
+  try {
+    const tokenCachePath = join(homedir(), '.snowflake', 'token-cache.json')
+    if (existsSync(tokenCachePath)) {
+      unlinkSync(tokenCachePath)
+      console.log('[Snowflake EXTERNALBROWSER] Cleared token cache file')
+    }
+  }
+  catch (cacheErr) {
+    console.log('[Snowflake EXTERNALBROWSER] Could not clear token cache:', cacheErr)
+  }
+}
 
 /**
  * SQL SELECT clause with column aliases to convert snake_case to camelCase.
@@ -1984,19 +2004,7 @@ async function getExternalBrowserConnection(
         if (errAny.code === '390195' || errAny.data?.nextAction === 'RETRY_LOGIN') {
           console.log('[Snowflake EXTERNALBROWSER] Token expired, clearing cache. User must re-authenticate.')
           // Clear any cached token by trying to delete the token cache
-          try {
-            const fs = require('node:fs')
-            const os = require('node:os')
-            const path = require('node:path')
-            const tokenCachePath = path.join(os.homedir(), '.snowflake', 'token-cache.json')
-            if (fs.existsSync(tokenCachePath)) {
-              fs.unlinkSync(tokenCachePath)
-              console.log('[Snowflake EXTERNALBROWSER] Cleared token cache file')
-            }
-          }
-          catch (cacheErr) {
-            console.log('[Snowflake EXTERNALBROWSER] Could not clear token cache:', cacheErr)
-          }
+          clearSnowflakeTokenCache()
           reject(new Error('Snowflake session expired. Please test the connection again to re-authenticate through your browser.'))
           return
         }
