@@ -406,7 +406,13 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     const response = await fetch(configRef.current.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'chat', messages, apiKey: configRef.current.apiKey }),
+      body: JSON.stringify({
+        action: 'chat',
+        messages,
+        apiKey: configRef.current.apiKey,
+        aiBaseUrl: configRef.current.aiBaseUrl,
+        aiModel: configRef.current.aiModel,
+      }),
     })
 
     if (!response.ok) {
