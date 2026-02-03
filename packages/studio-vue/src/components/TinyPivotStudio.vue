@@ -37,6 +37,7 @@ import { provideStudio, type StudioConfig } from '../composables'
 import { calculateResizeWithCollision } from '../utils/gridCollision'
 import { capturePageThumbnail } from '../utils/thumbnail'
 import { getLastPage, getWidgetState, saveLastPage, saveWidgetState } from '../utils/widgetState'
+import ReportGallery from './ReportGallery.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import ShareModal from './ShareModal.vue'
 // Import styles
