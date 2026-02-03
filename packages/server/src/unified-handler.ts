@@ -238,6 +238,10 @@ export interface TinyPivotRequest {
   messages?: Array<{ role: 'user' | 'assistant' | 'system', content: string }>
   /** Client-provided API key for LLM requests (overrides server AI_API_KEY) */
   apiKey?: string
+  /** Client-provided base URL for AI API (overrides server aiBaseUrl and AI_BASE_URL env) */
+  aiBaseUrl?: string
+  /** Client-provided model override for AI requests */
+  aiModel?: string
 
   // For datasource management
   /** Datasource ID */
@@ -723,7 +727,14 @@ export function createTinyPivotHandler(options: TinyPivotHandlerOptions = {}): R
 
         case 'chat':
           // Client-provided apiKey takes precedence over server config
-          return handleChat(body.messages || [], body.apiKey || apiKey, modelOverride, maxTokens, onError)
+          return handleChat(
+            body.messages || [],
+            body.apiKey || apiKey,
+            body.aiBaseUrl || options.aiBaseUrl || process.env.AI_BASE_URL,
+            body.aiModel || modelOverride,
+            maxTokens,
+            onError,
+          )
 
         // Datasource management actions
         case 'list-datasources':
@@ -1229,6 +1240,7 @@ async function handleQuery(
 async function handleChat(
   messages: Array<{ role: 'user' | 'assistant' | 'system', content: string }>,
   apiKey: string | undefined,
+  _aiBaseUrl: string | undefined, // TODO: Will be used in Task 4 for custom endpoint support
   modelOverride: string | undefined,
   maxTokens: number,
   onError?: (error: Error) => void,
