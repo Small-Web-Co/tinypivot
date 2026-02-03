@@ -1,6 +1,8 @@
 export { default as DatasourceDialog } from './DatasourceDialog.vue'
 export { default as PageViewer } from './PageViewer.vue'
 export type { PageViewerProps } from './PageViewer.vue'
+export { default as ReportGallery } from './ReportGallery.vue'
+export type { ReportGalleryProps } from './ReportGallery.vue'
 export { default as RichTextEditor } from './RichTextEditor.vue'
 export { default as ShareModal } from './ShareModal.vue'
 export type { ShareModalProps } from './ShareModal.vue'
