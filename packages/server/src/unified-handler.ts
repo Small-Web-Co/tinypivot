@@ -1703,18 +1703,27 @@ async function handleQueryDatasource(
   if (!datasourceId) {
     return createErrorResponse('datasourceId is required', 400)
   }
-  if (!userId) {
-    return createErrorResponse('userId is required', 400)
-  }
-  if (!userKey) {
-    return createErrorResponse('userKey is required for executing queries', 400)
-  }
   if (!sql) {
     return createErrorResponse('sql is required', 400)
   }
 
   try {
-    const result = await manager.executeQuery(datasourceId, userId, userKey, sql, maxRows)
+    let result
+
+    // Check if this is an org-tier datasource (no user auth needed)
+    if (manager.isOrgDatasource(datasourceId)) {
+      result = await manager.executeOrgQuery(datasourceId, sql, maxRows)
+    }
+    else {
+      // User-tier datasource requires authentication
+      if (!userId) {
+        return createErrorResponse('userId is required for user-tier datasources', 400)
+      }
+      if (!userKey) {
+        return createErrorResponse('userKey is required for user-tier datasources', 400)
+      }
+      result = await manager.executeQuery(datasourceId, userId, userKey, sql, maxRows)
+    }
 
     if (!result.success) {
       return createErrorResponse(result.error || 'Query execution failed', 400)

@@ -115,6 +115,19 @@ export interface DatasourceManager {
     userKey: string
   ) => Promise<DatasourceWithCredentials | null>
 
+  /** Check if a datasource is org-tier (no user auth needed) */
+  isOrgDatasource: (id: string) => boolean
+
+  /** Get org-tier datasource with credentials (no user auth needed) */
+  getOrgDatasourceWithCredentials: (id: string) => DatasourceWithCredentials | null
+
+  /** Execute a query against an org-tier datasource (no user auth needed) */
+  executeOrgQuery: (
+    id: string,
+    sql: string,
+    maxRows?: number
+  ) => Promise<QueryResult>
+
   /** Create a new user-owned datasource */
   createDatasource: (
     input: CreateDatasourceInput,
@@ -498,6 +511,53 @@ export function createDatasourceManager(config: DatasourceManagerConfig): Dataso
         credentials,
         refreshToken,
         tokenExpiresAt: record.tokenExpiresAt || undefined,
+      }
+    },
+
+    isOrgDatasource(id: string): boolean {
+      return orgSources.has(id)
+    },
+
+    getOrgDatasourceWithCredentials(id: string): DatasourceWithCredentials | null {
+      return orgSources.get(id) || null
+    },
+
+    async executeOrgQuery(
+      id: string,
+      sql: string,
+      maxRows = 1000,
+    ): Promise<QueryResult> {
+      const source = orgSources.get(id)
+      if (!source) {
+        return {
+          success: false,
+          error: 'Org datasource not found',
+        }
+      }
+
+      const startTime = Date.now()
+
+      try {
+        if (source.type === 'postgres') {
+          return await executePostgresQuery(source, sql, maxRows, startTime)
+        }
+
+        if (source.type === 'snowflake') {
+          return await executeSnowflakeQuery(source, sql, maxRows, startTime)
+        }
+
+        return {
+          success: false,
+          error: `Unsupported datasource type: ${source.type}`,
+        }
+      }
+      catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        return {
+          success: false,
+          error: errorMessage,
+          duration: Date.now() - startTime,
+        }
       }
     },
 
