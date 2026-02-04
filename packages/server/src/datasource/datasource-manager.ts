@@ -205,18 +205,60 @@ export interface DatasourceManager {
 }
 
 /**
- * Helper to get env var with optional custom mapping
+ * Helper to get env var with flexible matching
+ *
+ * Tries multiple patterns to find the env var:
+ * 1. Explicit mapping (if provided)
+ * 2. Standard pattern: {PREFIX}_{FIELD}
+ * 3. Environment-prefixed: PROD_{PREFIX}_{FIELD}, DEV_{PREFIX}_{FIELD}, etc.
+ * 4. Any env var containing both prefix and field
  */
 function getEnvVar(
   prefix: string,
   field: string,
   envMapping?: OrgDatasourceEnvConfig['envMapping'],
 ): string | undefined {
+  // 1. Check explicit mapping first
   const customKey = envMapping?.[field as keyof NonNullable<typeof envMapping>]
-  if (customKey) {
+  if (customKey && process.env[customKey]) {
     return process.env[customKey]
   }
-  return process.env[`${prefix}_${field.toUpperCase()}`]
+
+  const fieldUpper = field.toUpperCase()
+  const prefixUpper = prefix.toUpperCase()
+
+  // 2. Try standard pattern: {PREFIX}_{FIELD}
+  const standardKey = `${prefixUpper}_${fieldUpper}`
+  if (process.env[standardKey]) {
+    return process.env[standardKey]
+  }
+
+  // 3. Try common environment prefixes: PROD_, DEV_, STAGING_, TEST_
+  const envPrefixes = ['PROD', 'DEV', 'STAGING', 'TEST', 'LOCAL']
+  for (const envPrefix of envPrefixes) {
+    const prefixedKey = `${envPrefix}_${prefixUpper}_${fieldUpper}`
+    if (process.env[prefixedKey]) {
+      return process.env[prefixedKey]
+    }
+  }
+
+  // 4. Search all env vars for a match containing both prefix and field
+  // This handles cases like MY_CUSTOM_SNOWFLAKE_PRIVATE_KEY
+  const allEnvKeys = Object.keys(process.env)
+  const matchingKey = allEnvKeys.find((key) => {
+    const keyUpper = key.toUpperCase()
+    // Must contain both the prefix and the field
+    // Handle both PRIVATE_KEY and PRIVATEKEY patterns
+    const fieldPattern = fieldUpper.replace(/_/g, '_?')
+    const regex = new RegExp(`${prefixUpper}.*${fieldPattern}|${fieldPattern}.*${prefixUpper}`)
+    return regex.test(keyUpper)
+  })
+
+  if (matchingKey) {
+    return process.env[matchingKey]
+  }
+
+  return undefined
 }
 
 /**
