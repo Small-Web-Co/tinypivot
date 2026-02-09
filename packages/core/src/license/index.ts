@@ -127,10 +127,102 @@ function derToRaw(der: Uint8Array): Uint8Array {
 }
 
 /**
+ * ECDSA P-256 verification via @noble/curves (pure JS fallback)
+ * Used when SubtleCrypto is unavailable (e.g. browser on plain HTTP)
+ */
+async function verifySignatureNoble(
+  rawSig: Uint8Array,
+  msgBytes: Uint8Array,
+  spkiBytes: Uint8Array,
+): Promise<boolean> {
+  const { p256 } = await import('@noble/curves/p256')
+  // SPKI for P-256 has a fixed 26-byte header; raw key starts at offset 26
+  const rawPublicKey = spkiBytes.slice(26)
+  return p256.verify(rawSig, msgBytes, rawPublicKey)
+}
+
+/**
+ * SHA-256 hashing via @noble/hashes (pure JS fallback)
+ * Used when SubtleCrypto is unavailable (e.g. browser on plain HTTP)
+ */
+async function hashSecretNoble(secret: string): Promise<string> {
+  const { sha256 } = await import('@noble/hashes/sha256')
+  const data = new TextEncoder().encode(secret)
+  const hash = sha256(data)
+  return Array.from(hash).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+
+/**
+ * Cached SubtleCrypto instance (undefined = not yet checked)
+ */
+let subtleCryptoCache: SubtleCrypto | null | undefined
+
+/**
+ * Get a SubtleCrypto instance, falling back to Node.js webcrypto for SSR
+ */
+async function getSubtleCrypto(): Promise<SubtleCrypto | null> {
+  if (subtleCryptoCache !== undefined)
+    return subtleCryptoCache
+
+  if (globalThis.crypto?.subtle) {
+    subtleCryptoCache = globalThis.crypto.subtle
+    return subtleCryptoCache
+  }
+
+  try {
+    // Node.js / SSR fallback
+    const nodeCrypto = await import('node:crypto')
+    const subtle = (nodeCrypto as any).webcrypto?.subtle as SubtleCrypto | undefined
+    if (subtle) {
+      subtleCryptoCache = subtle
+      return subtleCryptoCache
+    }
+  }
+  catch {}
+
+  subtleCryptoCache = null
+  return null
+}
+
+/**
+ * @internal
+ */
+export function _resetCryptoState(forcedValue?: SubtleCrypto | null): void {
+  // undefined = re-detect on next call, null = force "no crypto available"
+  subtleCryptoCache = forcedValue
+  insecureContextWarned = false
+}
+
+let insecureContextWarned = false
+
+/**
+ * Log a one-time info message when crypto.subtle is unavailable (plain HTTP)
+ * Not a blocker since @noble/curves provides a pure JS fallback.
+ */
+function warnInsecureContext(): void {
+  if (insecureContextWarned)
+    return
+  insecureContextWarned = true
+
+  console.info(
+    '[TinyPivot] crypto.subtle is not available — using pure JS crypto fallback.\n'
+    + 'This typically happens when serving over plain HTTP. For best performance, consider:\n'
+    + '  1. Serve your app over HTTPS (recommended for production)\n'
+    + '  2. Access via localhost (e.g. http://localhost:3000)\n'
+    + '  3. Use a self-signed certificate for internal IPs',
+  )
+}
+
+/**
  * Import the public key for verification
  */
 async function importPublicKey(): Promise<CryptoKey | null> {
   try {
+    const subtle = await getSubtleCrypto()
+    if (!subtle) {
+      return null
+    }
+
     // Convert PEM to binary
     const pemContents = PUBLIC_KEY_PEM
       .replace('-----BEGIN PUBLIC KEY-----', '')
@@ -139,7 +231,7 @@ async function importPublicKey(): Promise<CryptoKey | null> {
 
     const binaryKey = base64ToUint8Array(pemContents)
 
-    return await crypto.subtle.importKey(
+    return await subtle.importKey(
       'spki',
       new Uint8Array(binaryKey).buffer,
       { name: 'ECDSA', namedCurve: 'P-256' },
@@ -153,8 +245,20 @@ async function importPublicKey(): Promise<CryptoKey | null> {
 }
 
 /**
+ * Get SPKI bytes from the embedded PEM public key
+ */
+function getSpkiBytes(): Uint8Array {
+  const pemContents = PUBLIC_KEY_PEM
+    .replace('-----BEGIN PUBLIC KEY-----', '')
+    .replace('-----END PUBLIC KEY-----', '')
+    .replace(/\s/g, '')
+  return base64ToUint8Array(pemContents)
+}
+
+/**
  * ECDSA P-256 signature verification
  * Verifies that the license was signed with our private key
+ * Falls back to @noble/curves when SubtleCrypto is unavailable
  */
 async function verifySignature(
   typeCode: string,
@@ -162,20 +266,31 @@ async function verifySignature(
   expiry: string,
 ): Promise<boolean> {
   const payload = `TP-${typeCode}-${expiry}`
+  const encoder = new TextEncoder()
+  const msgData = encoder.encode(payload)
+  const derSig = base64ToUint8Array(signature)
+
+  const subtle = await getSubtleCrypto()
+  if (!subtle) {
+    // Fall back to @noble/curves pure JS implementation
+    warnInsecureContext()
+    try {
+      const rawSig = derToRaw(derSig)
+      const spkiBytes = getSpkiBytes()
+      return await verifySignatureNoble(rawSig, msgData, spkiBytes)
+    }
+    catch {
+      return false
+    }
+  }
 
   try {
+    const rawSig = derToRaw(derSig)
     const publicKey = await importPublicKey()
     if (!publicKey)
       return false
 
-    const encoder = new TextEncoder()
-    const msgData = encoder.encode(payload)
-
-    // Convert DER-encoded signature to raw format for Web Crypto
-    const derSig = base64ToUint8Array(signature)
-    const rawSig = derToRaw(derSig)
-
-    return await crypto.subtle.verify(
+    return await subtle.verify(
       { name: 'ECDSA', hash: 'SHA-256' },
       publicKey,
       new Uint8Array(rawSig).buffer,
@@ -183,7 +298,6 @@ async function verifySignature(
     )
   }
   catch {
-    // Fallback for environments without crypto.subtle (SSR, older browsers)
     return false
   }
 }
@@ -283,9 +397,16 @@ const DEMO_SECRET_HASH = 'A48AA0618518D3E62F31FCFCA2DD2B86E7FE0863E2F90756FB0A96
  */
 async function hashSecret(secret: string): Promise<string> {
   try {
+    const subtle = await getSubtleCrypto()
+    if (!subtle) {
+      // Fall back to @noble/hashes pure JS implementation
+      warnInsecureContext()
+      return await hashSecretNoble(secret)
+    }
+
     const encoder = new TextEncoder()
     const data = encoder.encode(secret)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashBuffer = await subtle.digest('SHA-256', data)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
   }
