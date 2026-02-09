@@ -51,6 +51,7 @@ BUILD.md
 .cursor
 
 scripts/generate-license.js
+scripts/verify-license.mjs
 
 README_PERSONAL.md
 
@@ -58,3 +59,7 @@ README_PERSONAL.md
 
 CLAUDE.md
 AGENTS.md
+
+/docs/**
+
+/invoices/**

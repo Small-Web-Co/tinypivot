@@ -38,7 +38,7 @@ export async function setLicenseKey(key: string): Promise<void> {
   validationPromise = null
 
   if (!licenseInfo.value.isValid) {
-    console.warn('[TinyPivot] Invalid or expired license key. Running in free mode.')
+    console.warn('[TinyPivot] License validation failed. Check the console for environment details. Running in free mode.')
   }
   else if (licenseInfo.value.type !== 'free') {
     console.info(`[TinyPivot] Pro license activated (${licenseInfo.value.type})`)
