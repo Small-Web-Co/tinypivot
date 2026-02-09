@@ -1,8 +1,25 @@
+export interface ChartConfigState {
+  chartType?: string
+  xAxis?: string
+  yAxis?: string
+  yAxisAggregation?: string
+  colorField?: string
+}
+
+export interface PivotConfigState {
+  rows?: string[]
+  columns?: string[]
+  values?: string[]
+  aggregations?: Record<string, string>
+}
+
 export interface WidgetViewState {
   activeTab: 'ai' | 'grid' | 'pivot' | 'chart'
   columns?: string[]
   sortOrder?: { column: string, direction: 'asc' | 'desc' }[]
   filters?: Record<string, unknown>
+  chartConfig?: ChartConfigState
+  pivotConfig?: PivotConfigState
 }
 
 const STORAGE_PREFIX = 'tinypivot-widget-state-'

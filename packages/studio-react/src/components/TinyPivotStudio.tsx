@@ -362,6 +362,7 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
   const [widgetConfigShowTitle, setWidgetConfigShowTitle] = useState(true)
   // Datasource selection for widget
   const [widgetConfigDatasourceId, setWidgetConfigDatasourceId] = useState<string>('sample')
+  const [widgetConfigQuery, setWidgetConfigQuery] = useState<string>('')
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false)
@@ -556,9 +557,10 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
     setWidgetConfigHeight(typeof block.height === 'number' ? block.height : 400)
     setWidgetConfigVisualizationType((block.metadata?.visualizationType as 'table' | 'pivot' | 'chart') || 'table')
     setWidgetConfigShowTitle(block.showTitle !== false)
-    // Load datasource from block metadata
+    // Load datasource and query from block metadata
     const dsId = (block.metadata?.datasourceId as string) || 'sample'
     setWidgetConfigDatasourceId(dsId)
+    setWidgetConfigQuery((block.metadata?.query as string) || '')
     setShowWidgetConfigModal(true)
   }, [])
 
@@ -570,6 +572,7 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
     setWidgetConfigVisualizationType('table')
     setWidgetConfigShowTitle(true)
     setWidgetConfigDatasourceId('sample')
+    setWidgetConfigQuery('')
   }, [])
 
   // Share modal functions
@@ -676,6 +679,9 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
             onConfigureWidget={openWidgetConfigModal}
             getAiAnalystConfig={getAiAnalystConfigForDatasource}
             onShare={openShareModal}
+            apiEndpoint={apiEndpoint}
+            userId={userId}
+            userKey={userKey}
           />
         ) : (
           <EmptyState onCreatePage={() => setShowCreateModal(true)} />
@@ -702,6 +708,8 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
           datasourceId={widgetConfigDatasourceId}
           onDatasourceChange={handleWidgetDatasourceChange}
           datasources={datasources}
+          query={widgetConfigQuery}
+          onQueryChange={setWidgetConfigQuery}
           onClose={closeWidgetConfigModal}
           onSave={() => {
             if (!widgetConfigBlockId || !currentPage)
@@ -716,6 +724,7 @@ function StudioLayout({ theme, onPageSave }: StudioLayoutProps) {
               metadata: {
                 visualizationType: widgetConfigVisualizationType,
                 datasourceId: isSampleData ? undefined : widgetConfigDatasourceId,
+                query: isSampleData ? undefined : (widgetConfigQuery || undefined),
               },
             }
 
@@ -1154,6 +1163,9 @@ interface PageEditorProps {
   onConfigureWidget: (block: WidgetBlock) => void
   getAiAnalystConfig?: (datasourceId?: string) => Record<string, unknown> | undefined
   onShare?: () => void
+  apiEndpoint?: string | null
+  userId?: string | null
+  userKey?: string | null
 }
 
 interface ActiveFilter {
@@ -1163,11 +1175,15 @@ interface ActiveFilter {
   sourceWidgetId?: string
 }
 
-function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalystConfig, onShare }: PageEditorProps) {
+function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalystConfig, onShare, apiEndpoint, userId, userKey }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
   const [blocks, setBlocks] = useState<Block[]>(page.blocks)
   const [showBlockMenu, setShowBlockMenu] = useState(false)
   const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([])
+
+  // Widget data fetching state
+  const [widgetDataCache, setWidgetDataCache] = useState<Record<string, Record<string, unknown>[]>>({})
+  const [widgetDataLoading, setWidgetDataLoading] = useState<Record<string, boolean>>({})
 
   // Widget hover state tracking
   const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null)
@@ -1187,6 +1203,110 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
     }
     setFocusedBlockId(null)
   }, [])
+
+  // Fetch data for a widget from its configured datasource
+  const fetchWidgetData = useCallback(async (block: WidgetBlock) => {
+    const datasourceId = block.metadata?.datasourceId as string
+    if (!datasourceId || datasourceId === 'sample') {
+      return
+    }
+
+    // Already loading or cached
+    if (widgetDataLoading[block.id] || widgetDataCache[block.id]) {
+      return
+    }
+
+    setWidgetDataLoading(prev => ({ ...prev, [block.id]: true }))
+
+    try {
+      // Get query from widget metadata
+      const query = block.metadata?.query as string
+
+      if (!query) {
+        // No query configured - show message and use sample data
+        console.info(`Widget ${block.id} has no query configured, using sample data`)
+        setWidgetDataLoading(prev => ({ ...prev, [block.id]: false }))
+        return
+      }
+
+      if (!apiEndpoint) {
+        console.warn('No API endpoint configured for datasource queries')
+        return
+      }
+
+      const sqlQuery = query
+
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'query-datasource',
+          datasourceId,
+          userId,
+          userKey,
+          sql: sqlQuery,
+          maxRows: 1000,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch data: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      setWidgetDataCache(prev => ({
+        ...prev,
+        [block.id]: result.data || result.rows || [],
+      }))
+    }
+    catch (err) {
+      console.error(`Failed to fetch widget data for ${block.id}:`, err)
+    }
+    finally {
+      setWidgetDataLoading(prev => ({ ...prev, [block.id]: false }))
+    }
+  }, [apiEndpoint, userId, userKey, widgetDataLoading, widgetDataCache])
+
+  // Get data for a widget - uses cached data if available, otherwise triggers fetch
+  const getWidgetData = useCallback((block: WidgetBlock): Record<string, unknown>[] | undefined => {
+    const datasourceId = block.metadata?.datasourceId as string
+    if (!datasourceId || datasourceId === 'sample') {
+      return undefined // Return undefined to use sample data
+    }
+
+    const cachedData = widgetDataCache[block.id]
+    if (cachedData) {
+      return cachedData
+    }
+
+    // Trigger fetch if not loading
+    if (!widgetDataLoading[block.id]) {
+      fetchWidgetData(block)
+    }
+
+    return undefined // Return undefined while loading to use sample data
+  }, [widgetDataCache, widgetDataLoading, fetchWidgetData])
+
+  // Check if widget data is loading
+  const isWidgetLoading = useCallback((blockId: string): boolean => {
+    return widgetDataLoading[blockId] || false
+  }, [widgetDataLoading])
+
+  // Fetch data for all widgets on mount and when blocks change
+  useEffect(() => {
+    for (const block of blocks) {
+      if (isWidgetBlock(block)) {
+        const datasourceId = block.metadata?.datasourceId as string
+        if (datasourceId && datasourceId !== 'sample' && !widgetDataCache[block.id]) {
+          fetchWidgetData(block)
+        }
+      }
+    }
+  }, [blocks, widgetDataCache, fetchWidgetData])
 
   // Layout mode state
   const [layoutMode, setLayoutModeState] = useState<LayoutMode>(page.layoutMode || 'linear')
@@ -1990,6 +2110,8 @@ function PageEditor({ page, theme, onUpdatePage, onConfigureWidget, getAiAnalyst
                       onMouseLeave={() => setHoveredBlockId(null)}
                       onFocusIn={setFocusedBlockId}
                       onFocusOut={handleBlockFocusOut}
+                      getWidgetData={getWidgetData}
+                      isWidgetLoading={isWidgetLoading}
                     />
                   </SortableBlockWrapper>
                 ))}
@@ -2421,9 +2543,13 @@ interface BlockRendererProps {
   onFocusIn?: (blockId: string) => void
   /** Callback when block loses focus */
   onFocusOut?: (event: React.FocusEvent, blockId: string) => void
+  /** Get widget data for a block */
+  getWidgetData?: (block: WidgetBlock) => Record<string, unknown>[] | undefined
+  /** Check if widget data is loading */
+  isWidgetLoading?: (blockId: string) => boolean
 }
 
-function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick, getAiAnalystConfig, shouldShowControls, isPreviewMode, onMouseEnter, onMouseLeave, onFocusIn, onFocusOut }: BlockRendererProps) {
+function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, isNested, activeFilters, onWidgetRowClick, getAiAnalystConfig, shouldShowControls, isPreviewMode, onMouseEnter, onMouseLeave, onFocusIn, onFocusOut, getWidgetData, isWidgetLoading }: BlockRendererProps) {
   if (block.type === 'text') {
     return (
       <TextBlockComponent
@@ -2469,6 +2595,8 @@ function BlockRenderer({ block, theme, onUpdate, onDelete, onConfigureWidget, is
         onMouseLeave={onMouseLeave}
         onFocusIn={onFocusIn ? () => onFocusIn(block.id) : undefined}
         onFocusOut={onFocusOut ? (e: React.FocusEvent) => onFocusOut(e, block.id) : undefined}
+        widgetData={getWidgetData?.(block)}
+        isLoadingData={isWidgetLoading?.(block.id)}
       />
     )
   }
@@ -3041,6 +3169,8 @@ function WidgetBlockComponent({
   onMouseLeave,
   onFocusIn,
   onFocusOut,
+  widgetData,
+  isLoadingData: _isLoadingData,
 }: {
   block: WidgetBlock
   theme: 'light' | 'dark'
@@ -3055,6 +3185,8 @@ function WidgetBlockComponent({
   onMouseLeave?: () => void
   onFocusIn?: () => void
   onFocusOut?: (event: React.FocusEvent) => void
+  widgetData?: Record<string, unknown>[]
+  isLoadingData?: boolean
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -3073,16 +3205,18 @@ function WidgetBlockComponent({
 
   // Filter data based on active filters
   const filteredData = useMemo(() => {
+    // Use widget-specific data if available, otherwise fall back to sample data
+    const baseData = widgetData || widgetSampleData
     if (!activeFilters || activeFilters.length === 0) {
-      return widgetSampleData
+      return baseData
     }
-    return widgetSampleData.filter((row) => {
+    return baseData.filter((row) => {
       return activeFilters.every((filter) => {
         const fieldValue = String(row[filter.field as keyof typeof row] ?? '')
         return fieldValue.toLowerCase().includes(filter.value.toLowerCase())
       })
     })
-  }, [activeFilters])
+  }, [activeFilters, widgetData])
 
   // Handle row click for filtering
   const handleRowClick = useCallback((row: Record<string, unknown>) => {
@@ -4744,6 +4878,9 @@ interface WidgetConfigModalProps {
   datasourceId: string
   onDatasourceChange: (id: string) => void
   datasources: DatasourceConfig[]
+  // SQL query
+  query: string
+  onQueryChange: (query: string) => void
   onClose: () => void
   onSave: () => void
 }
@@ -4760,6 +4897,8 @@ function WidgetConfigModal({
   datasourceId,
   onDatasourceChange,
   datasources,
+  query,
+  onQueryChange,
   onClose,
   onSave,
 }: WidgetConfigModalProps) {
@@ -4836,6 +4975,23 @@ function WidgetConfigModal({
                 </p>
               )}
             </div>
+
+            {datasourceId !== 'sample' && (
+              <div className="tps-form-group">
+                <label className="tps-label" htmlFor="widget-query">SQL Query</label>
+                <textarea
+                  id="widget-query"
+                  className="tps-textarea"
+                  placeholder="SELECT * FROM your_table LIMIT 1000"
+                  rows={4}
+                  value={query}
+                  onChange={e => onQueryChange(e.target.value)}
+                />
+                <p className="tps-form-hint">
+                  Enter a SQL query to fetch data from your data source. Leave empty to use a default query.
+                </p>
+              </div>
+            )}
 
             <div className="tps-form-group">
               <label className="tps-label" htmlFor="widget-viz-type">Visualization Type</label>

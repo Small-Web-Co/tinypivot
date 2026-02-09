@@ -28,6 +28,13 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 const props = defineProps<{
   data: Record<string, unknown>[]
   theme?: 'light' | 'dark'
+  initialConfig?: {
+    chartType?: string
+    xAxis?: string
+    yAxis?: string
+    yAxisAggregation?: string
+    colorField?: string
+  }
 }>()
 
 const emit = defineEmits<{
@@ -39,8 +46,43 @@ const VueApexCharts = defineAsyncComponent(() =>
   import('vue3-apexcharts').then(m => m.default),
 )
 
+// Initialize chart config from props or defaults
+function initializeConfig(): ChartConfig {
+  const defaultConfig = createDefaultChartConfig()
+  if (props.initialConfig) {
+    const config: ChartConfig = {
+      ...defaultConfig,
+      type: (props.initialConfig.chartType as ChartType) || defaultConfig.type,
+    }
+    // Restore xAxis if saved
+    if (props.initialConfig.xAxis) {
+      config.xAxis = {
+        field: props.initialConfig.xAxis,
+        role: 'dimension',
+      }
+    }
+    // Restore yAxis with aggregation if saved
+    if (props.initialConfig.yAxis) {
+      config.yAxis = {
+        field: props.initialConfig.yAxis,
+        role: 'measure',
+        aggregation: (props.initialConfig.yAxisAggregation as ChartAggregation) || 'sum',
+      }
+    }
+    // Restore colorField if saved
+    if (props.initialConfig.colorField) {
+      config.colorField = {
+        field: props.initialConfig.colorField,
+        role: 'dimension',
+      }
+    }
+    return config
+  }
+  return defaultConfig
+}
+
 // Chart configuration state
-const chartConfig = ref<ChartConfig>(createDefaultChartConfig())
+const chartConfig = ref<ChartConfig>(initializeConfig())
 
 // Field analysis
 const fieldInfos = computed(() => analyzeFieldsForChart(props.data))

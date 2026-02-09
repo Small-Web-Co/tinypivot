@@ -59,7 +59,22 @@ const props = withDefaults(defineProps<{
   /** Optional widget ID for state persistence */
   widgetId?: string
   /** Initial view state from persisted storage */
-  initialViewState?: { activeTab?: 'ai' | 'grid' | 'pivot' | 'chart' }
+  initialViewState?: {
+    activeTab?: 'ai' | 'grid' | 'pivot' | 'chart'
+    chartConfig?: {
+      chartType?: string
+      xAxis?: string
+      yAxis?: string
+      yAxisAggregation?: string
+      colorField?: string
+    }
+    pivotConfig?: {
+      rows?: string[]
+      columns?: string[]
+      values?: string[]
+      aggregations?: Record<string, string>
+    }
+  }
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -96,7 +111,22 @@ const emit = defineEmits<{
   (e: 'aiQueryExecuted', payload: AIQueryExecutedEvent): void
   (e: 'aiError', payload: AIErrorEvent): void
   // View state change event
-  (e: 'viewStateChange', payload: { activeTab: 'ai' | 'grid' | 'pivot' | 'chart' }): void
+  (e: 'viewStateChange', payload: {
+    activeTab: 'ai' | 'grid' | 'pivot' | 'chart'
+    chartConfig?: {
+      chartType?: string
+      xAxis?: string
+      yAxis?: string
+      yAxisAggregation?: string
+      colorField?: string
+    }
+    pivotConfig?: {
+      rows?: string[]
+      columns?: string[]
+      values?: string[]
+      aggregations?: Record<string, string>
+    }
+  }): void
 }>()
 
 const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro } = useLicense()
@@ -438,7 +468,29 @@ const viewMode = ref<'ai' | 'grid' | 'pivot' | 'chart'>(
 // Emit view state changes when widgetId is provided
 watch(viewMode, (newMode) => {
   if (props.widgetId) {
-    emit('viewStateChange', { activeTab: newMode })
+    const payload: {
+      activeTab: 'ai' | 'grid' | 'pivot' | 'chart'
+      chartConfig?: {
+        chartType?: string
+        xAxis?: string
+        yAxis?: string
+        yAxisAggregation?: string
+        colorField?: string
+      }
+    } = { activeTab: newMode }
+
+    // Include chart config if we have one (serialize ChartField to strings)
+    if (chartConfig?.value) {
+      payload.chartConfig = {
+        chartType: chartConfig.value.type, // ChartConfig uses 'type' not 'chartType'
+        xAxis: chartConfig.value.xAxis?.field,
+        yAxis: chartConfig.value.yAxis?.field,
+        yAxisAggregation: chartConfig.value.yAxis?.aggregation,
+        colorField: chartConfig.value.colorField?.field,
+      }
+    }
+
+    emit('viewStateChange', payload)
   }
 })
 
@@ -554,10 +606,28 @@ function handleAIViewResults(payload: { data: Record<string, unknown>[], query: 
   aiLoadedData.value = payload.data
   viewMode.value = 'grid' // Switch to grid to show the results
 }
+
+// Initialize chart config from initialViewState if provided
+// Note: initialViewState stores simplified versions (strings), ChartConfig uses ChartField objects
+// The ChartBuilder handles the conversion via its initialConfig prop
 const chartConfig = ref<ChartConfig | null>(null)
 
 function handleChartConfigChange(config: ChartConfig) {
   chartConfig.value = config
+  // Emit view state change with updated chart config
+  // Serialize ChartField objects to simple strings for storage
+  if (props.widgetId) {
+    emit('viewStateChange', {
+      activeTab: viewMode.value,
+      chartConfig: {
+        chartType: config.type, // Use 'type' property from ChartConfig
+        xAxis: config.xAxis?.field,
+        yAxis: config.yAxis?.field,
+        yAxisAggregation: config.yAxis?.aggregation,
+        colorField: config.colorField?.field,
+      },
+    })
+  }
 }
 const showPivotConfig = ref(true)
 const draggingField = ref<string | null>(null)
@@ -1473,6 +1543,7 @@ function handleContainerClick(event: MouseEvent) {
         <ChartBuilder
           :data="filteredDataForPivot"
           :theme="currentTheme"
+          :initial-config="initialViewState?.chartConfig"
           @config-change="handleChartConfigChange"
         />
       </div>

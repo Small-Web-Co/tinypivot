@@ -30,16 +30,56 @@ const Chart = React.lazy(() => import('react-apexcharts'))
 interface ChartBuilderProps {
   data: Record<string, unknown>[]
   theme?: 'light' | 'dark'
+  initialConfig?: {
+    chartType?: string
+    xAxis?: string
+    yAxis?: string
+    yAxisAggregation?: string
+    colorField?: string
+  }
   onConfigChange?: (config: ChartConfig) => void
 }
 
 export function ChartBuilder({
   data,
   theme = 'light',
+  initialConfig,
   onConfigChange,
 }: ChartBuilderProps) {
-  // Chart configuration state
-  const [chartConfig, setChartConfig] = useState<ChartConfig>(createDefaultChartConfig())
+  // Initialize chart config from props or defaults
+  const [chartConfig, setChartConfig] = useState<ChartConfig>(() => {
+    const defaultConfig = createDefaultChartConfig()
+    if (initialConfig) {
+      const config: ChartConfig = {
+        ...defaultConfig,
+        type: (initialConfig.chartType as ChartType) || defaultConfig.type,
+      }
+      // Restore xAxis if saved
+      if (initialConfig.xAxis) {
+        config.xAxis = {
+          field: initialConfig.xAxis,
+          role: 'dimension',
+        }
+      }
+      // Restore yAxis with aggregation if saved
+      if (initialConfig.yAxis) {
+        config.yAxis = {
+          field: initialConfig.yAxis,
+          role: 'measure',
+          aggregation: (initialConfig.yAxisAggregation as ChartAggregation) || 'sum',
+        }
+      }
+      // Restore colorField if saved
+      if (initialConfig.colorField) {
+        config.colorField = {
+          field: initialConfig.colorField,
+          role: 'dimension',
+        }
+      }
+      return config
+    }
+    return defaultConfig
+  })
 
   // Drag state
   const [draggingField, setDraggingField] = useState<ChartFieldInfo | null>(null)

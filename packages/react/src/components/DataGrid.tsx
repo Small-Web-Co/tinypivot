@@ -8,7 +8,9 @@ import type {
   AIDataLoadedEvent,
   AIErrorEvent,
   AIQueryExecutedEvent,
+  ChartAggregation,
   ChartConfig,
+  ChartType,
 } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -59,7 +61,16 @@ interface DataGridProps {
   /** Optional widget ID for state persistence */
   widgetId?: string
   /** Initial view state from persisted storage */
-  initialViewState?: { activeTab?: 'ai' | 'grid' | 'pivot' | 'chart' }
+  initialViewState?: {
+    activeTab?: 'ai' | 'grid' | 'pivot' | 'chart'
+    chartConfig?: {
+      chartType?: string
+      xAxis?: string
+      yAxis?: string
+      yAxisAggregation?: string
+      colorField?: string
+    }
+  }
   onCellClick?: (payload: {
     row: number
     col: number
@@ -75,7 +86,16 @@ interface DataGridProps {
   onAIQueryExecuted?: (payload: AIQueryExecutedEvent) => void
   onAIError?: (payload: AIErrorEvent) => void
   // View state change event
-  onViewStateChange?: (payload: { activeTab: 'ai' | 'grid' | 'pivot' | 'chart' }) => void
+  onViewStateChange?: (payload: {
+    activeTab: 'ai' | 'grid' | 'pivot' | 'chart'
+    chartConfig?: {
+      chartType?: string
+      xAxis?: string
+      yAxis?: string
+      yAxisAggregation?: string
+      colorField?: string
+    }
+  }) => void
 }
 
 const MIN_COL_WIDTH = 120
@@ -146,9 +166,34 @@ export function DataGrid({
   )
 
   // Emit view state changes when widgetId is provided
+  // Note: We use a ref to track chartConfig to avoid re-running this effect on every chartConfig change
+  // (chartConfig changes are emitted separately in handleChartConfigChange)
+  const chartConfigRef = useRef<ChartConfig | null>(null)
   useEffect(() => {
     if (widgetId && onViewStateChange) {
-      onViewStateChange({ activeTab: viewMode })
+      const payload: {
+        activeTab: 'ai' | 'grid' | 'pivot' | 'chart'
+        chartConfig?: {
+          chartType?: string
+          xAxis?: string
+          yAxis?: string
+          yAxisAggregation?: string
+          colorField?: string
+        }
+      } = { activeTab: viewMode }
+
+      // Include chart config if we have one
+      if (chartConfigRef.current) {
+        payload.chartConfig = {
+          chartType: chartConfigRef.current.type,
+          xAxis: chartConfigRef.current.xAxis?.field,
+          yAxis: chartConfigRef.current.yAxis?.field,
+          yAxisAggregation: chartConfigRef.current.yAxis?.aggregation,
+          colorField: chartConfigRef.current.colorField?.field,
+        }
+      }
+
+      onViewStateChange(payload)
     }
   }, [viewMode, widgetId, onViewStateChange])
 
@@ -169,11 +214,48 @@ export function DataGrid({
 
   // Data to display - AI loaded data takes precedence
   const displayData = useMemo(() => aiLoadedData || data, [aiLoadedData, data])
-  const [_chartConfig, setChartConfig] = useState<ChartConfig | null>(null)
+
+  // Initialize chart config from initialViewState if provided
+  const [_chartConfig, setChartConfig] = useState<ChartConfig | null>(() => {
+    if (initialViewState?.chartConfig) {
+      const config: ChartConfig = {
+        type: (initialViewState.chartConfig.chartType || 'bar') as ChartType,
+      }
+      if (initialViewState.chartConfig.xAxis) {
+        config.xAxis = { field: initialViewState.chartConfig.xAxis, role: 'dimension' }
+      }
+      if (initialViewState.chartConfig.yAxis) {
+        config.yAxis = {
+          field: initialViewState.chartConfig.yAxis,
+          role: 'measure',
+          aggregation: (initialViewState.chartConfig.yAxisAggregation || 'sum') as ChartAggregation,
+        }
+      }
+      if (initialViewState.chartConfig.colorField) {
+        config.colorField = { field: initialViewState.chartConfig.colorField, role: 'dimension' }
+      }
+      return config
+    }
+    return null
+  })
 
   const handleChartConfigChange = useCallback((config: ChartConfig) => {
     setChartConfig(config)
-  }, [])
+    chartConfigRef.current = config // Keep ref in sync for viewMode changes
+    // Emit view state change with updated chart config
+    if (widgetId && onViewStateChange) {
+      onViewStateChange({
+        activeTab: viewMode,
+        chartConfig: {
+          chartType: config.type,
+          xAxis: config.xAxis?.field,
+          yAxis: config.yAxis?.field,
+          yAxisAggregation: config.yAxis?.aggregation,
+          colorField: config.colorField?.field,
+        },
+      })
+    }
+  }, [widgetId, onViewStateChange, viewMode])
   const [showPivotConfig, setShowPivotConfig] = useState(true)
   const [draggingField, setDraggingField] = useState<string | null>(null)
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null)
@@ -1511,6 +1593,7 @@ export function DataGrid({
           <ChartBuilder
             data={filteredDataForPivot}
             theme={currentTheme}
+            initialConfig={initialViewState?.chartConfig}
             onConfigChange={handleChartConfigChange}
           />
         </div>

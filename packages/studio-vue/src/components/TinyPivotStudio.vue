@@ -175,6 +175,7 @@ const widgetConfigVisualizationType = ref<'table' | 'pivot' | 'chart'>('table')
 const widgetConfigShowTitle = ref(true)
 // Datasource selection for widget
 const widgetConfigDatasourceId = ref<string>('sample') // 'sample' or datasource ID
+const widgetConfigQuery = ref<string>('') // SQL query for the widget
 
 // Share modal state
 const showShareModal = ref(false)
@@ -630,6 +631,125 @@ function removeFilter(filterId: string) {
 function clearAllFilters() {
   activeFilters.value = []
 }
+
+// Widget data cache - stores fetched data keyed by block ID
+const widgetDataCache = ref<Record<string, Record<string, unknown>[]>>({})
+const widgetDataLoading = ref<Record<string, boolean>>({})
+const widgetDataErrors = ref<Record<string, string>>({})
+
+// Fetch data for a widget from its configured datasource
+async function fetchWidgetData(block: WidgetBlock) {
+  const datasourceId = block.metadata?.datasourceId as string
+  if (!datasourceId || datasourceId === 'sample') {
+    // No datasource configured, use sample data
+    return
+  }
+
+  if (!props.apiEndpoint) {
+    console.warn('No API endpoint configured for datasource queries')
+    return
+  }
+
+  widgetDataLoading.value[block.id] = true
+  widgetDataErrors.value[block.id] = ''
+
+  try {
+    // Get query from widget metadata
+    const query = block.metadata?.query as string
+
+    if (!query) {
+      // No query configured - show message and use sample data
+      console.info(`Widget ${block.id} has no query configured, using sample data`)
+      widgetDataLoading.value[block.id] = false
+      return
+    }
+
+    const sql = query
+
+    // Call the API to fetch data
+    const response = await fetch(props.apiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'query-datasource',
+        datasourceId,
+        sql,
+        userId: props.userId,
+        userKey: props.userKey,
+        maxRows: 1000,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
+
+    if (!result.success) {
+      throw new Error(result.error || 'Query failed')
+    }
+
+    widgetDataCache.value[block.id] = result.data || result.rows || []
+  }
+  catch (err) {
+    console.error(`Failed to fetch data for widget ${block.id}:`, err)
+    widgetDataErrors.value[block.id] = err instanceof Error ? err.message : 'Failed to load data'
+  }
+  finally {
+    widgetDataLoading.value[block.id] = false
+  }
+}
+
+// Get data for a widget - uses cached data if available, otherwise sample data
+function getWidgetData(block: WidgetBlock): Record<string, unknown>[] {
+  const datasourceId = block.metadata?.datasourceId as string
+
+  // If no datasource configured or sample, return filtered sample data
+  if (!datasourceId || datasourceId === 'sample') {
+    return getFilteredSampleData()
+  }
+
+  // Return cached data if available
+  const cachedData = widgetDataCache.value[block.id]
+  if (cachedData) {
+    // Apply filters to cached data
+    if (activeFilters.value.length === 0) {
+      return cachedData
+    }
+    return cachedData.filter((row) => {
+      return activeFilters.value.every((filter) => {
+        const fieldValue = String(row[filter.field] ?? '')
+        return fieldValue.toLowerCase().includes(filter.value.toLowerCase())
+      })
+    })
+  }
+
+  // Data not fetched yet - trigger fetch and return sample data for now
+  if (!widgetDataLoading.value[block.id]) {
+    fetchWidgetData(block)
+  }
+
+  return getFilteredSampleData()
+}
+
+// Check if widget is loading data (available for future loading indicator)
+function _isWidgetLoading(blockId: string): boolean {
+  return widgetDataLoading.value[blockId] || false
+}
+
+// Refresh data for all widgets when blocks change
+watch(editorBlocks, (blocks) => {
+  // Fetch data for any widgets with datasources that aren't cached
+  for (const block of blocks) {
+    if (isWidgetBlock(block)) {
+      const datasourceId = block.metadata?.datasourceId as string
+      if (datasourceId && datasourceId !== 'sample' && !widgetDataCache.value[block.id]) {
+        fetchWidgetData(block)
+      }
+    }
+  }
+}, { immediate: true })
 
 // Apply filters to sample data (for demo purposes)
 function getFilteredSampleData() {
@@ -1141,8 +1261,9 @@ function openWidgetConfigModal(block: WidgetBlock) {
   widgetConfigHeight.value = typeof block.height === 'number' ? block.height : 400
   widgetConfigVisualizationType.value = (block.metadata?.visualizationType as 'table' | 'pivot' | 'chart') || 'table'
   widgetConfigShowTitle.value = block.showTitle !== false
-  // Load datasource from block metadata
+  // Load datasource and query from block metadata
   widgetConfigDatasourceId.value = (block.metadata?.datasourceId as string) || 'sample'
+  widgetConfigQuery.value = (block.metadata?.query as string) || ''
   showWidgetConfigModal.value = true
 }
 
@@ -1154,6 +1275,7 @@ function closeWidgetConfigModal() {
   widgetConfigVisualizationType.value = 'table'
   widgetConfigShowTitle.value = true
   widgetConfigDatasourceId.value = 'sample'
+  widgetConfigQuery.value = ''
 }
 
 function handleWidgetConfigOverlayClick() {
@@ -1246,7 +1368,13 @@ function handleSaveWidgetConfig() {
     metadata: {
       visualizationType: widgetConfigVisualizationType.value,
       datasourceId: isSampleData ? undefined : widgetConfigDatasourceId.value,
+      query: isSampleData ? undefined : (widgetConfigQuery.value || undefined),
     },
+  }
+
+  // Clear cached data so it refetches with new config
+  if (!isSampleData && widgetConfigBlockId.value) {
+    delete widgetDataCache.value[widgetConfigBlockId.value]
   }
 
   handleBlockUpdate(widgetConfigBlockId.value, updates)
@@ -2714,12 +2842,12 @@ defineExpose({
                   </button>
                 </div>
 
-                <!-- Widget with Data (using sample data for now, filtered by active filters) -->
+                <!-- Widget with Data -->
                 <div v-else class="tps-widget-content" :class="{ 'tps-widget-linked': activeFilters.length > 0 }">
                   <DataGrid
                     :widget-id="block.id"
                     :initial-view-state="getWidgetState(block.id) ?? undefined"
-                    :data="getFilteredSampleData()"
+                    :data="getWidgetData(block)"
                     :theme="resolvedTheme"
                     :show-controls="!isPreviewMode || shouldShowControls(block.id)"
                     :enable-export="false"
@@ -4171,7 +4299,7 @@ defineExpose({
                     <DataGrid
                       :widget-id="block.id"
                       :initial-view-state="getWidgetState(block.id) ?? undefined"
-                      :data="getFilteredSampleData()"
+                      :data="getWidgetData(block)"
                       :theme="resolvedTheme"
                       :show-controls="!isPreviewMode || shouldShowControls(block.id)"
                       :enable-export="false"
@@ -4827,6 +4955,20 @@ defineExpose({
               </p>
               <p v-else-if="datasources.length === 0" class="tps-form-hint tps-form-hint-warning">
                 No data sources connected. Add a data source from the sidebar first.
+              </p>
+            </div>
+
+            <div v-if="widgetConfigDatasourceId !== 'sample'" class="tps-form-group">
+              <label class="tps-label" for="widget-query">SQL Query</label>
+              <textarea
+                id="widget-query"
+                v-model="widgetConfigQuery"
+                class="tps-textarea"
+                placeholder="SELECT * FROM your_table LIMIT 1000"
+                rows="4"
+              />
+              <p class="tps-form-hint">
+                Enter a SQL query to fetch data from your data source. Leave empty to use a default query.
               </p>
             </div>
 
