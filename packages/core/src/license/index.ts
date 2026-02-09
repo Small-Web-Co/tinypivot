@@ -138,7 +138,9 @@ async function verifySignatureNoble(
   const { p256 } = await import('@noble/curves/p256')
   // SPKI for P-256 has a fixed 26-byte header; raw key starts at offset 26
   const rawPublicKey = spkiBytes.slice(26)
-  return p256.verify(rawSig, msgBytes, rawPublicKey)
+  // prehash: true makes noble SHA-256 hash the message before verifying,
+  // matching Web Crypto's { name: 'ECDSA', hash: 'SHA-256' } behavior
+  return p256.verify(rawSig, msgBytes, rawPublicKey, { prehash: true })
 }
 
 /**
