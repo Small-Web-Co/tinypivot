@@ -1,4 +1,5 @@
-import type { NumericRange } from '@smallwebco/tinypivot-core'
+import type { NumberFormat, NumericRange } from '@smallwebco/tinypivot-core'
+import { formatNumber } from '@smallwebco/tinypivot-core'
 /**
  * Numeric Range Filter Component for React
  * Provides an intuitive dual-handle slider and input fields for filtering numeric data
@@ -10,6 +11,7 @@ interface NumericRangeFilterProps {
   dataMax: number
   currentRange: NumericRange | null
   onChange: (range: NumericRange | null) => void
+  numberFormat?: NumberFormat
 }
 
 export function NumericRangeFilter({
@@ -17,6 +19,7 @@ export function NumericRangeFilter({
   dataMax,
   currentRange,
   onChange,
+  numberFormat = 'us',
 }: NumericRangeFilterProps) {
   // Local state for the range values
   const [localMin, setLocalMin] = useState<number | null>(currentRange?.min ?? null)
@@ -42,10 +45,8 @@ export function NumericRangeFilter({
   const formatValue = useCallback((val: number | null): string => {
     if (val === null)
       return ''
-    if (Number.isInteger(val))
-      return val.toLocaleString()
-    return val.toLocaleString(undefined, { maximumFractionDigits: 2 })
-  }, [])
+    return formatNumber(val, numberFormat)
+  }, [numberFormat])
 
   // Check if filter is active
   const isFilterActive = localMin !== null || localMax !== null
