@@ -7,12 +7,13 @@ import type {
   CalculatedField,
   CustomAggregationFn,
   FieldStats,
+  NumberFormat,
   PivotCell,
   PivotConfig,
   PivotResult,
   PivotValueField,
 } from '../types'
-import { detectFieldType, makeKey, parseKey } from '../utils'
+import { detectFieldType, formatNumber, makeKey, parseKey } from '../utils'
 
 /**
  * Calculate median of an array
@@ -94,27 +95,19 @@ export function aggregate(
 /**
  * Format aggregated value for display
  */
-export function formatAggregatedValue(value: number | null, fn: AggregationFunction): string {
+export function formatAggregatedValue(value: number | null, fn: AggregationFunction, numberFormat: NumberFormat = 'us'): string {
   if (value === null)
     return '-'
 
   if (fn === 'count' || fn === 'countDistinct') {
-    return Math.round(value).toLocaleString()
+    return formatNumber(Math.round(value), numberFormat, { maximumFractionDigits: 0 })
   }
 
   if (fn === 'percentOfTotal') {
     return `${value.toFixed(1)}%`
   }
 
-  if (fn === 'stdDev') {
-    return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
-  }
-
-  if (Math.abs(value) >= 1000) {
-    return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
-  }
-
-  return value.toLocaleString('en-US', { maximumFractionDigits: 4 })
+  return formatNumber(value, numberFormat)
 }
 
 /**
@@ -258,6 +251,7 @@ export function formatCalculatedValue(
   value: number | null,
   formatAs?: 'number' | 'percent' | 'currency',
   decimals = 2,
+  numberFormat: NumberFormat = 'us',
 ): string {
   if (value === null)
     return '-'
@@ -266,17 +260,9 @@ export function formatCalculatedValue(
     case 'percent':
       return `${value.toFixed(decimals)}%`
     case 'currency':
-      return value.toLocaleString('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      })
+      return formatNumber(value, numberFormat, { maximumFractionDigits: decimals })
     default:
-      return value.toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: decimals,
-      })
+      return formatNumber(value, numberFormat, { maximumFractionDigits: decimals })
   }
 }
 
