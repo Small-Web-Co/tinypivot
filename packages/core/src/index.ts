@@ -213,9 +213,12 @@ export {
   detectColumnType,
   detectFieldType,
   formatCellValue,
+  formatDate,
   formatNumber,
   getColumnUniqueValues,
+  getDatePlaceholder,
   makeKey,
   naturalSort,
+  parseDateInput,
   parseKey,
 } from './utils'

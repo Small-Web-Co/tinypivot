@@ -2,7 +2,7 @@
  * TinyPivot Core - Utility Functions
  * Pure utility functions with no framework dependencies
  */
-import type { ColumnStats, FieldStats } from '../types'
+import type { ColumnStats, DateFormat, FieldStats, NumberFormat } from '../types'
 
 /**
  * Detect column data type from values
@@ -79,6 +79,8 @@ export function getColumnUniqueValues<T>(
   let nullCount = 0
   let numericMin: number | undefined
   let numericMax: number | undefined
+  let dateMin: string | undefined
+  let dateMax: string | undefined
 
   for (const row of data) {
     const value = (row as Record<string, unknown>)[columnKey]
@@ -94,6 +96,17 @@ export function getColumnUniqueValues<T>(
           numericMin = num
         if (numericMax === undefined || num > numericMax)
           numericMax = num
+      }
+      // Track date min/max
+      if (value instanceof Date || (typeof value === 'string' && !Number.isNaN(Date.parse(String(value))))) {
+        const dateObj = value instanceof Date ? value : new Date(String(value))
+        if (!Number.isNaN(dateObj.getTime())) {
+          const isoStr = dateObj.toISOString().split('T')[0]
+          if (dateMin === undefined || isoStr < dateMin)
+            dateMin = isoStr
+          if (dateMax === undefined || isoStr > dateMax)
+            dateMax = isoStr
+        }
       }
     }
   }
@@ -127,13 +140,21 @@ export function getColumnUniqueValues<T>(
     ...(columnType === 'number' && numericMin !== undefined && numericMax !== undefined
       ? { numericMin, numericMax }
       : {}),
+    ...(columnType === 'date' && dateMin !== undefined && dateMax !== undefined
+      ? { dateMin, dateMax }
+      : {}),
   }
 }
 
 /**
  * Format cell value for display
  */
-export function formatCellValue(value: unknown, type: ColumnStats['type']): string {
+export function formatCellValue(
+  value: unknown,
+  type: ColumnStats['type'],
+  numberFormat: NumberFormat = 'us',
+  dateFormat: DateFormat = 'iso',
+): string {
   if (value === null || value === undefined)
     return ''
   if (value === '')
@@ -144,22 +165,10 @@ export function formatCellValue(value: unknown, type: ColumnStats['type']): stri
       const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
       if (Number.isNaN(num))
         return String(value)
-      // Format with commas for large numbers
-      if (Math.abs(num) >= 1000) {
-        return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
-      }
-      return num.toLocaleString('en-US', { maximumFractionDigits: 4 })
+      return formatNumber(num, numberFormat)
     }
-    case 'date': {
-      const date = value instanceof Date ? value : new Date(String(value))
-      if (Number.isNaN(date.getTime()))
-        return String(value)
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    }
+    case 'date':
+      return formatDate(value, dateFormat)
     case 'boolean':
       return value ? 'Yes' : 'No'
     default:
@@ -170,13 +179,112 @@ export function formatCellValue(value: unknown, type: ColumnStats['type']): stri
 /**
  * Format number for display with appropriate precision
  */
-export function formatNumber(value: number | null, options?: { maximumFractionDigits?: number }): string {
+export function formatNumber(value: number | null, format: NumberFormat = 'us', options?: { maximumFractionDigits?: number }): string {
   if (value === null)
     return '-'
 
   const maxDigits = options?.maximumFractionDigits ?? (Math.abs(value) >= 1000 ? 2 : 4)
 
-  return value.toLocaleString('en-US', { maximumFractionDigits: maxDigits })
+  switch (format) {
+    case 'eu':
+      return value.toLocaleString('de-DE', { maximumFractionDigits: maxDigits })
+    case 'plain':
+      return Number.isInteger(value) ? String(value) : value.toFixed(Math.min(maxDigits, 20))
+    case 'us':
+    default:
+      return value.toLocaleString('en-US', { maximumFractionDigits: maxDigits })
+  }
+}
+
+/**
+ * Format date according to the specified format preset
+ */
+export function formatDate(value: unknown, format: DateFormat = 'iso'): string {
+  const date = value instanceof Date ? value : new Date(String(value))
+  if (Number.isNaN(date.getTime()))
+    return String(value)
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  switch (format) {
+    case 'us':
+      return `${month}/${day}/${year}`
+    case 'eu':
+      return `${day}/${month}/${year}`
+    case 'iso':
+    default:
+      return `${year}-${month}-${day}`
+  }
+}
+
+/**
+ * Parse a date string in the given format back to an ISO string (YYYY-MM-DD)
+ * Returns null if parsing fails
+ */
+export function parseDateInput(input: string, format: DateFormat = 'iso'): string | null {
+  const trimmed = input.trim()
+  if (!trimmed)
+    return null
+
+  let year: number, month: number, day: number
+
+  switch (format) {
+    case 'us': {
+      const parts = trimmed.split('/')
+      if (parts.length !== 3)
+        return null
+      month = Number.parseInt(parts[0], 10)
+      day = Number.parseInt(parts[1], 10)
+      year = Number.parseInt(parts[2], 10)
+      break
+    }
+    case 'eu': {
+      const parts = trimmed.split('/')
+      if (parts.length !== 3)
+        return null
+      day = Number.parseInt(parts[0], 10)
+      month = Number.parseInt(parts[1], 10)
+      year = Number.parseInt(parts[2], 10)
+      break
+    }
+    case 'iso':
+    default: {
+      const parts = trimmed.split('-')
+      if (parts.length !== 3)
+        return null
+      year = Number.parseInt(parts[0], 10)
+      month = Number.parseInt(parts[1], 10)
+      day = Number.parseInt(parts[2], 10)
+      break
+    }
+  }
+
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day))
+    return null
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1)
+    return null
+
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day)
+    return null
+
+  const m = String(month).padStart(2, '0')
+  const d = String(day).padStart(2, '0')
+  return `${year}-${m}-${d}`
+}
+
+/**
+ * Get the date format placeholder string
+ */
+export function getDatePlaceholder(format: DateFormat = 'iso'): string {
+  switch (format) {
+    case 'us': return 'MM/DD/YYYY'
+    case 'eu': return 'DD/MM/YYYY'
+    case 'iso':
+    default: return 'YYYY-MM-DD'
+  }
 }
 
 /**
