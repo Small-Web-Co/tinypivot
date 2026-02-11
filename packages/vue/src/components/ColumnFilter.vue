@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
+import type { ColumnStats, DateFormat, DateRange, NumberFormat, NumericRange } from '@smallwebco/tinypivot-core'
 /**
  * Column Filter Dropdown Component
  * Shows unique values with checkboxes, search, and sort controls
  * For numeric columns, also provides a range filter option
+ * For date columns, also provides a date range filter option
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import DateRangeFilter from './DateRangeFilter.vue'
 import NumericRangeFilter from './NumericRangeFilter.vue'
 
 type FilterMode = 'values' | 'range'
@@ -18,6 +20,12 @@ const props = defineProps<{
   sortDirection: 'asc' | 'desc' | null
   /** Current numeric range filter (if any) */
   numericRange?: NumericRange | null
+  /** Current date range filter (if any) */
+  dateRange?: DateRange | null
+  /** Number display format */
+  numberFormat?: NumberFormat
+  /** Date display format */
+  dateFormat?: DateFormat
 }>()
 
 const emit = defineEmits<{
@@ -26,6 +34,8 @@ const emit = defineEmits<{
   close: []
   /** Emitted when a numeric range filter is applied */
   rangeFilter: [range: NumericRange | null]
+  /** Emitted when a date range filter is applied */
+  dateRangeFilter: [range: DateRange | null]
 }>()
 
 // Local state
@@ -33,16 +43,23 @@ const searchQuery = ref('')
 const dropdownRef = ref<HTMLDivElement>()
 const searchInputRef = ref<HTMLInputElement>()
 
-// Filter mode (values vs range) - only available for numeric columns
+// Filter mode (values vs range) - only available for numeric/date columns
 const isNumericColumn = computed(() => props.stats.type === 'number'
   && props.stats.numericMin !== undefined
   && props.stats.numericMax !== undefined)
 
+const isDateColumn = computed(() => props.stats.type === 'date'
+  && props.stats.dateMin !== undefined
+  && props.stats.dateMax !== undefined)
+
 // Determine initial mode based on existing filters
-const filterMode = ref<FilterMode>(props.numericRange ? 'range' : 'values')
+const filterMode = ref<FilterMode>(props.numericRange || props.dateRange ? 'range' : 'values')
 
 // Local range for the numeric filter
 const localRange = ref<NumericRange | null>(props.numericRange ?? null)
+
+// Local range for the date filter
+const localDateRange = ref<DateRange | null>(props.dateRange ?? null)
 
 // Initialize with selected values
 const localSelected = ref<Set<string>>(new Set(props.selectedValues))
@@ -67,6 +84,39 @@ const allValues = computed(() => {
     values.unshift('(blank)')
   }
   return values
+})
+
+// Sort label helpers
+const ascLabel = computed(() => {
+  if (isDateColumn.value)
+    return 'Old\u2192New'
+  if (isNumericColumn.value)
+    return '1\u21929'
+  return 'A\u2192Z'
+})
+
+const descLabel = computed(() => {
+  if (isDateColumn.value)
+    return 'New\u2192Old'
+  if (isNumericColumn.value)
+    return '9\u21921'
+  return 'Z\u2192A'
+})
+
+const ascTitle = computed(() => {
+  if (isDateColumn.value)
+    return 'Sort Old to New'
+  if (isNumericColumn.value)
+    return 'Sort Low to High'
+  return 'Sort A to Z'
+})
+
+const descTitle = computed(() => {
+  if (isDateColumn.value)
+    return 'Sort New to Old'
+  if (isNumericColumn.value)
+    return 'Sort High to Low'
+  return 'Sort Z to A'
 })
 
 // Toggle single value
@@ -140,6 +190,24 @@ function clearRangeFilter() {
   emit('close')
 }
 
+// Handle date range filter change from the DateRangeFilter component
+function handleDateRangeChange(range: DateRange | null) {
+  localDateRange.value = range
+}
+
+// Apply the date range filter
+function applyDateRangeFilter() {
+  emit('dateRangeFilter', localDateRange.value)
+  emit('close')
+}
+
+// Clear date range filter
+function clearDateRangeFilter() {
+  localDateRange.value = null
+  emit('dateRangeFilter', null)
+  emit('close')
+}
+
 // Switch filter mode
 function setFilterMode(mode: FilterMode) {
   filterMode.value = mode
@@ -188,6 +256,14 @@ watch(() => props.numericRange, (newRange) => {
     filterMode.value = 'range'
   }
 }, { immediate: true })
+
+// Sync date range with props
+watch(() => props.dateRange, (newRange) => {
+  localDateRange.value = newRange ?? null
+  if (newRange) {
+    filterMode.value = 'range'
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -205,31 +281,31 @@ watch(() => props.numericRange, (newRange) => {
       <button
         class="vpg-sort-btn"
         :class="{ active: sortDirection === 'asc' }"
-        :title="isNumericColumn ? 'Sort Low to High' : 'Sort A to Z'"
+        :title="ascTitle"
         @click="sortAscending"
       >
         <svg class="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
         </svg>
-        <span>{{ isNumericColumn ? '1→9' : 'A→Z' }}</span>
+        <span>{{ ascLabel }}</span>
       </button>
       <button
         class="vpg-sort-btn"
         :class="{ active: sortDirection === 'desc' }"
-        :title="isNumericColumn ? 'Sort High to Low' : 'Sort Z to A'"
+        :title="descTitle"
         @click="sortDescending"
       >
         <svg class="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
         </svg>
-        <span>{{ isNumericColumn ? '9→1' : 'Z→A' }}</span>
+        <span>{{ descLabel }}</span>
       </button>
     </div>
 
     <div class="vpg-divider" />
 
-    <!-- Filter Mode Tabs (only for numeric columns) -->
-    <div v-if="isNumericColumn" class="vpg-filter-tabs">
+    <!-- Filter Mode Tabs (for numeric or date columns) -->
+    <div v-if="isNumericColumn || isDateColumn" class="vpg-filter-tabs">
       <button
         class="vpg-tab-btn"
         :class="{ active: filterMode === 'values' }"
@@ -253,7 +329,7 @@ watch(() => props.numericRange, (newRange) => {
     </div>
 
     <!-- Values Filter Mode -->
-    <template v-if="!isNumericColumn || filterMode === 'values'">
+    <template v-if="(!isNumericColumn && !isDateColumn) || filterMode === 'values'">
       <!-- Search -->
       <div class="vpg-search-container">
         <svg class="vpg-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -322,21 +398,41 @@ watch(() => props.numericRange, (newRange) => {
       </div>
     </template>
 
-    <!-- Range Filter Mode -->
-    <template v-else>
+    <!-- Numeric Range Filter Mode -->
+    <template v-else-if="isNumericColumn && filterMode === 'range'">
       <NumericRangeFilter
         :data-min="stats.numericMin!"
         :data-max="stats.numericMax!"
         :current-range="localRange"
+        :number-format="numberFormat"
         @change="handleRangeChange"
       />
 
-      <!-- Footer for Range Mode -->
       <div class="vpg-filter-footer">
         <button class="vpg-btn-clear" @click="clearRangeFilter">
           Clear Filter
         </button>
         <button class="vpg-btn-apply" @click="applyRangeFilter">
+          Apply
+        </button>
+      </div>
+    </template>
+
+    <!-- Date Range Filter Mode -->
+    <template v-else-if="isDateColumn && filterMode === 'range'">
+      <DateRangeFilter
+        :data-min="stats.dateMin!"
+        :data-max="stats.dateMax!"
+        :current-range="localDateRange"
+        :date-format="dateFormat"
+        @change="handleDateRangeChange"
+      />
+
+      <div class="vpg-filter-footer">
+        <button class="vpg-btn-clear" @click="clearDateRangeFilter">
+          Clear Filter
+        </button>
+        <button class="vpg-btn-apply" @click="applyDateRangeFilter">
           Apply
         </button>
       </div>
