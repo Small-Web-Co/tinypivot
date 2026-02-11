@@ -199,6 +199,20 @@ const activeFilterInfo = computed(() => {
         isRange: true,
       }
     }
+    if (f.type === 'dateRange' && f.dateRange) {
+      // Format date range filter display
+      const parts = []
+      if (f.dateRange.min !== null)
+        parts.push(`from ${coreFormatDate(f.dateRange.min, props.dateFormat)}`)
+      if (f.dateRange.max !== null)
+        parts.push(`to ${coreFormatDate(f.dateRange.max, props.dateFormat)}`)
+      return {
+        column: f.column,
+        valueCount: 1,
+        displayText: parts.join(' '),
+        isRange: true,
+      }
+    }
     return {
       column: f.column,
       valueCount: f.values?.length || 0,

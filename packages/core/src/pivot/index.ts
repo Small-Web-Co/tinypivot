@@ -260,7 +260,7 @@ export function formatCalculatedValue(
     case 'percent':
       return `${value.toFixed(decimals)}%`
     case 'currency':
-      return formatNumber(value, numberFormat, { maximumFractionDigits: decimals })
+      return `$${formatNumber(value, numberFormat, { maximumFractionDigits: decimals })}`
     default:
       return formatNumber(value, numberFormat, { maximumFractionDigits: decimals })
   }

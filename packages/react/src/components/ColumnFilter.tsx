@@ -263,7 +263,7 @@ export function ColumnFilter({
       <div className="vpg-sort-controls">
         <button
           className={`vpg-sort-btn ${sortDirection === 'asc' ? 'active' : ''}`}
-          title={isNumericColumn ? 'Sort Low to High' : 'Sort A to Z'}
+          title={isDateColumn ? 'Sort Old to New' : isNumericColumn ? 'Sort Low to High' : 'Sort A to Z'}
           onClick={sortAscending}
         >
           <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -274,11 +274,11 @@ export function ColumnFilter({
               d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
             />
           </svg>
-          <span>{isNumericColumn ? '1\u21929' : 'A\u2192Z'}</span>
+          <span>{isDateColumn ? 'Old\u2192New' : isNumericColumn ? '1\u21929' : 'A\u2192Z'}</span>
         </button>
         <button
           className={`vpg-sort-btn ${sortDirection === 'desc' ? 'active' : ''}`}
-          title={isNumericColumn ? 'Sort High to Low' : 'Sort Z to A'}
+          title={isDateColumn ? 'Sort New to Old' : isNumericColumn ? 'Sort High to Low' : 'Sort Z to A'}
           onClick={sortDescending}
         >
           <svg className="vpg-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,7 +289,7 @@ export function ColumnFilter({
               d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"
             />
           </svg>
-          <span>{isNumericColumn ? '9\u21921' : 'Z\u2192A'}</span>
+          <span>{isDateColumn ? 'New\u2192Old' : isNumericColumn ? '9\u21921' : 'Z\u2192A'}</span>
         </button>
       </div>
 

@@ -138,8 +138,8 @@ describe('formatNumber', () => {
   })
 
   it('should respect maximumFractionDigits option', () => {
-    const result = formatNumber(1.123456, { maximumFractionDigits: 2 })
-    expect(result).toMatch(/1\.12/)
+    const result = formatNumber(1.123456, 'us', { maximumFractionDigits: 2 })
+    expect(result).toBe('1.12')
   })
 })
 

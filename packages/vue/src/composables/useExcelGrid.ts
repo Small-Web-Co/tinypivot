@@ -178,6 +178,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
           column: f.id,
           type: 'range' as const,
           range: filterValue,
+          dateRange: null as DateRange | null,
           values: [] as string[],
         }
       }
@@ -187,7 +188,8 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
         return {
           column: f.id,
           type: 'dateRange' as const,
-          range: filterValue,
+          range: null as NumericRange | null,
+          dateRange: filterValue,
           values: [] as string[],
         }
       }
@@ -198,6 +200,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
         type: 'values' as const,
         values: Array.isArray(filterValue) ? filterValue : [],
         range: null as NumericRange | null,
+        dateRange: null as DateRange | null,
       }
     })
   })
