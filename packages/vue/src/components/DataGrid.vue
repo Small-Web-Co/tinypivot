@@ -52,6 +52,10 @@ const props = withDefaults(defineProps<{
   maxHeight?: number
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
+  /** Number display format */
+  numberFormat?: NumberFormat
+  /** Date display format */
+  dateFormat?: DateFormat
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -73,6 +77,8 @@ const props = withDefaults(defineProps<{
   minHeight: 300,
   maxHeight: 1200,
   aiAnalyst: undefined,
+  numberFormat: 'us',
+  dateFormat: 'iso',
 })
 
 const emit = defineEmits<{
@@ -161,6 +167,9 @@ const {
   // Numeric range filters
   setNumericRangeFilter,
   getNumericRangeFilter,
+  // Date range filters
+  setDateRangeFilter,
+  getDateRangeFilter,
 } = useExcelGrid({ data: dataRef })
 
 // Filtered data for pivot table (respects column filters)
@@ -629,6 +638,10 @@ function handleRangeFilter(columnId: string, range: import('@smallwebco/tinypivo
   setNumericRangeFilter(columnId, range)
 }
 
+function handleDateRangeFilter(columnId: string, range: import('@smallwebco/tinypivot-core').DateRange | null) {
+  setDateRangeFilter(columnId, range)
+}
+
 function handleSort(columnId: string, direction: 'asc' | 'desc' | null) {
   if (direction === null) {
     const current = getSortDirection(columnId)
@@ -742,10 +755,7 @@ const selectionStats = computed(() => {
 function formatStatValue(value: number | null): string {
   if (value === null)
     return '-'
-  if (Math.abs(value) >= 1000) {
-    return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
-  }
-  return value.toLocaleString('en-US', { maximumFractionDigits: 4 })
+  return coreFormatNumber(value, props.numberFormat)
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -888,19 +898,24 @@ function formatCellValue(value: unknown, columnId: string): string {
     return ''
 
   const stats = getColumnStats(columnId)
+
+  if (stats.type === 'date') {
+    return coreFormatDate(value, props.dateFormat)
+  }
+
   if (stats.type === 'number') {
     const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
     if (Number.isNaN(num))
       return String(value)
 
     if (shouldFormatNumber(columnId) && Math.abs(num) >= 1000) {
-      return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
+      return coreFormatNumber(num, props.numberFormat)
     }
 
     if (Number.isInteger(num)) {
       return String(num)
     }
-    return num.toLocaleString('en-US', { maximumFractionDigits: 4, useGrouping: false })
+    return coreFormatNumber(num, props.numberFormat, { maximumFractionDigits: 4 })
   }
 
   return String(value)
@@ -1542,8 +1557,12 @@ function handleContainerClick(event: MouseEvent) {
           :selected-values="getColumnFilterValues(activeFilterColumn)"
           :sort-direction="getSortDirection(activeFilterColumn)"
           :numeric-range="getNumericRangeFilter(activeFilterColumn)"
+          :date-range="getDateRangeFilter(activeFilterColumn)"
+          :number-format="numberFormat"
+          :date-format="dateFormat"
           @filter="(values) => handleFilter(activeFilterColumn!, values)"
           @range-filter="(range) => handleRangeFilter(activeFilterColumn!, range)"
+          @date-range-filter="(range) => handleDateRangeFilter(activeFilterColumn!, range)"
           @sort="(dir) => handleSort(activeFilterColumn!, dir)"
           @close="closeFilterDropdown"
         />
