@@ -264,7 +264,7 @@ export function isNumericRange(value: ColumnFilterValue): value is NumericRange 
     return false
   if (!('min' in value) && !('max' in value))
     return false
-  const v = value as Record<string, unknown>
+  const v = value as unknown as Record<string, unknown>
   return (v.min === null || typeof v.min === 'number') && (v.max === null || typeof v.max === 'number')
 }
 
@@ -274,7 +274,7 @@ export function isDateRange(value: ColumnFilterValue): value is DateRange {
     return false
   if (!('min' in value) && !('max' in value))
     return false
-  const v = value as Record<string, unknown>
+  const v = value as unknown as Record<string, unknown>
   return (v.min === null || typeof v.min === 'string') && (v.max === null || typeof v.max === 'string')
 }
 
