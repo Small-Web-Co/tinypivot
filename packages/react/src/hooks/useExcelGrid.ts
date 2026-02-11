@@ -1,5 +1,5 @@
-import type { ColumnFilterValue, ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
-import { formatCellValue, getColumnUniqueValues, isNumericRange } from '@smallwebco/tinypivot-core'
+import type { ColumnFilterValue, ColumnStats, DateRange, NumericRange } from '@smallwebco/tinypivot-core'
+import { formatCellValue, getColumnUniqueValues, isDateRange, isNumericRange } from '@smallwebco/tinypivot-core'
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -18,7 +18,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // Re-export for convenience
-export { formatCellValue, getColumnUniqueValues, isNumericRange }
+export { formatCellValue, getColumnUniqueValues, isDateRange, isNumericRange }
 
 export interface ExcelGridOptions<T> {
   data: T[]
@@ -29,7 +29,7 @@ export interface ExcelGridOptions<T> {
 }
 
 /**
- * Combined filter function for Excel-style filtering and numeric range filtering
+ * Combined filter function for Excel-style filtering, numeric range, and date range filtering
  */
 const multiSelectFilter: FilterFn<unknown> = (row, columnId, filterValue: ColumnFilterValue | undefined) => {
   if (!filterValue)
@@ -49,6 +49,25 @@ const multiSelectFilter: FilterFn<unknown> = (row, columnId, filterValue: Column
     if (min !== null && num < min)
       return false
     if (max !== null && num > max)
+      return false
+    return true
+  }
+
+  // Handle date range filter
+  if (isDateRange(filterValue)) {
+    const cellValue = row.getValue(columnId)
+    if (cellValue === null || cellValue === undefined || cellValue === '') {
+      return false
+    }
+    const dateObj = cellValue instanceof Date ? cellValue : new Date(String(cellValue))
+    if (Number.isNaN(dateObj.getTime()))
+      return false
+    const dateStr = dateObj.toISOString().split('T')[0]
+
+    const { min, max } = filterValue
+    if (min !== null && dateStr < min)
+      return false
+    if (max !== null && dateStr > max)
       return false
     return true
   }
@@ -163,7 +182,7 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
   const filteredRowCount = table.getFilteredRowModel().rows.length
   const totalRowCount = data.length
 
-  // Active filters (handles both array values and numeric ranges)
+  // Active filters (handles array values, numeric ranges, and date ranges)
   const activeFilters = useMemo(() => {
     return columnFilters.map((f) => {
       const filterValue = f.value as ColumnFilterValue | undefined
@@ -174,6 +193,18 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
           column: f.id,
           type: 'range' as const,
           range: filterValue,
+          dateRange: null as DateRange | null,
+          values: [] as string[],
+        }
+      }
+
+      // Handle date range
+      if (filterValue && isDateRange(filterValue)) {
+        return {
+          column: f.id,
+          type: 'dateRange' as const,
+          range: null as NumericRange | null,
+          dateRange: filterValue,
           values: [] as string[],
         }
       }
@@ -184,11 +215,12 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
         type: 'values' as const,
         values: Array.isArray(filterValue) ? filterValue : [],
         range: null as NumericRange | null,
+        dateRange: null as DateRange | null,
       }
     })
   }, [columnFilters])
 
-  // Check if column has active filter (handles both array and numeric range)
+  // Check if column has active filter (handles array, numeric range, and date range)
   const hasActiveFilter = useCallback(
     (columnId: string): boolean => {
       const column = table.getColumn(columnId)
@@ -200,6 +232,11 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
 
       // Check for numeric range
       if (isNumericRange(filterValue)) {
+        return filterValue.min !== null || filterValue.max !== null
+      }
+
+      // Check for date range
+      if (isDateRange(filterValue)) {
         return filterValue.min !== null || filterValue.max !== null
       }
 
@@ -247,6 +284,37 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
         return null
       const filterValue = column.getFilterValue() as ColumnFilterValue | undefined
       if (filterValue && isNumericRange(filterValue)) {
+        return filterValue
+      }
+      return null
+    },
+    [table],
+  )
+
+  // Set date range filter
+  const setDateRangeFilter = useCallback(
+    (columnId: string, range: DateRange | null) => {
+      const column = table.getColumn(columnId)
+      if (column) {
+        if (!range || (range.min === null && range.max === null)) {
+          column.setFilterValue(undefined)
+        }
+        else {
+          column.setFilterValue(range)
+        }
+      }
+    },
+    [table],
+  )
+
+  // Get date range filter for a column
+  const getDateRangeFilter = useCallback(
+    (columnId: string): DateRange | null => {
+      const column = table.getColumn(columnId)
+      if (!column)
+        return null
+      const filterValue = column.getFilterValue() as ColumnFilterValue | undefined
+      if (filterValue && isDateRange(filterValue)) {
         return filterValue
       }
       return null
@@ -332,5 +400,8 @@ export function useExcelGrid<T extends Record<string, unknown>>(options: ExcelGr
     // Numeric range filters
     setNumericRangeFilter,
     getNumericRangeFilter,
+    // Date range filters
+    setDateRangeFilter,
+    getDateRangeFilter,
   }
 }
