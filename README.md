@@ -134,6 +134,8 @@ export default function App() {
 | `enableColumnResize` | `boolean` | `true` | Drag to resize columns |
 | `enableClipboard` | `boolean` | `true` | Ctrl+C to copy cells |
 | `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme |
+| `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display format |
+| `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display format |
 | `stripedRows` | `boolean` | `true` | Alternating row colors |
 | `exportFilename` | `string` | `'data-export.csv'` | CSV filename |
 
@@ -160,10 +162,42 @@ const badData = [
 | Type | Example | Display |
 |------|---------|---------|
 | `string` | `'Hello'` | As-is |
-| `number` | `1234.56` | Formatted with commas |
+| `number` | `1234.56` | Formatted per `numberFormat` prop |
 | `boolean` | `true` | `true` / `false` |
 | `null` / `undefined` | `null` | Empty cell |
-| `Date` | `new Date()` | ISO string |
+| `Date` | `new Date()` | Formatted per `dateFormat` prop |
+
+## Number & Date Formatting
+
+Control how numbers and dates are displayed using the `numberFormat` and `dateFormat` props.
+
+### Number Formats
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| `'us'` (default) | `1,234,567.89` | US format with comma separators |
+| `'eu'` | `1.234.567,89` | European format with period separators |
+| `'plain'` | `1234567.89` | No formatting or separators |
+
+### Date Formats
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| `'iso'` (default) | `2024-03-15` | ISO 8601 (YYYY-MM-DD) |
+| `'us'` | `03/15/2024` | US format (MM/DD/YYYY) |
+| `'eu'` | `15/03/2024` | European format (DD/MM/YYYY) |
+
+Date columns also support date range filtering. When a column is detected as date type, the filter UI shows date range inputs (From/To) with the appropriate format placeholder.
+
+```vue
+<!-- Vue -->
+<DataGrid :data="data" number-format="eu" date-format="eu" />
+```
+
+```tsx
+{/* React */}
+<DataGrid data={data} numberFormat="eu" dateFormat="eu" />
+```
 
 ## Events
 

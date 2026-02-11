@@ -136,6 +136,10 @@ const aiAnalystConfig: AIAnalystConfig = {
   aiModelName: __AI_MODEL__,
 }
 
+// Format toggles
+const numberFormat = ref<'us' | 'eu' | 'plain'>('us')
+const dateFormat = ref<'us' | 'eu' | 'iso'>('iso')
+
 // Theme toggle
 const demoTheme = ref<'light' | 'dark'>('dark')
 function toggleDemoTheme() {
@@ -766,6 +770,16 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
             <span>true</span>
             <span>Show pivot table toggle</span>
           </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? 'number-format' : 'numberFormat' }}</code>
+            <span>"us"</span>
+            <span>"us" | "eu" | "plain"</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? 'date-format' : 'dateFormat' }}</code>
+            <span>"iso"</span>
+            <span>"us" | "eu" | "iso"</span>
+          </div>
         </div>
       </div>
     </section>
@@ -778,6 +792,54 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
       </div>
 
       <div class="demo-controls">
+        <div class="demo-format-controls">
+          <div class="demo-format-group">
+            <span class="demo-format-label">Numbers:</span>
+            <div class="demo-format-toggle">
+              <button
+                class="demo-format-btn" :class="{ active: numberFormat === 'us' }"
+                @click="numberFormat = 'us'"
+              >
+                US (1,000.00)
+              </button>
+              <button
+                class="demo-format-btn" :class="{ active: numberFormat === 'eu' }"
+                @click="numberFormat = 'eu'"
+              >
+                EU (1.000,00)
+              </button>
+              <button
+                class="demo-format-btn" :class="{ active: numberFormat === 'plain' }"
+                @click="numberFormat = 'plain'"
+              >
+                Plain (1000)
+              </button>
+            </div>
+          </div>
+          <div class="demo-format-group">
+            <span class="demo-format-label">Dates:</span>
+            <div class="demo-format-toggle">
+              <button
+                class="demo-format-btn" :class="{ active: dateFormat === 'iso' }"
+                @click="dateFormat = 'iso'"
+              >
+                ISO (2024-01-15)
+              </button>
+              <button
+                class="demo-format-btn" :class="{ active: dateFormat === 'us' }"
+                @click="dateFormat = 'us'"
+              >
+                US (01/15/2024)
+              </button>
+              <button
+                class="demo-format-btn" :class="{ active: dateFormat === 'eu' }"
+                @click="dateFormat = 'eu'"
+              >
+                EU (15/01/2024)
+              </button>
+            </div>
+          </div>
+        </div>
         <button class="demo-theme-toggle" @click="toggleDemoTheme">
           <svg v-if="demoTheme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -802,6 +864,8 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
           :enable-clipboard="true"
           :theme="demoTheme"
           :striped-rows="true"
+          :number-format="numberFormat"
+          :date-format="dateFormat"
           export-filename="tinypivot-demo.csv"
           :ai-analyst="aiAnalystConfig"
         />
@@ -1786,8 +1850,63 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 
 .demo-controls {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.demo-format-controls {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.demo-format-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.demo-format-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.demo-format-toggle {
+  display: flex;
+  gap: 0.125rem;
+  padding: 0.125rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.demo-format-btn {
+  padding: 0.3rem 0.6rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.demo-format-btn:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.demo-format-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
 }
 
 .demo-theme-toggle {

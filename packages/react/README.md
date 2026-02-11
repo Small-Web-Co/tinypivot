@@ -78,6 +78,8 @@ export default function App() {
 | `enableColumnResize` | `boolean` | `true` | Drag to resize columns |
 | `enableClipboard` | `boolean` | `true` | Ctrl+C to copy cells |
 | `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme |
+| `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display format: US (1,234.56), EU (1.234,56), plain (1234.56) |
+| `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display format: US (MM/DD/YYYY), EU (DD/MM/YYYY), ISO (YYYY-MM-DD) |
 
 ## Callbacks
 
