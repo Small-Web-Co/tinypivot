@@ -169,6 +169,8 @@ export type {
   DatabaseEndpointRequest,
   // Component Props Types
   DataGridProps,
+  DateFormat,
+  DateRange,
 
   ExportEvent,
   ExportOptions,
@@ -183,6 +185,7 @@ export type {
   // License Types
   LicenseType,
   ListTablesResponse,
+  NumberFormat,
   NumericRange,
   // Feature Types
   PaginationOptions,
@@ -202,7 +205,7 @@ export type {
   SortEvent,
 } from './types'
 // Type Guards
-export { isNumericRange } from './types'
+export { isDateRange, isNumericRange } from './types'
 // Utility Functions
 export {
   clamp,

@@ -9,6 +9,14 @@ export interface NumericRange {
   max: number | null
 }
 
+export type NumberFormat = 'us' | 'eu' | 'plain'
+export type DateFormat = 'us' | 'eu' | 'iso'
+
+export interface DateRange {
+  min: string | null // ISO date string
+  max: string | null // ISO date string
+}
+
 export interface ColumnStats {
   uniqueValues: string[]
   totalCount: number
@@ -18,10 +26,14 @@ export interface ColumnStats {
   numericMin?: number
   /** Max value for numeric columns */
   numericMax?: number
+  /** Min date for date columns (ISO string) */
+  dateMin?: string
+  /** Max date for date columns (ISO string) */
+  dateMax?: string
 }
 
-/** Filter value can be either selected values or numeric range */
-export type ColumnFilterValue = string[] | NumericRange
+/** Filter value can be either selected values, numeric range, or date range */
+export type ColumnFilterValue = string[] | NumericRange | DateRange
 
 export interface GridOptions<T = Record<string, unknown>> {
   data: T[]
@@ -127,6 +139,10 @@ export interface DataGridProps {
   enableColumnResize?: boolean
   enableClipboard?: boolean
   theme?: 'light' | 'dark' | 'auto'
+  /** Number display format: 'us' (1,234.56), 'eu' (1.234,56), 'plain' (1234.56) */
+  numberFormat?: NumberFormat
+  /** Date display format: 'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DD) */
+  dateFormat?: DateFormat
   stripedRows?: boolean
   exportFilename?: string
   // Vertical resize
@@ -216,6 +232,10 @@ export interface ExportOptions {
   filename?: string
   includeHeaders?: boolean
   delimiter?: string
+  /** Number format for exported values */
+  numberFormat?: NumberFormat
+  /** Date format for exported values */
+  dateFormat?: DateFormat
 }
 
 export interface SelectionBounds {
@@ -240,10 +260,22 @@ export interface ActiveFilter {
 
 /** Type guard to check if filter value is a numeric range */
 export function isNumericRange(value: ColumnFilterValue): value is NumericRange {
-  return value !== null
-    && typeof value === 'object'
-    && !Array.isArray(value)
-    && ('min' in value || 'max' in value)
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    return false
+  if (!('min' in value) && !('max' in value))
+    return false
+  const v = value as Record<string, unknown>
+  return (v.min === null || typeof v.min === 'number') && (v.max === null || typeof v.max === 'number')
+}
+
+/** Type guard to check if filter value is a date range */
+export function isDateRange(value: ColumnFilterValue): value is DateRange {
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    return false
+  if (!('min' in value) && !('max' in value))
+    return false
+  const v = value as Record<string, unknown>
+  return (v.min === null || typeof v.min === 'string') && (v.max === null || typeof v.max === 'string')
 }
 
 // Chart Types
