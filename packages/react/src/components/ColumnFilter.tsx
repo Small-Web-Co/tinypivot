@@ -1,10 +1,11 @@
-import type { ColumnStats, NumericRange } from '@smallwebco/tinypivot-core'
+import type { ColumnStats, DateFormat, DateRange, NumberFormat, NumericRange } from '@smallwebco/tinypivot-core'
 /**
  * Column Filter Dropdown Component for React
  * Shows unique values with checkboxes, search, and sort controls
- * For numeric columns, also provides a range filter option
+ * For numeric and date columns, also provides a range filter option
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DateRangeFilter } from './DateRangeFilter'
 import { NumericRangeFilter } from './NumericRangeFilter'
 
 type FilterMode = 'values' | 'range'
@@ -17,11 +18,19 @@ interface ColumnFilterProps {
   sortDirection: 'asc' | 'desc' | null
   /** Current numeric range filter (if any) */
   numericRange?: NumericRange | null
+  /** Current date range filter (if any) */
+  dateRange?: DateRange | null
+  /** Number display format */
+  numberFormat?: NumberFormat
+  /** Date display format */
+  dateFormat?: DateFormat
   onFilter: (values: string[]) => void
   onSort: (direction: 'asc' | 'desc' | null) => void
   onClose: () => void
   /** Called when a numeric range filter is applied */
   onRangeFilter?: (range: NumericRange | null) => void
+  /** Called when a date range filter is applied */
+  onDateRangeFilter?: (range: DateRange | null) => void
 }
 
 export function ColumnFilter({
@@ -30,26 +39,39 @@ export function ColumnFilter({
   selectedValues,
   sortDirection,
   numericRange,
+  dateRange,
+  numberFormat,
+  dateFormat,
   onFilter,
   onSort,
   onClose,
   onRangeFilter,
+  onDateRangeFilter,
 }: ColumnFilterProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [localSelected, setLocalSelected] = useState<Set<string>>(new Set(selectedValues))
   const dropdownRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Filter mode (values vs range) - only available for numeric columns
+  // Filter mode (values vs range) - available for numeric and date columns
   const isNumericColumn = stats.type === 'number'
     && stats.numericMin !== undefined
     && stats.numericMax !== undefined
 
+  const isDateColumn = stats.type === 'date'
+    && stats.dateMin !== undefined
+    && stats.dateMax !== undefined
+
   // Determine initial mode based on existing filters
-  const [filterMode, setFilterMode] = useState<FilterMode>(numericRange ? 'range' : 'values')
+  const [filterMode, setFilterMode] = useState<FilterMode>(
+    numericRange || dateRange ? 'range' : 'values',
+  )
 
   // Local range for the numeric filter
   const [localRange, setLocalRange] = useState<NumericRange | null>(numericRange ?? null)
+
+  // Local date range for the date filter
+  const [localDateRange, setLocalDateRange] = useState<DateRange | null>(dateRange ?? null)
 
   // Include blank option if there are null values
   const hasBlankValues = stats.nullCount > 0
@@ -154,6 +176,24 @@ export function ColumnFilter({
     onClose()
   }, [onRangeFilter, onClose])
 
+  // Handle date range filter change from the DateRangeFilter component
+  const handleDateRangeChange = useCallback((range: DateRange | null) => {
+    setLocalDateRange(range)
+  }, [])
+
+  // Apply the date range filter
+  const applyDateRangeFilter = useCallback(() => {
+    onDateRangeFilter?.(localDateRange)
+    onClose()
+  }, [localDateRange, onDateRangeFilter, onClose])
+
+  // Clear date range filter
+  const clearDateRangeFilter = useCallback(() => {
+    setLocalDateRange(null)
+    onDateRangeFilter?.(null)
+    onClose()
+  }, [onDateRangeFilter, onClose])
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -199,6 +239,14 @@ export function ColumnFilter({
     }
   }, [numericRange])
 
+  // Sync date range with props
+  useEffect(() => {
+    setLocalDateRange(dateRange ?? null)
+    if (dateRange) {
+      setFilterMode('range')
+    }
+  }, [dateRange])
+
   return (
     <div ref={dropdownRef} className="vpg-filter-dropdown">
       {/* Header */}
@@ -226,7 +274,7 @@ export function ColumnFilter({
               d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
             />
           </svg>
-          <span>{isNumericColumn ? '1→9' : 'A→Z'}</span>
+          <span>{isNumericColumn ? '1\u21929' : 'A\u2192Z'}</span>
         </button>
         <button
           className={`vpg-sort-btn ${sortDirection === 'desc' ? 'active' : ''}`}
@@ -241,14 +289,14 @@ export function ColumnFilter({
               d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"
             />
           </svg>
-          <span>{isNumericColumn ? '9→1' : 'Z→A'}</span>
+          <span>{isNumericColumn ? '9\u21921' : 'Z\u2192A'}</span>
         </button>
       </div>
 
       <div className="vpg-divider" />
 
-      {/* Filter Mode Tabs (only for numeric columns) */}
-      {isNumericColumn && (
+      {/* Filter Mode Tabs (for numeric and date columns) */}
+      {(isNumericColumn || isDateColumn) && (
         <div className="vpg-filter-tabs">
           <button
             className={`vpg-tab-btn ${filterMode === 'values' ? 'active' : ''}`}
@@ -282,7 +330,7 @@ export function ColumnFilter({
       )}
 
       {/* Values Filter Mode */}
-      {(!isNumericColumn || filterMode === 'values') && (
+      {((!isNumericColumn && !isDateColumn) || filterMode === 'values') && (
         <>
           {/* Search */}
           <div className="vpg-search-container">
@@ -304,7 +352,7 @@ export function ColumnFilter({
             />
             {searchQuery && (
               <button className="vpg-clear-search" onClick={() => setSearchQuery('')}>
-                ×
+                &times;
               </button>
             )}
           </div>
@@ -369,7 +417,7 @@ export function ColumnFilter({
         </>
       )}
 
-      {/* Range Filter Mode */}
+      {/* Numeric Range Filter Mode */}
       {isNumericColumn && filterMode === 'range' && (
         <>
           <NumericRangeFilter
@@ -377,6 +425,7 @@ export function ColumnFilter({
             dataMax={stats.numericMax!}
             currentRange={localRange}
             onChange={handleRangeChange}
+            numberFormat={numberFormat}
           />
 
           {/* Footer for Range Mode */}
@@ -385,6 +434,29 @@ export function ColumnFilter({
               Clear Filter
             </button>
             <button className="vpg-btn-apply" onClick={applyRangeFilter}>
+              Apply
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Date Range Filter Mode */}
+      {isDateColumn && filterMode === 'range' && (
+        <>
+          <DateRangeFilter
+            dataMin={stats.dateMin!}
+            dataMax={stats.dateMax!}
+            currentRange={localDateRange}
+            onChange={handleDateRangeChange}
+            dateFormat={dateFormat}
+          />
+
+          {/* Footer for Date Range Mode */}
+          <div className="vpg-filter-footer">
+            <button className="vpg-btn-clear" onClick={clearDateRangeFilter}>
+              Clear Filter
+            </button>
+            <button className="vpg-btn-apply" onClick={applyDateRangeFilter}>
               Apply
             </button>
           </div>
