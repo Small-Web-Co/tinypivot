@@ -7,8 +7,10 @@ import type {
   AIQueryExecutedEvent,
   CalculatedField,
   ChartConfig,
+  DateFormat,
+  NumberFormat,
 } from '@smallwebco/tinypivot-core'
-import { loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
+import { formatDate as coreFormatDate, formatNumber as coreFormatNumber, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
