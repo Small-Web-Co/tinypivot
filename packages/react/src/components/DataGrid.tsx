@@ -9,7 +9,11 @@ import type {
   AIErrorEvent,
   AIQueryExecutedEvent,
   ChartConfig,
+  DateFormat,
+  DateRange,
+  NumberFormat,
 } from '@smallwebco/tinypivot-core'
+import { formatDate as coreFormatDate, formatNumber as coreFormatNumber } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useExcelGrid } from '../hooks/useExcelGrid'
@@ -50,6 +54,10 @@ interface DataGridProps {
   initialHeight?: number
   minHeight?: number
   maxHeight?: number
+  /** Number display format */
+  numberFormat?: NumberFormat
+  /** Date display format */
+  dateFormat?: DateFormat
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
   onCellClick?: (payload: {
@@ -89,6 +97,8 @@ export function DataGrid({
   initialHeight = 600,
   minHeight = 300,
   maxHeight = 1200,
+  numberFormat = 'us',
+  dateFormat = 'iso',
   aiAnalyst,
   onCellClick,
   onExport,
@@ -180,6 +190,9 @@ export function DataGrid({
     // Numeric range filters
     setNumericRangeFilter,
     getNumericRangeFilter,
+    // Date range filters
+    setDateRangeFilter,
+    getDateRangeFilter,
   } = useExcelGrid({ data: displayData, enableSorting: true, enableFiltering: true })
 
   // Filtered data for pivot table
@@ -222,16 +235,30 @@ export function DataGrid({
       return null
     return activeFilters.map((f) => {
       if (f.type === 'range' && f.range) {
-        // Format range filter display
+        // Format numeric range filter display
         const parts = []
         if (f.range.min !== null)
-          parts.push(`≥ ${f.range.min}`)
+          parts.push(`\u2265 ${f.range.min}`)
         if (f.range.max !== null)
-          parts.push(`≤ ${f.range.max}`)
+          parts.push(`\u2264 ${f.range.max}`)
         return {
           column: f.column,
           valueCount: 1,
           displayText: parts.join(' and '),
+          isRange: true,
+        }
+      }
+      if (f.type === 'dateRange' && f.dateRange) {
+        // Format date range filter display
+        const parts = []
+        if (f.dateRange.min !== null)
+          parts.push(`from ${coreFormatDate(f.dateRange.min, dateFormat)}`)
+        if (f.dateRange.max !== null)
+          parts.push(`to ${coreFormatDate(f.dateRange.max, dateFormat)}`)
+        return {
+          column: f.column,
+          valueCount: 1,
+          displayText: parts.join(' '),
           isRange: true,
         }
       }
@@ -242,7 +269,7 @@ export function DataGrid({
         isRange: false,
       }
     })
-  }, [activeFilters])
+  }, [activeFilters, dateFormat])
 
   // Rows - depends on columnFilters to recompute when filters change
   const rows = useMemo(() => table.getFilteredRowModel().rows, [table, columnFilters])
@@ -726,6 +753,13 @@ export function DataGrid({
     [setNumericRangeFilter],
   )
 
+  const handleDateRangeFilter = useCallback(
+    (columnId: string, range: DateRange | null) => {
+      setDateRangeFilter(columnId, range)
+    },
+    [setDateRangeFilter],
+  )
+
   const handleSort = useCallback(
     (columnId: string, direction: 'asc' | 'desc' | null) => {
       if (direction === null) {
@@ -767,10 +801,7 @@ export function DataGrid({
   const formatStatValue = (value: number | null): string => {
     if (value === null)
       return '-'
-    if (Math.abs(value) >= 1000) {
-      return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
-    }
-    return value.toLocaleString('en-US', { maximumFractionDigits: 4 })
+    return coreFormatNumber(value, numberFormat)
   }
 
   // Format cell value
@@ -788,19 +819,24 @@ export function DataGrid({
       return ''
 
     const stats = getColumnStats(columnId)
+
+    if (stats.type === 'date') {
+      return coreFormatDate(value, dateFormat)
+    }
+
     if (stats.type === 'number') {
       const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
       if (Number.isNaN(num))
         return String(value)
 
       if (shouldFormatNumber(columnId) && Math.abs(num) >= 1000) {
-        return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
+        return coreFormatNumber(num, numberFormat)
       }
 
       if (Number.isInteger(num)) {
         return String(num)
       }
-      return num.toLocaleString('en-US', { maximumFractionDigits: 4, useGrouping: false })
+      return coreFormatNumber(num, numberFormat, { maximumFractionDigits: 4 })
     }
 
     return String(value)
@@ -1651,8 +1687,12 @@ export function DataGrid({
             selectedValues={getColumnFilterValues(activeFilterColumn)}
             sortDirection={getSortDirection(activeFilterColumn)}
             numericRange={getNumericRangeFilter(activeFilterColumn)}
+            dateRange={getDateRangeFilter(activeFilterColumn)}
+            numberFormat={numberFormat}
+            dateFormat={dateFormat}
             onFilter={values => handleFilter(activeFilterColumn, values)}
             onRangeFilter={range => handleRangeFilter(activeFilterColumn, range)}
+            onDateRangeFilter={range => handleDateRangeFilter(activeFilterColumn, range)}
             onSort={dir => handleSort(activeFilterColumn, dir)}
             onClose={closeFilterDropdown}
           />
