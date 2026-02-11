@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import type { NumericRange } from '@smallwebco/tinypivot-core'
+import type { NumberFormat, NumericRange } from '@smallwebco/tinypivot-core'
 /**
  * Numeric Range Filter Component
  * Provides an intuitive dual-handle slider and input fields for filtering numeric data
  */
+import { formatNumber } from '@smallwebco/tinypivot-core'
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   dataMin: number
   dataMax: number
   currentRange: NumericRange | null
+  numberFormat?: NumberFormat
 }>()
 
 const emit = defineEmits<{
@@ -40,9 +42,7 @@ const step = computed(() => {
 function formatValue(val: number | null): string {
   if (val === null)
     return ''
-  if (Number.isInteger(val))
-    return val.toLocaleString()
-  return val.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  return formatNumber(val, props.numberFormat ?? 'us')
 }
 
 // Check if filter is active
