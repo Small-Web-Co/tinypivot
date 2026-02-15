@@ -1815,6 +1815,7 @@ function handleContainerClick(event: MouseEvent) {
   overflow: auto;
   position: relative;
   background: rgba(248, 250, 252, 0.3);
+  isolation: isolate;
 }
 
 .vpg-grid-container:focus {

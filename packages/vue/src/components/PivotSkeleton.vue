@@ -1422,6 +1422,7 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
   flex: 1;
   overflow: auto;
   max-height: 100%;
+  isolation: isolate;
 }
 
 .vpg-pivot-table {
