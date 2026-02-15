@@ -299,40 +299,25 @@ function copyInstallCommand() {
     <section id="hero" class="hero">
       <div class="hero-bg" />
       <div class="hero-content">
-        <!-- Framework Toggle -->
-        <div class="framework-toggle-wrapper">
-          <div class="framework-toggle">
-            <button
-              class="framework-btn" :class="[{ active: selectedFramework === 'vue' }]"
-              @click="selectedFramework = 'vue'"
-            >
-              <svg viewBox="0 0 128 128" width="20" height="20">
-                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z" />
-                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z" />
-              </svg>
-              Vue 3
-            </button>
-            <button
-              class="framework-btn" :class="[{ active: selectedFramework === 'react' }]"
-              @click="selectedFramework = 'react'"
-            >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="#61dafb">
-                <circle cx="12" cy="12" r="2.5" />
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" />
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)" />
-                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)" />
-              </svg>
-              React
-            </button>
-          </div>
-          <div class="badge">
-            {{ selectedFramework === 'vue' ? 'Vue 3' : 'React 18' }} Component Library
-          </div>
+        <!-- Framework Badge -->
+        <div class="framework-badge">
+          <svg viewBox="0 0 128 128" width="18" height="18">
+            <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z" />
+            <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z" />
+          </svg>
+          <span class="framework-badge-separator">+</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="#61dafb">
+            <circle cx="12" cy="12" r="2.5" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)" />
+          </svg>
+          <span class="framework-badge-text">Works with Vue 3 & React</span>
         </div>
         <h1>Excel-like Data Grid, <span class="gradient-text">Pivot Table & Charts</span></h1>
         <p class="hero-subtitle">
           A powerful, performant data grid with built-in filtering, sorting, pivot tables, and chart builder.
-          Available for <strong>Vue 3</strong> and <strong>React</strong>. Freemium model - start free, upgrade when you need more.
+          Same API, same features — choose your framework. Freemium model - start free, upgrade when you need more.
         </p>
         <div class="hero-actions">
           <a href="#demo" class="btn btn-primary">
@@ -1010,46 +995,30 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 }
 
 /* Framework Toggle */
-.framework-toggle-wrapper {
-  display: flex;
-  flex-direction: column;
+.framework-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
   margin-bottom: 1.5rem;
 }
 
-.framework-toggle {
-  display: inline-flex;
-  gap: 0.5rem;
-  padding: 0.25rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.framework-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: transparent;
-  border: none;
-  border-radius: 0.375rem;
-  color: #94a3b8;
+.framework-badge-separator {
+  color: #475569;
   font-size: 0.875rem;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
 }
 
-.framework-btn:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.framework-btn.active {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+.framework-badge-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #42b883 30%, #61dafb 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .code-function {
@@ -1191,17 +1160,6 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   position: relative;
   max-width: 800px;
   text-align: center;
-}
-
-.badge {
-  display: inline-block;
-  padding: 0.375rem 0.875rem;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #10b981;
 }
 
 .hero h1 {
