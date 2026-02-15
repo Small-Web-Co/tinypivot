@@ -281,6 +281,7 @@ export function isDateRange(value: ColumnFilterValue): value is DateRange {
 // Chart Types
 export type ChartType =
   | 'bar'
+  | 'stackedBar'
   | 'line'
   | 'area'
   | 'pie'

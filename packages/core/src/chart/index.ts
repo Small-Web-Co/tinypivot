@@ -28,6 +28,16 @@ export const CHART_TYPES: ChartTypeInfo[] = [
     bestFor: ['Comparing categories', 'Ranking', 'Part-to-whole'],
   },
   {
+    type: 'stackedBar',
+    label: 'Stacked Bar',
+    icon: 'stackedBar',
+    description: 'Compare composition across categories',
+    requiredFields: ['dimension', 'measure'],
+    optionalFields: ['dimension'],
+    guidance: 'Drag a category to X-axis, a number to Y-axis, and a grouping field to Series',
+    bestFor: ['Part-to-whole comparison', 'Composition over categories', 'Cumulative totals'],
+  },
+  {
     type: 'line',
     label: 'Line Chart',
     icon: 'line',
@@ -273,6 +283,7 @@ export function isChartConfigValid(config: ChartConfig): boolean {
   // Check required fields based on chart type
   switch (config.type) {
     case 'bar':
+    case 'stackedBar':
     case 'line':
     case 'area':
     case 'pie':
@@ -320,6 +331,15 @@ export function getChartGuidance(config: ChartConfig): string {
       if (!config.seriesField)
         return 'Optionally add a field to Color for grouped series'
       return 'Chart is ready! Adjust options as needed.'
+
+    case 'stackedBar':
+      if (!config.xAxis)
+        return 'Drag a category field to the X-axis'
+      if (!config.yAxis)
+        return 'Drag a number field to the Y-axis'
+      if (!config.seriesField)
+        return 'Add a field to Series to define stacked segments'
+      return 'Chart is ready! Each series is stacked within the bar.'
 
     case 'pie':
     case 'donut':

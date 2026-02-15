@@ -117,6 +117,17 @@ const zoneLabels = computed(() => {
         showSize: false,
         showSeries: true,
       }
+    case 'stackedBar':
+      return {
+        xAxis: 'X-Axis (dimension)',
+        xAxisPlaceholder: 'Drop a dimension',
+        yAxis: 'Y-Axis (measure)',
+        yAxisPlaceholder: 'Drop a measure',
+        series: 'Series (stacking field)',
+        seriesPlaceholder: 'Drop a dimension to stack by',
+        showSize: false,
+        showSeries: true,
+      }
     default: // bar, line, area
       return {
         xAxis: 'X-Axis (dimension)',
@@ -333,8 +344,8 @@ const chartOptions = computed<ApexOptions>(() => {
     }
   }
 
-  // Stacking
-  if (options.stacked && ['bar', 'area'].includes(config.type)) {
+  // Stacking — forced on for stackedBar, optional for bar/area
+  if (config.type === 'stackedBar' || (options.stacked && ['bar', 'area'].includes(config.type))) {
     baseOptions.chart!.stacked = true
   }
 
@@ -486,6 +497,7 @@ type ApexChartType = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'radar' | 'scat
 function getApexChartType(type: ChartType): ApexChartType {
   const mapping: Record<ChartType, ApexChartType> = {
     bar: 'bar',
+    stackedBar: 'bar',
     line: 'line',
     area: 'area',
     pie: 'pie',
@@ -524,6 +536,7 @@ function formatValue(val: unknown, format?: string, decimals?: number): string {
 function getChartIcon(type: ChartType): string {
   const icons: Record<ChartType, string> = {
     bar: 'M3 3v18h18V3H3zm4 14H5v-6h2v6zm4 0H9V7h2v10zm4 0h-2V9h2v8zm4 0h-2v-4h2v4z',
+    stackedBar: 'M3 3v18h18V3H3zm4 14H5v-3h2v3zm0-4H5v-3h2v3zm4 4H9v-5h2v5zm0-6H9v-4h2v4zm4 6h-2v-3h2v3zm0-4h-2v-5h2v5zm4 4h-2v-2h2v2zm0-3h-2v-2h2v2z',
     line: 'M3.5 18.5l6-6 4 4 8-8M14.5 8.5h6v6',
     area: 'M3 17l6-6 4 4 8-8v10H3z',
     pie: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8v8l5.66 5.66C14.28 19.04 13.18 20 12 20z',
