@@ -1,7 +1,7 @@
 {
   "name": "@smallwebco/tinypivot-vue",
   "type": "module",
-  "version": "1.0.68",
+  "version": "1.0.69",
   "description": "TinyPivot Vue 3 - Lightweight data grid with pivot tables, charts, and optional AI Data Analyst. Under 50KB gzipped. BYOK for AI features.",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",

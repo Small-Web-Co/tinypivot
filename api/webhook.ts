@@ -224,16 +224,25 @@ export const config = {
 }
 
 /**
- * Get raw body - handles both Vercel production and vercel dev
+ * Get raw body for Stripe webhook signature verification.
+ *
+ * CRITICAL: The body must be the exact original bytes from Stripe.
+ * Re-serializing via JSON.stringify() breaks signatures because:
+ * - Forward slashes: \/ becomes /
+ * - Number formatting may change (1.0 → 1)
+ * - Unicode escaping differences
  */
 async function getRawBody(req: VercelRequest): Promise<Buffer> {
-  // If body was already parsed (vercel dev sometimes does this), stringify it back
-  if (req.body && typeof req.body === 'object') {
-    return Buffer.from(JSON.stringify(req.body))
+  // If body is already a string or Buffer (bodyParser: false working correctly)
+  if (typeof req.body === 'string') {
+    return Buffer.from(req.body)
+  }
+  if (Buffer.isBuffer(req.body)) {
+    return req.body
   }
 
-  // Otherwise read from stream (production Vercel)
-  return new Promise((resolve, reject) => {
+  // Read from stream (primary path for Vercel production with bodyParser: false)
+  const buf = await new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = []
 
     req.on('data', (chunk: Buffer) => {
@@ -246,13 +255,26 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
 
     req.on('error', reject)
 
-    // Timeout after 10 seconds
     setTimeout(() => {
       if (chunks.length === 0) {
-        reject(new Error('Request body timeout'))
+        reject(new Error('Request body timeout - stream was empty (body may have been consumed by parser)'))
       }
     }, 10000)
   })
+
+  if (buf.length > 0) {
+    return buf
+  }
+
+  // Stream was empty — body was already consumed by Vercel's parser.
+  // This should not happen when bodyParser: false is set correctly.
+  // Log a warning so we can detect this in production logs.
+  if (req.body && typeof req.body === 'object') {
+    console.warn('⚠️ Raw body stream was empty — Vercel body parser may be active despite bodyParser: false config. Falling back to JSON.stringify which may break signature verification.')
+    return Buffer.from(JSON.stringify(req.body))
+  }
+
+  throw new Error('No request body available')
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -283,6 +305,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   else {
     // Production: verify signature
     const signature = req.headers['stripe-signature'] as string
+    console.log(`🔍 req.body type: ${typeof req.body}, isBuffer: ${Buffer.isBuffer(req.body)}, isNull: ${req.body === null}, isUndefined: ${req.body === undefined}`)
 
     if (!signature) {
       console.error('❌ No stripe-signature header')
@@ -292,7 +315,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let rawBody: Buffer
     try {
       rawBody = await getRawBody(req)
-      console.log(`📥 Received webhook body (${rawBody.length} bytes)`)
+      console.log(`📥 Received webhook body (${rawBody.length} bytes), first 100 chars: ${rawBody.toString('utf8').slice(0, 100)}`)
     }
     catch (err) {
       console.error('❌ Failed to read request body:', err)

@@ -1,7 +1,7 @@
 {
   "name": "@smallwebco/tinypivot-core",
   "type": "module",
-  "version": "1.0.68",
+  "version": "1.0.69",
   "description": "Core logic for TinyPivot - framework agnostic utilities for AI-enabled data grids, pivot tables, and embedded analytics",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
