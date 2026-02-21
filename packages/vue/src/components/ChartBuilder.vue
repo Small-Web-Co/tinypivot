@@ -28,6 +28,7 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 const props = defineProps<{
   data: Record<string, unknown>[]
   theme?: 'light' | 'dark'
+  fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
 }>()
 
 const emit = defineEmits<{
@@ -42,8 +43,8 @@ const VueApexCharts = defineAsyncComponent(() =>
 // Chart configuration state
 const chartConfig = ref<ChartConfig>(createDefaultChartConfig())
 
-// Field analysis
-const fieldInfos = computed(() => analyzeFieldsForChart(props.data))
+// Field analysis (applies consumer overrides when provided)
+const fieldInfos = computed(() => analyzeFieldsForChart(props.data, props.fieldRoleOverrides))
 
 // Separate fields by role
 const dimensions = computed(() => fieldInfos.value.filter(f => f.role === 'dimension' || f.role === 'temporal'))
