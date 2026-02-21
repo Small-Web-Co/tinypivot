@@ -58,6 +58,8 @@ const props = withDefaults(defineProps<{
   numberFormat?: NumberFormat
   /** Date display format */
   dateFormat?: DateFormat
+  /** Override auto-detected chart field roles per column name */
+  fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -1424,6 +1426,7 @@ function handleContainerClick(event: MouseEvent) {
         <ChartBuilder
           :data="filteredDataForPivot"
           :theme="currentTheme"
+          :field-role-overrides="props.fieldRoleOverrides"
           @config-change="handleChartConfigChange"
         />
       </div>

@@ -11,6 +11,7 @@ import type {
   ChartType,
   ChartTypeInfo,
   FieldRole,
+  FieldRoleOverrides,
 } from '../types'
 
 /**
@@ -148,12 +149,24 @@ export const CHART_COLORS = [
 ]
 
 /**
- * Detect the role of a field based on its data
+ * Detect the role of a field based on its data.
+ *
+ * When values are native JS `number` types (not numeric strings), they are
+ * treated as measures regardless of cardinality — the consumer has already
+ * signaled intent by providing typed numeric data.
+ *
+ * Pass `overrides` to explicitly set a field's role, bypassing auto-detection.
  */
 export function detectFieldRole(
   data: Record<string, unknown>[],
   field: string,
+  overrides?: FieldRoleOverrides,
 ): FieldRole {
+  // Explicit override takes priority over any heuristic
+  if (overrides?.[field]) {
+    return overrides[field]
+  }
+
   if (data.length === 0)
     return 'dimension'
 
@@ -165,11 +178,15 @@ export function detectFieldRole(
 
   // Check if numeric
   let numericCount = 0
+  let jsNumberCount = 0
   let dateCount = 0
 
   for (const val of values) {
     if (typeof val === 'number' || (!Number.isNaN(Number(val)) && val !== '' && typeof val !== 'boolean')) {
       numericCount++
+      if (typeof val === 'number') {
+        jsNumberCount++
+      }
     }
     if (val instanceof Date || (typeof val === 'string' && !Number.isNaN(Date.parse(val)) && val.includes('-'))) {
       dateCount++
@@ -183,8 +200,15 @@ export function detectFieldRole(
     return 'temporal'
   }
 
-  // Measure detection (numeric with low cardinality ratio)
+  // Measure detection (numeric with sufficient cardinality OR native JS numbers)
   if (numericCount >= threshold) {
+    // If every numeric value is a native JS number, the consumer has already
+    // typed the data — trust it as a measure regardless of cardinality.
+    const allJSNumbers = jsNumberCount >= numericCount
+    if (allJSNumbers) {
+      return 'measure'
+    }
+
     const uniqueCount = new Set(values.map(String)).size
     // If high cardinality relative to count, it's a measure
     // If low cardinality (like "1, 2, 3" categories), treat as dimension
@@ -197,10 +221,14 @@ export function detectFieldRole(
 }
 
 /**
- * Analyze all fields in a dataset for chart building
+ * Analyze all fields in a dataset for chart building.
+ *
+ * Pass `overrides` to explicitly set field roles, bypassing auto-detection
+ * for specific columns.
  */
 export function analyzeFieldsForChart(
   data: Record<string, unknown>[],
+  overrides?: FieldRoleOverrides,
 ): ChartFieldInfo[] {
   if (data.length === 0)
     return []
@@ -210,7 +238,7 @@ export function analyzeFieldsForChart(
 
   for (const field of fields) {
     const values = data.map(row => row[field]).filter(v => v !== null && v !== undefined)
-    const role = detectFieldRole(data, field)
+    const role = detectFieldRole(data, field, overrides)
     const uniqueSet = new Set(values.map(String))
 
     let dataType: 'string' | 'number' | 'date' | 'boolean' = 'string'

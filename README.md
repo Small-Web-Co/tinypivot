@@ -136,6 +136,7 @@ export default function App() {
 | `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme |
 | `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display format |
 | `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display format |
+| `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override auto-detected chart field roles |
 | `stripedRows` | `boolean` | `true` | Alternating row colors |
 | `exportFilename` | `string` | `'data-export.csv'` | CSV filename |
 
@@ -588,6 +589,52 @@ TinyPivot Pro includes a drag-and-drop chart builder with 6 chart types. Simply 
 
 Charts automatically respect any filters applied in Grid view — filter your data, then visualize the subset.
 
+### Field Role Detection
+
+The Chart Builder automatically classifies each column as a **dimension** (category/grouping), **measure** (aggregatable number), or **temporal** (date/time) using heuristics on your data.
+
+**How it works:**
+- Columns where values are native JS `number` types are classified as **measures** — if your data layer has already cast values to numbers, TinyPivot trusts that intent regardless of cardinality
+- Numeric strings with high cardinality (many unique values) are classified as **measures**
+- Numeric strings with low cardinality (e.g., `"1"`, `"2"`, `"3"`) are classified as **dimensions** (they could be category IDs)
+- Date-like strings are classified as **temporal**
+- Everything else is classified as **dimensions**
+
+**Overriding field roles:**
+
+When the auto-detection doesn't match your intent, use `fieldRoleOverrides` to explicitly set roles:
+
+```vue
+<!-- Vue -->
+<DataGrid
+  :data="data"
+  :field-role-overrides="{
+    'Answer Score': 'measure',
+    'Question Order': 'dimension',
+    'Company Size': 'measure',
+  }"
+/>
+```
+
+```tsx
+{/* React */}
+<DataGrid
+  data={data}
+  fieldRoleOverrides={{
+    "Answer Score": "measure",
+    "Question Order": "dimension",
+    "Company Size": "measure",
+  }}
+/>
+```
+
+Available roles: `'dimension'` | `'measure'` | `'temporal'`
+
+This is useful when:
+- Low-cardinality numbers (like Likert scores 1-5) arrive as strings and get classified as dimensions
+- You want to force a numeric column to be used as a grouping axis (dimension) instead of an aggregated value
+- A column should be treated as temporal but isn't in a recognizable date format
+
 ## Custom Calculations
 
 TinyPivot supports three types of custom calculations:
@@ -775,6 +822,8 @@ Full TypeScript support included. Import types as needed:
 import type {
   AggregationFunction,
   DataGridProps,
+  FieldRole,
+  FieldRoleOverrides,
   PivotConfig,
 } from '@smallwebco/tinypivot-react'
 
@@ -783,6 +832,8 @@ import type {
   AggregationFunction,
   CellClickEvent,
   DataGridProps,
+  FieldRole,
+  FieldRoleOverrides,
   PivotConfig,
   SelectionChangeEvent,
 } from '@smallwebco/tinypivot-vue'
