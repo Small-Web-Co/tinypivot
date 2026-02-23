@@ -63,3 +63,6 @@ AGENTS.md
 /docs/**
 
 /invoices/**
+
+# Harnetic worktrees
+.harnetic/
