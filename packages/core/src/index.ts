@@ -175,6 +175,7 @@ export type {
   ExportEvent,
   ExportOptions,
   FieldRole,
+  FieldRoleOverrides,
   FieldStats,
   // Event Types
   FilterEvent,

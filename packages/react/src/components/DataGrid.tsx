@@ -58,6 +58,8 @@ interface DataGridProps {
   numberFormat?: NumberFormat
   /** Date display format */
   dateFormat?: DateFormat
+  /** Override auto-detected chart field roles per column name */
+  fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
   onCellClick?: (payload: {
@@ -99,6 +101,7 @@ export function DataGrid({
   maxHeight = 1200,
   numberFormat = 'us',
   dateFormat = 'iso',
+  fieldRoleOverrides,
   aiAnalyst,
   onCellClick,
   onExport,
@@ -1461,6 +1464,7 @@ export function DataGrid({
           <ChartBuilder
             data={filteredDataForPivot}
             theme={currentTheme}
+            fieldRoleOverrides={fieldRoleOverrides}
             onConfigChange={handleChartConfigChange}
           />
         </div>

@@ -30,12 +30,14 @@ const Chart = React.lazy(() => import('react-apexcharts'))
 interface ChartBuilderProps {
   data: Record<string, unknown>[]
   theme?: 'light' | 'dark'
+  fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
   onConfigChange?: (config: ChartConfig) => void
 }
 
 export function ChartBuilder({
   data,
   theme = 'light',
+  fieldRoleOverrides,
   onConfigChange,
 }: ChartBuilderProps) {
   // Chart configuration state
@@ -45,8 +47,8 @@ export function ChartBuilder({
   const [draggingField, setDraggingField] = useState<ChartFieldInfo | null>(null)
   const [dragOverZone, setDragOverZone] = useState<string | null>(null)
 
-  // Field analysis
-  const fieldInfos = useMemo(() => analyzeFieldsForChart(data), [data])
+  // Field analysis (applies consumer overrides when provided)
+  const fieldInfos = useMemo(() => analyzeFieldsForChart(data, fieldRoleOverrides), [data, fieldRoleOverrides])
 
   // Separate fields by role
   const dimensions = useMemo(

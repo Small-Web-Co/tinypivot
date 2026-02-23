@@ -143,6 +143,8 @@ export interface DataGridProps {
   numberFormat?: NumberFormat
   /** Date display format: 'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DD) */
   dateFormat?: DateFormat
+  /** Override auto-detected chart field roles (dimension/measure/temporal) per column name */
+  fieldRoleOverrides?: FieldRoleOverrides
   stripedRows?: boolean
   exportFilename?: string
   // Vertical resize
@@ -295,6 +297,26 @@ export type ChartAggregation = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countD
 
 /** Field classification for chart building */
 export type FieldRole = 'dimension' | 'measure' | 'temporal'
+
+/**
+ * Override auto-detected field roles for chart building.
+ * Maps field names to explicit roles.
+ *
+ * Useful when the heuristic misclassifies low-cardinality numeric columns
+ * (e.g. Likert scores 1-5) as dimensions instead of measures.
+ *
+ * @example
+ * ```tsx
+ * <DataGrid
+ *   data={data}
+ *   fieldRoleOverrides={{
+ *     "Answer Score": "measure",
+ *     "Question Order": "dimension",
+ *   }}
+ * />
+ * ```
+ */
+export type FieldRoleOverrides = Record<string, FieldRole>
 
 /** A field configured for chart use */
 export interface ChartField {

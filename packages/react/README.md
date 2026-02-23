@@ -80,6 +80,7 @@ export default function App() {
 | `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme |
 | `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display format: US (1,234.56), EU (1.234,56), plain (1234.56) |
 | `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display format: US (MM/DD/YYYY), EU (DD/MM/YYYY), ISO (YYYY-MM-DD) |
+| `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override auto-detected chart field roles per column (`'dimension'` \| `'measure'` \| `'temporal'`) |
 
 ## Callbacks
 
