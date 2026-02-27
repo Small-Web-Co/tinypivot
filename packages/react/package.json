@@ -1,7 +1,7 @@
 {
   "name": "@smallwebco/tinypivot-react",
   "type": "module",
-  "version": "1.0.73",
+  "version": "1.0.74",
   "description": "TinyPivot React - Lightweight data grid with pivot tables, charts, and optional AI Data Analyst. Under 40KB gzipped. BYOK for AI features.",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
