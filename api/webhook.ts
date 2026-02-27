@@ -339,8 +339,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
 
+    // Only process TinyPivot checkouts — must have a "plan" metadata key
+    // (other products on this Stripe account use different metadata like "clerkUserId")
+    if (!session.metadata?.plan) {
+      console.log('Ignoring checkout event: not a TinyPivot purchase (no "plan" metadata)')
+      return res.status(200).json({ received: true })
+    }
+
     const email = session.customer_details?.email
-    const plan = session.metadata?.plan || 'single'
+    const plan = session.metadata.plan
 
     if (email) {
       const licenseKey = await generateLicenseKey(plan)
