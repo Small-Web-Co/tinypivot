@@ -5,6 +5,7 @@
  * Default: patch
  *
  * By default, npm publishing is handled by GitHub Actions when the tag is pushed.
+ * Manual verification lives in the "Publish Dry Run" GitHub Actions workflow.
  * Use --local flag to publish from your local machine (requires npm token).
  */
 

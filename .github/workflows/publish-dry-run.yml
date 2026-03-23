@@ -1,20 +1,13 @@
-# Publish packages to npm using Trusted Publishing (OIDC)
-# Keep this workflow tag-only. npm Trusted Publishing can mis-identify
-# manually dispatched publishes and reject them even when the package settings
-# look correct.
-name: Publish to npm
+# Build and pack npm publish artifacts without attempting a real publish.
+name: Publish Dry Run
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  # Run quality checks before publishing
   quality:
     name: Quality Checks
     runs-on: ubuntu-latest
@@ -40,9 +33,8 @@ jobs:
       - name: Run tests
         run: pnpm test:unit
 
-  # Publish only after quality checks pass
-  publish:
-    name: Publish
+  pack:
+    name: Build and Pack
     runs-on: ubuntu-latest
     needs: [quality]
     steps:
@@ -55,7 +47,6 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # npm trusted publishing requires Node 22.14+ and npm 11.5.1+
           node-version: 24
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
@@ -91,14 +82,8 @@ jobs:
       - name: List publish artifacts
         run: ls -1 "${RUNNER_TEMP}/npm-packages"
 
-      - name: Publish @smallwebco/tinypivot-core with OIDC
-        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-core-*.tgz --access public
-
-      - name: Publish @smallwebco/tinypivot-server with OIDC
-        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-server-*.tgz --access public
-
-      - name: Publish @smallwebco/tinypivot-vue with OIDC
-        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-vue-*.tgz --access public
-
-      - name: Publish @smallwebco/tinypivot-react with OIDC
-        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-react-*.tgz --access public
+      - name: Upload publish artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages-dry-run
+          path: ${{ runner.temp }}/npm-packages
