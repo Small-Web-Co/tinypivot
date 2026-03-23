@@ -152,9 +152,9 @@ const packageName = computed(() => selectedFramework.value === 'vue' ? '@smallwe
 // Pricing
 const selectedPlan = ref<'single' | 'unlimited' | 'team'>('single')
 const plans = [
-  { id: 'single', name: 'Single Project', price: 49, description: 'Lifetime license for 1 developer, 1 project. Includes updates.' },
-  { id: 'unlimited', name: 'Unlimited Projects', price: 149, description: 'Lifetime license for 1 developer, unlimited projects. Includes updates.' },
-  { id: 'team', name: 'Team License', price: 399, description: 'Lifetime license for up to 10 developers, unlimited projects. Includes updates.' },
+  { id: 'single', name: 'Single Project', price: 49, description: 'Lifetime Pro license for 1 developer, 1 project.' },
+  { id: 'unlimited', name: 'Unlimited Projects', price: 149, description: 'Lifetime Pro license for 1 developer, unlimited projects.' },
+  { id: 'team', name: 'Team License', price: 399, description: 'Lifetime Pro license for up to 10 developers, unlimited projects.' },
 ] as const
 
 const isCheckingOut = ref(false)
@@ -219,15 +219,14 @@ const freeFeatures = [
   'Keyboard Nav',
   'Pivot Table (Sum)',
   'Row/Col Totals',
+  'Calculated Fields',
+  'Formula Builder',
 ]
 const proFeatures = [
+  'Advanced Aggregations (9+)',
   'AI Data Analyst (BYOK)',
   'Natural Language Queries',
   'Chart Builder (6 types)',
-  'All Aggregations (9+)',
-  'Custom Functions',
-  'Calculated Fields',
-  'Formula Builder',
   'No Watermark',
 ]
 
@@ -316,8 +315,8 @@ function copyInstallCommand() {
         </div>
         <h1>Excel-like Data Grid, <span class="gradient-text">Pivot Table & Charts</span></h1>
         <p class="hero-subtitle">
-          A powerful, performant data grid with built-in filtering, sorting, pivot tables, and chart builder.
-          Same API, same features — choose your framework. Freemium model - start free, upgrade when you need more.
+          A powerful, performant data grid with built-in filtering, sorting, and free pivot tables.
+          Same API, same features — choose your framework. Upgrade for advanced aggregations, charts, AI Analyst, and no watermark.
         </p>
         <div class="hero-actions">
           <a href="#demo" class="btn btn-primary">
@@ -339,6 +338,11 @@ function copyInstallCommand() {
             </svg>
           </button>
         </div>
+        <p class="hero-note">
+          <a href="https://bvallieres.com/product/development/2026/03/23/tinypivot-free-pivot-tables-lifetime-license.html" target="_blank" rel="noopener">
+            Read the latest update: free pivot tables + lifetime Pro licensing →
+          </a>
+        </p>
       </div>
     </section>
 
@@ -423,8 +427,8 @@ function copyInstallCommand() {
             </svg>
           </div>
           <h3>Pivot Table</h3>
-          <p>Drag-and-drop pivot with aggregations</p>
-          <span class="feature-badge pro">Pro</span>
+          <p>Drag-and-drop pivoting with Sum aggregation and totals</p>
+          <span class="feature-badge free">Free</span>
         </div>
 
         <div class="feature-card">
@@ -433,9 +437,9 @@ function copyInstallCommand() {
               <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </div>
-          <h3>Custom Calculations</h3>
-          <p>9 built-in + custom functions & formula builder</p>
-          <span class="feature-badge pro">Pro</span>
+          <h3>Calculated Fields</h3>
+          <p>Build formulas like profit margin and derived metrics</p>
+          <span class="feature-badge free">Free</span>
         </div>
 
         <div class="feature-card">
@@ -868,7 +872,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
     <section id="pricing" class="pricing">
       <div class="section-header">
         <h2>Simple Pricing</h2>
-        <p>One-time payment, lifetime license with free updates. Works for both Vue and React.</p>
+        <p>One-time payment, lifetime Pro license. Works for both Vue and React.</p>
       </div>
 
       <div class="pricing-cards">
@@ -972,6 +976,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
           <div class="footer-col">
             <h4>Resources</h4>
             <a href="https://github.com/Small-Web-Co/tinypivot#readme" target="_blank">Documentation</a>
+            <a href="https://bvallieres.com/product/development/2026/03/23/tinypivot-free-pivot-tables-lifetime-license.html" target="_blank">Latest Update</a>
             <a href="https://github.com/Small-Web-Co/tinypivot/releases" target="_blank">Changelog</a>
             <a href="https://github.com/Small-Web-Co/tinypivot/blob/main/LICENSE" target="_blank">License</a>
           </div>
@@ -1266,6 +1271,21 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 .hero-install code {
   font-size: 0.875rem;
   color: #10b981;
+}
+
+.hero-note {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.hero-note a {
+  color: #94a3b8;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.hero-note a:hover {
+  color: white;
 }
 
 .copy-btn {

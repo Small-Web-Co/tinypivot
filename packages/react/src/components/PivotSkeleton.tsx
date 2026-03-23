@@ -660,7 +660,7 @@ export function PivotSkeleton({
         </div>
       </div>
 
-      {/* License Required Message */}
+      {/* Fallback message */}
       {!canUsePivot ? (
         <div className="vpg-pro-required">
           <div className="vpg-pro-content">
@@ -672,11 +672,8 @@ export function PivotSkeleton({
                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
-            <h3>Pro Feature</h3>
-            <p>Pivot Table functionality requires a Pro license.</p>
-            <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener noreferrer" className="vpg-pro-link">
-              Get Pro License →
-            </a>
+            <h3>Pivot Unavailable</h3>
+            <p>Pivot mode could not be enabled in this session. Try reloading the page.</p>
           </div>
         </div>
       ) : (

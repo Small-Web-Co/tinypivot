@@ -1,6 +1,6 @@
 # TinyPivot
 
-A lightweight data grid with pivot tables, charts, and optional AI-powered data exploration for Vue 3 and React. **Under 40KB gzipped** — 10x smaller than AG Grid.
+A lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3 and React. **Under 40KB gzipped** — 10x smaller than AG Grid.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)**
 
@@ -16,10 +16,11 @@ A lightweight data grid with pivot tables, charts, and optional AI-powered data 
 ## Why TinyPivot?
 
 - **Lightweight**: Under 40KB gzipped vs 500KB+ for AG Grid
-- **Batteries Included**: Pivot tables, 6 chart types, Excel-like features out of the box
+- **Free Pivot Tables**: Sum aggregations, totals, and calculated fields included out of the box
+- **Pro Upgrade**: Advanced aggregations, charts, AI Data Analyst, and no watermark
 - **AI Data Analyst** (Pro): Natural language queries with BYOK — use your own OpenAI/Anthropic key
 - **Framework Support**: First-class Vue 3 and React packages
-- **One-Time License**: No subscriptions — pay once, use forever
+- **Lifetime License**: No subscriptions — buy once, use forever
 
 ## Features
 
@@ -36,11 +37,10 @@ A lightweight data grid with pivot tables, charts, and optional AI-powered data 
 | Keyboard navigation | ✅ | ✅ |
 | Pivot table with Sum aggregation | ✅ | ✅ |
 | Row/column totals | ✅ | ✅ |
+| Calculated fields with formulas | ✅ | ✅ |
 | **AI Data Analyst** (natural language queries, BYOK) | ❌ | ✅ |
 | **Chart Builder** (6 chart types, drag-and-drop) | ❌ | ✅ |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
-| Custom aggregation functions | ❌ | ✅ |
-| Calculated fields with formulas | ❌ | ✅ |
 | No watermark | ❌ | ✅ |
 
 ## Installation
@@ -126,7 +126,7 @@ export default function App() {
 | `data` | `Record<string, unknown>[]` | **required** | Array of data objects |
 | `loading` | `boolean` | `false` | Show loading spinner |
 | `fontSize` | `'xs' \| 'sm' \| 'base'` | `'xs'` | Font size preset |
-| `showPivot` | `boolean` | `true` | Show pivot toggle (Pro) |
+| `showPivot` | `boolean` | `true` | Show pivot toggle |
 | `enableExport` | `boolean` | `true` | Show CSV export button |
 | `enableSearch` | `boolean` | `true` | Show global search |
 | `enablePagination` | `boolean` | `false` | Enable pagination |
@@ -755,9 +755,9 @@ interface CalculatedField {
 
 ## Pro License
 
-Unlock pivot table functionality and remove the watermark with a Pro license.
+Unlock advanced aggregations, charts, AI Data Analyst, and remove the watermark with a Pro license.
 
-**Licenses are perpetual** — once purchased, Pro features work forever. The date in your license key indicates your update eligibility period, not an expiration.
+**TinyPivot Pro uses a lifetime license** — buy once, set your key, and keep shipping.
 
 ### Activate License
 
@@ -848,7 +848,7 @@ import type {
 
 ## License
 
-- **Free Tier**: MIT License for basic grid features
+- **Free Tier**: MIT License for core grid and pivot features
 - **Pro Features**: Commercial license required
 
 See [LICENSE.md](./LICENSE.md) for details.

@@ -38,16 +38,13 @@ const PLAN_CODES: Record<string, string> = {
  * - Private key (in env) signs licenses
  * - Public key (in library) verifies them
  *
- * Licenses are PERPETUAL - the expiry date only affects update eligibility
+ * Licenses are PERPETUAL
  */
 async function generateLicenseKey(plan: string): Promise<string> {
   const typeCode = PLAN_CODES[plan] || 'PRO1'
 
-  // License update eligibility for 1 year from now
-  // Note: Licenses are PERPETUAL - features never expire
-  const expiryDate = new Date()
-  expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-  const expiry = expiryDate.toISOString().slice(0, 10).replace(/-/g, '')
+  // Keep the key format stable while making the lifetime nature of the license explicit.
+  const expiry = '20991231'
 
   const privateKeyPem = process.env.LICENSE_PRIVATE_KEY
   if (!privateKeyPem) {
@@ -190,11 +187,11 @@ ${licenseKey}
           </pre>
           <h2>How to use your license:</h2>
           <pre style="background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; font-size: 14px;">
-import { setLicenseKey } from 'tinypivot'
+import { setLicenseKey } from '@smallwebco/tinypivot-react' // or '@smallwebco/tinypivot-vue'
 
 setLicenseKey('${licenseKey}')
           </pre>
-          <p>Your license is valid for 1 year of updates. After that, you can continue using the version you have, or renew for continued updates.</p>
+          <p>Your TinyPivot Pro license is perpetual. Add it once at app startup and you're set.</p>
           <p>If you have any questions, reply to this email.</p>
           <p>Happy coding!</p>
         `,

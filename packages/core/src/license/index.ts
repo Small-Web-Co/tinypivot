@@ -307,8 +307,8 @@ async function verifySignature(
 /**
  * Validate a license key and extract info
  *
- * Note: Licenses are PERPETUAL - the expiry date indicates update eligibility,
- * not when features stop working. All Pro features remain active forever.
+ * TinyPivot licenses are perpetual.
+ * The trailing date remains part of the key format, but it does not disable features.
  */
 export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   // Free tier - no key needed
@@ -349,7 +349,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
     return INVALID_LICENSE
   }
 
-  // Parse expiry date (for update eligibility tracking, NOT feature expiration)
+  // Parse the embedded date segment from the key format.
   const year = Number.parseInt(expiryStr.slice(0, 4))
   const month = Number.parseInt(expiryStr.slice(4, 6)) - 1
   const day = Number.parseInt(expiryStr.slice(6, 8))
@@ -364,14 +364,13 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   else if (typeCode === 'PROT')
     type = 'pro-team'
 
-  // PERPETUAL LICENSE: Features never expire, only update eligibility does
-  // The expiresAt date is retained for informational purposes only
+  // Features remain active forever. The parsed date is retained for compatibility.
   return {
     type,
     isValid: true,
     expiresAt,
     features: {
-      pivot: type !== 'free',
+      pivot: true,
       advancedAggregations: type !== 'free',
       percentageMode: type !== 'free',
       sessionPersistence: type !== 'free',

@@ -1,15 +1,16 @@
 # @smallwebco/tinypivot-vue
 
-A lightweight data grid with pivot tables, charts, and optional AI-powered data exploration for Vue 3. **Under 50KB gzipped** — 10x smaller than AG Grid.
+A lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3. **Under 50KB gzipped** — 10x smaller than AG Grid.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
 
 ## Why TinyPivot?
 
 - **Lightweight**: Under 50KB gzipped vs 500KB+ for AG Grid
-- **Batteries Included**: Pivot tables, 6 chart types, Excel-like features out of the box
+- **Free Pivot Tables**: Sum aggregations, totals, and calculated fields included
+- **Pro Upgrade**: Advanced aggregations, charts, AI Data Analyst, and no watermark
 - **AI Data Analyst** (Pro): Natural language queries with BYOK — use your own OpenAI/Anthropic key
-- **One-Time License**: No subscriptions — pay once, use forever
+- **Lifetime License**: No subscriptions — buy once, use forever
 
 ## Installation
 
@@ -56,11 +57,12 @@ const data = [
 | Column resizing | ✅ | ✅ |
 | Clipboard (Ctrl+C) | ✅ | ✅ |
 | Dark mode | ✅ | ✅ |
+| Pivot table with Sum aggregation | ✅ | ✅ |
+| Row/column totals | ✅ | ✅ |
+| Calculated fields with formulas | ✅ | ✅ |
 | **AI Data Analyst** (natural language, BYOK) | ❌ | ✅ |
 | **Chart Builder** (6 chart types) | ❌ | ✅ |
-| Pivot table | ❌ | ✅ |
-| Aggregations (Sum, Avg, etc.) | ❌ | ✅ |
-| Row/column totals | ❌ | ✅ |
+| Advanced aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
 | No watermark | ❌ | ✅ |
 
 ## Props
@@ -70,7 +72,7 @@ const data = [
 | `data` | `Record<string, unknown>[]` | **required** | Array of data objects |
 | `loading` | `boolean` | `false` | Show loading spinner |
 | `fontSize` | `'xs' \| 'sm' \| 'base'` | `'xs'` | Font size preset |
-| `showPivot` | `boolean` | `true` | Show pivot toggle (Pro) |
+| `showPivot` | `boolean` | `true` | Show pivot toggle |
 | `enableExport` | `boolean` | `true` | Show CSV export button |
 | `enableSearch` | `boolean` | `true` | Show global search |
 | `enablePagination` | `boolean` | `false` | Enable pagination |
@@ -180,7 +182,7 @@ See the [full documentation](https://github.com/Small-Web-Co/tinypivot) for comp
 
 ## License
 
-- **Free Tier**: MIT License for basic grid features
+- **Free Tier**: MIT License for core grid and pivot features
 - **Pro Features**: Commercial license required
 
 **[Purchase at tiny-pivot.com/#pricing](https://tiny-pivot.com/#pricing)**
