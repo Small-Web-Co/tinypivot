@@ -146,6 +146,22 @@ export function getMessagesForAPI(
 }
 
 /**
+ * Get the most recent query result data stored in the conversation, if any
+ */
+export function getLatestConversationData(
+  conversation: AIConversation,
+): Record<string, unknown>[] | null {
+  for (let i = conversation.messages.length - 1; i >= 0; i--) {
+    const data = conversation.messages[i].metadata?.data
+    if (data && data.length > 0) {
+      return data
+    }
+  }
+
+  return null
+}
+
+/**
  * Trim conversation to last N messages to manage context window
  */
 export function trimConversation(

@@ -59,44 +59,62 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # npm trusted publishing requires Node 22.14+ and npm 11.5.1+
+          node-version: 24
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Show publish tool versions
+        run: |
+          node --version
+          npm --version
+          pnpm --version
+
       - name: Build all packages
         run: pnpm build
 
-      - name: Publish @smallwebco/tinypivot-core
-        if: ${{ inputs.dry_run != 'true' }}
-        run: pnpm --filter @smallwebco/tinypivot-core publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Pack publish artifacts
+        run: |
+          mkdir -p "${RUNNER_TEMP}/npm-packages"
 
-      - name: Publish @smallwebco/tinypivot-server
-        if: ${{ inputs.dry_run != 'true' }}
-        run: pnpm --filter @smallwebco/tinypivot-server publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          cd packages/core
+          pnpm pack --pack-destination "${RUNNER_TEMP}/npm-packages"
 
-      - name: Publish @smallwebco/tinypivot-vue
-        if: ${{ inputs.dry_run != 'true' }}
-        run: pnpm --filter @smallwebco/tinypivot-vue publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          cd ../server
+          pnpm pack --pack-destination "${RUNNER_TEMP}/npm-packages"
 
-      - name: Publish @smallwebco/tinypivot-react
+          cd ../vue
+          pnpm pack --pack-destination "${RUNNER_TEMP}/npm-packages"
+
+          cd ../react
+          pnpm pack --pack-destination "${RUNNER_TEMP}/npm-packages"
+
+      - name: List publish artifacts
+        run: ls -1 "${RUNNER_TEMP}/npm-packages"
+
+      - name: Publish @smallwebco/tinypivot-core with OIDC
         if: ${{ inputs.dry_run != 'true' }}
-        run: pnpm --filter @smallwebco/tinypivot-react publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-core-*.tgz --access public
+
+      - name: Publish @smallwebco/tinypivot-server with OIDC
+        if: ${{ inputs.dry_run != 'true' }}
+        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-server-*.tgz --access public
+
+      - name: Publish @smallwebco/tinypivot-vue with OIDC
+        if: ${{ inputs.dry_run != 'true' }}
+        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-vue-*.tgz --access public
+
+      - name: Publish @smallwebco/tinypivot-react with OIDC
+        if: ${{ inputs.dry_run != 'true' }}
+        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-react-*.tgz --access public
 
       - name: Dry run summary
         if: ${{ inputs.dry_run == 'true' }}
         run: |
-          echo "Dry run complete - packages built but not published"
+          echo "Dry run complete - packages built and packed but not published"
           echo "Packages that would be published:"
           echo "  - @smallwebco/tinypivot-core"
           echo "  - @smallwebco/tinypivot-server"

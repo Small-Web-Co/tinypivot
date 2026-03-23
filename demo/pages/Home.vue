@@ -945,10 +945,41 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
       </div>
     </section>
 
+    <!-- Testimonial Section -->
+    <section class="testimonial-section">
+      <div class="section-header">
+        <div class="badge badge-glow">
+          Customer Feedback
+        </div>
+        <h2>Used by teams that need self-serve analytics</h2>
+        <p>A recent note from a TinyPivot customer using the grid for orders, website traffic, and performance analytics.</p>
+      </div>
+
+      <div class="testimonial-card">
+        <div class="testimonial-mark">
+          “
+        </div>
+        <blockquote class="testimonial-quote">
+          Thank you so much! We found Brice to be a highly skilled, meticulous, and helpful developer. We had the opportunity to use TinyPivot, which enabled our colleagues to generate and view analytics on orders, website traffic, and performance independently, without placing a strain on the company’s IT team. We even made modifications to the plugin to suit our specific needs.
+        </blockquote>
+        <div class="testimonial-attribution">
+          <div class="testimonial-author">
+            Atlantis Headwear
+          </div>
+          <div class="testimonial-role">
+            CS
+          </div>
+          <a href="https://www.atlantisheadwear.com" target="_blank" rel="noopener" class="testimonial-link">
+            atlantisheadwear.com
+          </a>
+        </div>
+      </div>
+    </section>
+
     <!-- CTA Section -->
     <section class="cta">
       <h2>Ready to supercharge your {{ selectedFramework === 'vue' ? 'Vue' : 'React' }} app?</h2>
-      <p>Join hundreds of developers using TinyPivot</p>
+      <p>Give your team a lightweight grid with built-in pivoting, then upgrade when you need richer analytics.</p>
       <div class="cta-actions">
         <code>pnpm add {{ packageName }}</code>
       </div>
@@ -2085,6 +2116,75 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   font-size: 0.8125rem;
 }
 
+/* Testimonial */
+.testimonial-section {
+  padding: 4rem 2rem 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.testimonial-card {
+  position: relative;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(16, 185, 129, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  border-radius: 1rem;
+  box-shadow: 0 20px 50px -30px rgba(0, 0, 0, 0.6);
+}
+
+.testimonial-mark {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  font-size: 4rem;
+  line-height: 1;
+  color: rgba(16, 185, 129, 0.25);
+  font-weight: 700;
+}
+
+.testimonial-quote {
+  position: relative;
+  margin: 0;
+  padding-left: 1.5rem;
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: #e2e8f0;
+}
+
+.testimonial-attribution {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-left: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.testimonial-author {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.testimonial-role {
+  padding: 0.25rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.testimonial-link {
+  color: #34d399;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.testimonial-link:hover {
+  color: #6ee7b7;
+}
+
 /* CTA */
 .cta {
   padding: 6rem 2rem;
@@ -2210,6 +2310,22 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 
   .pricing-cards {
     grid-template-columns: 1fr;
+  }
+
+  .testimonial-card {
+    padding: 1.5rem;
+  }
+
+  .testimonial-quote,
+  .testimonial-attribution {
+    padding-left: 0;
+  }
+
+  .testimonial-mark {
+    position: static;
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 3rem;
   }
 
   .pricing-features {

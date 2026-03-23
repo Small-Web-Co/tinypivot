@@ -26,11 +26,12 @@ import {
   getDefaultDemoResponse,
   getDemoSchema,
   getInitialDemoData,
+  getLatestConversationData,
   getMessagesForAPI,
   setConversationDataSource,
   validateSQLSafety,
 } from '@smallwebco/tinypivot-core'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 export interface UseAIAnalystOptions {
   config: AIAnalystConfig
@@ -87,17 +88,21 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     }
   }
 
+  const initialConversation = loadFromStorage()
+
   // State
-  const conversation = ref<AIConversation>(loadFromStorage())
+  const conversation = ref<AIConversation>(initialConversation)
   const schemas = ref<Map<string, AITableSchema>>(new Map())
   const allSchemas = ref<AITableSchema[]>([]) // All table schemas for JOINs
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const lastLoadedData = ref<Record<string, unknown>[] | null>(null)
+  const lastLoadedData = ref<Record<string, unknown>[] | null>(getLatestConversationData(initialConversation))
 
   // Dynamic data sources (discovered from endpoint)
   const discoveredDataSources = ref<AIDataSource[]>([])
   const isLoadingTables = ref(false)
+  const dataSourceLoadPromises = new Map<string, Promise<void>>()
+  const hydratedPersistedSelection = ref(false)
 
   // Get effective data sources (config or discovered)
   const effectiveDataSources = computed<AIDataSource[]>(() => {
@@ -227,51 +232,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     )
     conversation.value = addMessageToConversation(conversation.value, systemMessage)
 
-    // Load data source if custom loader is provided (demo mode)
-    if (config.dataSourceLoader) {
-      try {
-        const { data, schema } = await config.dataSourceLoader(dataSourceId)
-        if (schema) {
-          schemas.value.set(dataSourceId, schema)
-        }
-        // Store the loaded data for the data source
-        if (data && data.length > 0) {
-          lastLoadedData.value = data
-          onDataLoaded?.({
-            data,
-            query: `SELECT * FROM ${dataSource.table} LIMIT 100`,
-            dataSourceId,
-            rowCount: data.length,
-          })
-        }
-      }
-      catch (err) {
-        console.warn('Failed to load data source:', err)
-      }
-    }
-    // Fetch schema (demo mode uses mock schemas)
-    else if (config.demoMode) {
-      const demoSchema = getDemoSchema(dataSourceId)
-      if (demoSchema) {
-        schemas.value.set(dataSourceId, demoSchema)
-      }
-      // Load initial sample data for the preview
-      const initialData = getInitialDemoData(dataSourceId)
-      if (initialData) {
-        lastLoadedData.value = initialData
-        onDataLoaded?.({
-          data: initialData,
-          query: `SELECT * FROM ${dataSource.table} LIMIT 10`,
-          dataSourceId,
-          rowCount: initialData.length,
-        })
-      }
-    }
-    // Use endpoint for schema discovery and sample data
-    else if (config.endpoint) {
-      await fetchSchema(dataSource)
-      await fetchSampleData(dataSource)
-    }
+    await ensureDataSourceState(dataSource)
 
     emitConversationUpdate()
   }
@@ -357,6 +318,98 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
       console.warn('Failed to fetch sample data:', err)
     }
   }
+
+  async function loadDataSourceState(dataSource: AIDataSource) {
+    if (config.dataSourceLoader) {
+      const { data, schema } = await config.dataSourceLoader(dataSource.id)
+      if (schema) {
+        schemas.value.set(dataSource.id, schema)
+      }
+      if (data && data.length > 0) {
+        lastLoadedData.value = data
+        onDataLoaded?.({
+          data,
+          query: `SELECT * FROM ${dataSource.table} LIMIT 100`,
+          dataSourceId: dataSource.id,
+          rowCount: data.length,
+        })
+      }
+      return
+    }
+
+    if (config.demoMode) {
+      const demoSchema = getDemoSchema(dataSource.id)
+      if (demoSchema) {
+        schemas.value.set(dataSource.id, demoSchema)
+      }
+
+      const initialData = getInitialDemoData(dataSource.id)
+      if (initialData) {
+        lastLoadedData.value = initialData
+        onDataLoaded?.({
+          data: initialData,
+          query: `SELECT * FROM ${dataSource.table} LIMIT 10`,
+          dataSourceId: dataSource.id,
+          rowCount: initialData.length,
+        })
+      }
+      return
+    }
+
+    if (config.endpoint) {
+      await fetchSchema(dataSource)
+      await fetchSampleData(dataSource)
+    }
+  }
+
+  async function ensureDataSourceState(dataSource: AIDataSource) {
+    const existingLoad = dataSourceLoadPromises.get(dataSource.id)
+    if (existingLoad) {
+      return existingLoad
+    }
+
+    const loadPromise = loadDataSourceState(dataSource)
+      .catch((err) => {
+        console.warn('Failed to load data source:', err)
+      })
+      .finally(() => {
+        dataSourceLoadPromises.delete(dataSource.id)
+      })
+
+    dataSourceLoadPromises.set(dataSource.id, loadPromise)
+    return loadPromise
+  }
+
+  watch(
+    effectiveDataSources,
+    (dataSources) => {
+      if (hydratedPersistedSelection.value) {
+        return
+      }
+
+      const initialDataSourceId = initialConversation.dataSourceId
+      if (!initialDataSourceId) {
+        hydratedPersistedSelection.value = true
+        return
+      }
+
+      const dataSource = dataSources.find(ds => ds.id === initialDataSourceId)
+      if (!dataSource) {
+        return
+      }
+
+      const hasPersistedPreviewData = !!getLatestConversationData(initialConversation)
+      const hasSchema = schemas.value.has(initialDataSourceId)
+      const hasPreviewData = !!lastLoadedData.value?.length || hasPersistedPreviewData
+
+      hydratedPersistedSelection.value = true
+
+      if (!hasSchema || !hasPreviewData) {
+        void ensureDataSourceState(dataSource)
+      }
+    },
+    { immediate: true },
+  )
 
   /**
    * Send a message to the AI
@@ -817,6 +870,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
    * Clear the conversation
    */
   function clearConversation() {
+    hydratedPersistedSelection.value = true
     conversation.value = createConversation(config.sessionId)
     error.value = null
     lastLoadedData.value = null
@@ -834,7 +888,9 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
    * Import a conversation
    */
   function importConversation(conv: AIConversation) {
+    hydratedPersistedSelection.value = true
     conversation.value = conv
+    lastLoadedData.value = getLatestConversationData(conv)
     emitConversationUpdate()
   }
 

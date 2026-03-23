@@ -36,6 +36,7 @@ export {
   generateMessageId,
   generateSessionId,
   getConversationStats,
+  getLatestConversationData,
   getMessagesForAPI,
   serializeConversation,
   setConversationDataSource,

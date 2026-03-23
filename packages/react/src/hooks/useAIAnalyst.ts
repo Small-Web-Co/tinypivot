@@ -26,6 +26,7 @@ import {
   getDefaultDemoResponse,
   getDemoSchema,
   getInitialDemoData,
+  getLatestConversationData,
   getMessagesForAPI,
   setConversationDataSource,
   validateSQLSafety,
@@ -90,17 +91,26 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     }
   }, [storageKey])
 
+  const initialConversationRef = useRef<AIConversation | null>(null)
+  if (!initialConversationRef.current) {
+    initialConversationRef.current = loadFromStorage()
+  }
+
   // State
-  const [conversation, setConversation] = useState<AIConversation>(() => loadFromStorage())
+  const [conversation, setConversation] = useState<AIConversation>(initialConversationRef.current)
   const [schemas, setSchemas] = useState<Map<string, AITableSchema>>(new Map())
   const [allSchemas, setAllSchemas] = useState<AITableSchema[]>([]) // All table schemas for JOINs
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastLoadedData, setLastLoadedData] = useState<Record<string, unknown>[] | null>(null)
+  const [lastLoadedData, setLastLoadedData] = useState<Record<string, unknown>[] | null>(
+    () => getLatestConversationData(initialConversationRef.current!),
+  )
 
   // Dynamic data sources (discovered from endpoint)
   const [discoveredDataSources, setDiscoveredDataSources] = useState<AIDataSource[]>([])
   const [isLoadingTables, setIsLoadingTables] = useState(false)
+  const dataSourceLoadPromisesRef = useRef(new Map<string, Promise<void>>())
+  const hydratedPersistedSelectionRef = useRef(false)
 
   // Get effective data sources (config or discovered)
   const effectiveDataSources = useMemo<AIDataSource[]>(() => {
@@ -303,6 +313,69 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
     }
   }, [onDataLoaded])
 
+  const loadDataSourceState = useCallback(async (dataSource: AIDataSource) => {
+    const currentConfig = configRef.current
+
+    if (currentConfig.dataSourceLoader) {
+      const { data, schema } = await currentConfig.dataSourceLoader(dataSource.id)
+      if (schema) {
+        setSchemas(prev => new Map(prev).set(dataSource.id, schema))
+      }
+      if (data && data.length > 0) {
+        setLastLoadedData(data)
+        onDataLoaded?.({
+          data,
+          query: `SELECT * FROM ${dataSource.table} LIMIT 100`,
+          dataSourceId: dataSource.id,
+          rowCount: data.length,
+        })
+      }
+      return
+    }
+
+    if (currentConfig.demoMode) {
+      const demoSchema = getDemoSchema(dataSource.id)
+      if (demoSchema) {
+        setSchemas(prev => new Map(prev).set(dataSource.id, demoSchema))
+      }
+
+      const initialData = getInitialDemoData(dataSource.id)
+      if (initialData) {
+        setLastLoadedData(initialData)
+        onDataLoaded?.({
+          data: initialData,
+          query: `SELECT * FROM ${dataSource.table} LIMIT 10`,
+          dataSourceId: dataSource.id,
+          rowCount: initialData.length,
+        })
+      }
+      return
+    }
+
+    if (currentConfig.endpoint) {
+      await fetchSchema(dataSource)
+      await fetchSampleData(dataSource)
+    }
+  }, [fetchSchema, fetchSampleData, onDataLoaded])
+
+  const ensureDataSourceState = useCallback(async (dataSource: AIDataSource) => {
+    const existingLoad = dataSourceLoadPromisesRef.current.get(dataSource.id)
+    if (existingLoad) {
+      return existingLoad
+    }
+
+    const loadPromise = loadDataSourceState(dataSource)
+      .catch((err) => {
+        console.warn('Failed to load data source:', err)
+      })
+      .finally(() => {
+        dataSourceLoadPromisesRef.current.delete(dataSource.id)
+      })
+
+    dataSourceLoadPromisesRef.current.set(dataSource.id, loadPromise)
+    return loadPromise
+  }, [loadDataSourceState])
+
   /**
    * Select a data source and fetch its schema
    */
@@ -326,52 +399,36 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
       return withMessage
     })
 
-    // Load data source if custom loader is provided (demo mode)
-    if (configRef.current.dataSourceLoader) {
-      try {
-        const { data, schema } = await configRef.current.dataSourceLoader(dataSourceId)
-        if (schema) {
-          setSchemas(prev => new Map(prev).set(dataSourceId, schema))
-        }
-        // Store the loaded data for the data source
-        if (data && data.length > 0) {
-          setLastLoadedData(data)
-          onDataLoaded?.({
-            data,
-            query: `SELECT * FROM ${dataSource.table} LIMIT 100`,
-            dataSourceId,
-            rowCount: data.length,
-          })
-        }
-      }
-      catch (err) {
-        console.warn('Failed to load data source:', err)
-      }
+    await ensureDataSourceState(dataSource)
+  }, [effectiveDataSources, ensureDataSourceState, onConversationUpdate])
+
+  useEffect(() => {
+    if (hydratedPersistedSelectionRef.current) {
+      return
     }
-    // Fetch schema (demo mode uses mock schemas)
-    else if (configRef.current.demoMode) {
-      const demoSchema = getDemoSchema(dataSourceId)
-      if (demoSchema) {
-        setSchemas(prev => new Map(prev).set(dataSourceId, demoSchema))
-      }
-      // Load initial sample data for the preview
-      const initialData = getInitialDemoData(dataSourceId)
-      if (initialData) {
-        setLastLoadedData(initialData)
-        onDataLoaded?.({
-          data: initialData,
-          query: `SELECT * FROM ${dataSource.table} LIMIT 10`,
-          dataSourceId,
-          rowCount: initialData.length,
-        })
-      }
+
+    const initialConversation = initialConversationRef.current
+    const initialDataSourceId = initialConversation?.dataSourceId
+    if (!initialDataSourceId) {
+      hydratedPersistedSelectionRef.current = true
+      return
     }
-    // Use endpoint for schema discovery and sample data
-    else if (configRef.current.endpoint) {
-      await fetchSchema(dataSource)
-      await fetchSampleData(dataSource)
+
+    const dataSource = effectiveDataSources.find(ds => ds.id === initialDataSourceId)
+    if (!dataSource) {
+      return
     }
-  }, [effectiveDataSources, fetchSchema, fetchSampleData, onConversationUpdate, onDataLoaded])
+
+    const hasPersistedPreviewData = !!getLatestConversationData(initialConversation)
+    const hasSchema = schemas.has(initialDataSourceId)
+    const hasPreviewData = !!lastLoadedData?.length || hasPersistedPreviewData
+
+    hydratedPersistedSelectionRef.current = true
+
+    if (!hasSchema || !hasPreviewData) {
+      void ensureDataSourceState(dataSource)
+    }
+  }, [effectiveDataSources, ensureDataSourceState, lastLoadedData, schemas])
 
   /**
    * Call the AI endpoint
@@ -915,6 +972,7 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
    * Clear the conversation
    */
   const clearConversation = useCallback(() => {
+    hydratedPersistedSelectionRef.current = true
     const newConv = createConversation(configRef.current.sessionId)
     setConversation(newConv)
     setError(null)
@@ -933,7 +991,9 @@ export function useAIAnalyst(options: UseAIAnalystOptions) {
    * Import a conversation
    */
   const importConversation = useCallback((conv: AIConversation) => {
+    hydratedPersistedSelectionRef.current = true
     setConversation(conv)
+    setLastLoadedData(getLatestConversationData(conv))
     onConversationUpdate?.({ conversation: conv })
   }, [onConversationUpdate])
 

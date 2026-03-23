@@ -30,6 +30,7 @@ export {
   getDefaultDemoResponse,
   getDemoSchema,
   getInitialDemoData,
+  getLatestConversationData,
   getMessagesForAPI,
   serializeConversation,
   setConversationDataSource,
