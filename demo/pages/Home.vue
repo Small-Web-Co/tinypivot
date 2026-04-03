@@ -952,26 +952,48 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
           Customer Feedback
         </div>
         <h2>Used by teams that need self-serve analytics</h2>
-        <p>A recent note from a TinyPivot customer using the grid for orders, website traffic, and performance analytics.</p>
+        <p>See what teams are saying about TinyPivot.</p>
       </div>
 
-      <div class="testimonial-card">
-        <div class="testimonial-mark">
-          “
+      <div class="”testimonial-grid”">
+        <div class="”testimonial-card”">
+          <div class="”testimonial-mark”">
+            “
+          </div>
+          <blockquote class="”testimonial-quote”">
+            TinyPivot has been a great addition to our analytics platform, giving our customers intuitive, interactive data grid and pivot table capabilities without the overhead of building our own solution. Small Web Co has been incredibly responsive — actively listening to our use cases and shipping improvements quickly. It’s a high-quality, well-maintained library that delivers real value at a fraction of the cost of alternatives.
+          </blockquote>
+          <div class="”testimonial-attribution”">
+            <div class="”testimonial-author”">
+              Kevin Tetz
+            </div>
+            <div class="”testimonial-role”">
+              CIO
+            </div>
+            <a href="”https://www.vesselscale.com”" target="”_blank”" rel="”noopener”" class="”testimonial-link”">
+              vesselscale.com
+            </a>
+          </div>
         </div>
-        <blockquote class="testimonial-quote">
-          Thank you so much! We found Brice to be a highly skilled, meticulous, and helpful developer. We had the opportunity to use TinyPivot, which enabled our colleagues to generate and view analytics on orders, website traffic, and performance independently, without placing a strain on the company’s IT team. We even made modifications to the plugin to suit our specific needs.
-        </blockquote>
-        <div class="testimonial-attribution">
-          <div class="testimonial-author">
-            Atlantis Headwear
+
+        <div class="”testimonial-card”">
+          <div class="”testimonial-mark”">
+            “
           </div>
-          <div class="testimonial-role">
-            CS
+          <blockquote class="”testimonial-quote”">
+            Thank you so much! We found Brice to be a highly skilled, meticulous, and helpful developer. We had the opportunity to use TinyPivot, which enabled our colleagues to generate and view analytics on orders, website traffic, and performance independently, without placing a strain on the company’s IT team. We even made modifications to the plugin to suit our specific needs.
+          </blockquote>
+          <div class="”testimonial-attribution”">
+            <div class="”testimonial-author”">
+              Atlantis Headwear
+            </div>
+            <div class="”testimonial-role”">
+              CS
+            </div>
+            <a href="”https://www.atlantisheadwear.com”" target="”_blank”" rel="”noopener”" class="”testimonial-link”">
+              atlantisheadwear.com
+            </a>
           </div>
-          <a href="https://www.atlantisheadwear.com" target="_blank" rel="noopener" class="testimonial-link">
-            atlantisheadwear.com
-          </a>
         </div>
       </div>
     </section>
@@ -2123,6 +2145,12 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   margin: 0 auto;
 }
 
+.testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
 .testimonial-card {
   position: relative;
   padding: 2rem;
@@ -2309,6 +2337,10 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   }
 
   .pricing-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .testimonial-grid {
     grid-template-columns: 1fr;
   }
 
