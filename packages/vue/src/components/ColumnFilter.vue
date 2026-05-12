@@ -444,10 +444,10 @@ watch(() => props.dateRange, (newRange) => {
 .vpg-filter-dropdown {
   position: absolute;
   z-index: 50;
-  background: white;
+  background: var(--vpg-surface-elevated);
   border-radius: 0.375rem;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--vpg-border-default);
   min-width: 220px;
   max-width: 280px;
   top: 100%;
@@ -541,9 +541,9 @@ watch(() => props.dateRange, (newRange) => {
   padding: 0.375rem 0.5rem;
   font-size: 0.6875rem;
   font-weight: 500;
-  color: #64748b;
-  background: white;
-  border: 1px solid #e2e8f0;
+  color: var(--vpg-text-secondary);
+  background: var(--vpg-surface-elevated);
+  border: 1px solid var(--vpg-border-default);
   border-radius: 0.25rem;
   cursor: pointer;
   transition: all 0.15s;
