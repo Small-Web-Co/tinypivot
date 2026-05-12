@@ -420,8 +420,8 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
 <style scoped>
 .vpg-pivot-config {
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--vpg-surface-bg);
+  border: 1px solid var(--vpg-border-default);
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   overflow: hidden;
@@ -435,8 +435,8 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0.75rem;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--vpg-surface-panel);
+  border-bottom: 1px solid var(--vpg-border-default);
   flex-shrink: 0;
 }
 
@@ -446,7 +446,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   gap: 0.375rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--vpg-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -482,7 +482,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-clear-btn {
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
 }
 
 .vpg-clear-btn:hover {
@@ -493,20 +493,20 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-section-label {
   font-size: 0.625rem;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   padding: 0.25rem 0.5rem;
 }
 
 .vpg-section-label .vpg-count {
-  color: #cbd5e1;
+  color: var(--vpg-border-strong);
   margin-left: 0.25rem;
 }
 
 .vpg-assigned-section {
-  border-bottom: 1px solid #e2e8f0;
-  background: linear-gradient(to bottom, #f8fafc, white);
+  border-bottom: 1px solid var(--vpg-border-default);
+  background: linear-gradient(to bottom, var(--vpg-surface-panel), var(--vpg-surface-bg));
   padding-bottom: 0.5rem;
   flex-shrink: 0;
 }
@@ -599,7 +599,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
-  color: #334155;
+  color: var(--vpg-text-primary);
 }
 
 .vpg-item-actions {
@@ -616,7 +616,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   align-items: center;
   justify-content: center;
   border-radius: 0.25rem;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -624,14 +624,14 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-toggle-btn:hover {
-  background: white;
-  color: #475569;
+  background: var(--vpg-surface-elevated);
+  color: var(--vpg-text-secondary);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .vpg-agg-select {
   font-size: 0.625rem;
-  background: white;
+  background: var(--vpg-surface-elevated);
   border: 1px solid #a7f3d0;
   border-radius: 0.25rem;
   padding: 0.125rem 0.25rem;
@@ -654,7 +654,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   justify-content: center;
   font-size: 0.875rem;
   line-height: 1;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   background: transparent;
   border: none;
   border-radius: 50%;
@@ -694,7 +694,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   transform: translateY(-50%);
   width: 0.875rem;
   height: 0.875rem;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   pointer-events: none;
 }
 
@@ -702,14 +702,14 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   width: 100%;
   padding: 0.375rem 1.75rem 0.375rem 1.75rem;
   font-size: 0.75rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--vpg-border-default);
   border-radius: 0.375rem;
-  background: white;
-  color: #334155;
+  background: var(--vpg-surface-elevated);
+  color: var(--vpg-text-primary);
 }
 
 .vpg-search-input::placeholder {
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
 }
 
 .vpg-search-input:focus {
@@ -725,7 +725,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   transform: translateY(-50%);
   padding: 0.125rem;
   border-radius: 0.25rem;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -733,8 +733,8 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-clear-search:hover {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--vpg-surface-hover);
+  color: var(--vpg-text-secondary);
 }
 
 .vpg-field-list {
@@ -754,15 +754,15 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   border-radius: 0.375rem;
   font-size: 0.75rem;
   cursor: grab;
-  background: white;
-  border: 1px solid #e2e8f0;
-  color: #475569;
+  background: var(--vpg-surface-elevated);
+  border: 1px solid var(--vpg-border-default);
+  color: var(--vpg-text-secondary);
   transition: all 0.15s;
 }
 
 .vpg-field-item:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
+  border-color: var(--vpg-border-strong);
+  background: var(--vpg-surface-panel);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
@@ -795,7 +795,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   justify-content: center;
   font-size: 0.75rem;
   line-height: 1;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   background: transparent;
   border: none;
   border-radius: 50%;
@@ -806,7 +806,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
 .vpg-field-edit:hover {
   background: #e0e7ff;
-  color: #4f46e5;
+  color: var(--vpg-accent);
 }
 
 .vpg-field-delete:hover {
@@ -822,9 +822,9 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   justify-content: center;
   font-size: 0.625rem;
   font-weight: 700;
-  background: #f1f5f9;
+  background: var(--vpg-surface-hover);
   border-radius: 0.25rem;
-  color: #64748b;
+  color: var(--vpg-text-secondary);
   flex-shrink: 0;
 }
 
@@ -843,14 +843,14 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
 .vpg-unique-count {
   font-size: 0.625rem;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
 .vpg-empty-hint {
   font-size: 0.6875rem;
-  color: #94a3b8;
+  color: var(--vpg-text-muted);
   font-style: italic;
   text-align: center;
   padding: 1rem;
@@ -862,7 +862,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--vpg-border-subtle);
   background: rgba(248, 250, 252, 0.5);
   flex-shrink: 0;
 }
@@ -872,7 +872,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   align-items: center;
   gap: 0.375rem;
   font-size: 0.6875rem;
-  color: #64748b;
+  color: var(--vpg-text-secondary);
   cursor: pointer;
   user-select: none;
 }
@@ -920,33 +920,27 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-field-list::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: var(--vpg-border-default);
   border-radius: 9999px;
 }
 
 .vpg-field-list::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: var(--vpg-border-strong);
 }
 </style>
 
 <style>
-/* Dark mode - PivotConfig */
+/* Dark mode - PivotConfig
+ * Most chrome surface/text overrides are now handled by --vpg-* tokens.
+ * Rules below cover token-mismatches (card uses panel surface in dark) and
+ * decorative/rgba accents that fall outside the chrome token system.
+ */
 .vpg-theme-dark .vpg-pivot-config {
-  background: #1e293b;
-  border-color: #334155;
+  background: var(--vpg-surface-panel);
 }
 
 .vpg-theme-dark .vpg-config-header {
-  background: #0f172a;
-  border-color: #334155;
-}
-
-.vpg-theme-dark .vpg-config-title {
-  color: #94a3b8;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-clear-btn {
-  color: #64748b;
+  background: var(--vpg-surface-bg);
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-clear-btn:hover {
@@ -954,17 +948,8 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   color: #f87171;
 }
 
-.vpg-theme-dark .vpg-pivot-config .vpg-section-label {
-  color: #64748b;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-section-label .vpg-count {
-  color: #475569;
-}
-
 .vpg-theme-dark .vpg-assigned-section {
-  border-color: #334155;
-  background: linear-gradient(to bottom, #0f172a, #1e293b);
+  background: linear-gradient(to bottom, var(--vpg-surface-bg), var(--vpg-surface-panel));
 }
 
 .vpg-theme-dark .vpg-assigned-item.vpg-type-row {
@@ -1007,31 +992,15 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   color: #c4b5fd;
 }
 
-.vpg-theme-dark .vpg-pivot-config .vpg-item-name {
-  color: #e2e8f0;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-toggle-btn {
-  color: #64748b;
-}
-
 .vpg-theme-dark .vpg-pivot-config .vpg-toggle-btn:hover {
-  background: #334155;
+  background: var(--vpg-surface-hover);
   color: #cbd5e1;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-agg-select {
-  background: #0f172a;
+  background: var(--vpg-surface-bg);
   border-color: rgba(16, 185, 129, 0.3);
   color: #6ee7b7;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-agg-select:focus {
-  box-shadow: 0 0 0 1px #10b981;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-remove-btn {
-  color: #64748b;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-remove-btn:hover {
@@ -1040,48 +1009,21 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-search-input {
-  background: #0f172a;
-  border-color: #334155;
-  color: #e2e8f0;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-search-input::placeholder {
-  color: #64748b;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-search-input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 1px #6366f1;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-search-icon {
-  color: #64748b;
+  background: var(--vpg-surface-bg);
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-clear-search:hover {
-  background: #334155;
   color: #cbd5e1;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-field-item {
-  background: #0f172a;
-  border-color: #334155;
+  background: var(--vpg-surface-bg);
   color: #cbd5e1;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-field-item:hover {
-  border-color: #475569;
-  background: #1e293b;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-field-item.vpg-is-numeric {
   border-color: rgba(59, 130, 246, 0.3);
   background: rgba(59, 130, 246, 0.1);
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-field-type-icon {
-  background: #334155;
-  color: #94a3b8;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-field-item.vpg-is-numeric .vpg-field-type-icon {
@@ -1099,11 +1041,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   color: #c4b5fd !important;
 }
 
-.vpg-theme-dark .vpg-field-edit,
-.vpg-theme-dark .vpg-field-delete {
-  color: #64748b;
-}
-
 .vpg-theme-dark .vpg-field-edit:hover {
   background: rgba(99, 102, 241, 0.2);
   color: #a5b4fc;
@@ -1114,21 +1051,9 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   color: #f87171;
 }
 
-.vpg-theme-dark .vpg-pivot-config .vpg-unique-count {
-  color: #64748b;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-empty-hint {
-  color: #64748b;
-}
-
 .vpg-theme-dark .vpg-options-section {
-  border-color: #334155;
+  border-color: var(--vpg-border-default);
   background: rgba(15, 23, 42, 0.5);
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-option-toggle {
-  color: #94a3b8;
 }
 
 .vpg-theme-dark .vpg-calc-btn {
@@ -1140,13 +1065,5 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-theme-dark .vpg-calc-btn:hover {
   background: rgba(168, 85, 247, 0.25);
   border-color: rgba(168, 85, 247, 0.5);
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-field-list::-webkit-scrollbar-thumb {
-  background: #334155;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-field-list::-webkit-scrollbar-thumb:hover {
-  background: #475569;
 }
 </style>
