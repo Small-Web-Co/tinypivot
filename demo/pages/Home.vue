@@ -140,11 +140,72 @@ const aiAnalystConfig: AIAnalystConfig = {
 const numberFormat = ref<'us' | 'eu' | 'plain'>('us')
 const dateFormat = ref<'us' | 'eu' | 'iso'>('iso')
 
-// Theme toggle
-const demoTheme = ref<'light' | 'dark'>('dark')
-function toggleDemoTheme() {
-  demoTheme.value = demoTheme.value === 'dark' ? 'light' : 'dark'
-}
+// Theme selector
+const demoTheme = ref<
+  | 'light' | 'dark' | 'auto'
+  | 'slate' | 'slate-dark'
+  | 'zinc' | 'zinc-dark'
+  | 'indigo' | 'indigo-dark'
+  | 'violet' | 'violet-dark'
+  | 'emerald' | 'emerald-dark'
+  | 'sky' | 'sky-dark'
+  | 'rose' | 'rose-dark'
+  | 'amber' | 'amber-dark'
+  | 'solar' | 'solar-dark'
+  | 'mono' | 'mono-dark'
+>('dark')
+
+const themeOptions = [
+  { group: 'Neutral', options: [
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+    { value: 'auto', label: 'Auto (system)' },
+  ] },
+  { group: 'Slate', options: [
+    { value: 'slate', label: 'Slate' },
+    { value: 'slate-dark', label: 'Slate (dark)' },
+  ] },
+  { group: 'Zinc', options: [
+    { value: 'zinc', label: 'Zinc' },
+    { value: 'zinc-dark', label: 'Zinc (dark)' },
+  ] },
+  { group: 'Indigo', options: [
+    { value: 'indigo', label: 'Indigo' },
+    { value: 'indigo-dark', label: 'Indigo (dark)' },
+  ] },
+  { group: 'Violet', options: [
+    { value: 'violet', label: 'Violet' },
+    { value: 'violet-dark', label: 'Violet (dark)' },
+  ] },
+  { group: 'Emerald', options: [
+    { value: 'emerald', label: 'Emerald' },
+    { value: 'emerald-dark', label: 'Emerald (dark)' },
+  ] },
+  { group: 'Sky', options: [
+    { value: 'sky', label: 'Sky' },
+    { value: 'sky-dark', label: 'Sky (dark)' },
+  ] },
+  { group: 'Rose', options: [
+    { value: 'rose', label: 'Rose' },
+    { value: 'rose-dark', label: 'Rose (dark)' },
+  ] },
+  { group: 'Amber', options: [
+    { value: 'amber', label: 'Amber' },
+    { value: 'amber-dark', label: 'Amber (dark)' },
+  ] },
+  { group: 'Solar', options: [
+    { value: 'solar', label: 'Solar' },
+    { value: 'solar-dark', label: 'Solar (dark)' },
+  ] },
+  { group: 'Mono', options: [
+    { value: 'mono', label: 'Mono' },
+    { value: 'mono-dark', label: 'Mono (dark)' },
+  ] },
+] as const
+
+const isDarkDemoTheme = computed(() =>
+  demoTheme.value === 'dark' || demoTheme.value.endsWith('-dark'),
+)
 
 // Package name based on framework
 const packageName = computed(() => selectedFramework.value === 'vue' ? '@smallwebco/tinypivot-vue' : '@smallwebco/tinypivot-react')
@@ -829,18 +890,31 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
             </div>
           </div>
         </div>
-        <button class="demo-theme-toggle" @click="toggleDemoTheme">
-          <svg v-if="demoTheme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-          </svg>
-          {{ demoTheme === 'dark' ? 'Light Mode' : 'Dark Mode' }}
-        </button>
+        <div class="demo-theme-selector">
+          <label class="demo-theme-label" for="demo-theme-select">Theme</label>
+          <select
+            id="demo-theme-select"
+            v-model="demoTheme"
+            class="demo-theme-select"
+          >
+            <optgroup
+              v-for="group in themeOptions"
+              :key="group.group"
+              :label="group.group"
+            >
+              <option
+                v-for="opt in group.options"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
       </div>
 
-      <div class="demo-container" :class="{ 'demo-light': demoTheme === 'light' }">
+      <div class="demo-container" :class="{ 'demo-light': !isDarkDemoTheme }">
         <DataGrid
           :data="sampleData"
           :show-pivot="true"
@@ -1929,11 +2003,20 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   color: #10b981;
 }
 
-.demo-theme-toggle {
+.demo-theme-selector {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
+}
+
+.demo-theme-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.demo-theme-select {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 500;
   color: #e2e8f0;
@@ -1942,11 +2025,27 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   border-radius: 0.5rem;
   cursor: pointer;
   transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23e2e8f0'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1rem;
 }
 
-.demo-theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.15);
+.demo-theme-select:hover {
+  background-color: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+.demo-theme-select:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.demo-theme-select option,
+.demo-theme-select optgroup {
+  color: #1f2937;
+  background: #ffffff;
 }
 
 .demo-container {
