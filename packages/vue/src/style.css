@@ -31,6 +31,70 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ==========================================================================
+   Theme Tokens — light defaults
+   ========================================================================== */
+.vpg-data-grid,
+.vpg-pivot-config,
+.vpg-pivot-skeleton,
+.vpg-filter-dropdown {
+  --vpg-surface-bg: #ffffff;
+  --vpg-surface-panel: #f8fafc;
+  --vpg-surface-elevated: #ffffff;
+  --vpg-surface-hover: #f1f5f9;
+  --vpg-surface-selected: #eef2ff;
+  --vpg-surface-striped: #f9fafb;
+  --vpg-text-primary: #1f2937;
+  --vpg-text-secondary: #475569;
+  --vpg-text-muted: #94a3b8;
+  --vpg-text-inverse: #ffffff;
+  --vpg-border-default: #e2e8f0;
+  --vpg-border-strong: #cbd5e1;
+  --vpg-border-subtle: #f1f5f9;
+  --vpg-accent: #4f46e5;
+  --vpg-accent-hover: #4338ca;
+  --vpg-accent-soft-bg: #eef2ff;
+  --vpg-accent-soft-text: #4338ca;
+  --vpg-focus-ring: #4f46e5;
+  --vpg-state-error: #dc2626;
+  --vpg-state-warning: #d97706;
+  --vpg-state-success: #059669;
+  --vpg-state-info: #0284c7;
+  --vpg-scrollbar-thumb: #cbd5e1;
+  --vpg-scrollbar-track: #f1f5f9;
+}
+
+/* Dark theme — override tokens */
+.vpg-data-grid.vpg-theme-dark,
+.vpg-pivot-config.vpg-theme-dark,
+.vpg-pivot-skeleton.vpg-theme-dark,
+.vpg-filter-dropdown.vpg-theme-dark {
+  --vpg-surface-bg: #0f172a;
+  --vpg-surface-panel: #1e293b;
+  --vpg-surface-elevated: #1e293b;
+  --vpg-surface-hover: #334155;
+  --vpg-surface-selected: #1e1b4b;
+  --vpg-surface-striped: #1a2434;
+  --vpg-text-primary: #e2e8f0;
+  --vpg-text-secondary: #94a3b8;
+  --vpg-text-muted: #64748b;
+  --vpg-text-inverse: #ffffff;
+  --vpg-border-default: #334155;
+  --vpg-border-strong: #475569;
+  --vpg-border-subtle: #1e293b;
+  --vpg-accent: #8b5cf6;
+  --vpg-accent-hover: #7c3aed;
+  --vpg-accent-soft-bg: #1e1b4b;
+  --vpg-accent-soft-text: #c4b5fd;
+  --vpg-focus-ring: #8b5cf6;
+  --vpg-state-error: #f87171;
+  --vpg-state-warning: #fbbf24;
+  --vpg-state-success: #34d399;
+  --vpg-state-info: #38bdf8;
+  --vpg-scrollbar-thumb: #475569;
+  --vpg-scrollbar-track: #1e293b;
+}
+
 .vpg-data-grid :focus-visible,
 .vpg-pivot-config :focus-visible,
 .vpg-pivot-skeleton :focus-visible,
