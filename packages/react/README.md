@@ -105,6 +105,36 @@ import './my-brand.css'
 
 Custom theme classes layer on top of any preset, so you can start from `theme="dark"` and tweak just the accent, for example.
 
+### Adding a theme switcher
+
+Let users pick their own theme — bind a state value to a `<select>`:
+
+```tsx
+import { DataGrid } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+import { useState } from 'react'
+
+type Theme = 'light' | 'dark' | 'slate' | 'slate-dark' | 'emerald' | 'emerald-dark'
+
+export function MyGrid({ data }) {
+  const [theme, setTheme] = useState<Theme>('dark')
+
+  return (
+    <>
+      <select value={theme} onChange={e => setTheme(e.target.value as Theme)}>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="slate-dark">Slate (dark)</option>
+        <option value="emerald-dark">Emerald (dark)</option>
+        {/* …add more themes */}
+      </select>
+
+      <DataGrid data={data} theme={theme} />
+    </>
+  )
+}
+```
+
 ## Features
 
 | Feature | Free | Pro |

@@ -104,6 +104,33 @@ Brand themes redefine ~25 CSS custom property tokens at the grid root. You can o
 
 Custom theme classes layer on top of any preset, so you can start from `theme="dark"` and tweak just the accent, for example.
 
+### Adding a theme switcher
+
+Let users pick their own theme — bind a reactive `theme` value to a `<select>`:
+
+```vue
+<script setup lang="ts">
+import { DataGrid } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
+import { ref } from 'vue'
+
+const theme = ref<'light' | 'dark' | 'slate' | 'slate-dark' | 'emerald' | 'emerald-dark'>('dark')
+const data = [/* ... */]
+</script>
+
+<template>
+  <select v-model="theme">
+    <option value="light">Light</option>
+    <option value="dark">Dark</option>
+    <option value="slate-dark">Slate (dark)</option>
+    <option value="emerald-dark">Emerald (dark)</option>
+    <!-- …add more themes -->
+  </select>
+
+  <DataGrid :data="data" :theme="theme" />
+</template>
+```
+
 ## Features
 
 | Feature | Free | Pro |
