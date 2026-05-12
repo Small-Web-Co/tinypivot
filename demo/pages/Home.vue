@@ -469,7 +469,7 @@ function copyInstallCommand() {
     <!-- AI Data Analyst Section -->
     <section id="ai-analyst" class="ai-analyst-section">
       <div class="section-header">
-        <div class="badge badge-glow badge-ai">
+        <div class="badge badge-ai">
           Pro Feature
         </div>
         <h2>AI Data Analyst <span class="gradient-text">(BYOK)</span></h2>
@@ -599,7 +599,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
     <!-- Quick Start Section -->
     <section id="quickstart" class="quickstart">
       <div class="section-header">
-        <div class="badge badge-glow">
+        <div class="badge">
           Dead Simple Integration
         </div>
         <h2>Up and Running in <span class="gradient-text">30 Seconds</span></h2>
@@ -948,7 +948,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
     <!-- Testimonial Section -->
     <section class="testimonial-section">
       <div class="section-header">
-        <div class="badge badge-glow">
+        <div class="badge">
           Customer Feedback
         </div>
         <h2>Used by teams that need self-serve analytics</h2>
@@ -1531,9 +1531,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 }
 
 .badge-ai {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2));
   color: #a78bfa;
-  border-color: rgba(139, 92, 246, 0.3);
 }
 
 .ai-demo-container {
@@ -1661,15 +1659,6 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   height: 100%;
   background: radial-gradient(ellipse 60% 40% at 50% 20%, rgba(16, 185, 129, 0.08), transparent);
   pointer-events: none;
-}
-
-.badge-glow {
-  animation: badge-pulse 2s ease-in-out infinite;
-}
-
-@keyframes badge-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  50% { box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.2); }
 }
 
 .steps-container {
