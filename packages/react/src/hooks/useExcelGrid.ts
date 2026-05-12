@@ -1,15 +1,14 @@
 import type { ColumnFilterValue, ColumnStats, DateRange, NumericRange } from '@smallwebco/tinypivot-core'
+import type { ColumnDef, ColumnFiltersState, FilterFn, SortingState, VisibilityState } from '@tanstack/react-table'
 import { formatCellValue, getColumnUniqueValues, isDateRange, isNumericRange } from '@smallwebco/tinypivot-core'
 import {
-  type ColumnDef,
-  type ColumnFiltersState,
-  type FilterFn,
+
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  type SortingState,
+
   useReactTable,
-  type VisibilityState,
+
 } from '@tanstack/react-table'
 /**
  * Excel-like Grid Hook for React

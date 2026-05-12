@@ -1,4 +1,5 @@
 import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds } from '@smallwebco/tinypivot-core'
+import type { Ref } from 'vue'
 import {
   copyToClipboard as coreCopyToClipboard,
   exportPivotToCSV as coreExportPivotToCSV,
@@ -9,7 +10,7 @@ import {
  * Grid Features Composable for Vue
  * Provides CSV export, clipboard, pagination, and other utility features
  */
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref } from 'vue'
 
 // Re-export core functions
 export {

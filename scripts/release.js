@@ -193,13 +193,13 @@ function extractFeatures(diffContent, changedFiles) {
 
     // React component definitions (export function ComponentName)
     const componentMatch = added.match(/export\s+(?:default\s+)?function\s+([A-Z][a-zA-Z0-9]+)/)
-    if (componentMatch && !componentMatch[1].match(/^(React|Vue|Props|Type|Interface)/)) {
+    if (componentMatch && !/^(?:React|Vue|Props|Type|Interface)/.test(componentMatch[1])) {
       features.newComponents.add(componentMatch[1])
     }
 
     // React arrow function components (export const ComponentName = )
     const arrowComponentMatch = added.match(/export\s+(?:default\s+)?const\s+([A-Z][a-zA-Z0-9]+)\s*[=:]/)
-    if (arrowComponentMatch && !arrowComponentMatch[1].match(/^(React|Vue|Props|Type|Interface)/)) {
+    if (arrowComponentMatch && !/^(?:React|Vue|Props|Type|Interface)/.test(arrowComponentMatch[1])) {
       features.newComponents.add(arrowComponentMatch[1])
     }
 
@@ -223,7 +223,7 @@ function extractFeatures(diffContent, changedFiles) {
     }
 
     // Vue defineProps - extract prop names
-    if (added.includes('defineProps<{') || (currentFile.endsWith('.vue') && added.match(/^\s+[a-z][a-zA-Z0-9]+\??:/))) {
+    if (added.includes('defineProps<{') || (currentFile.endsWith('.vue') && /^\s+[a-z][a-zA-Z0-9]+\??:/.test(added))) {
       const vuePropMatch = added.match(/^\s+([a-z][a-zA-Z0-9]+)\??:/)
       if (vuePropMatch) {
         features.newProps.add(vuePropMatch[1])

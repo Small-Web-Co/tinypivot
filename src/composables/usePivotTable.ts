@@ -1,9 +1,10 @@
+import type { Ref } from 'vue'
 import type { AggregationFunction, CalculatedField, FieldStats, PivotCell, PivotConfig, PivotResult, PivotValueField } from '../types'
 /**
  * Pivot Table Composable
  * Provides pivot table functionality with aggregation, row/column grouping
  */
-import { computed, type Ref, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useLicense } from './useLicense'
 
 // Calculated fields localStorage key

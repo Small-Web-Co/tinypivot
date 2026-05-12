@@ -227,7 +227,7 @@ export function PivotSkeleton({
       const cellCount = (maxRow - minRow + 1) * (maxCol - minCol + 1)
       setCopyToastMessage(`Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`)
       setShowCopyToast(true)
-      setTimeout(() => setShowCopyToast(false), 2000)
+      setTimeout(setShowCopyToast, 2000, false)
     }).catch((err) => {
       console.error('Copy failed:', err)
     })

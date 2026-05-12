@@ -1,4 +1,5 @@
 import type { AggregationFunction, CalculatedField, FieldStats, PivotConfig, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { Ref } from 'vue'
 import {
   computeAvailableFields,
   computePivotResult,
@@ -16,7 +17,7 @@ import {
  * Pivot Table Composable for Vue
  * Wraps core pivot logic with Vue reactivity
  */
-import { computed, type Ref, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useLicense } from './useLicense'
 
 // Re-export for convenience

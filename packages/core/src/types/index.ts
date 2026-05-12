@@ -21,20 +21,20 @@ export type DateFormat = 'us' | 'eu' | 'iso'
  *   variant (e.g. `'slate-dark'`). The class `vpg-theme-${theme}` is applied
  *   on the root and themed via CSS.
  */
-export type Theme =
-  | 'light'
-  | 'dark'
-  | 'auto'
-  | 'slate' | 'slate-dark'
-  | 'zinc' | 'zinc-dark'
-  | 'indigo' | 'indigo-dark'
-  | 'violet' | 'violet-dark'
-  | 'emerald' | 'emerald-dark'
-  | 'sky' | 'sky-dark'
-  | 'rose' | 'rose-dark'
-  | 'amber' | 'amber-dark'
-  | 'solar' | 'solar-dark'
-  | 'mono' | 'mono-dark'
+export type Theme
+  = | 'light'
+    | 'dark'
+    | 'auto'
+    | 'slate' | 'slate-dark'
+    | 'zinc' | 'zinc-dark'
+    | 'indigo' | 'indigo-dark'
+    | 'violet' | 'violet-dark'
+    | 'emerald' | 'emerald-dark'
+    | 'sky' | 'sky-dark'
+    | 'rose' | 'rose-dark'
+    | 'amber' | 'amber-dark'
+    | 'solar' | 'solar-dark'
+    | 'mono' | 'mono-dark'
 
 /**
  * Resolved theme value passed to child components (no `'auto'`).
@@ -89,7 +89,7 @@ export interface PivotField {
  */
 export type CustomAggregationFn = (
   values: number[],
-  allFieldValues?: Record<string, number[]>
+  allFieldValues?: Record<string, number[]>,
 ) => number | null
 
 export interface PivotValueField extends PivotField {
@@ -311,17 +311,17 @@ export function isDateRange(value: ColumnFilterValue): value is DateRange {
 }
 
 // Chart Types
-export type ChartType =
-  | 'bar'
-  | 'stackedBar'
-  | 'line'
-  | 'area'
-  | 'pie'
-  | 'donut'
-  | 'scatter'
-  | 'bubble'
-  | 'heatmap'
-  | 'radar'
+export type ChartType
+  = | 'bar'
+    | 'stackedBar'
+    | 'line'
+    | 'area'
+    | 'pie'
+    | 'donut'
+    | 'scatter'
+    | 'bubble'
+    | 'heatmap'
+    | 'radar'
 
 export type ChartAggregation = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct'
 

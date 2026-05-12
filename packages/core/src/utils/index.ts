@@ -325,7 +325,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
   return (...args: Parameters<T>) => {
     if (timeoutId)
       clearTimeout(timeoutId)
-    timeoutId = setTimeout(() => fn(...args), delay)
+    timeoutId = setTimeout(fn, delay, ...args)
   }
 }
 

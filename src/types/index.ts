@@ -31,7 +31,7 @@ export interface PivotField {
  */
 export type CustomAggregationFn = (
   values: number[],
-  allFieldValues?: Record<string, number[]>
+  allFieldValues?: Record<string, number[]>,
 ) => number | null
 
 export interface PivotValueField extends PivotField {

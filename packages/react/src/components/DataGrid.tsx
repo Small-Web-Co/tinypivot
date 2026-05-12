@@ -14,6 +14,7 @@ import type {
   NumberFormat,
   Theme,
 } from '@smallwebco/tinypivot-core'
+import type { AIAnalystHandle } from './AIAnalyst'
 import { formatDate as coreFormatDate, formatNumber as coreFormatNumber } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -26,7 +27,7 @@ import {
 } from '../hooks/useGridFeatures'
 import { useLicense } from '../hooks/useLicense'
 import { usePivotTable } from '../hooks/usePivotTable'
-import { AIAnalyst, type AIAnalystHandle } from './AIAnalyst'
+import { AIAnalyst } from './AIAnalyst'
 import { ChartBuilder } from './ChartBuilder'
 import { ColumnFilter } from './ColumnFilter'
 import { PivotConfig } from './PivotConfig'
@@ -554,13 +555,13 @@ export function DataGrid({
             * (selectionBounds.maxCol - selectionBounds.minCol + 1)
         setCopyToastMessage(`Copied ${cellCount} cell${cellCount > 1 ? 's' : ''}`)
         setShowCopyToast(true)
-        setTimeout(() => setShowCopyToast(false), 2000)
+        setTimeout(setShowCopyToast, 2000, false)
         onCopy?.({ text, cellCount })
       },
       (err) => {
         setCopyToastMessage('Copy failed')
         setShowCopyToast(true)
-        setTimeout(() => setShowCopyToast(false), 2000)
+        setTimeout(setShowCopyToast, 2000, false)
         console.error('Copy failed:', err)
       },
     )
@@ -1676,36 +1677,36 @@ export function DataGrid({
 
       {/* Filter Dropdown Portal */}
       {activeFilterColumn && typeof document !== 'undefined'
-      && createPortal(
-        <div
-          className="vpg-filter-portal"
-          style={{
-            position: 'fixed',
-            top: `${filterDropdownPosition.top}px`,
-            left: `${filterDropdownPosition.left}px`,
-            maxHeight: `${filterDropdownPosition.maxHeight}px`,
-            zIndex: 9999,
-          }}
-        >
-          <ColumnFilter
-            columnId={activeFilterColumn}
-            columnName={activeFilterColumn}
-            stats={getColumnStats(activeFilterColumn)}
-            selectedValues={getColumnFilterValues(activeFilterColumn)}
-            sortDirection={getSortDirection(activeFilterColumn)}
-            numericRange={getNumericRangeFilter(activeFilterColumn)}
-            dateRange={getDateRangeFilter(activeFilterColumn)}
-            numberFormat={numberFormat}
-            dateFormat={dateFormat}
-            onFilter={values => handleFilter(activeFilterColumn, values)}
-            onRangeFilter={range => handleRangeFilter(activeFilterColumn, range)}
-            onDateRangeFilter={range => handleDateRangeFilter(activeFilterColumn, range)}
-            onSort={dir => handleSort(activeFilterColumn, dir)}
-            onClose={closeFilterDropdown}
-          />
-        </div>,
-        document.body,
-      )}
+        && createPortal(
+          <div
+            className="vpg-filter-portal"
+            style={{
+              position: 'fixed',
+              top: `${filterDropdownPosition.top}px`,
+              left: `${filterDropdownPosition.left}px`,
+              maxHeight: `${filterDropdownPosition.maxHeight}px`,
+              zIndex: 9999,
+            }}
+          >
+            <ColumnFilter
+              columnId={activeFilterColumn}
+              columnName={activeFilterColumn}
+              stats={getColumnStats(activeFilterColumn)}
+              selectedValues={getColumnFilterValues(activeFilterColumn)}
+              sortDirection={getSortDirection(activeFilterColumn)}
+              numericRange={getNumericRangeFilter(activeFilterColumn)}
+              dateRange={getDateRangeFilter(activeFilterColumn)}
+              numberFormat={numberFormat}
+              dateFormat={dateFormat}
+              onFilter={values => handleFilter(activeFilterColumn, values)}
+              onRangeFilter={range => handleRangeFilter(activeFilterColumn, range)}
+              onDateRangeFilter={range => handleDateRangeFilter(activeFilterColumn, range)}
+              onSort={dir => handleSort(activeFilterColumn, dir)}
+              onClose={closeFilterDropdown}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

@@ -54,7 +54,7 @@ interface UsePivotTableReturn {
   updateValueFieldAggregation: (
     field: string,
     oldAgg: AggregationFunction,
-    newAgg: AggregationFunction
+    newAgg: AggregationFunction,
   ) => void
   clearConfig: () => void
   setShowRowTotals: (value: boolean) => void

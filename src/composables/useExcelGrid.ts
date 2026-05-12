@@ -3,6 +3,7 @@
  * Provides Excel-like filtering, sorting, and data manipulation functionality
  */
 import type { ColumnDef, ColumnFiltersState, FilterFn, SortingState, VisibilityState } from '@tanstack/vue-table'
+import type { Ref } from 'vue'
 import type { ColumnStats } from '../types'
 import {
   getCoreRowModel,
@@ -10,7 +11,7 @@ import {
   getSortedRowModel,
   useVueTable,
 } from '@tanstack/vue-table'
-import { computed, type Ref, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 export interface ExcelGridOptions<T> {
   data: Ref<T[]>
