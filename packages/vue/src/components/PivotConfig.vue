@@ -536,23 +536,23 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-assigned-item.vpg-type-row {
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  background: var(--vpg-dim-row-bg);
+  border: 1px solid var(--vpg-dim-row-border);
 }
 
 .vpg-assigned-item.vpg-type-column {
-  background: #f5f3ff;
-  border: 1px solid #ddd6fe;
+  background: var(--vpg-dim-col-bg);
+  border: 1px solid var(--vpg-dim-col-border);
 }
 
 .vpg-assigned-item.vpg-type-value {
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  background: var(--vpg-dim-value-bg);
+  border: 1px solid var(--vpg-dim-value-border);
 }
 
 .vpg-assigned-item.vpg-type-calc {
-  background: #fdf4ff;
-  border: 1px solid #f0abfc;
+  background: var(--vpg-dim-calc-bg);
+  border: 1px solid var(--vpg-dim-calc-border);
   cursor: pointer;
 }
 
@@ -575,23 +575,23 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-item-badge.row {
-  background: #c7d2fe;
-  color: #4338ca;
+  background: var(--vpg-dim-row-border);
+  color: var(--vpg-dim-row-text);
 }
 
 .vpg-item-badge.column {
-  background: #ddd6fe;
-  color: #7c3aed;
+  background: var(--vpg-dim-col-border);
+  color: var(--vpg-dim-col-text);
 }
 
 .vpg-item-badge.value {
-  background: #a7f3d0;
-  color: #059669;
+  background: var(--vpg-dim-value-border);
+  color: var(--vpg-dim-value-text);
 }
 
 .vpg-item-badge.calc {
-  background: #f0abfc;
-  color: #86198f;
+  background: var(--vpg-dim-calc-border);
+  color: var(--vpg-dim-calc-text);
 }
 
 .vpg-item-name {
@@ -632,10 +632,10 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-agg-select {
   font-size: 0.625rem;
   background: var(--vpg-surface-elevated);
-  border: 1px solid #a7f3d0;
+  border: 1px solid var(--vpg-dim-value-border);
   border-radius: 0.25rem;
   padding: 0.125rem 0.25rem;
-  color: #059669;
+  color: var(--vpg-dim-value-text);
   font-weight: 500;
   min-width: 70px;
   cursor: pointer;
@@ -643,7 +643,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
 .vpg-agg-select:focus {
   outline: none;
-  box-shadow: 0 0 0 1px #10b981;
+  box-shadow: 0 0 0 1px var(--vpg-dim-value-text);
 }
 
 .vpg-remove-btn {
@@ -777,13 +777,13 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-field-item.vpg-is-calculated {
-  border-color: #e9d5ff;
-  background: rgba(250, 232, 255, 0.5);
+  border-color: var(--vpg-dim-calc-border);
+  background: var(--vpg-dim-calc-bg);
 }
 
 .vpg-calc-type {
-  background: #f0abfc !important;
-  color: #86198f !important;
+  background: var(--vpg-dim-calc-border) !important;
+  color: var(--vpg-dim-calc-text) !important;
 }
 
 .vpg-field-edit,
@@ -881,7 +881,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   width: 0.875rem;
   height: 0.875rem;
   border-radius: 0.25rem;
-  accent-color: #10b981;
+  accent-color: var(--vpg-accent);
   cursor: pointer;
 }
 
@@ -893,16 +893,16 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   font-size: 0.6875rem;
   font-weight: 500;
   border-radius: 0.25rem;
-  background: #fdf4ff;
-  color: #a855f7;
-  border: 1px solid #e9d5ff;
+  background: var(--vpg-dim-calc-bg);
+  color: var(--vpg-dim-calc-text);
+  border: 1px solid var(--vpg-dim-calc-border);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .vpg-calc-btn:hover {
-  background: #fae8ff;
-  border-color: #d8b4fe;
+  background: var(--vpg-dim-calc-border);
+  border-color: var(--vpg-dim-calc-text);
 }
 
 .vpg-calc-icon {
@@ -952,46 +952,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   background: linear-gradient(to bottom, var(--vpg-surface-bg), var(--vpg-surface-panel));
 }
 
-.vpg-theme-dark .vpg-assigned-item.vpg-type-row {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-.vpg-theme-dark .vpg-assigned-item.vpg-type-column {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.3);
-}
-
-.vpg-theme-dark .vpg-assigned-item.vpg-type-value {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: rgba(16, 185, 129, 0.3);
-}
-
-.vpg-theme-dark .vpg-assigned-item.vpg-type-calc {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.3);
-}
-
-.vpg-theme-dark .vpg-item-badge.row {
-  background: rgba(99, 102, 241, 0.3);
-  color: #a5b4fc;
-}
-
-.vpg-theme-dark .vpg-item-badge.column {
-  background: rgba(139, 92, 246, 0.3);
-  color: #c4b5fd;
-}
-
-.vpg-theme-dark .vpg-item-badge.value {
-  background: rgba(16, 185, 129, 0.3);
-  color: #6ee7b7;
-}
-
-.vpg-theme-dark .vpg-item-badge.calc {
-  background: rgba(168, 85, 247, 0.3);
-  color: #c4b5fd;
-}
-
 .vpg-theme-dark .vpg-pivot-config .vpg-toggle-btn:hover {
   background: var(--vpg-surface-hover);
   color: #cbd5e1;
@@ -999,8 +959,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
 .vpg-theme-dark .vpg-pivot-config .vpg-agg-select {
   background: var(--vpg-surface-bg);
-  border-color: rgba(16, 185, 129, 0.3);
-  color: #6ee7b7;
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-remove-btn:hover {
@@ -1031,16 +989,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   color: #60a5fa;
 }
 
-.vpg-theme-dark .vpg-pivot-config .vpg-field-item.vpg-is-calculated {
-  border-color: rgba(168, 85, 247, 0.3);
-  background: rgba(168, 85, 247, 0.1);
-}
-
-.vpg-theme-dark .vpg-calc-type {
-  background: rgba(168, 85, 247, 0.4) !important;
-  color: #c4b5fd !important;
-}
-
 .vpg-theme-dark .vpg-field-edit:hover {
   background: rgba(99, 102, 241, 0.2);
   color: #a5b4fc;
@@ -1054,16 +1002,5 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-theme-dark .vpg-options-section {
   border-color: var(--vpg-border-default);
   background: rgba(15, 23, 42, 0.5);
-}
-
-.vpg-theme-dark .vpg-calc-btn {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
-  border-color: rgba(168, 85, 247, 0.3);
-}
-
-.vpg-theme-dark .vpg-calc-btn:hover {
-  background: rgba(168, 85, 247, 0.25);
-  border-color: rgba(168, 85, 247, 0.5);
 }
 </style>
