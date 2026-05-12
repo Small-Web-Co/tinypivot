@@ -654,6 +654,10 @@
   transition: all 0.15s ease;
 }
 
+.vpg-data-grid.vpg-theme-dark .vpg-watermark-inline a {
+  background: linear-gradient(135deg, var(--vpg-surface-panel) 0%, var(--vpg-surface-hover) 100%);
+}
+
 .vpg-watermark-inline a:hover {
   color: var(--vpg-text-secondary);
   background: linear-gradient(135deg, var(--vpg-border-default) 0%, var(--vpg-border-strong) 100%);
@@ -2331,7 +2335,6 @@
 .vpg-theme-dark .vpg-zone-aggregation { background: #1e1b4b; border-color: #4c1d95; color: #c4b5fd; }
 .vpg-theme-dark .vpg-zone-remove-btn { color: #a78bfa; }
 .vpg-theme-dark .vpg-zone-remove-btn:hover { background: #312e81; }
-.vpg-theme-dark .vpg-chart-empty-state h3 { color: #e2e8f0; }
 
 /* ==========================================================================
    ApexCharts Tooltip Overrides
