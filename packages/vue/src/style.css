@@ -32,8 +32,9 @@
 }
 
 /* ==========================================================================
-   Theme Tokens — light defaults
+   Theme Tokens
    ========================================================================== */
+/* Light defaults */
 .vpg-data-grid,
 .vpg-pivot-config,
 .vpg-pivot-skeleton,
@@ -55,7 +56,7 @@
   --vpg-accent-hover: #4338ca;
   --vpg-accent-soft-bg: #eef2ff;
   --vpg-accent-soft-text: #4338ca;
-  --vpg-focus-ring: #4f46e5;
+  --vpg-focus-ring: var(--vpg-accent);
   --vpg-state-error: #dc2626;
   --vpg-state-warning: #d97706;
   --vpg-state-success: #059669;
@@ -64,7 +65,7 @@
   --vpg-scrollbar-track: #f1f5f9;
 }
 
-/* Dark theme — override tokens */
+/* Dark overrides */
 .vpg-data-grid.vpg-theme-dark,
 .vpg-pivot-config.vpg-theme-dark,
 .vpg-pivot-skeleton.vpg-theme-dark,
@@ -86,7 +87,7 @@
   --vpg-accent-hover: #7c3aed;
   --vpg-accent-soft-bg: #1e1b4b;
   --vpg-accent-soft-text: #c4b5fd;
-  --vpg-focus-ring: #8b5cf6;
+  --vpg-focus-ring: var(--vpg-accent);
   --vpg-state-error: #f87171;
   --vpg-state-warning: #fbbf24;
   --vpg-state-success: #34d399;
