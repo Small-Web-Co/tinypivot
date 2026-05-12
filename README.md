@@ -133,7 +133,7 @@ export default function App() {
 | `pageSize` | `number` | `50` | Rows per page |
 | `enableColumnResize` | `boolean` | `true` | Drag to resize columns |
 | `enableClipboard` | `boolean` | `true` | Ctrl+C to copy cells |
-| `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme |
+| `theme` | `string` | `'light'` | Color theme — see [Theming](#theming) for the full list (22 presets) |
 | `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display format |
 | `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display format |
 | `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override auto-detected chart field roles |
@@ -801,17 +801,74 @@ import '@smallwebco/tinypivot-vue/style.css'
 import '@smallwebco/tinypivot-react/style.css'
 ```
 
-### Custom Theming
+## Theming
 
-Override CSS variables for theming:
+TinyPivot ships **22 themes** — 2 neutral (`light`, `dark`) plus 10 brand themes each with a light and dark variant. Themes are applied via the `theme` prop on `DataGrid`.
+
+```vue
+<!-- Vue -->
+<DataGrid :data="data" theme="slate-dark" />
+```
+
+```tsx
+{/* React */}
+<DataGrid data={data} theme="slate-dark" />
+```
+
+`theme="auto"` resolves to `'light'` or `'dark'` based on the user's system preference.
+
+### Available themes
+
+| Theme | Accent | Vibe |
+|---|---|---|
+| `light` / `dark` / `auto` | indigo / violet | Default — neutral cool grays |
+| `slate` / `slate-dark` | `#4f46e5` indigo | Linear / Stripe — cool neutral |
+| `zinc` / `zinc-dark` | near-mono | Vercel / Anthropic — minimalist |
+| `indigo` / `indigo-dark` | `#6366f1` indigo | Premium SaaS |
+| `violet` / `violet-dark` | `#8b5cf6` purple | Data viz / AI tools |
+| `emerald` / `emerald-dark` | `#10b981` green | Fintech / finance |
+| `sky` / `sky-dark` | `#0ea5e9` light blue | Productivity / airy |
+| `rose` / `rose-dark` | `#f43f5e` warm pink | Friendly / creator |
+| `amber` / `amber-dark` | `#f59e0b` warm orange | Energy / wellness |
+| `solar` / `solar-dark` | `#b58900` mustard | Solarized — warm cream + dark teal |
+| `mono` / `mono-dark` | `#000` / `#fff` | Editorial — pure grayscale |
+
+### Custom themes
+
+Each theme redefines ~30 CSS custom property tokens at the grid root. Override them in your own CSS for a custom theme:
 
 ```css
-.vpg-data-grid {
-  --vpg-header-bg: #1e293b;
-  --vpg-row-hover: #f1f5f9;
-  --vpg-border-color: #e2e8f0;
+.vpg-data-grid.my-brand {
+  --vpg-accent: #ff6b35;
+  --vpg-accent-hover: #e55426;
+  --vpg-surface-bg: #fafaf7;
+  --vpg-surface-panel: #f0eee7;
+  /* …override any other token */
 }
 ```
+
+```vue
+<!-- Vue -->
+<DataGrid :data="data" theme="light" class="my-brand" />
+```
+
+```tsx
+{/* React */}
+<DataGrid data={data} theme="light" className="my-brand" />
+```
+
+**Token reference**:
+
+- **Surfaces**: `--vpg-surface-bg`, `--vpg-surface-panel`, `--vpg-surface-elevated`, `--vpg-surface-hover`, `--vpg-surface-selected`, `--vpg-surface-striped`
+- **Text**: `--vpg-text-primary`, `--vpg-text-secondary`, `--vpg-text-muted`, `--vpg-text-inverse`
+- **Borders**: `--vpg-border-default`, `--vpg-border-strong`, `--vpg-border-subtle`
+- **Accent**: `--vpg-accent`, `--vpg-accent-hover`, `--vpg-accent-soft-bg`, `--vpg-accent-soft-text`, `--vpg-focus-ring`
+- **States**: `--vpg-state-error`, `--vpg-state-warning`, `--vpg-state-success`, `--vpg-state-info`
+- **Pivot dimensions**: `--vpg-dim-row-*`, `--vpg-dim-col-*`, `--vpg-dim-value-*`, `--vpg-dim-calc-*` (each with `-bg`, `-text`, `-border`)
+- **Highlights**: `--vpg-highlight-bg`, `--vpg-highlight-text`, `--vpg-highlight-border`
+- **Scrollbar**: `--vpg-scrollbar-thumb`, `--vpg-scrollbar-track`
+
+Custom theme classes layer on top of any preset, so you can start from `theme="dark"` and tweak just the accent.
 
 ## TypeScript
 
