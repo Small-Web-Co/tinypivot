@@ -595,8 +595,8 @@
 /* Rows */
 .vpg-row { transition: background 0.15s; }
 .vpg-row:nth-child(odd) { background: var(--vpg-surface-bg); }
-.vpg-row:nth-child(even) { background: rgba(248, 250, 252, 0.5); }
-.vpg-row:hover { background: rgba(239, 246, 255, 0.4); }
+.vpg-row:nth-child(even) { background: var(--vpg-surface-striped); }
+.vpg-row:hover { background: var(--vpg-accent-soft-bg); }
 
 /* Cells */
 .vpg-cell {

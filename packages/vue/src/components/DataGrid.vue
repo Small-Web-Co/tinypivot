@@ -2017,11 +2017,11 @@ function handleContainerClick(event: MouseEvent) {
 }
 
 .vpg-row:nth-child(even) {
-  background: rgba(248, 250, 252, 0.5);
+  background: var(--vpg-surface-striped);
 }
 
 .vpg-row:hover {
-  background: rgba(239, 246, 255, 0.4);
+  background: var(--vpg-accent-soft-bg);
 }
 
 .vpg-cell {
@@ -2559,11 +2559,11 @@ function handleContainerClick(event: MouseEvent) {
 }
 
 .vpg-theme-dark .vpg-row:nth-child(even) {
-  background: rgba(30, 41, 59, 0.7);
+  background: var(--vpg-surface-striped);
 }
 
 .vpg-theme-dark .vpg-row:hover {
-  background: rgba(51, 65, 85, 0.5);
+  background: var(--vpg-accent-soft-bg);
 }
 
 .vpg-theme-dark .vpg-cell {
