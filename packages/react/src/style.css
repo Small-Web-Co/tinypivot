@@ -2,6 +2,7 @@
  * TinyPivot - Shared Styles
  * Import this file in your app: import '@smallwebco/tinypivot-react/style.css'
  */
+@import './themes.css';
 
 /* ==========================================================================
    Reset and Base
