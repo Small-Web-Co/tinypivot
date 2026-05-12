@@ -199,12 +199,14 @@ export type {
   PivotValueField,
   QueryRequest,
   QueryResponse,
+  ResolvedTheme,
   RowSelectionChangeEvent,
   SchemaRequest,
   SchemaResponse,
   SelectionBounds,
   SelectionChangeEvent,
   SortEvent,
+  Theme,
 } from './types'
 // Type Guards
 export { isDateRange, isNumericRange } from './types'

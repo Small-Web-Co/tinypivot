@@ -12,6 +12,36 @@ export interface NumericRange {
 export type NumberFormat = 'us' | 'eu' | 'plain'
 export type DateFormat = 'us' | 'eu' | 'iso'
 
+/**
+ * Theme options for DataGrid and related components.
+ *
+ * - `'light'` / `'dark'` / `'auto'`: the original light/dark modes (auto resolves to
+ *   `'light'` or `'dark'` based on system preference).
+ * - Brand themes: each brand has a light variant (e.g. `'slate'`) and a dark
+ *   variant (e.g. `'slate-dark'`). The class `vpg-theme-${theme}` is applied
+ *   on the root and themed via CSS.
+ */
+export type Theme =
+  | 'light'
+  | 'dark'
+  | 'auto'
+  | 'slate' | 'slate-dark'
+  | 'zinc' | 'zinc-dark'
+  | 'indigo' | 'indigo-dark'
+  | 'violet' | 'violet-dark'
+  | 'emerald' | 'emerald-dark'
+  | 'sky' | 'sky-dark'
+  | 'rose' | 'rose-dark'
+  | 'amber' | 'amber-dark'
+  | 'solar' | 'solar-dark'
+  | 'mono' | 'mono-dark'
+
+/**
+ * Resolved theme value passed to child components (no `'auto'`).
+ * Equivalent to `Theme` minus `'auto'`.
+ */
+export type ResolvedTheme = Exclude<Theme, 'auto'>
+
 export interface DateRange {
   min: string | null // ISO date string
   max: string | null // ISO date string
@@ -138,7 +168,7 @@ export interface DataGridProps {
   enableRowSelection?: boolean
   enableColumnResize?: boolean
   enableClipboard?: boolean
-  theme?: 'light' | 'dark' | 'auto'
+  theme?: Theme
   /** Number display format: 'us' (1,234.56), 'eu' (1.234,56), 'plain' (1234.56) */
   numberFormat?: NumberFormat
   /** Date display format: 'us' (MM/DD/YYYY), 'eu' (DD/MM/YYYY), 'iso' (YYYY-MM-DD) */

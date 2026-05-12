@@ -11,6 +11,7 @@ import type {
   AIMessage,
   AIQueryExecutedEvent,
   AITableSchema,
+  ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
 import { stripSQLFromContent } from '@smallwebco/tinypivot-core'
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
@@ -18,7 +19,7 @@ import { useAIAnalyst } from '../hooks/useAIAnalyst'
 
 interface AIAnalystProps {
   config: AIAnalystConfig
-  theme?: 'light' | 'dark'
+  theme?: ResolvedTheme
   onDataLoaded?: (payload: AIDataLoadedEvent) => void
   onConversationUpdate?: (payload: AIConversationUpdateEvent) => void
   onQueryExecuted?: (payload: AIQueryExecutedEvent) => void
@@ -61,6 +62,8 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
     onQueryExecuted,
     onError,
   })
+
+  const isDarkTheme = theme === 'dark' || (typeof theme === 'string' && theme.endsWith('-dark'))
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -263,7 +266,7 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
   // Render data source picker (full screen)
   if (!selectedDataSource) {
     return (
-      <div className={`vpg-ai-analyst ${theme === 'dark' ? 'vpg-theme-dark' : ''}`}>
+      <div className={`vpg-ai-analyst ${isDarkTheme ? 'vpg-theme-dark' : ''}`}>
         <div className="vpg-ai-picker-fullscreen">
           <div className="vpg-ai-picker-content">
             <div className="vpg-ai-picker-header">
@@ -349,7 +352,7 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
 
   // Render split layout
   return (
-    <div className={`vpg-ai-analyst ${theme === 'dark' ? 'vpg-theme-dark' : ''}`}>
+    <div className={`vpg-ai-analyst ${isDarkTheme ? 'vpg-theme-dark' : ''}`}>
       <div className="vpg-ai-split-layout">
         {/* Left Panel: Chat */}
         <div className="vpg-ai-chat-panel">

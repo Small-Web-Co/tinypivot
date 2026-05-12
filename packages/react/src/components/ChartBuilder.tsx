@@ -3,6 +3,7 @@ import type {
   ChartConfig,
   ChartFieldInfo,
   ChartType,
+  ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot React - Chart Builder Component
@@ -29,7 +30,7 @@ const Chart = React.lazy(() => import('react-apexcharts'))
 
 interface ChartBuilderProps {
   data: Record<string, unknown>[]
-  theme?: 'light' | 'dark'
+  theme?: ResolvedTheme
   fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
   onConfigChange?: (config: ChartConfig) => void
 }
@@ -328,7 +329,7 @@ export function ChartBuilder({
 
   // Chart options
   const chartOptions = useMemo<ApexOptions>(() => {
-    const isDark = theme === 'dark'
+    const isDark = theme === 'dark' || (typeof theme === 'string' && theme.endsWith('-dark'))
     const config = chartConfig
     const options = config.options || {}
 

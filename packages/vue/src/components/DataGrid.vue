@@ -9,6 +9,7 @@ import type {
   ChartConfig,
   DateFormat,
   NumberFormat,
+  Theme,
 } from '@smallwebco/tinypivot-core'
 import { formatDate as coreFormatDate, formatNumber as coreFormatNumber, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 /**
@@ -45,7 +46,7 @@ const props = withDefaults(defineProps<{
   pageSize?: number
   enableColumnResize?: boolean
   enableClipboard?: boolean
-  theme?: 'light' | 'dark' | 'auto'
+  theme?: Theme
   stripedRows?: boolean
   exportFilename?: string
   enableVerticalResize?: boolean

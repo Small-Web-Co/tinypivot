@@ -12,6 +12,7 @@ import type {
   DateFormat,
   DateRange,
   NumberFormat,
+  Theme,
 } from '@smallwebco/tinypivot-core'
 import { formatDate as coreFormatDate, formatNumber as coreFormatNumber } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -47,7 +48,7 @@ interface DataGridProps {
   pageSize?: number
   enableColumnResize?: boolean
   enableClipboard?: boolean
-  theme?: 'light' | 'dark' | 'auto'
+  theme?: Theme
   stripedRows?: boolean
   exportFilename?: string
   enableVerticalResize?: boolean

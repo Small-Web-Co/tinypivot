@@ -12,6 +12,7 @@ import type {
   AIMessage,
   AIQueryExecutedEvent,
   AITableSchema,
+  ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
 import { stripSQLFromContent } from '@smallwebco/tinypivot-core'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -19,7 +20,7 @@ import { useAIAnalyst } from '../composables/useAIAnalyst'
 
 const props = defineProps<{
   config: AIAnalystConfig
-  theme?: 'light' | 'dark'
+  theme?: ResolvedTheme
 }>()
 
 const emit = defineEmits<{
@@ -244,10 +245,15 @@ function autoResizeTextarea(event: Event) {
 function hasQueryResult(message: AIMessage): boolean {
   return !!message.metadata?.data && message.metadata.data.length > 0
 }
+
+const isDarkTheme = computed(() => {
+  const t = props.theme
+  return t === 'dark' || (typeof t === 'string' && t.endsWith('-dark'))
+})
 </script>
 
 <template>
-  <div class="vpg-ai-analyst" :class="{ 'vpg-theme-dark': theme === 'dark' }">
+  <div class="vpg-ai-analyst" :class="{ 'vpg-theme-dark': isDarkTheme }">
     <!-- Data Source Picker (full width when no data source selected) -->
     <div v-if="!selectedDataSource" class="vpg-ai-picker-fullscreen">
       <div class="vpg-ai-picker-content">

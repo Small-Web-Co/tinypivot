@@ -4,6 +4,7 @@ import type {
   ChartConfig,
   ChartFieldInfo,
   ChartType,
+  ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Chart Builder Component
@@ -27,7 +28,7 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   data: Record<string, unknown>[]
-  theme?: 'light' | 'dark'
+  theme?: ResolvedTheme
   fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
 }>()
 
@@ -247,7 +248,7 @@ function updateAggregation(zone: string, aggregation: ChartAggregation) {
 
 // Chart rendering
 const chartOptions = computed<ApexOptions>(() => {
-  const isDark = props.theme === 'dark'
+  const isDark = props.theme === 'dark' || (typeof props.theme === 'string' && props.theme.endsWith('-dark'))
   const config = chartConfig.value
   const options = config.options || {}
 
