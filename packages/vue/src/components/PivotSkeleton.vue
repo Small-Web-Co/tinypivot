@@ -28,6 +28,7 @@ const props = defineProps<{
   activeFilters?: ActiveFilter[] | null
   totalRowCount?: number
   filteredRowCount?: number
+  theme?: string
 }>()
 
 const emit = defineEmits<{
@@ -496,6 +497,7 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
     class="vpg-pivot-skeleton"
     :class="[
       `vpg-font-${currentFontSize}`,
+      theme ? `vpg-theme-${theme}` : '',
       { 'vpg-is-dragging': draggingField },
     ]"
   >

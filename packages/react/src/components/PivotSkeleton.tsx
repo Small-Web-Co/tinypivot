@@ -36,6 +36,7 @@ interface PivotSkeletonProps {
   onUpdateAggregation: (field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction) => void
   onReorderRowFields: (fields: string[]) => void
   onReorderColumnFields: (fields: string[]) => void
+  theme?: string
 }
 
 export function PivotSkeleton({
@@ -58,6 +59,7 @@ export function PivotSkeleton({
   onRemoveValueField,
   onReorderRowFields,
   onReorderColumnFields,
+  theme,
 }: PivotSkeletonProps) {
   const { showWatermark, canUsePivot, isDemo } = useLicense()
 
@@ -521,7 +523,7 @@ export function PivotSkeleton({
 
   return (
     <div
-      className={`vpg-pivot-skeleton vpg-font-${currentFontSize} ${draggingField ? 'vpg-is-dragging' : ''}`}
+      className={`vpg-pivot-skeleton vpg-font-${currentFontSize} ${theme ? `vpg-theme-${theme}` : ''} ${draggingField ? 'vpg-is-dragging' : ''}`}
     >
       {/* Copy Toast */}
       {showCopyToast && (

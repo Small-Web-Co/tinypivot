@@ -45,6 +45,7 @@ interface PivotConfigProps {
   onAddCalculatedField?: (field: CalculatedField) => void
   onRemoveCalculatedField?: (id: string) => void
   onUpdateCalculatedField?: (field: CalculatedField) => void
+  theme?: string
 }
 
 function getFieldIcon(type: FieldStats['type'], isCalculated?: boolean): string {
@@ -84,6 +85,7 @@ export function PivotConfig({
   onAddCalculatedField,
   onRemoveCalculatedField,
   onUpdateCalculatedField,
+  theme,
 }: PivotConfigProps) {
   const [fieldSearch, setFieldSearch] = useState('')
   const [showCalcModal, setShowCalcModal] = useState(false)
@@ -253,7 +255,7 @@ export function PivotConfig({
   }, [])
 
   return (
-    <div className="vpg-pivot-config">
+    <div className={`vpg-pivot-config ${theme ? `vpg-theme-${theme}` : ''}`}>
       {/* Header */}
       <div className="vpg-config-header">
         <h3 className="vpg-config-title">

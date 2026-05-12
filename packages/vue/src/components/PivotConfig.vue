@@ -31,6 +31,7 @@ const props = defineProps<{
   showRowTotals: boolean
   showColumnTotals: boolean
   calculatedFields?: CalculatedField[]
+  theme?: string
 }>()
 
 const emit = defineEmits<{
@@ -231,7 +232,10 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 </script>
 
 <template>
-  <div class="vpg-pivot-config">
+  <div
+    class="vpg-pivot-config"
+    :class="theme ? `vpg-theme-${theme}` : ''"
+  >
     <!-- Header -->
     <div class="vpg-config-header">
       <h3 class="vpg-config-title">

@@ -1408,6 +1408,7 @@ export function DataGrid({
                 onAddCalculatedField={addCalculatedField}
                 onRemoveCalculatedField={removeCalculatedField}
                 onUpdateCalculatedField={addCalculatedField}
+                theme={currentTheme}
               />
             </div>
           )}
@@ -1434,6 +1435,7 @@ export function DataGrid({
               onUpdateAggregation={updateValueFieldAggregation}
               onReorderRowFields={setRowFields}
               onReorderColumnFields={setColumnFields}
+              theme={currentTheme}
             />
           </div>
         </div>
