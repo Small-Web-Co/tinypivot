@@ -1419,6 +1419,7 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
   overflow: auto;
   max-height: 100%;
   isolation: isolate;
+  background: var(--vpg-surface-bg);
 }
 
 .vpg-pivot-table {
@@ -1519,11 +1520,11 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
 }
 
 .vpg-data-row:hover {
-  background: #ecfdf5;
+  background: var(--vpg-accent-soft-bg);
 }
 
 .vpg-data-row:nth-child(even) {
-  background: var(--vpg-surface-panel);
+  background: var(--vpg-surface-striped);
 }
 
 .vpg-row-header-cell {
@@ -1542,7 +1543,7 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
 }
 
 .vpg-data-row:nth-child(even) .vpg-row-header-cell {
-  background: var(--vpg-surface-panel);
+  background: var(--vpg-surface-striped);
 }
 
 /* Row header cells now render as separate columns */
@@ -1876,30 +1877,9 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
   background: var(--vpg-surface-panel) !important;
 }
 
-/* Row-header-cell background flips to surface-panel in dark (light=surface-bg). */
-.vpg-theme-dark .vpg-pivot-skeleton .vpg-row-header-cell {
-  background: var(--vpg-surface-panel);
-}
-
-/* Data cell border swaps to default in dark (light uses subtle/panel separately). */
+/* Data cell border in dark uses border-default for visibility. */
 .vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell {
-  background: var(--vpg-surface-panel);
   border-color: var(--vpg-border-default);
-}
-
-.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell:hover {
-  box-shadow: inset 0 0 0 2px rgba(52, 211, 153, 0.5);
-}
-
-.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-cell.selected {
-  background: rgba(16, 185, 129, 0.2);
-  box-shadow: inset 0 0 0 2px #34d399;
-}
-
-/* Even-row striping flips to surface-bg in dark (light=panel; token-mismatch). */
-.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:nth-child(even) .vpg-row-header-cell,
-.vpg-theme-dark .vpg-pivot-skeleton .vpg-data-row:nth-child(even) .vpg-data-cell {
-  background: var(--vpg-surface-bg);
 }
 
 /* Row hover is decorative emerald in light, chrome surface-hover in dark (role change). */
