@@ -1358,7 +1358,7 @@
 
 .vpg-field-item:hover { border-color: var(--vpg-border-strong); background: var(--vpg-surface-panel); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
 .vpg-field-item:active { cursor: grabbing; transform: scale(0.98); }
-.vpg-field-item.vpg-is-numeric { border-color: #bfdbfe; background: rgba(239, 246, 255, 0.3); }
+.vpg-field-item.vpg-is-numeric { border-color: var(--vpg-dim-value-border); background: var(--vpg-dim-value-bg); }
 .vpg-field-item.vpg-is-calculated { border-color: var(--vpg-dim-calc-border); background: var(--vpg-dim-calc-bg); }
 
 .vpg-calc-type { background: var(--vpg-dim-calc-border) !important; color: var(--vpg-dim-calc-text) !important; }
@@ -1398,7 +1398,7 @@
   flex-shrink: 0;
 }
 
-.vpg-field-item.vpg-is-numeric .vpg-field-type-icon { background: #dbeafe; color: #2563eb; }
+.vpg-field-item.vpg-is-numeric .vpg-field-type-icon { background: var(--vpg-dim-value-border); color: var(--vpg-dim-value-text); }
 
 .vpg-field-name {
   flex: 1;

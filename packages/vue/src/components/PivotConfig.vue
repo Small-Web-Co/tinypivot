@@ -772,8 +772,8 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-field-item.vpg-is-numeric {
-  border-color: #bfdbfe;
-  background: rgba(239, 246, 255, 0.3);
+  border-color: var(--vpg-dim-value-border);
+  background: var(--vpg-dim-value-bg);
 }
 
 .vpg-field-item.vpg-is-calculated {
@@ -829,8 +829,8 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 }
 
 .vpg-field-item.vpg-is-numeric .vpg-field-type-icon {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--vpg-dim-value-border);
+  color: var(--vpg-dim-value-text);
 }
 
 .vpg-field-name {
@@ -977,16 +977,6 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 .vpg-theme-dark .vpg-pivot-config .vpg-field-item {
   background: var(--vpg-surface-bg);
   color: #cbd5e1;
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-field-item.vpg-is-numeric {
-  border-color: rgba(59, 130, 246, 0.3);
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.vpg-theme-dark .vpg-pivot-config .vpg-field-item.vpg-is-numeric .vpg-field-type-icon {
-  background: rgba(59, 130, 246, 0.3);
-  color: #60a5fa;
 }
 
 .vpg-theme-dark .vpg-field-edit:hover {
