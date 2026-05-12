@@ -45,6 +45,66 @@ export default function App() {
 }
 ```
 
+## Theming
+
+TinyPivot ships 22 themes — 2 neutral (`light`, `dark`) plus 10 brand themes each with a light and dark variant. Themes are applied via the `theme` prop on `DataGrid`.
+
+### Quick start
+
+```tsx
+<DataGrid data={data} theme="slate-dark" />
+```
+
+`theme="auto"` resolves to `'light'` or `'dark'` based on the user's system preference (`prefers-color-scheme`).
+
+### Available themes
+
+| Theme | Accent | Vibe |
+|---|---|---|
+| `light` / `dark` / `auto` | indigo / violet | TinyPivot defaults — neutral cool grays |
+| `slate` / `slate-dark` | `#4f46e5` indigo | Linear / Stripe — cool neutral |
+| `zinc` / `zinc-dark` | near-mono | Vercel / Anthropic — minimalist |
+| `indigo` / `indigo-dark` | `#6366f1` vivid indigo | Premium SaaS |
+| `violet` / `violet-dark` | `#8b5cf6` purple | Data viz / AI tools |
+| `emerald` / `emerald-dark` | `#10b981` green | Fintech / finance |
+| `sky` / `sky-dark` | `#0ea5e9` light blue | Productivity / airy |
+| `rose` / `rose-dark` | `#f43f5e` warm pink | Friendly / creator |
+| `amber` / `amber-dark` | `#f59e0b` warm orange | Energy / wellness |
+| `solar` / `solar-dark` | `#b58900` mustard | Solarized-inspired warm cream + dark teal |
+| `mono` / `mono-dark` | `#000` / `#fff` | Editorial — pure grayscale, high contrast |
+
+### Custom themes
+
+Brand themes redefine ~25 CSS custom property tokens at the grid root. You can override these in your own CSS to create a custom theme:
+
+```tsx
+import './my-brand.css'
+
+<DataGrid data={data} theme="light" className="my-brand" />
+```
+
+```css
+/* my-brand.css */
+.vpg-data-grid.my-brand {
+  --vpg-accent: #ff6b35;
+  --vpg-accent-hover: #e55426;
+  --vpg-surface-bg: #fafaf7;
+  --vpg-surface-panel: #f0eee7;
+  /* …override any of the tokens below */
+}
+```
+
+**Token reference** — these are the variables you can override:
+
+- **Surfaces**: `--vpg-surface-bg`, `--vpg-surface-panel`, `--vpg-surface-elevated`, `--vpg-surface-hover`, `--vpg-surface-selected`, `--vpg-surface-striped`
+- **Text**: `--vpg-text-primary`, `--vpg-text-secondary`, `--vpg-text-muted`, `--vpg-text-inverse`
+- **Borders**: `--vpg-border-default`, `--vpg-border-strong`, `--vpg-border-subtle`
+- **Accent**: `--vpg-accent`, `--vpg-accent-hover`, `--vpg-accent-soft-bg`, `--vpg-accent-soft-text`, `--vpg-focus-ring`
+- **States**: `--vpg-state-error`, `--vpg-state-warning`, `--vpg-state-success`, `--vpg-state-info`
+- **Scrollbar**: `--vpg-scrollbar-thumb`, `--vpg-scrollbar-track`
+
+Custom theme classes layer on top of any preset, so you can start from `theme="dark"` and tweak just the accent, for example.
+
 ## Features
 
 | Feature | Free | Pro |
@@ -79,7 +139,7 @@ export default function App() {
 | `pageSize` | `number` | `50` | Rows per page |
 | `enableColumnResize` | `boolean` | `true` | Drag to resize columns |
 | `enableClipboard` | `boolean` | `true` | Ctrl+C to copy cells |
-| `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme |
+| `theme` | `string` | `'light'` | Color theme — see [Theming](#theming) for the full list (22 presets) |
 | `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display format: US (1,234.56), EU (1.234,56), plain (1234.56) |
 | `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display format: US (MM/DD/YYYY), EU (DD/MM/YYYY), ISO (YYYY-MM-DD) |
 | `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override auto-detected chart field roles per column (`'dimension'` \| `'measure'` \| `'temporal'`) |
