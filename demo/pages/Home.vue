@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AIAnalystConfig, AIDataSource, AITableSchema, QueryExecutorResult } from '@smallwebco/tinypivot-core'
+import { track } from '@vercel/analytics'
 import { DataGrid } from 'tinypivot'
 import { computed, ref } from 'vue'
 import { DATASETS, getDataset } from '../datasets'
@@ -225,6 +226,7 @@ async function buyNow() {
     return
 
   isCheckingOut.value = true
+  track('checkout_started', { plan: selectedPlan.value })
   try {
     console.log('Starting checkout for plan:', selectedPlan.value)
 
@@ -248,6 +250,7 @@ async function buyNow() {
     console.log('API response:', data)
 
     if (data.url) {
+      track('checkout_redirected', { plan: selectedPlan.value })
       window.location.href = data.url
     }
     else if (data.error) {
@@ -297,6 +300,11 @@ const _activeSection = ref('hero')
 // Copy to clipboard
 function copyInstallCommand() {
   navigator.clipboard.writeText(`pnpm add ${packageName.value}`)
+  track('install_command_copied', { framework: selectedFramework.value })
+}
+
+function trackFreeStart() {
+  track('free_github_started', { framework: selectedFramework.value })
 }
 </script>
 
@@ -966,7 +974,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
               {{ f }}
             </li>
           </ul>
-          <a href="https://github.com/Small-Web-Co/tinypivot" class="btn btn-outline">
+          <a href="https://github.com/Small-Web-Co/tinypivot" class="btn btn-outline" @click="trackFreeStart">
             Get Started
           </a>
         </div>
@@ -1029,42 +1037,42 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
         <p>See what teams are saying about TinyPivot.</p>
       </div>
 
-      <div class="”testimonial-grid”">
-        <div class="”testimonial-card”">
-          <div class="”testimonial-mark”">
+      <div class="testimonial-grid">
+        <div class="testimonial-card">
+          <div class="testimonial-mark">
             “
           </div>
-          <blockquote class="”testimonial-quote”">
+          <blockquote class="testimonial-quote">
             TinyPivot has been a great addition to our analytics platform, giving our customers intuitive, interactive data grid and pivot table capabilities without the overhead of building our own solution. Small Web Co has been incredibly responsive — actively listening to our use cases and shipping improvements quickly. It’s a high-quality, well-maintained library that delivers real value at a fraction of the cost of alternatives.
           </blockquote>
-          <div class="”testimonial-attribution”">
-            <div class="”testimonial-author”">
+          <div class="testimonial-attribution">
+            <div class="testimonial-author">
               Kevin Tetz
             </div>
-            <div class="”testimonial-role”">
+            <div class="testimonial-role">
               CIO
             </div>
-            <a href="”https://www.vesselscale.com”" target="”_blank”" rel="”noopener”" class="”testimonial-link”">
+            <a href="https://www.vesselscale.com" target="_blank" rel="noopener" class="testimonial-link">
               vesselscale.com
             </a>
           </div>
         </div>
 
-        <div class="”testimonial-card”">
-          <div class="”testimonial-mark”">
+        <div class="testimonial-card">
+          <div class="testimonial-mark">
             “
           </div>
-          <blockquote class="”testimonial-quote”">
+          <blockquote class="testimonial-quote">
             Thank you so much! We found Brice to be a highly skilled, meticulous, and helpful developer. We had the opportunity to use TinyPivot, which enabled our colleagues to generate and view analytics on orders, website traffic, and performance independently, without placing a strain on the company’s IT team. We even made modifications to the plugin to suit our specific needs.
           </blockquote>
-          <div class="”testimonial-attribution”">
-            <div class="”testimonial-author”">
+          <div class="testimonial-attribution">
+            <div class="testimonial-author">
               Atlantis Headwear
             </div>
-            <div class="”testimonial-role”">
+            <div class="testimonial-role">
               CS
             </div>
-            <a href="”https://www.atlantisheadwear.com”" target="”_blank”" rel="”noopener”" class="”testimonial-link”">
+            <a href="https://www.atlantisheadwear.com" target="_blank" rel="noopener" class="testimonial-link">
               atlantisheadwear.com
             </a>
           </div>
@@ -1102,6 +1110,15 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
           </div>
           <div class="footer-col">
             <h4>Resources</h4>
+            <router-link to="/ag-grid-alternatives">
+              AG Grid Alternatives
+            </router-link>
+            <router-link to="/best-react-pivot-table-libraries">
+              React Pivot Guide
+            </router-link>
+            <router-link to="/best-vue-pivot-table-components">
+              Vue Pivot Guide
+            </router-link>
             <a href="https://github.com/Small-Web-Co/tinypivot#readme" target="_blank">Documentation</a>
             <a href="https://bvallieres.com/product/development/2026/03/23/tinypivot-free-pivot-tables-lifetime-license.html" target="_blank">Latest Update</a>
             <a href="https://github.com/Small-Web-Co/tinypivot/releases" target="_blank">Changelog</a>
@@ -1114,7 +1131,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2024 TinyPivot. All rights reserved.</p>
+        <p>&copy; 2026 TinyPivot. All rights reserved.</p>
       </div>
     </footer>
   </div>

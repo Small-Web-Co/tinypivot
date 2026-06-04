@@ -8,7 +8,7 @@ onMounted(() => {
 
   const metaDescription = document.querySelector('meta[name="description"]')
   if (metaDescription) {
-    metaDescription.setAttribute('content', 'Compare TinyPivot and AG Grid for React and Vue. TinyPivot is 10x smaller (37KB vs 500KB+), 10x cheaper ($49 vs $999+), with pivot tables and data grid features included.')
+    metaDescription.setAttribute('content', 'Compare TinyPivot and AG Grid for React and Vue. TinyPivot is a focused data grid with free pivot tables and lifetime Pro licensing.')
   }
 })
 </script>
@@ -60,35 +60,35 @@ onMounted(() => {
       <div class="stats-grid">
         <div class="stat-card highlight">
           <div class="stat-value">
-            10x
+            Focused
           </div>
           <div class="stat-label">
-            Smaller Bundle
+            Product Scope
           </div>
           <div class="stat-detail">
-            37KB vs 500KB+
+            Grid, pivot tables, and charts
           </div>
         </div>
         <div class="stat-card highlight">
           <div class="stat-value">
-            20x
+            $49
           </div>
           <div class="stat-label">
-            Lower Cost
+            Starting Pro Price
           </div>
           <div class="stat-detail">
-            $49 vs $999+
+            One-time TinyPivot license
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-value">
-            0
+            2
           </div>
           <div class="stat-label">
-            Dependencies
+            Framework Packages
           </div>
           <div class="stat-detail">
-            Just React or Vue
+            Dedicated React and Vue builds
           </div>
         </div>
         <div class="stat-card">
@@ -126,18 +126,18 @@ onMounted(() => {
               </td>
             </tr>
             <tr>
-              <td>Bundle Size (gzipped)</td>
+              <td>Product Scope</td>
               <td class="highlight-col">
-                <span class="check">37KB</span>
+                <span class="check">Focused analytics grid</span>
               </td>
-              <td>500KB+</td>
+              <td>Broad enterprise grid suite</td>
             </tr>
             <tr>
-              <td>Zero Dependencies</td>
+              <td>Framework Packages</td>
               <td class="highlight-col">
-                <span class="check">Yes</span>
+                <span class="check">React and Vue 3</span>
               </td>
-              <td>No</td>
+              <td>Multiple frameworks</td>
             </tr>
             <tr>
               <td>Large Dataset Support</td>
@@ -273,14 +273,14 @@ onMounted(() => {
               <td class="highlight-col">
                 <span class="check">$49 one-time</span>
               </td>
-              <td>$999+/year</td>
+              <td>Commercial license available</td>
             </tr>
             <tr>
               <td>Team License</td>
               <td class="highlight-col">
                 <span class="check">$399 one-time</span>
               </td>
-              <td>$2,999+/year</td>
+              <td>Commercial license available</td>
             </tr>
             <tr>
               <td>License Type</td>
@@ -312,7 +312,7 @@ onMounted(() => {
         <div class="choice-card aggrid">
           <h3>Choose AG Grid when...</h3>
           <ul>
-            <li>You need advanced features like Excel export, charts</li>
+            <li>You need advanced enterprise workflows such as Excel export</li>
             <li>You require row grouping with server-side processing</li>
             <li>You need Angular or vanilla JS support</li>
             <li>Your organization already has AG Grid licenses</li>
@@ -335,18 +335,12 @@ onMounted(() => {
           <div class="code-header">
             <span>React</span>
           </div>
-          <pre><code>import { TinyPivot } from '@smallwebco/tinypivot-react'
+          <pre><code>import { DataGrid } from '@smallwebco/tinypivot-react'
 import '@smallwebco/tinypivot-react/style.css'
 
 function App() {
   const data = [/* your data */]
-  const columns = [
-    { key: 'region', header: 'Region' },
-    { key: 'product', header: 'Product' },
-    { key: 'sales', header: 'Sales', type: 'number' },
-  ]
-
-  return &lt;TinyPivot data={data} columns={columns} showPivot /&gt;
+  return &lt;DataGrid data={data} showPivot /&gt;
 }</code></pre>
         </div>
 
@@ -359,15 +353,10 @@ import { DataGrid } from '@smallwebco/tinypivot-vue'
 import '@smallwebco/tinypivot-vue/style.css'
 
 const data = [/* your data */]
-const columns = [
-  { key: 'region', header: 'Region' },
-  { key: 'product', header: 'Product' },
-  { key: 'sales', header: 'Sales', type: 'number' },
-]
 &lt;/script&gt;
 
 &lt;template&gt;
-  &lt;DataGrid :data="data" :columns="columns" show-pivot /&gt;
+  &lt;DataGrid :data="data" show-pivot /&gt;
 &lt;/template&gt;</code></pre>
         </div>
       </div>
@@ -377,7 +366,7 @@ const columns = [
     <section class="cta-section">
       <div class="cta-content">
         <h2>Ready to try TinyPivot?</h2>
-        <p>Start with the free tier or get full pivot table features for just $49</p>
+        <p>Start with free pivot tables or unlock advanced analytics with a lifetime Pro license</p>
         <div class="cta-buttons">
           <RouterLink to="/#demo" class="btn btn-primary">
             Try Live Demo
@@ -412,7 +401,7 @@ const columns = [
           </RouterLink>
         </div>
         <p class="copyright">
-          &copy; 2024 Small Web, LLC. All rights reserved.
+          &copy; 2026 Small Web, LLC. All rights reserved.
         </p>
       </div>
     </footer>

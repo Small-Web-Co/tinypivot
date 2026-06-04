@@ -1,21 +1,21 @@
 # TinyPivot
 
-A lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3 and React. **Under 40KB gzipped** — 10x smaller than AG Grid.
+A lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3 and React. Focused, batteries-included, and easy to adopt.
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)**
 
 ⭐ **If you find TinyPivot useful, please consider giving it a star!** It helps others discover the project.
 
 [![Star on GitHub](https://img.shields.io/github/stars/Small-Web-Co/tinypivot?style=social)](https://github.com/Small-Web-Co/tinypivot)
-[![React Bundle](https://img.shields.io/badge/React-37KB%20gzip-brightgreen)](https://bundlephobia.com/package/@smallwebco/tinypivot-react)
-[![Vue Bundle](https://img.shields.io/badge/Vue-47KB%20gzip-brightgreen)](https://bundlephobia.com/package/@smallwebco/tinypivot-vue)
+[![React Package](https://img.shields.io/badge/npm-React-61dafb)](https://www.npmjs.com/package/@smallwebco/tinypivot-react)
+[![Vue Package](https://img.shields.io/badge/npm-Vue%203-42b883)](https://www.npmjs.com/package/@smallwebco/tinypivot-vue)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
 ![TinyPivot Demo](https://bvallieres.com/images/tinypivot_demo.gif)
 
 ## Why TinyPivot?
 
-- **Lightweight**: Under 40KB gzipped vs 500KB+ for AG Grid
+- **Focused**: A batteries-included analytics grid without adopting a broad enterprise suite
 - **Free Pivot Tables**: Sum aggregations, totals, and calculated fields included out of the box
 - **Pro Upgrade**: Advanced aggregations, charts, AI Data Analyst, and no watermark
 - **AI Data Analyst** (Pro): Natural language queries with BYOK — use your own OpenAI/Anthropic key
