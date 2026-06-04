@@ -1122,7 +1122,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
             <a href="https://github.com/Small-Web-Co/tinypivot#readme" target="_blank">Documentation</a>
             <a href="https://bvallieres.com/product/development/2026/03/23/tinypivot-free-pivot-tables-lifetime-license.html" target="_blank">Latest Update</a>
             <a href="https://github.com/Small-Web-Co/tinypivot/releases" target="_blank">Changelog</a>
-            <a href="https://github.com/Small-Web-Co/tinypivot/blob/main/LICENSE" target="_blank">License</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot/blob/master/LICENSE.md" target="_blank">License</a>
           </div>
           <div class="footer-col">
             <h4>Connect</h4>
