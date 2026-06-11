@@ -57,6 +57,7 @@ export type {
   DataGridProps,
   ExportEvent,
   ExportOptions,
+  FieldRoleOverrides,
   FieldStats,
   // Event Types
   FilterEvent,
