@@ -36,6 +36,8 @@ export {
 export type {
   // Pivot Types
   AggregationFunction,
+  // AI Data Analyst Types
+  AIAnalystConfig,
   CellClickEvent,
 
   // Grid Types
