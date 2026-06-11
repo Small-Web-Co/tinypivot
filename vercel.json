@@ -4,16 +4,6 @@
   "outputDirectory": "dist-demo",
   "installCommand": "pnpm install",
   "devCommand": "vite --config vite.demo.config.ts --port $PORT",
-  "rewrites": [
-    { "source": "/vs-ag-grid", "destination": "/index.html" },
-    { "source": "/ag-grid-alternatives", "destination": "/index.html" },
-    { "source": "/best-react-pivot-table-libraries", "destination": "/index.html" },
-    { "source": "/best-vue-pivot-table-components", "destination": "/index.html" },
-    { "source": "/react-data-grid-with-pivot-table", "destination": "/index.html" },
-    { "source": "/vue-data-grid-with-pivot-table", "destination": "/index.html" },
-    { "source": "/embedded-ai-data-analyst-component", "destination": "/index.html" },
-    { "source": "/vs-tanstack-table", "destination": "/index.html" }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
