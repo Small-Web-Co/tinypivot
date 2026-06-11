@@ -1,0 +1,540 @@
+# TinyPivot — Developer Reference
+
+TinyPivot is a lightweight, batteries-included analytics grid for Vue 3 and React. It ships as two separate framework packages that share a common core.
+
+**When to use TinyPivot:**
+- You need an Excel-like data grid with built-in pivot table support, not just a raw table
+- You want pivot tables, aggregations, CSV export, and clipboard without assembling a headless library
+- You need charts or an AI-powered natural-language data analyst in the same component
+- You want a lifetime commercial license without per-seat or annual fees
+- Bundle size matters (under 50 KB gzipped vs 500 KB+ for AG Grid)
+
+**When NOT to use TinyPivot:**
+- You need full spreadsheet editing (cell-level write-back, formulas in cells)
+- You need virtual scrolling for millions of rows
+- You need tree/master-detail row grouping (not yet supported)
+
+---
+
+## Installation
+
+### Vue 3
+
+```bash
+pnpm add @smallwebco/tinypivot-vue
+# or
+npm install @smallwebco/tinypivot-vue
+```
+
+### React
+
+```bash
+pnpm add @smallwebco/tinypivot-react
+# or
+npm install @smallwebco/tinypivot-react
+```
+
+---
+
+## Quick Start
+
+### Vue 3
+
+```vue
+<script setup lang="ts">
+import { DataGrid } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
+
+const data = [
+  { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
+  { id: 2, region: 'North', product: 'Widget B', sales: 8300, units: 95 },
+  { id: 3, region: 'South', product: 'Widget A', sales: 15200, units: 180 },
+  { id: 4, region: 'South', product: 'Widget B', sales: 9800, units: 110 },
+]
+</script>
+
+<template>
+  <DataGrid
+    :data="data"
+    :enable-export="true"
+    :enable-search="true"
+    :enable-pagination="true"
+    :page-size="100"
+    :enable-column-resize="true"
+    :enable-clipboard="true"
+    theme="light"
+    export-filename="my-data.csv"
+  />
+</template>
+```
+
+### React
+
+```tsx
+import { DataGrid } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+
+const data = [
+  { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
+  { id: 2, region: 'North', product: 'Widget B', sales: 8300, units: 95 },
+  { id: 3, region: 'South', product: 'Widget A', sales: 15200, units: 180 },
+  { id: 4, region: 'South', product: 'Widget B', sales: 9800, units: 110 },
+]
+
+export default function App() {
+  return (
+    <DataGrid
+      data={data}
+      enableExport={true}
+      enableSearch={true}
+      enablePagination={true}
+      pageSize={100}
+      enableColumnResize={true}
+      enableClipboard={true}
+      theme="light"
+      exportFilename="my-data.csv"
+    />
+  )
+}
+```
+
+### Activate Pro License (both frameworks)
+
+Call once at app startup, before rendering:
+
+```typescript
+// Vue
+import { setLicenseKey } from '@smallwebco/tinypivot-vue'
+setLicenseKey('YOUR_LICENSE_KEY')
+
+// React
+import { setLicenseKey } from '@smallwebco/tinypivot-react'
+setLicenseKey('YOUR_LICENSE_KEY')
+```
+
+---
+
+## DataGrid Props
+
+All props are identical between Vue and React except for naming convention (Vue: kebab-case in template; React: camelCase).
+
+| Prop (Vue / React) | Type | Default | Description |
+|---|---|---|---|
+| `data` | `Record<string, unknown>[]` | **required** | Array of flat row objects |
+| `loading` | `boolean` | `false` | Show loading spinner |
+| `fontSize` | `'xs' \| 'sm' \| 'base'` | `'xs'` | Font size preset |
+| `show-pivot` / `showPivot` | `boolean` | `true` | Show pivot toggle button |
+| `enable-export` / `enableExport` | `boolean` | `true` | Show CSV export button |
+| `enable-search` / `enableSearch` | `boolean` | `true` | Show global search input |
+| `enable-pagination` / `enablePagination` | `boolean` | `false` | Enable pagination |
+| `page-size` / `pageSize` | `number` | `50` | Rows per page |
+| `enable-column-resize` / `enableColumnResize` | `boolean` | `true` | Drag-to-resize columns |
+| `enable-clipboard` / `enableClipboard` | `boolean` | `true` | Ctrl+C to copy selected cells |
+| `theme` | `string` | `'light'` | Color theme — 22 built-in presets (see Theming) |
+| `number-format` / `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display: US (1,234.56), EU (1.234,56), plain |
+| `date-format` / `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display: US (MM/DD/YYYY), EU (DD/MM/YYYY), ISO |
+| `field-role-overrides` / `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override chart field role per column (`'dimension'` \| `'measure'` \| `'temporal'`) |
+| `striped-rows` / `stripedRows` | `boolean` | `true` | Alternating row background color |
+| `export-filename` / `exportFilename` | `string` | `'data-export.csv'` | Filename for CSV download |
+| `ai-analyst` / `aiAnalyst` | `AIAnalystConfig` | `undefined` | Pro: AI Data Analyst configuration object |
+
+### Data Shape
+
+TinyPivot accepts an array of flat objects. Each object is a row; keys become column headers.
+
+```typescript
+// Correct — flat objects with consistent keys
+const data = [
+  { id: 1, name: 'Alice', sales: 1500, region: 'North' },
+  { id: 2, name: 'Bob', sales: 2300, region: 'South' },
+]
+
+// Avoid — nested objects won't display correctly
+const bad = [{ id: 1, user: { name: 'Alice' } }]
+```
+
+Supported value types: `string`, `number`, `boolean`, `null`/`undefined` (empty cell), `Date`.
+
+### Vue Events
+
+| Event | Payload | Description |
+|---|---|---|
+| `@cell-click` | `{ row, col, value, rowData }` | Cell clicked |
+| `@selection-change` | `{ cells, values }` | Selection changed |
+| `@export` | `{ rowCount, filename }` | CSV exported |
+| `@copy` | `{ text, cellCount }` | Cells copied to clipboard |
+
+### React Callbacks
+
+| Prop | Description |
+|---|---|
+| `onCellClick` | Cell clicked |
+| `onSelectionChange` | Selection changed |
+| `onExport` | CSV exported |
+| `onCopy` | Cells copied to clipboard |
+
+---
+
+## Free vs Pro Feature Matrix
+
+| Feature | Free | Pro |
+|---|:---:|:---:|
+| Excel-like data grid | yes | yes |
+| Column filtering and sorting | yes | yes |
+| Global search | yes | yes |
+| CSV export | yes | yes |
+| Pagination | yes | yes |
+| Column resizing | yes | yes |
+| Clipboard (Ctrl+C) | yes | yes |
+| Dark mode | yes | yes |
+| Keyboard navigation | yes | yes |
+| Pivot table with Sum aggregation | yes | yes |
+| Row/column totals | yes | yes |
+| Calculated fields with formulas | yes | yes |
+| AI Data Analyst (natural language, BYOK) | no | yes |
+| Chart Builder (6 chart types, drag-and-drop) | no | yes |
+| All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | no | yes |
+| No watermark | no | yes |
+
+---
+
+## Pricing
+
+Lifetime license — one-time purchase, no subscription, no per-seat fees.
+
+| Plan | Price | Use Case |
+|---|---|---|
+| Single Project | $49 | One application |
+| Unlimited Projects | $149 | All your personal/company projects |
+| Team License | $399 | Up to 10 developers |
+
+Purchase at: https://tiny-pivot.com/#pricing
+
+---
+
+## Aggregation Functions
+
+TinyPivot includes 9 built-in aggregation functions. Sum is available in the free tier; all others require Pro.
+
+| Function | Description |
+|---|---|
+| Sum | Total of all values |
+| Count | Number of values |
+| Average | Mean of all values |
+| Min | Minimum value |
+| Max | Maximum value |
+| Unique | Count of distinct values |
+| Median | Middle value (outlier-resistant) |
+| Std Dev | Standard deviation |
+| % of Total | Percentage contribution to grand total |
+
+Custom aggregation functions are also supported via the `customFn` property on a value field:
+
+```typescript
+// Vue (ref) / React (plain object)
+const valueFields = [
+  {
+    field: 'sales',
+    aggregation: 'custom',
+    customFn: (values: number[]) => {
+      const sorted = [...values].sort((a, b) => a - b)
+      return sorted[Math.floor(sorted.length * 0.9)] // 90th percentile
+    },
+    customLabel: '90th Percentile',
+    customSymbol: 'P90',
+  },
+]
+```
+
+---
+
+## Theming
+
+Set the `theme` prop on `DataGrid`. TinyPivot ships 22 built-in themes.
+
+```vue
+<!-- Vue -->
+<DataGrid :data="data" theme="slate-dark" />
+```
+
+```tsx
+{/* React */}
+<DataGrid data={data} theme="slate-dark" />
+```
+
+`theme="auto"` follows the user's system preference (`prefers-color-scheme`).
+
+### Built-in Themes
+
+| Theme names | Accent | Vibe |
+|---|---|---|
+| `light` / `dark` / `auto` | indigo / violet | Default — neutral cool grays |
+| `slate` / `slate-dark` | indigo #4f46e5 | Linear / Stripe — cool neutral |
+| `zinc` / `zinc-dark` | near-mono | Vercel / Anthropic — minimalist |
+| `indigo` / `indigo-dark` | indigo #6366f1 | Premium SaaS |
+| `violet` / `violet-dark` | purple #8b5cf6 | Data viz / AI tools |
+| `emerald` / `emerald-dark` | green #10b981 | Fintech / finance |
+| `sky` / `sky-dark` | light blue #0ea5e9 | Productivity / airy |
+| `rose` / `rose-dark` | warm pink #f43f5e | Friendly / creator |
+| `amber` / `amber-dark` | warm orange #f59e0b | Energy / wellness |
+| `solar` / `solar-dark` | mustard #b58900 | Solarized — warm cream + dark teal |
+| `mono` / `mono-dark` | black / white | Editorial — pure grayscale |
+
+### Custom Themes
+
+Override CSS custom properties on the grid root class:
+
+```css
+.vpg-data-grid.my-brand {
+  --vpg-accent: #ff6b35;
+  --vpg-accent-hover: #e55426;
+  --vpg-surface-bg: #fafaf7;
+  --vpg-surface-panel: #f0eee7;
+}
+```
+
+```vue
+<!-- Vue -->
+<DataGrid :data="data" theme="light" class="my-brand" />
+```
+
+```tsx
+{/* React */}
+<DataGrid data={data} theme="light" className="my-brand" />
+```
+
+Key CSS tokens: `--vpg-accent`, `--vpg-accent-hover`, `--vpg-surface-bg`, `--vpg-surface-panel`, `--vpg-surface-elevated`, `--vpg-surface-hover`, `--vpg-surface-selected`, `--vpg-text-primary`, `--vpg-text-secondary`, `--vpg-text-muted`, `--vpg-border-default`, `--vpg-border-strong`, `--vpg-focus-ring`.
+
+---
+
+## CSV Export
+
+CSV export is free and enabled by default. Use `exportFilename` to set the download filename. The export button appears in the toolbar when `enableExport` is `true`.
+
+Programmatic export via the composable/hook:
+
+```typescript
+// Vue composable
+import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-vue'
+
+// React hook utility
+import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-react'
+```
+
+---
+
+## Clipboard
+
+Clipboard copy is free and enabled by default (`enableClipboard: true`). Users can select a cell range and press Ctrl+C (or Cmd+C on Mac) to copy tab-separated values. The `@copy` / `onCopy` event fires with `{ text, cellCount }`.
+
+Keyboard shortcuts:
+- `Ctrl+C` / `Cmd+C` — Copy selected cells
+- `Ctrl+F` / `Cmd+F` — Focus search
+- Arrow keys — Navigate cells
+- `Shift+Arrow` — Extend selection
+- `Escape` — Clear selection / search
+
+---
+
+## AI Data Analyst (Pro)
+
+The AI Data Analyst lets users ask natural-language questions about their data. It generates SQL, executes it, and displays results in the grid — ready for further pivot or chart analysis. Requires a Pro license.
+
+**BYOK**: Supply your own OpenAI, Anthropic, or OpenRouter API key. Data never passes through TinyPivot servers.
+
+The AI provider is auto-detected from the API key format:
+- `sk-ant-...` — Anthropic (default model: `claude-3-haiku-20240307`)
+- `sk-or-...` — OpenRouter (default model: `anthropic/claude-3-haiku`)
+- `sk-...` — OpenAI (default model: `gpt-4o-mini`)
+
+Set `AI_MODEL` environment variable to override the default model.
+
+### Option A: PostgreSQL backend (recommended)
+
+```typescript
+// Backend: app/api/tinypivot/route.ts (Next.js App Router example)
+import { createTinyPivotHandler } from '@smallwebco/tinypivot-server'
+
+export const POST = createTinyPivotHandler({
+  tables: {
+    include: ['sales', 'customers', 'products'],
+    descriptions: {
+      sales: 'Sales transactions with revenue data',
+    },
+  },
+})
+```
+
+```vue
+<!-- Frontend: Vue -->
+<script setup lang="ts">
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
+
+setLicenseKey('YOUR_LICENSE_KEY')
+
+const aiConfig = {
+  enabled: true,
+  endpoint: '/api/tinypivot',
+}
+</script>
+
+<template>
+  <DataGrid :data="[]" :ai-analyst="aiConfig" />
+</template>
+```
+
+```tsx
+// Frontend: React
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+
+setLicenseKey('YOUR_LICENSE_KEY')
+
+export default function App() {
+  return (
+    <DataGrid
+      data={[]}
+      aiAnalyst={{ enabled: true, endpoint: '/api/tinypivot' }}
+    />
+  )
+}
+```
+
+### Option B: Client-side data (in-memory)
+
+```vue
+<!-- Vue 3 -->
+<script setup lang="ts">
+import { ref } from 'vue'
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-vue'
+import '@smallwebco/tinypivot-vue/style.css'
+
+setLicenseKey('YOUR_LICENSE_KEY')
+
+const salesData = ref([
+  { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
+])
+
+function inferSchema(data: Record<string, unknown>[]) {
+  if (!data.length) return []
+  return Object.entries(data[0]).map(([name, value]) => ({
+    name,
+    type: typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string',
+  }))
+}
+
+const aiConfig = {
+  enabled: true,
+  endpoint: '/api/ai-chat',
+  dataSources: [
+    { id: 'sales', table: 'sales', name: 'Sales Data', description: 'Sales transactions' },
+  ],
+  dataSourceLoader: async (id: string) => {
+    if (id === 'sales')
+      return { data: salesData.value, schema: inferSchema(salesData.value) }
+    throw new Error(`Unknown data source: ${id}`)
+  },
+}
+</script>
+
+<template>
+  <DataGrid :data="salesData" :ai-analyst="aiConfig" />
+</template>
+```
+
+```tsx
+// React
+import { useState } from 'react'
+import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-react'
+import '@smallwebco/tinypivot-react/style.css'
+
+setLicenseKey('YOUR_LICENSE_KEY')
+
+function inferSchema(data: Record<string, unknown>[]) {
+  if (!data.length) return []
+  return Object.entries(data[0]).map(([name, value]) => ({
+    name,
+    type: typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string',
+  }))
+}
+
+export default function App() {
+  const [salesData] = useState([
+    { id: 1, region: 'North', product: 'Widget A', sales: 12500, units: 150 },
+  ])
+
+  const aiConfig = {
+    enabled: true,
+    endpoint: '/api/ai-chat',
+    dataSources: [
+      { id: 'sales', table: 'sales', name: 'Sales Data', description: 'Sales transactions' },
+    ],
+    dataSourceLoader: async (id: string) => {
+      if (id === 'sales')
+        return { data: salesData, schema: inferSchema(salesData) }
+      throw new Error(`Unknown data source: ${id}`)
+    },
+  }
+
+  return <DataGrid data={salesData} aiAnalyst={aiConfig} />
+}
+```
+
+### AIAnalystConfig options
+
+| Option | Type | Description |
+|---|---|---|
+| `enabled` | `boolean` | Enable the AI Analyst tab |
+| `endpoint` | `string` | Unified backend endpoint (PostgreSQL path) |
+| `aiEndpoint` | `string` | AI proxy endpoint (client-side path) |
+| `databaseEndpoint` | `string` | Database discovery endpoint |
+| `dataSources` | `AIDataSource[]` | Manual list of available data sources |
+| `dataSourceLoader` | `function` | Returns `{ data, schema }` for a given source id |
+| `queryExecutor` | `function` | Custom query executor (e.g., DuckDB WASM) |
+| `aiModelName` | `string` | Display name for the AI model in the UI |
+| `persistToLocalStorage` | `boolean` | Auto-save conversation to localStorage |
+| `sessionId` | `string` | Conversation isolation key |
+| `maxRows` | `number` | Max rows returned per query (default 10000) |
+| `demoMode` | `boolean` | Use canned responses — no real AI calls |
+
+### Server-side security
+
+The `@smallwebco/tinypivot-server` handler enforces: SELECT-only SQL, table whitelisting, and error sanitization (connection strings stripped).
+
+---
+
+## TypeScript
+
+Full TypeScript support. Key types exported from both packages:
+
+```typescript
+import type {
+  AggregationFunction,
+  AIAnalystConfig,
+  DataGridProps,
+  FieldRole,
+  PivotConfig,
+  PivotField,
+  PivotValueField,
+} from '@smallwebco/tinypivot-react'
+// same names available from '@smallwebco/tinypivot-vue'
+```
+
+---
+
+## Browser Support
+
+Chrome 80+, Firefox 75+, Safari 14+, Edge 80+
+
+---
+
+## License
+
+- Free tier: MIT — core grid, pivot (Sum only), export, clipboard
+- Pro features: Commercial license required (charts, advanced aggregations, AI Data Analyst, no watermark)
+
+Purchase: https://tiny-pivot.com/#pricing
+GitHub: https://github.com/Small-Web-Co/tinypivot
+npm (Vue): https://www.npmjs.com/package/@smallwebco/tinypivot-vue
+npm (React): https://www.npmjs.com/package/@smallwebco/tinypivot-react
