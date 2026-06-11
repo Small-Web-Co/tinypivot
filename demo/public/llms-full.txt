@@ -1,5 +1,7 @@
 # TinyPivot — Developer Reference
 
+> Reference generated from TinyPivot v1.0.82 (June 2026).
+
 TinyPivot is a lightweight, batteries-included analytics grid for Vue 3 and React. It ships as two separate framework packages that share a common core.
 
 **When to use TinyPivot:**
@@ -7,7 +9,7 @@ TinyPivot is a lightweight, batteries-included analytics grid for Vue 3 and Reac
 - You want pivot tables, aggregations, CSV export, and clipboard without assembling a headless library
 - You need charts or an AI-powered natural-language data analyst in the same component
 - You want a lifetime commercial license without per-seat or annual fees
-- Bundle size matters (under 50 KB gzipped vs 500 KB+ for AG Grid)
+- Bundle size matters (~40 KB gzipped (React) / ~50 KB gzipped (Vue) vs 500 KB+ for AG Grid)
 
 **When NOT to use TinyPivot:**
 - You need full spreadsheet editing (cell-level write-back, formulas in cells)
@@ -133,10 +135,17 @@ All props are identical between Vue and React except for naming convention (Vue:
 | `theme` | `string` | `'light'` | Color theme — 22 built-in presets (see Theming) |
 | `number-format` / `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display: US (1,234.56), EU (1.234,56), plain |
 | `date-format` / `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display: US (MM/DD/YYYY), EU (DD/MM/YYYY), ISO |
-| `field-role-overrides` / `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override chart field role per column (`'dimension'` \| `'measure'` \| `'temporal'`) |
+| `field-role-overrides` / `fieldRoleOverrides` | `FieldRoleOverrides` | `undefined` | Override chart field role per column (`'dimension'` \| `'measure'` \| `'temporal'`) |
 | `striped-rows` / `stripedRows` | `boolean` | `true` | Alternating row background color |
 | `export-filename` / `exportFilename` | `string` | `'data-export.csv'` | Filename for CSV download |
 | `ai-analyst` / `aiAnalyst` | `AIAnalystConfig` | `undefined` | Pro: AI Data Analyst configuration object |
+| `row-height` / `rowHeight` | `number` | — | Row height in pixels |
+| `header-height` / `headerHeight` | `number` | — | Header row height in pixels |
+| `enable-row-selection` / `enableRowSelection` | `boolean` | `false` | Enable row selection (adds a checkbox column) |
+| `enable-vertical-resize` / `enableVerticalResize` | `boolean` | — | Allow dragging the bottom edge to resize the grid height |
+| `initial-height` / `initialHeight` | `number` | — | Initial height of the grid in pixels |
+| `min-height` / `minHeight` | `number` | — | Minimum grid height in pixels |
+| `max-height` / `maxHeight` | `number` | — | Maximum grid height in pixels |
 
 ### Data Shape
 
@@ -319,6 +328,10 @@ import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-vue'
 
 // React hook utility
 import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-react'
+
+// Example: export the currently displayed rows
+// exportToCSV(data: T[], columns: string[], options?: ExportOptions): void
+exportToCSV(data, Object.keys(data[0] ?? {}), { filename: 'my-data.csv' })
 ```
 
 ---
@@ -327,11 +340,13 @@ import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-react'
 
 Clipboard copy is free and enabled by default (`enableClipboard: true`). Users can select a cell range and press Ctrl+C (or Cmd+C on Mac) to copy tab-separated values. The `@copy` / `onCopy` event fires with `{ text, cellCount }`.
 
-Keyboard shortcuts:
+**Clipboard:**
 - `Ctrl+C` / `Cmd+C` — Copy selected cells
-- `Ctrl+F` / `Cmd+F` — Focus search
+
+**Keyboard Navigation:**
 - Arrow keys — Navigate cells
 - `Shift+Arrow` — Extend selection
+- `Ctrl+F` / `Cmd+F` — Focus search
 - `Escape` — Clear selection / search
 
 ---
@@ -347,7 +362,7 @@ The AI provider is auto-detected from the API key format:
 - `sk-or-...` — OpenRouter (default model: `anthropic/claude-3-haiku`)
 - `sk-...` — OpenAI (default model: `gpt-4o-mini`)
 
-Set `AI_MODEL` environment variable to override the default model.
+Set `AI_MODEL` environment variable to override the default model. Default model names are point-in-time and may become outdated; check your provider's current model list for available options.
 
 ### Option A: PostgreSQL backend (recommended)
 
@@ -517,9 +532,9 @@ import type {
 } from '@smallwebco/tinypivot-react'
 
 // Most types also available from '@smallwebco/tinypivot-vue'
-// (AIAnalystConfig is React-only)
 import type {
   AggregationFunction,
+  AIAnalystConfig,
   DataGridProps,
   PivotConfigType,
   PivotField,

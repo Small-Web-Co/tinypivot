@@ -2,7 +2,7 @@
 
 > Lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3 and React.
 
-TinyPivot is a batteries-included analytics grid for Vue 3 and React. The free tier includes an Excel-like data grid, pivot tables with Sum aggregation, row/column totals, calculated fields, CSV export, and clipboard support. Pro adds advanced aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, % of Total), a drag-and-drop Chart Builder (6 chart types), and an AI Data Analyst with natural language queries using your own API key (OpenAI, Anthropic, or OpenRouter). Lifetime license — buy once, no subscription.
+TinyPivot is a batteries-included analytics grid for Vue 3 and React. The free tier includes an Excel-like data grid, pivot tables with Sum aggregation, row/column totals, calculated fields, CSV export, and clipboard support. Pro adds advanced aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, % of Total), a drag-and-drop Chart Builder (6 chart types), and an AI Data Analyst with natural language queries using your own API key (OpenAI, Anthropic, or OpenRouter).
 
 ## Docs
 
