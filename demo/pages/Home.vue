@@ -2,7 +2,7 @@
 import type { AIAnalystConfig, AIDataSource, AITableSchema, QueryExecutorResult } from '@smallwebco/tinypivot-core'
 import { track } from '@vercel/analytics'
 import { DataGrid } from 'tinypivot'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { DATASETS, getDataset } from '../datasets'
 import { executeQuery as executeDuckDBQuery, initDuckDB, loadData } from '../utils/duckdb'
 
@@ -72,7 +72,15 @@ function generateSampleData(count: number) {
   return data
 }
 
-const sampleData = ref(generateSampleData(10000))
+// isMounted gates the interactive demo from SSR — keeps prerendered HTML lean
+// while marketing copy (hero, features, pricing, testimonials) stays SSR-rendered.
+const isMounted = ref(false)
+const sampleData = ref<ReturnType<typeof generateSampleData>>([])
+
+onMounted(() => {
+  sampleData.value = generateSampleData(10000)
+  isMounted.value = true
+})
 
 // Custom data source loader - generates and loads data into DuckDB
 async function loadDataSource(dataSourceId: string): Promise<{ data: Record<string, unknown>[], schema?: AITableSchema }> {
@@ -849,104 +857,111 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
         <p>Try the grid, pivot table, and chart builder with 10,000 rows of sample data</p>
       </div>
 
-      <div class="demo-controls">
-        <div class="demo-format-controls">
-          <div class="demo-format-group">
-            <span class="demo-format-label">Numbers:</span>
-            <div class="demo-format-toggle">
-              <button
-                class="demo-format-btn" :class="{ active: numberFormat === 'us' }"
-                @click="numberFormat = 'us'"
-              >
-                US (1,000.00)
-              </button>
-              <button
-                class="demo-format-btn" :class="{ active: numberFormat === 'eu' }"
-                @click="numberFormat = 'eu'"
-              >
-                EU (1.000,00)
-              </button>
-              <button
-                class="demo-format-btn" :class="{ active: numberFormat === 'plain' }"
-                @click="numberFormat = 'plain'"
-              >
-                Plain (1000)
-              </button>
+      <!-- Client-only: DataGrid is gated behind isMounted to keep prerendered HTML lean.
+           Marketing copy above/below this section remains SSR-rendered. -->
+      <template v-if="isMounted">
+        <div class="demo-controls">
+          <div class="demo-format-controls">
+            <div class="demo-format-group">
+              <span class="demo-format-label">Numbers:</span>
+              <div class="demo-format-toggle">
+                <button
+                  class="demo-format-btn" :class="{ active: numberFormat === 'us' }"
+                  @click="numberFormat = 'us'"
+                >
+                  US (1,000.00)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: numberFormat === 'eu' }"
+                  @click="numberFormat = 'eu'"
+                >
+                  EU (1.000,00)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: numberFormat === 'plain' }"
+                  @click="numberFormat = 'plain'"
+                >
+                  Plain (1000)
+                </button>
+              </div>
+            </div>
+            <div class="demo-format-group">
+              <span class="demo-format-label">Dates:</span>
+              <div class="demo-format-toggle">
+                <button
+                  class="demo-format-btn" :class="{ active: dateFormat === 'iso' }"
+                  @click="dateFormat = 'iso'"
+                >
+                  ISO (2024-01-15)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: dateFormat === 'us' }"
+                  @click="dateFormat = 'us'"
+                >
+                  US (01/15/2024)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: dateFormat === 'eu' }"
+                  @click="dateFormat = 'eu'"
+                >
+                  EU (15/01/2024)
+                </button>
+              </div>
             </div>
           </div>
-          <div class="demo-format-group">
-            <span class="demo-format-label">Dates:</span>
-            <div class="demo-format-toggle">
-              <button
-                class="demo-format-btn" :class="{ active: dateFormat === 'iso' }"
-                @click="dateFormat = 'iso'"
-              >
-                ISO (2024-01-15)
-              </button>
-              <button
-                class="demo-format-btn" :class="{ active: dateFormat === 'us' }"
-                @click="dateFormat = 'us'"
-              >
-                US (01/15/2024)
-              </button>
-              <button
-                class="demo-format-btn" :class="{ active: dateFormat === 'eu' }"
-                @click="dateFormat = 'eu'"
-              >
-                EU (15/01/2024)
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="demo-theme-selector">
-          <label class="demo-theme-label" for="demo-theme-select">Theme</label>
-          <select
-            id="demo-theme-select"
-            v-model="demoTheme"
-            class="demo-theme-select"
-          >
-            <optgroup
-              v-for="group in themeOptions"
-              :key="group.group"
-              :label="group.group"
+          <div class="demo-theme-selector">
+            <label class="demo-theme-label" for="demo-theme-select">Theme</label>
+            <select
+              id="demo-theme-select"
+              v-model="demoTheme"
+              class="demo-theme-select"
             >
-              <option
-                v-for="opt in group.options"
-                :key="opt.value"
-                :value="opt.value"
+              <optgroup
+                v-for="group in themeOptions"
+                :key="group.group"
+                :label="group.group"
               >
-                {{ opt.label }}
-              </option>
-            </optgroup>
-          </select>
+                <option
+                  v-for="opt in group.options"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </optgroup>
+            </select>
+          </div>
         </div>
-      </div>
 
-      <div class="demo-container" :class="{ 'demo-light': !isDarkDemoTheme }">
-        <DataGrid
-          :data="sampleData"
-          :show-pivot="true"
-          font-size="sm"
-          :enable-export="true"
-          :enable-search="true"
-          :enable-pagination="true"
-          :page-size="1000"
-          :enable-column-resize="true"
-          :enable-clipboard="true"
-          :theme="demoTheme"
-          :striped-rows="true"
-          :number-format="numberFormat"
-          :date-format="dateFormat"
-          export-filename="tinypivot-demo.csv"
-          :ai-analyst="aiAnalystConfig"
-        />
-      </div>
+        <div class="demo-container" :class="{ 'demo-light': !isDarkDemoTheme }">
+          <DataGrid
+            :data="sampleData"
+            :show-pivot="true"
+            font-size="sm"
+            :enable-export="true"
+            :enable-search="true"
+            :enable-pagination="true"
+            :page-size="1000"
+            :enable-column-resize="true"
+            :enable-clipboard="true"
+            :theme="demoTheme"
+            :striped-rows="true"
+            :number-format="numberFormat"
+            :date-format="dateFormat"
+            export-filename="tinypivot-demo.csv"
+            :ai-analyst="aiAnalystConfig"
+          />
+        </div>
 
-      <div class="demo-note demo-note-success">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span><strong>Try it now!</strong> All Pro features unlocked — click "AI" to ask questions in natural language, "Pivot" for pivot tables, or "Chart" to build visualizations! Same API for Vue and React.</span>
+        <div class="demo-note demo-note-success">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span><strong>Try it now!</strong> All Pro features unlocked — click "AI" to ask questions in natural language, "Pivot" for pivot tables, or "Chart" to build visualizations! Same API for Vue and React.</span>
+        </div>
+      </template>
+      <div v-else class="demo-placeholder">
+        Loading live demo…
       </div>
     </section>
 
@@ -2099,6 +2114,15 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 
 .demo-note-success strong {
   color: #10b981;
+}
+
+.demo-placeholder {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.875rem;
 }
 
 /* Pricing */
