@@ -61,6 +61,8 @@ CLAUDE.md
 AGENTS.md
 
 /docs/**
+!/docs/distribution/
+!/docs/distribution/**
 
 /invoices/**
 
