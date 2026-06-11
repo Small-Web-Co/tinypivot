@@ -4,9 +4,12 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // tinypivot-react@1.0.81 style.css starts with `@import './themes.css'` but
-// themes.css was accidentally omitted from the npm dist. This plugin creates an
-// empty placeholder so the import resolves. The full styles (including themes)
-// live in style.css itself after the @import line, so nothing visual is lost.
+// themes.css was accidentally omitted from the npm dist, so the import fails to
+// resolve and the 20 brand themes are unavailable in that version. This plugin
+// creates an empty placeholder so the build succeeds; the base light/dark themes
+// used by this example live in style.css and are unaffected.
+// TODO: remove this plugin (and postcss.config.js) once a version newer than
+// 1.0.81 ships dist/themes.css.
 function fixMissingThemes() {
   return {
     name: 'tinypivot-fix-missing-themes',
@@ -17,7 +20,7 @@ function fixMissingThemes() {
       )
       const themesDest = join(pkgDist, 'themes.css')
       if (!existsSync(themesDest)) {
-        writeFileSync(themesDest, '/* themes are included in style.css */\n', 'utf-8')
+        writeFileSync(themesDest, '/* placeholder: themes.css missing from 1.0.81 npm dist */\n', 'utf-8')
       }
     },
   }
