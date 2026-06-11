@@ -11,6 +11,10 @@ A lightweight data grid with free pivot tables, Pro charts, and optional AI-powe
 [![Vue Package](https://img.shields.io/badge/npm-Vue%203-42b883)](https://www.npmjs.com/package/@smallwebco/tinypivot-vue)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
+**Try it instantly:**
+[![Open React example in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react)
+[![Open Vue example in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-vue)
+
 ![TinyPivot Demo](https://bvallieres.com/images/tinypivot_demo.gif)
 
 ## Why TinyPivot?

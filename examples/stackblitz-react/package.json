@@ -1,0 +1,22 @@
+{
+  "name": "tinypivot-stackblitz-react",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TinyPivot StackBlitz starter — React",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-react": "^1.0.81",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "postcss-import": "^16.1.1",
+    "vite": "^6.3.5"
+  }
+}

@@ -787,6 +787,35 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
         </div>
       </div>
 
+      <div class="stackblitz-cta">
+        <a
+          v-if="selectedFramework === 'vue'"
+          href="https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-vue"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="stackblitz-link"
+        >
+          <img
+            src="https://developer.stackblitz.com/img/open_in_stackblitz.svg"
+            alt="Open Vue example in StackBlitz"
+            height="28"
+          >
+        </a>
+        <a
+          v-else
+          href="https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="stackblitz-link"
+        >
+          <img
+            src="https://developer.stackblitz.com/img/open_in_stackblitz.svg"
+            alt="Open React example in StackBlitz"
+            height="28"
+          >
+        </a>
+      </div>
+
       <div class="api-preview">
         <h3>Full control when you need it</h3>
         <p>All features are toggled via simple props:</p>
@@ -1904,6 +1933,21 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 .code-number { color: #d19a66; }
 .code-tag { color: #61afef; }
 .code-attr { color: #d19a66; }
+
+.stackblitz-cta {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0 2rem;
+}
+
+.stackblitz-link img {
+  display: block;
+  transition: opacity 0.2s;
+}
+
+.stackblitz-link:hover img {
+  opacity: 0.85;
+}
 
 .api-preview {
   text-align: center;

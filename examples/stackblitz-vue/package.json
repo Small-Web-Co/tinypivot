@@ -1,0 +1,20 @@
+{
+  "name": "tinypivot-stackblitz-vue",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TinyPivot StackBlitz starter — Vue 3",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@smallwebco/tinypivot-vue": "^1.0.81",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "vite": "^6.3.5"
+  }
+}

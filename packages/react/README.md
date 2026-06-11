@@ -4,6 +4,8 @@ A lightweight data grid with free pivot tables, Pro charts, and optional AI-powe
 
 **[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
 
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react)
+
 ## Why TinyPivot?
 
 - **Lightweight**: Under 40KB gzipped vs 500KB+ for AG Grid

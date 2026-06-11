@@ -10,6 +10,10 @@ export default antfu({
     '**/dist-demo/**',
     'node_modules',
     '**/node_modules/**',
+    // StackBlitz examples are standalone projects with their own package.json;
+    // they use React JSX which the root monorepo lint config doesn't parse.
+    'examples/stackblitz-react/**',
+    'examples/stackblitz-vue/**',
     'coverage',
     '**/coverage/**',
     '*.log',

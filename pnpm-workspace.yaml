@@ -5,3 +5,5 @@ trustPolicy: no-downgrade
 packages:
   - 'packages/*'
   - 'examples/*'
+  - '!examples/stackblitz-react'
+  - '!examples/stackblitz-vue'
