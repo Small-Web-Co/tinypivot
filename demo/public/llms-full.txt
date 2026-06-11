@@ -486,17 +486,15 @@ export default function App() {
 | Option | Type | Description |
 |---|---|---|
 | `enabled` | `boolean` | Enable the AI Analyst tab |
-| `endpoint` | `string` | Unified backend endpoint (PostgreSQL path) |
-| `aiEndpoint` | `string` | AI proxy endpoint (client-side path) |
-| `databaseEndpoint` | `string` | Database discovery endpoint |
-| `dataSources` | `AIDataSource[]` | Manual list of available data sources |
-| `dataSourceLoader` | `function` | Returns `{ data, schema }` for a given source id |
-| `queryExecutor` | `function` | Custom query executor (e.g., DuckDB WASM) |
-| `aiModelName` | `string` | Display name for the AI model in the UI |
-| `persistToLocalStorage` | `boolean` | Auto-save conversation to localStorage |
-| `sessionId` | `string` | Conversation isolation key |
-| `maxRows` | `number` | Max rows returned per query (default 10000) |
+| `endpoint` | `string` | Unified backend endpoint (handles discovery, schema, query, and AI chat) |
+| `dataSources` | `AIDataSource[]` | Available data sources (demo/client-side mode only) |
+| `dataSourceLoader` | `function` | Custom data source loader (for client-side DuckDB demos) |
+| `queryExecutor` | `function` | Custom query executor (for client-side DuckDB demos) |
 | `demoMode` | `boolean` | Use canned responses — no real AI calls |
+| `maxRows` | `number` | Max rows returned per query (default 10000) |
+| `sessionId` | `string` | Session ID for conversation continuity |
+| `persistToLocalStorage` | `boolean` | Persist conversations to localStorage (default false) |
+| `aiModelName` | `string` | Display name for the AI model in the UI (cosmetic only) |
 
 ### Server-side security
 
@@ -513,12 +511,20 @@ import type {
   AggregationFunction,
   AIAnalystConfig,
   DataGridProps,
-  FieldRole,
-  PivotConfig,
+  PivotConfigType,
   PivotField,
   PivotValueField,
 } from '@smallwebco/tinypivot-react'
-// same names available from '@smallwebco/tinypivot-vue'
+
+// Most types also available from '@smallwebco/tinypivot-vue'
+// (AIAnalystConfig is React-only)
+import type {
+  AggregationFunction,
+  DataGridProps,
+  PivotConfigType,
+  PivotField,
+  PivotValueField,
+} from '@smallwebco/tinypivot-vue'
 ```
 
 ---
