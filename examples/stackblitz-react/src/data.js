@@ -34,7 +34,7 @@ export const salesData = [
   { id: 32, region: 'East', product: 'Device Pro', category: 'Electronics', sales: 30000, units: 100, price: 300, rep: 'Bob', quarter: 'Q4', year: 2024, status: 'Shipped', margin: 30.5 },
   { id: 33, region: 'West', product: 'Tool Plus', category: 'Hardware', sales: 22800, units: 190, price: 120, rep: 'Carol', quarter: 'Q4', year: 2024, status: 'Completed', margin: 32.1 },
   { id: 34, region: 'Central', product: 'Widget B', category: 'Hardware', sales: 11760, units: 120, price: 98, rep: 'David', quarter: 'Q4', year: 2024, status: 'Delivered', margin: 28.4 },
-  { id: 35, region: 'Northeast', product: 'Device Lite', category: 'Electronics', sales: 16200, units: 180, price: 90, rep: 'Eve', quarter: 'Q4', year: 2024, status: 'Completed', margin: 25.6 },
+  { id: 35, region: 'Northeast', product: 'Device Lite', category: 'Electronics', sales: 22800, units: 180, price: 90, rep: 'Eve', quarter: 'Q4', year: 2024, status: 'Completed', margin: 25.6 },
   { id: 36, region: 'Southeast', product: 'Gadget Y', category: 'Services', sales: 25000, units: 100, price: 250, rep: 'Frank', quarter: 'Q4', year: 2024, status: 'Completed', margin: 40.0 },
   { id: 37, region: 'Northwest', product: 'Widget A', category: 'Electronics', sales: 18750, units: 150, price: 125, rep: 'Grace', quarter: 'Q4', year: 2024, status: 'Processing', margin: 33.4 },
   { id: 38, region: 'Southwest', product: 'Gadget X', category: 'Software', sales: 31200, units: 120, price: 260, rep: 'Henry', quarter: 'Q4', year: 2024, status: 'Shipped', margin: 41.5 },
