@@ -48,12 +48,12 @@ Add TinyPivot to the Table section of awesome-react-components.
 TinyPivot is a lightweight, batteries-included React data grid with free pivot tables, sorting, filtering, CSV export, and calculated fields. Ideal for users who want a focused analytics component with good defaults rather than a headless table library. Pro tier adds advanced aggregations, charts, AI Data Analyst (BYOK), and watermark removal.
 
 Entry:
-- [TinyPivot](https://tiny-pivot.com) - [demo](https://tiny-pivot.com) - Lightweight React data grid with free pivot tables (Sum), sorting, filtering, CSV export, 22 themes, and calculated fields. Pro adds advanced aggregations, charts, AI Data Analyst (BYOK), and watermark removal.
+- [TinyPivot](https://tiny-pivot.com) - [demo](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react) - Lightweight React data grid with free pivot tables (Sum), sorting, filtering, CSV export, 22 themes, and calculated fields. Pro adds advanced aggregations, charts, AI Data Analyst (BYOK), and watermark removal.
 ```
 
 **Entry copy (paste into awesome-react-components README.md, Table section):**
 ```
-- [TinyPivot](https://tiny-pivot.com) - [demo](https://tiny-pivot.com) - Lightweight React data grid with free pivot tables (Sum), sorting, filtering, CSV export, 22 themes, and calculated fields. Pro adds advanced aggregations, charts, AI Data Analyst (BYOK), and watermark removal.
+- [TinyPivot](https://tiny-pivot.com) - [demo](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react) - Lightweight React data grid with free pivot tables (Sum), sorting, filtering, CSV export, 22 themes, and calculated fields. Pro adds advanced aggregations, charts, AI Data Analyst (BYOK), and watermark removal.
 ```
 
 **Destination:** https://github.com/brillout/awesome-react-components/blob/master/README.md → Find `### Table` section → add entry to the list
@@ -105,7 +105,7 @@ Lightweight Vue and React data grid with free pivot tables, Sum aggregation, CSV
 
 **Long Description (~100 words):**
 ```
-TinyPivot is a lightweight, open-source analytics component for Vue 3 and React. The free tier includes a data grid with sorting, filtering, search, pagination, column resizing, and pivot tables with Sum aggregation. Calculated fields allow on-the-fly data transformations. CSV export and 22 themes are built-in. The Pro tier (one-time $49–$399) adds advanced aggregations (average, min, max, median, mode, count unique), interactive chart builder, AI Data Analyst (bring your own OpenAI/Anthropic/OpenRouter key), session persistence, percentage mode, and watermark removal. Bundle size ~40–50 KB gzipped. TypeScript support included. Positioned as a lightweight alternative to enterprise grids like AG Grid when you need focused analytics without complexity.
+TinyPivot is a lightweight analytics component for Vue 3 and React with a free tier (MIT-licensed usage) and a commercial Pro tier. The free tier includes a data grid with sorting, filtering, search, pagination, column resizing, and pivot tables with Sum aggregation. Calculated fields allow on-the-fly data transformations. CSV export and 22 themes are built-in. The Pro tier (one-time $49–$399) adds advanced aggregations (count, average, min, max, count distinct, median, standard deviation, % of total), interactive chart builder, AI Data Analyst (bring your own OpenAI/Anthropic/OpenRouter key), session persistence, percentage mode, and watermark removal. Bundle size ~40–50 KB gzipped. TypeScript support included. Positioned as a lightweight alternative to enterprise grids like AG Grid when you need focused analytics without complexity.
 ```
 
 **Suggested Tags:**
@@ -133,7 +133,7 @@ Lightweight Vue and React data grid with free pivot tables, Sum aggregation, CSV
 
 **Long Description (~100 words):**
 ```
-TinyPivot is a lightweight analytics component for Vue 3 and React featuring a high-performance data grid with sorting, filtering, search, pagination, and column resizing. The free tier includes pivot tables with Sum aggregation, calculated fields, CSV export, and 22 color themes. Pro licensing ($49–$399 one-time) adds advanced aggregations (average, min, max, median, mode, count unique), interactive chart builder, AI Data Analyst (BYOK: OpenAI/Anthropic/OpenRouter), session persistence, percentage mode, and watermark removal. At ~40–50 KB gzipped, TinyPivot is ideal for teams wanting focused analytics features without the overhead of enterprise grids. Fully typed in TypeScript.
+TinyPivot is a lightweight analytics component for Vue 3 and React featuring a high-performance data grid with sorting, filtering, search, pagination, and column resizing. The free tier includes pivot tables with Sum aggregation, calculated fields, CSV export, and 22 color themes. Pro licensing ($49–$399 one-time) adds advanced aggregations (count, average, min, max, count distinct, median, standard deviation, % of total), interactive chart builder, AI Data Analyst (BYOK: OpenAI/Anthropic/OpenRouter), session persistence, percentage mode, and watermark removal. At ~40–50 KB gzipped, TinyPivot is ideal for teams wanting focused analytics features without the overhead of enterprise grids. Fully typed in TypeScript.
 ```
 
 **Suggested Tags:**
@@ -145,7 +145,7 @@ data-grid, pivot-table, analytics, react, vue, charts, ai, csv, spreadsheet, typ
 
 ## 5. StackBlitz Links
 
-**StackBlitz Template URLs:**
+**StackBlitz Template URLs** (valid only after `feat/distribution-tier1` merges to `master` — the examples don't exist on `master` yet):
 
 - React: `https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react`
 - Vue: `https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-vue`

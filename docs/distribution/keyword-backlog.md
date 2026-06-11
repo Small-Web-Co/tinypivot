@@ -24,7 +24,7 @@ Exclusions (already covered by existing routes in `demo/router/routes.ts`):
 - `vue-data-grid-with-pivot-table`
 - `embedded-ai-data-analyst-component`
 - `vs-tanstack-table`
-- `vs-ag-grid` (homepage comparison page)
+- `vs-ag-grid` (standalone comparison page)
 
 All keywords below are `queued` and ready for content generation.
 
