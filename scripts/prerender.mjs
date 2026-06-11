@@ -9,10 +9,12 @@
  *  1. Start a Vite SSR dev-server (no output dir) pointed at the demo root.
  *  2. Load demo/entry-ssr.ts via ssrLoadModule — this avoids executing
  *     browser-only code at module level (duckdb-wasm, vercel analytics).
- *  3. For each route, call render(url) → renderToString() HTML fragment.
- *  4. Inject per-route <title>, meta description, canonical, JSON-LD into the
+ *  3. Load demo/router/routes.ts via ssrLoadModule to derive the ROUTES list
+ *     automatically — no more hardcoded list that must stay in sync.
+ *  4. For each route, call render(url) → renderToString() HTML fragment.
+ *  5. Inject per-route <title>, meta description, canonical, JSON-LD into the
  *     built dist-demo/index.html shell, replacing <div id="app"></div>.
- *  5. Write the resulting HTML to dist-demo/<slug>/index.html (and
+ *  6. Write the resulting HTML to dist-demo/<slug>/index.html (and
  *     dist-demo/index.html for the root route).
  */
 
@@ -25,99 +27,49 @@ import { createServer } from 'vite'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..')
 const DIST = resolve(ROOT, 'dist-demo')
+const BASE_URL = 'https://tiny-pivot.com'
 
-// All routes to prerender — must match demo/router/routes.ts
-const ROUTES = [
-  {
-    url: '/',
-    outFile: 'index.html',
-    title: 'TinyPivot - Lightweight React & Vue Data Grid with Free Pivot Tables',
-    description: 'Lightweight data grid for React and Vue with free pivot tables, Sum aggregation, totals, and calculated fields. Upgrade for charts, AI Analyst, advanced aggregations, and no watermark.',
-    canonical: 'https://tiny-pivot.com/',
-    jsonLd: null, // Home keeps its existing global JSON-LD from index.html
-  },
-  {
-    url: '/vs-ag-grid',
-    outFile: 'vs-ag-grid/index.html',
-    title: 'TinyPivot vs AG Grid - Lightweight Pivot Table Comparison',
-    description: 'Compare TinyPivot and AG Grid for React and Vue. TinyPivot is a focused data grid with free pivot tables and lifetime Pro licensing.',
-    canonical: 'https://tiny-pivot.com/vs-ag-grid',
-    jsonLd: null,
-  },
-  {
-    url: '/best-react-pivot-table-libraries',
-    outFile: 'best-react-pivot-table-libraries/index.html',
-    title: 'Best React Pivot Table Libraries: How to Choose | TinyPivot',
-    description: 'Compare the main approaches to adding pivot tables in React, from headless table libraries to batteries-included data grids.',
-    canonical: 'https://tiny-pivot.com/best-react-pivot-table-libraries',
-    jsonLd: makeArticleJsonLd('Best React Pivot Table Libraries: How to Choose', 'https://tiny-pivot.com/best-react-pivot-table-libraries'),
-  },
-  {
-    url: '/best-vue-pivot-table-components',
-    outFile: 'best-vue-pivot-table-components/index.html',
-    title: 'Best Vue 3 Pivot Table Components: How to Choose | TinyPivot',
-    description: 'Choose a Vue 3 pivot table component based on setup time, analytics features, customization needs, and licensing.',
-    canonical: 'https://tiny-pivot.com/best-vue-pivot-table-components',
-    jsonLd: makeArticleJsonLd('Best Vue 3 Pivot Table Components: How to Choose', 'https://tiny-pivot.com/best-vue-pivot-table-components'),
-  },
-  {
-    url: '/ag-grid-alternatives',
-    outFile: 'ag-grid-alternatives/index.html',
-    title: 'AG Grid Alternatives for React and Vue | TinyPivot',
-    description: 'Explore AG Grid alternatives for React and Vue when you want a focused data grid, pivot tables, and a simpler licensing model.',
-    canonical: 'https://tiny-pivot.com/ag-grid-alternatives',
-    jsonLd: makeArticleJsonLd('AG Grid Alternatives for React and Vue', 'https://tiny-pivot.com/ag-grid-alternatives'),
-  },
-  {
-    url: '/react-data-grid-with-pivot-table',
-    outFile: 'react-data-grid-with-pivot-table/index.html',
-    title: 'Add a Data Grid with Pivot Tables to React | TinyPivot',
-    description: 'Add an Excel-like React data grid with free pivot tables using TinyPivot and a small DataGrid integration.',
-    canonical: 'https://tiny-pivot.com/react-data-grid-with-pivot-table',
-    jsonLd: makeArticleJsonLd('Add a Data Grid with Pivot Tables to React', 'https://tiny-pivot.com/react-data-grid-with-pivot-table'),
-  },
-  {
-    url: '/vue-data-grid-with-pivot-table',
-    outFile: 'vue-data-grid-with-pivot-table/index.html',
-    title: 'Add a Data Grid with Pivot Tables to Vue 3 | TinyPivot',
-    description: 'Add an Excel-like Vue 3 data grid with free pivot tables using TinyPivot and a small DataGrid integration.',
-    canonical: 'https://tiny-pivot.com/vue-data-grid-with-pivot-table',
-    jsonLd: makeArticleJsonLd('Add a Data Grid with Pivot Tables to Vue 3', 'https://tiny-pivot.com/vue-data-grid-with-pivot-table'),
-  },
-  {
-    url: '/embedded-ai-data-analyst-component',
-    outFile: 'embedded-ai-data-analyst-component/index.html',
-    title: 'Embed an AI Data Analyst in a React or Vue App | TinyPivot',
-    description: 'Add natural-language data exploration to a React or Vue application with a BYOK AI Data Analyst and queries that run in your environment.',
-    canonical: 'https://tiny-pivot.com/embedded-ai-data-analyst-component',
-    jsonLd: makeArticleJsonLd('Embed an AI Data Analyst in a React or Vue App', 'https://tiny-pivot.com/embedded-ai-data-analyst-component'),
-  },
-  {
-    url: '/vs-tanstack-table',
-    outFile: 'vs-tanstack-table/index.html',
-    title: 'TinyPivot vs TanStack Table | TinyPivot',
-    description: 'Compare TinyPivot and TanStack Table for React or Vue: a batteries-included analytics component versus a flexible headless table foundation.',
-    canonical: 'https://tiny-pivot.com/vs-tanstack-table',
-    jsonLd: null,
-  },
-]
+/**
+ * Routes excluded from prerender (e.g. post-purchase redirect, app pages).
+ * All other routes defined in router/routes.ts will be prerendered.
+ */
+const EXCLUDED_PATHS = new Set(['/success'])
 
-function makeArticleJsonLd(name, url) {
+function makeArticleJsonLd(title, url) {
   return JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Article',
-    'headline': name,
+    'headline': title,
     'url': url,
     'publisher': {
       '@type': 'Organization',
       'name': 'TinyPivot',
-      'url': 'https://tiny-pivot.com',
+      'url': BASE_URL,
     },
     'author': {
       '@type': 'Organization',
       'name': 'Small Web, LLC',
     },
   }, null, 2)
+}
+
+/**
+ * Derive the prerender route descriptor from a raw route definition.
+ * Guide routes (those whose path matches a marketingGuides slug) get
+ * Article JSON-LD; all others get null.
+ */
+function buildRouteDescriptor(routeDef, guideSlugSet) {
+  const path = routeDef.path
+  const meta = routeDef.meta ?? {}
+  const title = meta.title ?? ''
+  const description = meta.description ?? ''
+  const canonical = BASE_URL + (path === '/' ? '/' : path)
+  const outFile = path === '/' ? 'index.html' : `${path.replace(/^\//, '')}/index.html`
+  const jsonLd = guideSlugSet.has(path.replace(/^\//, ''))
+    ? makeArticleJsonLd(title, canonical)
+    : null
+
+  return { url: path, outFile, title, description, canonical, jsonLd }
 }
 
 /**
@@ -131,8 +83,19 @@ function makeArticleJsonLd(name, url) {
  *  - twitter:title, twitter:description, twitter:url
  *  - Adds per-route JSON-LD (article schema for guide pages)
  *  - Replaces <div id="app"></div> with rendered HTML
+ *
+ * Throws if the <div id="app"></div> marker is missing — that indicates a
+ * broken build template that would silently ship an un-hydrated page.
  */
 function injectIntoHtml(baseHtml, route, renderedHtml) {
+  const APP_MARKER = '<div id="app"></div>'
+  if (!baseHtml.includes(APP_MARKER)) {
+    throw new Error(
+      `[prerender] Template is missing "${APP_MARKER}" — the build template has changed. `
+      + 'Update prerender.mjs to match the new marker.',
+    )
+  }
+
   let html = baseHtml
 
   // Title
@@ -203,7 +166,7 @@ function injectIntoHtml(baseHtml, route, renderedHtml) {
 
   // Replace empty app div with SSR content
   html = html.replace(
-    '<div id="app"></div>',
+    APP_MARKER,
     `<div id="app" data-v-app="">${renderedHtml}</div>`,
   )
 
@@ -223,6 +186,16 @@ async function main() {
 
   // Read the built index.html as the base template
   const baseHtml = readFileSync(resolve(DIST, 'index.html'), 'utf-8')
+
+  // Validate the app marker before spending time rendering all routes
+  const APP_MARKER = '<div id="app"></div>'
+  if (!baseHtml.includes(APP_MARKER)) {
+    console.error(
+      `[prerender] FATAL: dist-demo/index.html is missing "${APP_MARKER}". `
+      + 'The build template has changed — update prerender.mjs to match.',
+    )
+    process.exit(1)
+  }
 
   // Create a Vite SSR server to load and render Vue components
   const viteServer = await createServer({
@@ -255,23 +228,46 @@ async function main() {
     logLevel: 'warn',
   })
 
+  const failures = []
+
   try {
     const { render } = await viteServer.ssrLoadModule('/entry-ssr.ts')
 
+    // Load route definitions from the single source of truth.
+    // marketingGuides is used to identify which routes get Article JSON-LD.
+    const { routeDefinitions, marketingGuides } = await viteServer.ssrLoadModule('/router/routes.ts')
+
+    const guideSlugSet = new Set(marketingGuides.map(g => g.slug))
+
+    // Build descriptors for every route, excluding non-public paths
+    const ROUTES = routeDefinitions
+      .filter(r => !EXCLUDED_PATHS.has(r.path))
+      .map(r => buildRouteDescriptor(r, guideSlugSet))
+
+    console.log(`[prerender] Found ${ROUTES.length} routes to prerender`)
+
     for (const route of ROUTES) {
       console.log(`[prerender] Rendering ${route.url}`)
-      let renderedHtml = ''
 
+      let renderedHtml
       try {
         renderedHtml = await render(route.url)
       }
       catch (err) {
-        console.warn(`[prerender] SSR render failed for ${route.url}, using shell: ${err.message}`)
-        // Fall back to an empty shell — meta tags + hydration still work
-        renderedHtml = ''
+        console.error(`[prerender] SSR render FAILED for ${route.url}: ${err.message}`)
+        failures.push({ url: route.url, error: err.message })
+        continue
       }
 
-      const html = injectIntoHtml(baseHtml, route, renderedHtml)
+      let html
+      try {
+        html = injectIntoHtml(baseHtml, route, renderedHtml)
+      }
+      catch (err) {
+        console.error(`[prerender] HTML injection FAILED for ${route.url}: ${err.message}`)
+        failures.push({ url: route.url, error: err.message })
+        continue
+      }
 
       const outPath = resolve(DIST, route.outFile)
       mkdirSync(dirname(outPath), { recursive: true })
@@ -281,6 +277,14 @@ async function main() {
   }
   finally {
     await viteServer.close()
+  }
+
+  if (failures.length > 0) {
+    console.error('\n[prerender] BUILD FAILED — the following routes did not prerender:')
+    for (const f of failures) {
+      console.error(`  ${f.url}: ${f.error}`)
+    }
+    process.exit(1)
   }
 
   console.log('[prerender] Done. All routes prerendered.')

@@ -1,4 +1,3 @@
-import { renderToString } from '@vue/server-renderer'
 /**
  * SSR entry point for prerendering marketing routes at build time.
  * Creates a Vue SSR app with memory history — never shipped to the browser.
@@ -6,6 +5,7 @@ import { renderToString } from '@vue/server-renderer'
  * Stubs for browser-only modules (duckdb-wasm, @vercel/analytics) are
  * configured in the Vite SSR server used by scripts/prerender.mjs.
  */
+import { renderToString } from '@vue/server-renderer'
 import { createSSRApp } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import App from './App.vue'
