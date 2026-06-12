@@ -10,6 +10,7 @@ import type {
   NumberFormat,
   PivotCell,
   PivotConfig,
+  PivotGroupStart,
   PivotResult,
   PivotRowMeta,
   PivotValueField,
@@ -690,124 +691,146 @@ export function computePivotResult(
   }
 
   // -------------------------------------------------------
-  // Build row list: for multi-level rowFields, include group
-  // rows (depth < rowFields.length - 1) before their children.
+  // Tabular-form collapse semantics
+  //
+  // Default output: ONLY leaf rows, same order as master.
+  // Each visible row carries `groupStarts` metadata so the UI
+  // can place chevrons without extra injected group rows.
+  //
+  // Collapsed group: all its leaf rows are replaced by ONE
+  // subtotal row (isSubtotal: true), aggregated over the full
+  // group's source rows via the same aggregate() path.
   // -------------------------------------------------------
 
-  /** Determine if a path is hidden because an ancestor is collapsed */
-  function isHiddenByCollapse(pathValues: string[]): boolean {
-    for (let len = 1; len < pathValues.length; len++) {
-      if (collapsedPaths.has(pathKey(pathValues.slice(0, len))))
-        return true
-    }
-    return false
-  }
-
-  // Collect all unique group-level prefixes (depth 0 … rowFields.length-2)
-  const groupPrefixSet = new Set<string>()
+  // Build map: prefixKey → leaf rowKeys belonging to that group
+  const groupLeafMap = new Map<string, string[]>()
   if (rowFields.length > 1) {
     for (const leafKey of leafRowKeys) {
       const parts = parseKey(leafKey)
       for (let depth = 1; depth < parts.length; depth++) {
-        groupPrefixSet.add(pathKey(parts.slice(0, depth)))
+        const prefixKey = pathKey(parts.slice(0, depth))
+        const existing = groupLeafMap.get(prefixKey)
+        if (existing) {
+          existing.push(leafKey)
+        }
+        else {
+          groupLeafMap.set(prefixKey, [leafKey])
+        }
       }
     }
   }
 
-  // Determine which leaf keys belong to each group prefix
-  // groupLeafMap: prefixKey → leaf rowKeys (makeKey-style, '|||'-joined)
-  const groupLeafMap = new Map<string, string[]>()
-  for (const prefixKey of groupPrefixSet) {
-    const prefixParts = parsePathKey(prefixKey)
-    const matching = leafRowKeys.filter((lk) => {
-      const lp = parseKey(lk)
-      return prefixParts.every((v, i) => lp[i] === v)
-    })
-    groupLeafMap.set(prefixKey, matching)
+  // Comparator for path-sorted row order (same as leaf key sort)
+  function comparePaths(a: string[], b: string[]): number {
+    const len = Math.min(a.length, b.length)
+    for (let i = 0; i < len; i++) {
+      const cmp = a[i].localeCompare(b[i], undefined, { numeric: true, sensitivity: 'base' })
+      if (cmp !== 0)
+        return cmp
+    }
+    return a.length - b.length
   }
 
-  // Build ordered list of visible rows
+  // Determine which ancestor (if any) is collapsed — returns the deepest
+  // collapsed ancestor path, or null if none.
+  function collapsedAncestor(leafParts: string[]): string[] | null {
+    // Check each prefix from shallowest to deepest
+    for (let len = 1; len < leafParts.length; len++) {
+      const prefix = leafParts.slice(0, len)
+      if (collapsedPaths.has(pathKey(prefix)))
+        return prefix
+    }
+    return null
+  }
+
+  // Build ordered visible rows in tabular form.
+  // Each entry is either a normal leaf or a collapsed-group subtotal.
   interface RowEntry {
-    rowPath: string[] // the path as display values
-    leafKeys: string[] // leaf rowKeys (makeKey style) contributing to this row
-    depth: number
-    isLeaf: boolean
-    isCollapsed: boolean
+    rowPath: string[]
+    leafKeys: string[]
+    isSubtotal: boolean
   }
 
   function buildRowEntries(): RowEntry[] {
     if (rowFields.length <= 1) {
-      // No hierarchy — every row is a leaf
       return leafRowKeys.map((lk) => {
         const parts = lk === '__all__' ? ['Total'] : parseKey(lk)
-        return { rowPath: parts, leafKeys: [lk], depth: 0, isLeaf: true, isCollapsed: false }
+        return { rowPath: parts, leafKeys: [lk], isSubtotal: false }
       })
     }
 
-    // Multi-level: include all group rows (always visible) and leaf rows.
-    // Collapsed group rows show subtotals; their children are hidden.
     const entries: RowEntry[] = []
-    const groupPrefixes = Array.from(groupPrefixSet).sort()
+    // Track which collapsed subtotals we've already emitted
+    const emittedSubtotals = new Set<string>()
 
-    for (const prefixKey of groupPrefixes) {
-      const prefixParts = parsePathKey(prefixKey)
-      if (isHiddenByCollapse(prefixParts))
-        continue
-      const isCollapsed = collapsedPaths.has(prefixKey)
-      const depth = prefixParts.length - 1
-      const leafKeysForGroup = groupLeafMap.get(prefixKey) ?? []
-      entries.push({
-        rowPath: prefixParts,
-        leafKeys: leafKeysForGroup,
-        depth,
-        isLeaf: false,
-        isCollapsed,
-      })
-    }
-
-    // Add leaf rows that are not hidden by any collapsed ancestor
     for (const lk of leafRowKeys) {
       const parts = parseKey(lk)
-      if (!isHiddenByCollapse(parts)) {
-        entries.push({
-          rowPath: parts,
-          leafKeys: [lk],
-          depth: parts.length - 1,
-          isLeaf: true,
-          isCollapsed: false,
-        })
+      const ancestor = collapsedAncestor(parts)
+      if (ancestor !== null) {
+        // Leaf is hidden by a collapsed ancestor — emit ONE subtotal for that group
+        const subtotalKey = pathKey(ancestor)
+        if (emittedSubtotals.has(subtotalKey))
+          continue
+        emittedSubtotals.add(subtotalKey)
+        const groupLeaves = groupLeafMap.get(subtotalKey) ?? []
+        // Pad subtotal path to full rowFields width with empty strings
+        const paddedPath = [...ancestor, ...Array.from({ length: rowFields.length - ancestor.length }).fill('')]
+        entries.push({ rowPath: paddedPath, leafKeys: groupLeaves, isSubtotal: true })
+      }
+      else {
+        entries.push({ rowPath: parts, leafKeys: [lk], isSubtotal: false })
       }
     }
 
-    // Sort: group rows before their leaf children; within same group, shorter path first
-    entries.sort((a, b) => {
-      const len = Math.min(a.rowPath.length, b.rowPath.length)
-      for (let i = 0; i < len; i++) {
-        const cmp = a.rowPath[i].localeCompare(b.rowPath[i], undefined, { numeric: true, sensitivity: 'base' })
-        if (cmp !== 0)
-          return cmp
-      }
-      return a.rowPath.length - b.rowPath.length
-    })
-
+    // Sort all visible rows by path
+    entries.sort((a, b) => comparePaths(a.rowPath, b.rowPath))
     return entries
   }
 
   const rowEntries = buildRowEntries()
 
-  // Determine which leaf keys are "visible" for column totals
-  // (only leaf rows that are not hidden)
-  // Build rowHeaders and rowMeta from entries
+  // Build groupStarts for each row entry.
+  // A group at depth d starts at the first visible row whose path[0..d] matches that group.
+  const seenGroupKeys = new Set<string>()
+
+  function buildGroupStarts(entry: RowEntry): PivotGroupStart[] {
+    // Only applies to multi-level hierarchies
+    if (rowFields.length <= 1)
+      return []
+    const starts: PivotGroupStart[] = []
+    // The effective path for a subtotal is the collapsed ancestor prefix
+    const effectivePath = entry.isSubtotal
+      ? entry.rowPath.slice(0, entry.rowPath.findLastIndex(v => v !== '') + 1)
+      : entry.rowPath
+    // Groups are at depths 0 … rowFields.length - 2 (not the leaf depth)
+    const maxGroupDepth = rowFields.length - 2
+    for (let depth = 0; depth <= maxGroupDepth; depth++) {
+      if (depth >= effectivePath.length)
+        break
+      const groupPath = effectivePath.slice(0, depth + 1)
+      const key = pathKey(groupPath)
+      if (!seenGroupKeys.has(key)) {
+        seenGroupKeys.add(key)
+        starts.push({
+          depth,
+          path: groupPath,
+          key,
+          isCollapsed: collapsedPaths.has(key),
+        })
+      }
+    }
+    return starts
+  }
+
+  // Build rowHeaders and rowMeta
   const rowHeaders: string[][] = rowEntries.map(e => e.rowPath)
 
   const rowMeta: PivotRowMeta[] = rowEntries.map((e) => {
-    const hasChildren = !e.isLeaf
     return {
       path: e.rowPath,
       key: pathKey(e.rowPath),
-      depth: e.depth,
-      hasChildren,
-      isCollapsed: e.isCollapsed,
+      isSubtotal: e.isSubtotal,
+      groupStarts: buildGroupStarts(e),
     }
   })
 
@@ -815,9 +838,7 @@ export function computePivotResult(
   // Build data matrix
   // -------------------------------------------------------
 
-  /**
-   * Get raw values for a set of leaf row keys + one column key
-   */
+  /** Get raw values for a set of leaf row keys + one column key */
   function getRawValues(leafKeys: string[], colKey: string): number[][] {
     const result: number[][] = valueFields.map(() => [])
     for (const lk of leafKeys) {
@@ -848,12 +869,10 @@ export function computePivotResult(
       if (!columnTotalsMap.has(colKey))
         columnTotalsMap.set(colKey, valueFields.map(() => []))
       const colTotals = columnTotalsMap.get(colKey)!
-      // Accumulate leaf rows AND collapsed group rows (each represents its full subtree).
-      // Expanded group rows are skipped to avoid double-counting their children.
-      if (entry.isLeaf || entry.isCollapsed) {
-        for (let fi = 0; fi < rawValues.length; fi++) {
-          colTotals[fi].push(...rawValues[fi])
-        }
+      // Every visible row (leaf or subtotal) contributes to column totals.
+      // No double-counting since each leaf key appears in exactly one visible row.
+      for (let fi = 0; fi < rawValues.length; fi++) {
+        colTotals[fi].push(...rawValues[fi])
       }
 
       for (let vfIdx = 0; vfIdx < valueFields.length; vfIdx++) {
@@ -875,11 +894,9 @@ export function computePivotResult(
     }
   }
 
-  // Column totals: show when there are multiple visible leaf-equivalent rows
-  // (leaves + collapsed groups each count as one data row)
+  // Column totals: show when there are multiple visible rows
   const columnTotals: PivotCell[] = []
-  const visibleRowCount = rowEntries.filter(e => e.isLeaf || e.isCollapsed).length
-  if (showColumnTotals && visibleRowCount > 1) {
+  if (showColumnTotals && rowEntries.length > 1) {
     for (const colKey of colKeys) {
       const colRawValues = columnTotalsMap.get(colKey) ?? valueFields.map(() => [])
       for (let vfIdx = 0; vfIdx < valueFields.length; vfIdx++) {

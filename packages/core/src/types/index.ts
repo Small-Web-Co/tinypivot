@@ -135,17 +135,34 @@ export interface PivotCell {
   formattedValue: string
 }
 
-export interface PivotRowMeta {
-  /** The path through rowFields for this row (e.g. ['West', 'Widgets']) */
-  path: string[]
-  /** NUL-joined key for use in collapsedPaths sets */
-  key: string
-  /** Depth in the row hierarchy (0 = outermost group, n = leaf) */
+/** Describes one row-group boundary that begins at a given visible row */
+export interface PivotGroupStart {
+  /** Depth of the group in the row hierarchy (0 = outermost) */
   depth: number
-  /** True when this row has child rows in the full (uncollapsed) output */
-  hasChildren: boolean
-  /** True when this row is currently collapsed */
+  /** Path values up to this group level (e.g. ['West'] at depth 0) */
+  path: string[]
+  /** NUL-joined path key for use in collapsedPaths sets */
+  key: string
+  /** True when this group is currently collapsed */
   isCollapsed: boolean
+}
+
+export interface PivotRowMeta {
+  /** Full path for this row (leaf: all rowField values; subtotal: partial path) */
+  path: string[]
+  /** NUL-joined key for this row's path */
+  key: string
+  /**
+   * True when this row is a collapsed-group subtotal row.
+   * False for normal leaf rows.
+   */
+  isSubtotal: boolean
+  /**
+   * Groups that begin at this row (i.e. this is the first visible row for each group).
+   * The UI places chevrons in the group header cells at these depths.
+   * Only depths < rowFields.length - 1 are collapsible.
+   */
+  groupStarts: PivotGroupStart[]
 }
 
 export interface PivotResult {
