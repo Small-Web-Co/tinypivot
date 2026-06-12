@@ -16,6 +16,7 @@ export default defineConfig({
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'TinyPivotVue',
       fileName: 'tinypivot-vue',
+      cssFileName: 'style',
       formats: ['es', 'umd'],
     },
     rollupOptions: {
