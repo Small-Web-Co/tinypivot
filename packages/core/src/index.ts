@@ -110,8 +110,10 @@ export {
   loadCalculatedFields,
   loadPivotConfig,
   parseFormula,
+  parsePathKey,
   // Simple Formula (field-level calculations)
   parseSimpleFormula,
+  pathKey,
   removeCalculatedField,
   // Calculated Fields Storage
   saveCalculatedFields,
@@ -120,7 +122,7 @@ export {
   validateSimpleFormula,
 } from './pivot'
 
-export type { FormulaFunction } from './pivot'
+export type { ComputePivotOptions, FormulaFunction } from './pivot'
 
 // Types
 export type {
@@ -195,6 +197,7 @@ export type {
   PivotConfig,
   PivotField,
   PivotResult,
+  PivotRowMeta,
   PivotTableProps,
   PivotValueField,
   QueryRequest,

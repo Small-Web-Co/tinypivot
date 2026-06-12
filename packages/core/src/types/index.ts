@@ -135,6 +135,19 @@ export interface PivotCell {
   formattedValue: string
 }
 
+export interface PivotRowMeta {
+  /** The path through rowFields for this row (e.g. ['West', 'Widgets']) */
+  path: string[]
+  /** NUL-joined key for use in collapsedPaths sets */
+  key: string
+  /** Depth in the row hierarchy (0 = outermost group, n = leaf) */
+  depth: number
+  /** True when this row has child rows in the full (uncollapsed) output */
+  hasChildren: boolean
+  /** True when this row is currently collapsed */
+  isCollapsed: boolean
+}
+
 export interface PivotResult {
   headers: string[][]
   rowHeaders: string[][]
@@ -142,6 +155,8 @@ export interface PivotResult {
   rowTotals: PivotCell[]
   columnTotals: PivotCell[]
   grandTotal: PivotCell
+  /** Metadata for each row, parallel to rowHeaders */
+  rowMeta: PivotRowMeta[]
 }
 
 export interface FieldStats {
