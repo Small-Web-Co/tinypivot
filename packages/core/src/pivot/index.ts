@@ -515,6 +515,51 @@ function extractNumericValue(
   return num
 }
 
+/** Merge all raw leaf values for a colKey and return per-value-field arrays */
+function mergeLeafValues(
+  leafRowKeys: string[],
+  leafDataMap: Map<string, Map<string, number[][]>>,
+  colKeys: string[],
+  fieldCount: number,
+): number[][] {
+  const merged: number[][] = Array.from({ length: fieldCount }, () => [])
+  for (const lk of leafRowKeys) {
+    const colMap = leafDataMap.get(lk)
+    if (!colMap)
+      continue
+    for (const colKey of colKeys) {
+      const vals = colMap.get(colKey)
+      if (!vals)
+        continue
+      for (let fi = 0; fi < vals.length; fi++) {
+        merged[fi].push(...vals[fi])
+      }
+    }
+  }
+  return merged
+}
+
+/** Compute the grand total PivotCell (always over all leaf source rows) */
+function buildGrandTotal(
+  leafRowKeys: string[],
+  leafDataMap: Map<string, Map<string, number[][]>>,
+  colKeys: string[],
+  valueFields: PivotValueField[],
+  grandTotals: number[],
+  calcFieldMap: Map<string, CalculatedField>,
+  showRowTotals: boolean,
+  showColumnTotals: boolean,
+): PivotCell {
+  const empty: PivotCell = { value: null, count: 0, formattedValue: '-' }
+  if (!showRowTotals || !showColumnTotals || valueFields.length === 0)
+    return empty
+
+  const allRawValues = mergeLeafValues(leafRowKeys, leafDataMap, colKeys, valueFields.length)
+  const vf = valueFields[0]
+  const values = allRawValues[0] ?? []
+  return buildCell(values, vf, grandTotals[0], calcFieldMap)
+}
+
 /** Compute a formatted PivotCell from raw numeric values */
 function buildCell(
   values: number[],
@@ -752,8 +797,6 @@ export function computePivotResult(
 
   // Determine which leaf keys are "visible" for column totals
   // (only leaf rows that are not hidden)
-  const visibleLeafKeySet = new Set(rowEntries.flatMap(e => e.isLeaf ? e.leafKeys : []))
-
   // Build rowHeaders and rowMeta from entries
   const rowHeaders: string[][] = rowEntries.map(e => e.rowPath)
 
@@ -805,8 +848,9 @@ export function computePivotResult(
       if (!columnTotalsMap.has(colKey))
         columnTotalsMap.set(colKey, valueFields.map(() => []))
       const colTotals = columnTotalsMap.get(colKey)!
-      // Only accumulate leaf rows in column totals to avoid double-counting
-      if (entry.isLeaf) {
+      // Accumulate leaf rows AND collapsed group rows (each represents its full subtree).
+      // Expanded group rows are skipped to avoid double-counting their children.
+      if (entry.isLeaf || entry.isCollapsed) {
         for (let fi = 0; fi < rawValues.length; fi++) {
           colTotals[fi].push(...rawValues[fi])
         }
@@ -831,10 +875,11 @@ export function computePivotResult(
     }
   }
 
-  // Column totals (based on visible leaf rows only — avoids double-counting group rows)
+  // Column totals: show when there are multiple visible leaf-equivalent rows
+  // (leaves + collapsed groups each count as one data row)
   const columnTotals: PivotCell[] = []
-  const visibleLeafCount = Array.from(visibleLeafKeySet).length
-  if (showColumnTotals && visibleLeafCount > 1) {
+  const visibleRowCount = rowEntries.filter(e => e.isLeaf || e.isCollapsed).length
+  if (showColumnTotals && visibleRowCount > 1) {
     for (const colKey of colKeys) {
       const colRawValues = columnTotalsMap.get(colKey) ?? valueFields.map(() => [])
       for (let vfIdx = 0; vfIdx < valueFields.length; vfIdx++) {
@@ -845,30 +890,8 @@ export function computePivotResult(
     }
   }
 
-  // Grand total
-  const grandTotal: PivotCell = { value: null, count: 0, formattedValue: '-' }
-  if (showRowTotals && showColumnTotals && valueFields.length > 0) {
-    const allRawValues: number[][] = valueFields.map(() => [])
-    for (const lk of leafRowKeys) {
-      const colMap = leafDataMap.get(lk)
-      if (colMap) {
-        for (const colKey of colKeys) {
-          const vals = colMap.get(colKey)
-          if (vals) {
-            for (let fi = 0; fi < vals.length; fi++) {
-              allRawValues[fi].push(...vals[fi])
-            }
-          }
-        }
-      }
-    }
-    const vf = valueFields[0]
-    const values = allRawValues[0] ?? []
-    const aggValue = aggregate(values, vf.aggregation, grandTotals[0])
-    grandTotal.value = aggValue
-    grandTotal.count = values.length
-    grandTotal.formattedValue = formatAggregatedValue(aggValue, vf.aggregation)
-  }
+  // Grand total (always over entire dataset — independent of collapse state)
+  const grandTotal = buildGrandTotal(leafRowKeys, leafDataMap, colKeys, valueFields, grandTotals, calcFieldMap, showRowTotals, showColumnTotals)
 
   return {
     headers,

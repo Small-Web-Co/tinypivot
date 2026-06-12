@@ -667,3 +667,145 @@ describe('computePivotResult – nested collapse no-op', () => {
     expect(resultParent.data).toEqual(resultBoth.data)
   })
 })
+
+describe('computePivotResult – collapse with stdDev (NOT derivable from child cells)', () => {
+  /**
+   * stdDev requires the full population, not component stdDevs.
+   * West/Widgets: [10, 20]  mean=15, stdDev=5
+   * West/Gadgets: [10, 20]  mean=15, stdDev=5
+   * West combined: [10, 20, 10, 20]
+   *   mean = (10+20+10+20)/4 = 15
+   *   squared diffs: [25, 25, 25, 25] → avg=25 → stdDev=5
+   *
+   * Now use asymmetric values so avg-of-child-stdDevs would differ:
+   * West/Widgets: [0, 10]   mean=5, stdDev=5
+   * West/Gadgets: [100, 110] mean=105, stdDev=5
+   * West combined: [0, 10, 100, 110]
+   *   mean = 55
+   *   squared diffs: [3025, 2025, 2025, 3025] → avg=2525 → stdDev=√2525≈50.25
+   *   Child stdDevs are both 5 → avg(5,5)=5, sum=10, neither equals 50.25
+   */
+  const stdDevData: Record<string, unknown>[] = [
+    { region: 'West', product: 'Widgets', sales: 0 },
+    { region: 'West', product: 'Widgets', sales: 10 },
+    { region: 'West', product: 'Gadgets', sales: 100 },
+    { region: 'West', product: 'Gadgets', sales: 110 },
+    { region: 'East', product: 'Widgets', sales: 1 },
+  ]
+  const stdDevConfig = {
+    rowFields: ['region', 'product'],
+    columnFields: [],
+    valueFields: [{ field: 'sales', aggregation: 'stdDev' as const }],
+    showRowTotals: false,
+    showColumnTotals: false,
+  }
+  const collapsedWest = new Set([pathKey(['West'])])
+
+  it('west collapsed stdDev = √2525 (stdDev over all 4 West source rows, not avg of child stdDevs)', () => {
+    const result = computePivotResult(stdDevData, stdDevConfig, { collapsedPaths: collapsedWest })!
+    const westRowIdx = result.rowMeta.findIndex(m => m.path[0] === 'West' && m.path.length === 1)
+    const cell = result.data[westRowIdx][0]
+    const expected = Math.sqrt(2525) // ≈ 50.249
+    expect(cell.value).toBeCloseTo(expected, 5)
+    // Verify it is NOT 5 (avg of children) or 10 (sum of children)
+    expect(cell.value).not.toBeCloseTo(5, 1)
+  })
+})
+
+describe('computePivotResult – column totals with collapse', () => {
+  /**
+   * Verify column totals are correct when a group is collapsed.
+   * With West collapsed: colTotals should include West (via its collapsed group row)
+   * + East leaf rows. So total should equal the grand total across all rows.
+   *
+   * No-column-field config for simplicity. All sales in one cell per row.
+   * West (collapsed): sales = 150+350+800 = 1800 (sum over all West source rows per drillData)
+   * East/Gadgets: 640, East/Widgets: 800
+   * Column total (no colField, just one cell): 1800 + 640 + 800 = 3240
+   */
+  it('column total with collapsed West equals sum of West-subtotal + East leaf rows', () => {
+    const noColConfig = {
+      rowFields: ['region', 'product'],
+      columnFields: [],
+      valueFields: [{ field: 'sales', aggregation: 'sum' as const }],
+      showRowTotals: false,
+      showColumnTotals: true,
+    }
+    const collapsedWest = new Set([pathKey(['West'])])
+    const result = computePivotResult(drillData, noColConfig, { collapsedPaths: collapsedWest })!
+    // columnTotals has 1 cell (single value field, no colFields)
+    expect(result.columnTotals).toHaveLength(1)
+    // West=1800, East/Gadgets=640, East/Widgets=800 → 3240
+    // (East group row is NOT added again since it's an expanded group, not a leaf/collapsed)
+    expect(result.columnTotals[0].value).toBe(3240)
+  })
+})
+
+describe('computePivotResult – 3-level row hierarchy', () => {
+  /**
+   * Three rowFields: region / product / quarter
+   * Collapse behavior at each level:
+   * - Collapse root (region) → only the region collapsed row visible for that branch
+   * - Collapse mid-level (region/product) → region group row + mid-level collapsed row visible
+   * Depth checks: region rows at depth=0, product rows at depth=1, quarter rows at depth=2
+   */
+  const deepData: Record<string, unknown>[] = [
+    { region: 'West', product: 'Widgets', quarter: 'Q1', sales: 10 },
+    { region: 'West', product: 'Widgets', quarter: 'Q2', sales: 20 },
+    { region: 'West', product: 'Gadgets', quarter: 'Q1', sales: 30 },
+    { region: 'East', product: 'Widgets', quarter: 'Q1', sales: 5 },
+  ]
+  const deepConfig = {
+    rowFields: ['region', 'product', 'quarter'],
+    columnFields: [],
+    valueFields: [{ field: 'sales', aggregation: 'sum' as const }],
+    showRowTotals: false,
+    showColumnTotals: false,
+  }
+
+  it('expanded: depth values are 0/1/2 for region/product/quarter rows', () => {
+    const result = computePivotResult(deepData, deepConfig)!
+    const depths = result.rowMeta.map(m => m.depth)
+    // Should have rows at depth 0 (region), 1 (region/product), 2 (leaf)
+    expect(depths).toContain(0)
+    expect(depths).toContain(1)
+    expect(depths).toContain(2)
+  })
+
+  it('collapsing root region hides all product and quarter rows for that region', () => {
+    const collapsed = new Set([pathKey(['West'])])
+    const result = computePivotResult(deepData, deepConfig, { collapsedPaths: collapsed })!
+    const westPaths = result.rowMeta.filter(m => m.path[0] === 'West')
+    // Only the West group row itself should remain
+    expect(westPaths).toHaveLength(1)
+    expect(westPaths[0].path).toEqual(['West'])
+    expect(westPaths[0].isCollapsed).toBe(true)
+  })
+
+  it('collapsing root region: West collapsed row sales = sum of all West source rows', () => {
+    const collapsed = new Set([pathKey(['West'])])
+    const result = computePivotResult(deepData, deepConfig, { collapsedPaths: collapsed })!
+    const westIdx = result.rowMeta.findIndex(m => m.path.length === 1 && m.path[0] === 'West')
+    expect(result.data[westIdx][0].value).toBe(60) // 10+20+30
+  })
+
+  it('collapsing mid-level (West/Widgets): West group row + West/Widgets collapsed + West/Gadgets leaves remain', () => {
+    const collapsed = new Set([pathKey(['West', 'Widgets'])])
+    const result = computePivotResult(deepData, deepConfig, { collapsedPaths: collapsed })!
+    // West group row (depth=0), West/Gadgets group row (depth=1), West/Gadgets/Q1 leaf (depth=2),
+    // West/Widgets collapsed (depth=1), East group row, East/Widgets group row, East/Widgets/Q1 leaf
+    const westWidgets = result.rowMeta.filter(m => m.path.length === 2 && m.path[0] === 'West' && m.path[1] === 'Widgets')
+    expect(westWidgets).toHaveLength(1)
+    expect(westWidgets[0].isCollapsed).toBe(true)
+    // West/Widgets quarter rows should be absent
+    const wwtChildren = result.rowMeta.filter(m => m.path.length === 3 && m.path[0] === 'West' && m.path[1] === 'Widgets')
+    expect(wwtChildren).toHaveLength(0)
+  })
+
+  it('collapsing mid-level (West/Widgets): collapsed row sum = 10 + 20 = 30', () => {
+    const collapsed = new Set([pathKey(['West', 'Widgets'])])
+    const result = computePivotResult(deepData, deepConfig, { collapsedPaths: collapsed })!
+    const idx = result.rowMeta.findIndex(m => m.path.length === 2 && m.path[0] === 'West' && m.path[1] === 'Widgets')
+    expect(result.data[idx][0].value).toBe(30) // 10+20
+  })
+})
