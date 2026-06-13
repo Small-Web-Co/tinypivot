@@ -6,7 +6,7 @@
  */
 
 // Components
-export { AIAnalyst, ColumnFilter, DataGrid, DrillThroughModal, PivotConfig, PivotSkeleton } from './components'
+export { AIAnalyst, ColumnFilter, DataGrid, PivotConfig, PivotSkeleton } from './components'
 
 // Hooks
 export {
