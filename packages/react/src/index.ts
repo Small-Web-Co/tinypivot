@@ -14,7 +14,9 @@ export {
   copyToClipboard,
   enableDemoMode,
   exportPivotToCSV,
+  exportPivotToXLSX,
   exportToCSV,
+  exportToXLSX,
   formatCellValue,
   formatSelectionForClipboard,
   getAggregationLabel,
@@ -64,16 +66,16 @@ export type {
   FieldStats,
   // Event Types
   FilterEvent,
-
   GridOptions,
-  LicenseInfo,
 
+  LicenseInfo,
   // License Types
   LicenseType,
+
   // Feature Types
   PaginationOptions,
-
   PivotCell,
+
   PivotConfig as PivotConfigType,
   PivotField,
   PivotGroupStart,
@@ -82,8 +84,9 @@ export type {
   PivotTableProps,
   PivotValueField,
   RowSelectionChangeEvent,
-
   SelectionBounds,
+
   SelectionChangeEvent,
   SortEvent,
+  XlsxExportOptions,
 } from '@smallwebco/tinypivot-core'

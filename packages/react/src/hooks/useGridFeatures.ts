@@ -1,8 +1,10 @@
-import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds } from '@smallwebco/tinypivot-core'
+import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds, XlsxExportOptions } from '@smallwebco/tinypivot-core'
 import {
   copyToClipboard as coreCopyToClipboard,
   exportPivotToCSV as coreExportPivotToCSV,
+  exportPivotToXLSX as coreExportPivotToXLSX,
   exportToCSV as coreExportToCSV,
+  exportToXLSX as coreExportToXLSX,
   formatSelectionForClipboard as coreFormatSelection,
 } from '@smallwebco/tinypivot-core'
 /**
@@ -28,6 +30,24 @@ export function exportPivotToCSV(
   options?: ExportOptions,
 ): void {
   coreExportPivotToCSV(pivotData, rowFields, columnFields, valueFields, options)
+}
+
+export async function exportToXLSX<T extends Record<string, unknown>>(
+  data: T[],
+  columns: string[],
+  options?: XlsxExportOptions,
+): Promise<void> {
+  await coreExportToXLSX(data, columns, options)
+}
+
+export async function exportPivotToXLSX(
+  pivotData: PivotExportData,
+  rowFields: string[],
+  columnFields: string[],
+  valueFields: PivotValueField[],
+  options?: XlsxExportOptions,
+): Promise<void> {
+  await coreExportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, options)
 }
 
 export function copyToClipboard(

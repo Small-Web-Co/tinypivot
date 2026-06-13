@@ -23,7 +23,9 @@ import { useExcelGrid } from '../hooks/useExcelGrid'
 import {
   copyToClipboard,
   exportPivotToCSV,
+  exportPivotToXLSX,
   exportToCSV,
+  exportToXLSX,
   formatSelectionForClipboard,
 } from '../hooks/useGridFeatures'
 import { useLicense } from '../hooks/useLicense'
@@ -126,7 +128,7 @@ export function DataGrid({
   onCollapseChange,
   onDrillThrough,
 }: DataGridProps) {
-  const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro, licenseInfo } = useLicense()
+  const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, canUseXlsxExport, isDemo, isPro, licenseInfo } = useLicense()
 
   // Drill-through state
   const [drillThroughResult, setDrillThroughResult] = useState<DrillThroughResult | null>(null)
@@ -592,6 +594,69 @@ export function DataGrid({
     })
 
     onExport?.({ rowCount: dataToExport.length, filename: exportFilename })
+  }, [
+    viewMode,
+    pivotResult,
+    exportFilename,
+    pivotShowRowTotals,
+    pivotShowColumnTotals,
+    pivotRowFields,
+    pivotColumnFields,
+    pivotValueFields,
+    enableSearch,
+    globalSearchTerm,
+    searchFilteredData,
+    rows,
+    columnKeys,
+    onExport,
+  ])
+
+  const handleExportXLSX = useCallback(async () => {
+    if (viewMode === 'pivot') {
+      if (!pivotResult)
+        return
+
+      const xlsxFilename = exportFilename.replace('.csv', '-pivot.xlsx')
+
+      try {
+        await exportPivotToXLSX(
+          {
+            headers: pivotResult.headers,
+            rowHeaders: pivotResult.rowHeaders,
+            data: pivotResult.data,
+            rowTotals: pivotResult.rowTotals,
+            columnTotals: pivotResult.columnTotals,
+            grandTotal: pivotResult.grandTotal,
+            showRowTotals: pivotShowRowTotals,
+            showColumnTotals: pivotShowColumnTotals,
+          },
+          pivotRowFields,
+          pivotColumnFields,
+          pivotValueFields,
+          { filename: xlsxFilename },
+        )
+        onExport?.({ rowCount: pivotResult.rowHeaders.length, filename: xlsxFilename })
+      }
+      catch (err) {
+        console.error('[TinyPivot] XLSX pivot export failed:', err)
+      }
+      return
+    }
+
+    const dataToExport
+      = enableSearch && globalSearchTerm.trim()
+        ? searchFilteredData.map(row => row.original)
+        : rows.map(row => row.original)
+
+    const xlsxFilename = exportFilename.replace('.csv', '.xlsx')
+
+    try {
+      await exportToXLSX(dataToExport, columnKeys, { filename: xlsxFilename })
+      onExport?.({ rowCount: dataToExport.length, filename: xlsxFilename })
+    }
+    catch (err) {
+      console.error('[TinyPivot] XLSX export failed:', err)
+    }
   }, [
     viewMode,
     pivotResult,
@@ -1246,6 +1311,25 @@ export function DataGrid({
               Export
             </button>
           )}
+          {enableExport && viewMode === 'grid' && (
+            <button
+              className={`vpg-export-btn ${!canUseXlsxExport ? 'vpg-export-btn-disabled' : ''}`}
+              disabled={!canUseXlsxExport}
+              title={canUseXlsxExport ? 'Export to XLSX' : 'Export to XLSX (Pro feature)'}
+              onClick={() => canUseXlsxExport && handleExportXLSX()}
+            >
+              <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Export XLSX
+              {!canUseXlsxExport ? ' (Pro)' : ''}
+            </button>
+          )}
           {enableExport && viewMode === 'pivot' && pivotIsConfigured && (
             <button
               className={`vpg-export-btn ${!isPro ? 'vpg-export-btn-disabled' : ''}`}
@@ -1263,6 +1347,25 @@ export function DataGrid({
               </svg>
               Export Pivot
               {!isPro ? ' (Pro)' : ''}
+            </button>
+          )}
+          {enableExport && viewMode === 'pivot' && pivotIsConfigured && (
+            <button
+              className={`vpg-export-btn ${!canUseXlsxExport ? 'vpg-export-btn-disabled' : ''}`}
+              disabled={!canUseXlsxExport}
+              title={canUseXlsxExport ? 'Export Pivot to XLSX' : 'Export Pivot to XLSX (Pro feature)'}
+              onClick={() => canUseXlsxExport && handleExportXLSX()}
+            >
+              <svg className="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Export Pivot XLSX
+              {!canUseXlsxExport ? ' (Pro)' : ''}
             </button>
           )}
         </div>
