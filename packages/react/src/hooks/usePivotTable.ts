@@ -71,7 +71,7 @@ interface UsePivotTableReturn {
 /**
  * Main pivot table hook
  */
-export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableReturn {
+export function usePivotTable(data: Record<string, unknown>[], enableDrillDown = true): UsePivotTableReturn {
   const { canUsePivot, requirePro } = useLicense()
 
   // Configuration state
@@ -125,8 +125,8 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
       showRowTotals,
       showColumnTotals,
       calculatedFields,
-    }, { collapsedPaths })
-  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields, collapsedPaths])
+    }, { collapsedPaths: enableDrillDown ? collapsedPaths : new Set<string>() })
+  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields, collapsedPaths, enableDrillDown])
 
   // Load/save config from storage
   useEffect(() => {

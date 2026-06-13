@@ -251,7 +251,7 @@ export function DataGrid({
     removeCalculatedField,
     collapsedPaths: pivotCollapsedPaths,
     toggleCollapsedPath,
-  } = usePivotTable(filteredDataForPivot)
+  } = usePivotTable(filteredDataForPivot, enableDrillDown)
 
   const handleToggleCollapse = useCallback(
     (key: string, altKey: boolean) => {

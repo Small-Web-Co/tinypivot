@@ -26,7 +26,7 @@ export { getAggregationLabel }
 /**
  * Main pivot table composable
  */
-export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
+export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillDown: Ref<boolean> = ref(true)) {
   const { canUsePivot, requirePro } = useLicense()
 
   // Configuration state
@@ -83,7 +83,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
       showRowTotals: showRowTotals.value,
       showColumnTotals: showColumnTotals.value,
       calculatedFields: calculatedFields.value,
-    }, { collapsedPaths: collapsedPaths.value })
+    }, { collapsedPaths: enableDrillDown.value ? collapsedPaths.value : new Set() })
   })
 
   // Actions - pivot is free with sum aggregation, Pro required for other aggregations

@@ -261,7 +261,7 @@ const {
   autoSuggestConfig: _autoSuggestConfig,
   collapsedPaths: pivotCollapsedPaths,
   toggleCollapsedPath,
-} = usePivotTable(filteredDataForPivot)
+} = usePivotTable(filteredDataForPivot, computed(() => props.enableDrillDown ?? true))
 
 // Filtered data based on global search
 const searchFilteredData = computed(() => {
