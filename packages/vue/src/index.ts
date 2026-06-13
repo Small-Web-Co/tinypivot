@@ -45,6 +45,9 @@ export type {
   CopyEvent,
   // Component Props Types
   DataGridProps,
+  // Drill-through types
+  DrillThroughDescriptor,
+  DrillThroughResult,
   ExportEvent,
   ExportOptions,
   FieldRoleOverrides,
@@ -63,7 +66,9 @@ export type {
   PivotCell,
   PivotConfig as PivotConfigType,
   PivotField,
+  PivotGroupStart,
   PivotResult,
+  PivotRowMeta,
   PivotTableProps,
   PivotValueField,
   RowSelectionChangeEvent,

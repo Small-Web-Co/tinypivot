@@ -77,6 +77,7 @@ export type { PivotExportData } from './export'
 export {
   canUseAIAnalyst,
   canUseCharts,
+  canUseDrillThrough,
   canUsePivot,
   configureLicenseSecret,
   getDemoLicenseInfo,
@@ -104,14 +105,18 @@ export {
   generateStorageKey,
   getAggregationLabel,
   getAggregationSymbol,
+  // Drill-Through
+  getDrillThroughRows,
   getUnassignedFields,
   isConfigValidForFields,
   isPivotConfigured,
   loadCalculatedFields,
   loadPivotConfig,
   parseFormula,
+  parsePathKey,
   // Simple Formula (field-level calculations)
   parseSimpleFormula,
+  pathKey,
   removeCalculatedField,
   // Calculated Fields Storage
   saveCalculatedFields,
@@ -120,7 +125,7 @@ export {
   validateSimpleFormula,
 } from './pivot'
 
-export type { FormulaFunction } from './pivot'
+export type { ComputePivotOptions, FormulaFunction } from './pivot'
 
 // Types
 export type {
@@ -130,9 +135,9 @@ export type {
   // AI Data Analyst Types
   AIAnalystConfig,
   AIColumnOverride,
-
   AIColumnSchema,
   AIConversation,
+
   AIConversationUpdateEvent,
   AIDataLoadedEvent,
   AIDataSource,
@@ -140,9 +145,9 @@ export type {
   AIMessage,
   AIMessageMetadata,
   AIProvider,
-
   AIProxyRequest,
   AIProxyResponse,
+
   AIQueryExecutedEvent,
   AITableSchema,
   CalculatedField,
@@ -152,16 +157,16 @@ export type {
   ChartConfig,
   ChartData,
   ChartField,
-
   ChartFieldInfo,
   ChartOptions,
 
   ChartSeries,
   ChartType,
-  ChartTypeInfo,
 
+  ChartTypeInfo,
   ColumnFilter,
   ColumnFilterValue,
+
   // Grid Types
   ColumnStats,
   CopyEvent,
@@ -172,6 +177,8 @@ export type {
   DataGridProps,
   DateFormat,
   DateRange,
+  DrillThroughDescriptor,
+  DrillThroughResult,
 
   ExportEvent,
   ExportOptions,
@@ -194,7 +201,9 @@ export type {
   PivotCell,
   PivotConfig,
   PivotField,
+  PivotGroupStart,
   PivotResult,
+  PivotRowMeta,
   PivotTableProps,
   PivotValueField,
   QueryRequest,

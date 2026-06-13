@@ -37,6 +37,7 @@ interface UsePivotTableReturn {
   showRowTotals: boolean
   showColumnTotals: boolean
   calculatedFields: CalculatedField[]
+  collapsedPaths: Set<string>
 
   // Computed
   availableFields: FieldStats[]
@@ -64,12 +65,13 @@ interface UsePivotTableReturn {
   setColumnFields: (fields: string[]) => void
   addCalculatedField: (field: CalculatedField) => void
   removeCalculatedField: (id: string) => void
+  toggleCollapsedPath: (key: string, altKey: boolean, rowFields: string[], currentPivotResult: PivotResult | null) => Set<string>
 }
 
 /**
  * Main pivot table hook
  */
-export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableReturn {
+export function usePivotTable(data: Record<string, unknown>[], enableDrillDown = true): UsePivotTableReturn {
   const { canUsePivot, requirePro } = useLicense()
 
   // Configuration state
@@ -80,6 +82,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
   const [showColumnTotals, setShowColumnTotals] = useState(true)
   const [calculatedFields, setCalculatedFields] = useState<CalculatedField[]>(() => loadCalculatedFields())
   const [currentStorageKey, setCurrentStorageKey] = useState<string | null>(null)
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
 
   // Compute available fields from data
   const availableFields = useMemo((): FieldStats[] => {
@@ -116,8 +119,8 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
       showRowTotals,
       showColumnTotals,
       calculatedFields,
-    })
-  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields])
+    }, { collapsedPaths: enableDrillDown ? collapsedPaths : new Set<string>() })
+  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields, collapsedPaths, enableDrillDown])
 
   // Load/save config from storage
   useEffect(() => {
@@ -156,6 +159,22 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
           setValueFields([])
         }
       }
+
+      // Load collapsed paths from separate sessionStorage key
+      try {
+        const collapsedKey = `${storageKey}-collapsed`
+        const raw = sessionStorage.getItem(collapsedKey)
+        if (raw) {
+          const parsed = JSON.parse(raw) as string[]
+          setCollapsedPaths(new Set(parsed))
+        }
+        else {
+          setCollapsedPaths(new Set())
+        }
+      }
+      catch {
+        setCollapsedPaths(new Set())
+      }
     }
   }, [data])
 
@@ -174,6 +193,19 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     }
     savePivotConfig(currentStorageKey, config)
   }, [currentStorageKey, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields])
+
+  // Save collapsedPaths separately when it or the storage key changes
+  useEffect(() => {
+    if (!currentStorageKey)
+      return
+    try {
+      const collapsedKey = `${currentStorageKey}-collapsed`
+      sessionStorage.setItem(collapsedKey, JSON.stringify(Array.from(collapsedPaths)))
+    }
+    catch {
+      // sessionStorage not available (SSR or private browsing)
+    }
+  }, [collapsedPaths, currentStorageKey])
 
   // Actions - pivot is free with sum aggregation, Pro required for other aggregations
   const addRowField = useCallback(
@@ -296,6 +328,67 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     setValueFields(prev => prev.filter(v => v.field !== `calc:${id}`))
   }, [])
 
+  const toggleCollapsedPath = useCallback(
+    (key: string, altKey: boolean, _rowFields: string[], currentPivotResult: PivotResult | null) => {
+      if (!altKey) {
+        const next = new Set(collapsedPaths)
+        if (next.has(key)) {
+          next.delete(key)
+        }
+        else {
+          next.add(key)
+        }
+        setCollapsedPaths(next)
+        return next
+      }
+
+      // Alt-click: toggle all groups at the same depth
+      if (!currentPivotResult)
+        return new Set<string>()
+
+      // Determine which depth this key belongs to by looking at groupStarts
+      let targetDepth = -1
+      for (const meta of currentPivotResult.rowMeta) {
+        for (const gs of meta.groupStarts) {
+          if (gs.key === key) {
+            targetDepth = gs.depth
+            break
+          }
+        }
+        if (targetDepth >= 0)
+          break
+      }
+
+      if (targetDepth < 0)
+        return new Set<string>()
+
+      // Collect all keys at this depth
+      const keysAtDepth = new Set<string>()
+      for (const meta of currentPivotResult.rowMeta) {
+        for (const gs of meta.groupStarts) {
+          if (gs.depth === targetDepth) {
+            keysAtDepth.add(gs.key)
+          }
+        }
+      }
+
+      // If the clicked key is currently collapsed, expand all; otherwise collapse all
+      const shouldCollapse = !collapsedPaths.has(key)
+      const next = new Set(collapsedPaths)
+      for (const k of keysAtDepth) {
+        if (shouldCollapse) {
+          next.add(k)
+        }
+        else {
+          next.delete(k)
+        }
+      }
+      setCollapsedPaths(next)
+      return next
+    },
+    [collapsedPaths],
+  )
+
   return {
     // State
     rowFields,
@@ -304,6 +397,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     showRowTotals,
     showColumnTotals,
     calculatedFields,
+    collapsedPaths,
 
     // Computed
     availableFields,
@@ -327,5 +421,6 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
     setColumnFields,
     addCalculatedField,
     removeCalculatedField,
+    toggleCollapsedPath,
   }
 }

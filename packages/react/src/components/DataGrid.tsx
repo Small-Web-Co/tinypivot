@@ -11,11 +11,12 @@ import type {
   ChartConfig,
   DateFormat,
   DateRange,
+  DrillThroughResult,
   NumberFormat,
   Theme,
 } from '@smallwebco/tinypivot-core'
 import type { AIAnalystHandle } from './AIAnalyst'
-import { formatDate as coreFormatDate, formatNumber as coreFormatNumber } from '@smallwebco/tinypivot-core'
+import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useExcelGrid } from '../hooks/useExcelGrid'
@@ -30,6 +31,7 @@ import { usePivotTable } from '../hooks/usePivotTable'
 import { AIAnalyst } from './AIAnalyst'
 import { ChartBuilder } from './ChartBuilder'
 import { ColumnFilter } from './ColumnFilter'
+import { DrillThroughModal } from './DrillThroughModal'
 import { PivotConfig } from './PivotConfig'
 import { PivotSkeleton } from './PivotSkeleton'
 
@@ -64,6 +66,10 @@ interface DataGridProps {
   fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
+  /** Enable row group collapse/expand (default true) */
+  enableDrillDown?: boolean
+  /** Enable drill-through on double-click (Pro feature, default true) */
+  enableDrillThrough?: boolean
   onCellClick?: (payload: {
     row: number
     col: number
@@ -78,6 +84,9 @@ interface DataGridProps {
   onAIConversationUpdate?: (payload: AIConversationUpdateEvent) => void
   onAIQueryExecuted?: (payload: AIQueryExecutedEvent) => void
   onAIError?: (payload: AIErrorEvent) => void
+  // Drill-down/through events
+  onCollapseChange?: (collapsedPaths: string[]) => void
+  onDrillThrough?: (result: DrillThroughResult) => void
 }
 
 const MIN_COL_WIDTH = 120
@@ -105,6 +114,8 @@ export function DataGrid({
   dateFormat = 'iso',
   fieldRoleOverrides,
   aiAnalyst,
+  enableDrillDown = true,
+  enableDrillThrough = true,
   onCellClick,
   onExport,
   onCopy,
@@ -112,8 +123,14 @@ export function DataGrid({
   onAIConversationUpdate,
   onAIQueryExecuted,
   onAIError,
+  onCollapseChange,
+  onDrillThrough,
 }: DataGridProps) {
-  const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro } = useLicense()
+  const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro, licenseInfo } = useLicense()
+
+  // Drill-through state
+  const [drillThroughResult, setDrillThroughResult] = useState<DrillThroughResult | null>(null)
+  const [showDrillThroughModal, setShowDrillThroughModal] = useState(false)
 
   // Check if AI Analyst should be shown (enabled in config + licensed)
   const showAIAnalyst = aiAnalyst?.enabled && canUseAIAnalyst
@@ -232,7 +249,63 @@ export function DataGrid({
     setColumnFields,
     addCalculatedField,
     removeCalculatedField,
-  } = usePivotTable(filteredDataForPivot)
+    toggleCollapsedPath,
+  } = usePivotTable(filteredDataForPivot, enableDrillDown)
+
+  const handleToggleCollapse = useCallback(
+    (key: string, altKey: boolean) => {
+      const next = toggleCollapsedPath(key, altKey, pivotRowFields, pivotResult)
+      onCollapseChange?.(Array.from(next))
+    },
+    [toggleCollapsedPath, pivotRowFields, pivotResult, onCollapseChange],
+  )
+
+  const handleDrillThroughCell = useCallback(
+    (payload: { rowPath: string[], columnPath: string[], valueFieldIndex: number }) => {
+      if (!enableDrillThrough)
+        return
+
+      if (!canUseDrillThrough(licenseInfo)) {
+        console.warn('[TinyPivot] "Drill-through" requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.')
+        return
+      }
+
+      const pivotConfig = {
+        rowFields: pivotRowFields,
+        columnFields: pivotColumnFields,
+        valueFields: pivotValueFields,
+        showRowTotals: pivotShowRowTotals,
+        showColumnTotals: pivotShowColumnTotals,
+      }
+
+      const result = getDrillThroughRows(
+        filteredDataForPivot,
+        pivotConfig,
+        payload.rowPath,
+        payload.columnPath,
+        payload.valueFieldIndex,
+      )
+
+      setDrillThroughResult(result)
+      setShowDrillThroughModal(true)
+      onDrillThrough?.(result)
+    },
+    [
+      enableDrillThrough,
+      licenseInfo,
+      pivotRowFields,
+      pivotColumnFields,
+      pivotValueFields,
+      pivotShowRowTotals,
+      pivotShowColumnTotals,
+      filteredDataForPivot,
+      onDrillThrough,
+    ],
+  )
+
+  const handleCloseDrillThroughModal = useCallback(() => {
+    setShowDrillThroughModal(false)
+  }, [])
 
   // Active filters info for display
   const activeFilterInfo = useMemo(() => {
@@ -1427,6 +1500,8 @@ export function DataGrid({
               activeFilters={activeFilterInfo}
               totalRowCount={totalRowCount}
               filteredRowCount={filteredRowCount}
+              enableDrillDown={enableDrillDown}
+              enableDrillThrough={enableDrillThrough}
               onAddRowField={addRowField}
               onRemoveRowField={removeRowField}
               onAddColumnField={addColumnField}
@@ -1436,7 +1511,18 @@ export function DataGrid({
               onUpdateAggregation={updateValueFieldAggregation}
               onReorderRowFields={setRowFields}
               onReorderColumnFields={setColumnFields}
+              onToggleCollapse={handleToggleCollapse}
+              onDrillThroughCell={handleDrillThroughCell}
               theme={currentTheme}
+            />
+
+            <DrillThroughModal
+              show={showDrillThroughModal}
+              result={drillThroughResult}
+              rowFields={pivotRowFields}
+              columnFields={pivotColumnFields}
+              valueFields={pivotValueFields}
+              onClose={handleCloseDrillThroughModal}
             />
           </div>
         </div>

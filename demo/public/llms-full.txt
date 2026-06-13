@@ -139,6 +139,8 @@ All props are identical between Vue and React except for naming convention (Vue:
 | `striped-rows` / `stripedRows` | `boolean` | `true` | Alternating row background color |
 | `export-filename` / `exportFilename` | `string` | `'data-export.csv'` | Filename for CSV download |
 | `ai-analyst` / `aiAnalyst` | `AIAnalystConfig` | `undefined` | Pro: AI Data Analyst configuration object |
+| `enable-drill-down` / `enableDrillDown` | `boolean` | `true` | Enable pivot row group expand/collapse chevrons (Free) |
+| `enable-drill-through` / `enableDrillThrough` | `boolean` | `true` | Enable double-click drill-through on pivot value cells (Pro feature) |
 | `row-height` / `rowHeight` | `number` | — | Row height in pixels |
 | `header-height` / `headerHeight` | `number` | — | Header row height in pixels |
 | `enable-row-selection` / `enableRowSelection` | `boolean` | `false` | Enable row selection (adds a checkbox column) |
@@ -172,6 +174,8 @@ Supported value types: `string`, `number`, `boolean`, `null`/`undefined` (empty 
 | `@selection-change` | `{ cells, values }` | Selection changed |
 | `@export` | `{ rowCount, filename }` | CSV exported |
 | `@copy` | `{ text, cellCount }` | Cells copied to clipboard |
+| `@collapse-change` | `string[]` | Pivot row groups collapsed/expanded (array of collapsed path keys) |
+| `@drill-through` | `DrillThroughResult` | Pivot cell double-clicked; drill-through modal opened (Pro) |
 
 ### React Callbacks
 
@@ -181,6 +185,8 @@ Supported value types: `string`, `number`, `boolean`, `null`/`undefined` (empty 
 | `onSelectionChange` | Selection changed |
 | `onExport` | CSV exported |
 | `onCopy` | Cells copied to clipboard |
+| `onCollapseChange` | Pivot row groups collapsed/expanded — receives `string[]` of collapsed path keys |
+| `onDrillThrough` | Pivot cell double-clicked; drill-through modal opened — receives `DrillThroughResult` (Pro) |
 
 ---
 
@@ -200,6 +206,8 @@ Supported value types: `string`, `number`, `boolean`, `null`/`undefined` (empty 
 | Pivot table with Sum aggregation | yes | yes |
 | Row/column totals | yes | yes |
 | Calculated fields with formulas | yes | yes |
+| Pivot row group expand/collapse | yes | yes |
+| Pivot drill-through (double-click to inspect source rows) | no | yes |
 | AI Data Analyst (natural language, BYOK) | no | yes |
 | Chart Builder (6 chart types, drag-and-drop) | no | yes |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | no | yes |
@@ -332,6 +340,71 @@ import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-react'
 // Example: export the currently displayed rows
 // exportToCSV(data: T[], columns: string[], options?: ExportOptions): void
 exportToCSV(data, Object.keys(data[0] ?? {}), { filename: 'my-data.csv' })
+```
+
+---
+
+## Pivot Drill-Down
+
+### Row Group Expand/Collapse (Free)
+
+When a pivot table has two or more row fields, group rows display a `▸`/`▾` chevron. Click to collapse or expand the group. Alt-click collapses/expands every group at that depth. Collapsed groups show correct aggregated values (sum, avg, median, stdDev, etc.) recomputed over all underlying source rows.
+
+Controlled by `enableDrillDown` (default `true`). Fires `@collapse-change` / `onCollapseChange` with the current array of collapsed path keys.
+
+```vue
+<!-- Vue -->
+<DataGrid
+  :data="data"
+  @collapse-change="(collapsedPaths) => console.log(collapsedPaths)"
+/>
+```
+
+```tsx
+// React
+<DataGrid
+  data={data}
+  onCollapseChange={(collapsedPaths) => console.log(collapsedPaths)}
+/>
+```
+
+### Drill-Through to Source Rows (Pro)
+
+Double-click any pivot value cell (including row/column totals and grand total) to open a modal listing the underlying source rows that contributed to that cell. The modal shows a slice description header, a paginated plain table (50 rows/page), and a CSV export button.
+
+Controlled by `enableDrillThrough` (default `true`). Requires a Pro license — without one a console warning is shown and the modal does not open. Fires `@drill-through` / `onDrillThrough` with a `DrillThroughResult` payload.
+
+```vue
+<!-- Vue -->
+<DataGrid
+  :data="data"
+  @drill-through="({ rows, descriptor }) => console.log(descriptor.rowCount, 'rows')"
+/>
+```
+
+```tsx
+// React
+<DataGrid
+  data={data}
+  onDrillThrough={({ rows, descriptor }) => console.log(descriptor.rowCount, 'rows')}
+/>
+```
+
+Key types (exported from both packages):
+
+```typescript
+interface DrillThroughResult {
+  rows: Record<string, unknown>[]  // Source rows matching the cell slice
+  descriptor: DrillThroughDescriptor
+}
+interface DrillThroughDescriptor {
+  rowPath: string[]          // e.g. ['West', 'Widgets']
+  columnPath: string[]       // e.g. ['Q3']
+  valueField: string         // e.g. 'sales'
+  aggregation: AggregationFunction
+  formattedValue: string     // Pre-formatted result, e.g. '1,234'
+  rowCount: number
+}
 ```
 
 ---
@@ -552,8 +625,8 @@ Chrome 80+, Firefox 75+, Safari 14+, Edge 80+
 
 ## License
 
-- Free tier: MIT — core grid, pivot (Sum only), export, clipboard
-- Pro features: Commercial license required (charts, advanced aggregations, AI Data Analyst, no watermark)
+- Free tier: MIT — core grid, pivot (Sum only), pivot row group expand/collapse, export, clipboard
+- Pro features: Commercial license required (pivot drill-through, charts, advanced aggregations, AI Data Analyst, no watermark)
 
 Purchase: https://tiny-pivot.com/#pricing
 GitHub: https://github.com/Small-Web-Co/tinypivot

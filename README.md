@@ -42,6 +42,8 @@ A lightweight data grid with free pivot tables, Pro charts, and optional AI-powe
 | Pivot table with Sum aggregation | ✅ | ✅ |
 | Row/column totals | ✅ | ✅ |
 | Calculated fields with formulas | ✅ | ✅ |
+| Pivot row group expand/collapse | ✅ | ✅ |
+| **Pivot drill-through** (double-click to inspect source rows) | ❌ | ✅ |
 | **AI Data Analyst** (natural language queries, BYOK) | ❌ | ✅ |
 | **Chart Builder** (6 chart types, drag-and-drop) | ❌ | ✅ |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
@@ -143,6 +145,8 @@ export default function App() {
 | `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override auto-detected chart field roles |
 | `stripedRows` | `boolean` | `true` | Alternating row colors |
 | `exportFilename` | `string` | `'data-export.csv'` | CSV filename |
+| `enableDrillDown` | `boolean` | `true` | Enable pivot row group expand/collapse chevrons |
+| `enableDrillThrough` | `boolean` | `true` | Enable double-click drill-through on pivot cells (Pro feature) |
 
 ## Data Shape
 
@@ -214,6 +218,8 @@ Date columns also support date range filtering. When a column is detected as dat
 | `@selection-change` | `{ cells, values }` | Selection changed |
 | `@export` | `{ rowCount, filename }` | CSV exported |
 | `@copy` | `{ text, cellCount }` | Cells copied |
+| `@collapse-change` | `string[]` | Pivot row groups collapsed/expanded (array of collapsed path keys) |
+| `@drill-through` | `DrillThroughResult` | Pivot cell double-clicked and drill-through opened (Pro) |
 
 ```vue
 <template>
@@ -233,6 +239,8 @@ Date columns also support date range filtering. When a column is detected as dat
 | `onSelectionChange` | `(payload) => void` | Selection changed |
 | `onExport` | `(payload) => void` | CSV exported |
 | `onCopy` | `(payload) => void` | Cells copied |
+| `onCollapseChange` | `(collapsedPaths: string[]) => void` | Pivot row groups collapsed/expanded |
+| `onDrillThrough` | `(result: DrillThroughResult) => void` | Pivot cell double-clicked and drill-through opened (Pro) |
 
 ```tsx
 <DataGrid
@@ -638,6 +646,78 @@ This is useful when:
 - Low-cardinality numbers (like Likert scores 1-5) arrive as strings and get classified as dimensions
 - You want to force a numeric column to be used as a grouping axis (dimension) instead of an aggregated value
 - A column should be treated as temporal but isn't in a recognizable date format
+
+## Pivot Drill-Down
+
+TinyPivot supports two complementary pivot drill-down capabilities:
+
+### Row Group Expand/Collapse (Free)
+
+When a pivot has two or more row fields, each group row displays a `▸`/`▾` chevron. Click to collapse or expand that group. Alt-click collapses/expands every group at the same depth at once. Collapsed groups still show correct aggregated values (sum, median, stdDev, etc.) over all rows in the group.
+
+Controlled with the `enableDrillDown` prop (default `true`).
+
+```vue
+<!-- Vue -->
+<DataGrid
+  :data="data"
+  @collapse-change="(collapsedPaths) => console.log('Collapsed:', collapsedPaths)"
+/>
+```
+
+```tsx
+// React
+<DataGrid
+  data={data}
+  onCollapseChange={(collapsedPaths) => console.log('Collapsed:', collapsedPaths)}
+/>
+```
+
+### Drill-Through to Source Rows (Pro)
+
+Double-click any pivot value cell (including totals) to open a modal showing the underlying source rows that contributed to that cell. The modal includes a header with the slice description, paginated rows (50/page), and a CSV export of the drill-through result.
+
+Requires a Pro license. Controlled with the `enableDrillThrough` prop (default `true`).
+
+```vue
+<!-- Vue -->
+<DataGrid
+  :data="data"
+  @drill-through="({ rows, descriptor }) => console.log(`${descriptor.rowCount} rows for ${descriptor.rowPath.join(' > ')}`)"
+/>
+```
+
+```tsx
+// React
+<DataGrid
+  data={data}
+  onDrillThrough={({ rows, descriptor }) =>
+    console.log(`${descriptor.rowCount} rows for ${descriptor.rowPath.join(' > ')}`)
+  }
+/>
+```
+
+### TypeScript Types
+
+```typescript
+import type { DrillThroughResult, DrillThroughDescriptor, PivotRowMeta } from '@smallwebco/tinypivot-vue'
+// or '@smallwebco/tinypivot-react'
+
+// DrillThroughResult — payload of the drill-through event
+interface DrillThroughResult {
+  rows: Record<string, unknown>[]   // Source rows matching the clicked cell's slice
+  descriptor: DrillThroughDescriptor
+}
+
+interface DrillThroughDescriptor {
+  rowPath: string[]          // e.g. ['West', 'Widgets']
+  columnPath: string[]       // e.g. ['Q3']
+  valueField: string         // e.g. 'sales'
+  aggregation: AggregationFunction
+  formattedValue: string     // Pre-formatted result, e.g. '1,234'
+  rowCount: number
+}
+```
 
 ## Custom Calculations
 
