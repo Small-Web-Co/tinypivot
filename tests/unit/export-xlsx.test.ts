@@ -120,7 +120,7 @@ describe('buildGridWorkbook', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildPivotWorkbook', () => {
-  it('has at least one merged cell range for spanning header groups', async () => {
+  it('east group merges exactly B1:C1 and West group merges exactly D1:E1 — totals column F1 is not merged', async () => {
     const workbook = await buildPivotWorkbook(
       samplePivotData,
       ['product'],
@@ -129,13 +129,25 @@ describe('buildPivotWorkbook', () => {
     )
     const worksheet = workbook.worksheets[0]
 
-    // Row 1 has 'East' spanning B1:C1 — B1 should be a master merge cell
-    // and C1 should be merged into it (isMerged = true on both)
+    // 'East' spans B1:C1
     expect(worksheet.getCell('B1').isMerged).toBe(true)
     expect(worksheet.getCell('C1').isMerged).toBe(true)
+
+    // 'West' spans D1:E1
+    expect(worksheet.getCell('D1').isMerged).toBe(true)
+    expect(worksheet.getCell('E1').isMerged).toBe(true)
+
+    // The totals column (F1) is NOT part of any merge
+    expect(worksheet.getCell('F1').isMerged).toBe(false)
+
+    // Verify the exact merge ranges (worksheet.model.merges is a string[])
+    const merges = ((worksheet.model as { merges?: string[] }).merges ?? []) as string[]
+    expect(merges).toContain('B1:C1')
+    expect(merges).toContain('D1:E1')
+    expect(merges.some(m => m.includes('F1'))).toBe(false)
   })
 
-  it('a known data cell value exists in the sheet', async () => {
+  it('data cells are at exact addresses: B3=100, F3=row total 700, F5=grand total 1440', async () => {
     const workbook = await buildPivotWorkbook(
       samplePivotData,
       ['product'],
@@ -144,13 +156,52 @@ describe('buildPivotWorkbook', () => {
     )
     const worksheet = workbook.worksheets[0]
 
-    // Data starts at row 3 (2 header levels), col 2 (1 rowHeader col)
-    const dataRow = worksheet.getRow(3)
-    const cellValues: string[] = []
-    dataRow.eachCell((cell) => {
-      cellValues.push(String(cell.value ?? ''))
-    })
-    expect(cellValues).toContain('100')
+    // Layout: 2 header rows, then data rows starting at row 3.
+    // Col A = row-field (product), cols B-E = 4 data cols, col F = row total.
+    expect(String(worksheet.getCell('B3').value)).toBe('100')
+    expect(String(worksheet.getCell('C3').value)).toBe('200')
+    expect(String(worksheet.getCell('D3').value)).toBe('150')
+    expect(String(worksheet.getCell('E3').value)).toBe('250')
+
+    // Row total for Widgets is in the trailing column (F3)
+    expect(String(worksheet.getCell('F3').value)).toBe('700')
+
+    // Row total for Gadgets (F4)
+    expect(String(worksheet.getCell('F4').value)).toBe('740')
+
+    // Grand total is in F5 (column totals row, trailing column)
+    expect(String(worksheet.getCell('F5').value)).toBe('1440')
+  })
+
+  it('the totals column header (F2) is labeled "Total" on the deepest header level', async () => {
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+    )
+    const worksheet = workbook.worksheets[0]
+
+    // Row 2 is the deepest (last) header level — F2 must have the totals label
+    expect(String(worksheet.getCell('F2').value)).toBe('Total')
+
+    // Row 1 is the upper header level — F1 should be empty (not labeled)
+    expect(String(worksheet.getCell('F1').value ?? '')).toBe('')
+  })
+
+  it('header column count equals data row column count', async () => {
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+    )
+    const worksheet = workbook.worksheets[0]
+
+    // Count non-null cells in deepest header row (row 2) and first data row (row 3)
+    const headerCellCount = worksheet.getRow(2).cellCount
+    const dataCellCount = worksheet.getRow(3).cellCount
+    expect(headerCellCount).toBe(dataCellCount)
   })
 
   it('column totals row (last row) has bold cells', async () => {

@@ -149,13 +149,25 @@ function writePivotHeaders(
   headers: string[][],
   rowFields: string[],
   rowHeaderColCount: number,
+  showRowTotals: boolean | undefined,
+  rowTotals: Array<{ formattedValue: string }> | undefined,
+  valueFields: import('../types').PivotValueField[],
 ): void {
+  const hasTotalsCol = showRowTotals && rowTotals && rowTotals.length > 0
+  const totalsLabel = valueFields.length === 1
+    ? `Total (${valueFields[0].aggregation})`
+    : 'Total'
+
   for (let level = 0; level < headers.length; level++) {
+    const isDeepest = level === headers.length - 1
     const headerValues = [
       ...Array.from({ length: rowHeaderColCount }, (_, i) =>
-        level === headers.length - 1 ? (rowFields[i] ?? '') : ''),
+        isDeepest ? (rowFields[i] ?? '') : ''),
       ...headers[level],
     ]
+    if (hasTotalsCol) {
+      headerValues.push(isDeepest ? totalsLabel : '')
+    }
     const row = worksheet.addRow(headerValues)
     applyHeaderStyle(row)
 
@@ -278,14 +290,18 @@ export async function buildPivotWorkbook(
 
   // Write column headers (with merges)
   if (headers.length > 0) {
-    writePivotHeaders(worksheet, headers, rowFields, rowHeaderColCount)
+    writePivotHeaders(worksheet, headers, rowFields, rowHeaderColCount, showRowTotals, rowTotals, valueFields)
   }
   else {
     // Simple single-level header
-    const headerRow = worksheet.addRow([
+    const simpleHeaderValues: string[] = [
       ...rowFields,
       ...(valueFields.map(vf => `${vf.field} (${vf.aggregation})`)),
-    ])
+    ]
+    if (showRowTotals && rowTotals && rowTotals.length > 0) {
+      simpleHeaderValues.push('Total')
+    }
+    const headerRow = worksheet.addRow(simpleHeaderValues)
     applyHeaderStyle(headerRow)
   }
 
