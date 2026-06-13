@@ -255,10 +255,10 @@ export function DataGrid({
 
   const handleToggleCollapse = useCallback(
     (key: string, altKey: boolean) => {
-      toggleCollapsedPath(key, altKey, pivotRowFields, pivotResult)
-      onCollapseChange?.(Array.from(pivotCollapsedPaths))
+      const next = toggleCollapsedPath(key, altKey, pivotRowFields, pivotResult)
+      onCollapseChange?.(Array.from(next))
     },
-    [toggleCollapsedPath, pivotRowFields, pivotResult, pivotCollapsedPaths, onCollapseChange],
+    [toggleCollapsedPath, pivotRowFields, pivotResult, onCollapseChange],
   )
 
   const handleDrillThroughCell = useCallback(

@@ -65,7 +65,7 @@ interface UsePivotTableReturn {
   setColumnFields: (fields: string[]) => void
   addCalculatedField: (field: CalculatedField) => void
   removeCalculatedField: (id: string) => void
-  toggleCollapsedPath: (key: string, altKey: boolean, rowFields: string[], currentPivotResult: PivotResult | null) => void
+  toggleCollapsedPath: (key: string, altKey: boolean, rowFields: string[], currentPivotResult: PivotResult | null) => Set<string>
 }
 
 /**
@@ -338,22 +338,20 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
   const toggleCollapsedPath = useCallback(
     (key: string, altKey: boolean, _rowFields: string[], currentPivotResult: PivotResult | null) => {
       if (!altKey) {
-        setCollapsedPaths((prev) => {
-          const next = new Set(prev)
-          if (next.has(key)) {
-            next.delete(key)
-          }
-          else {
-            next.add(key)
-          }
-          return next
-        })
-        return
+        const next = new Set(collapsedPaths)
+        if (next.has(key)) {
+          next.delete(key)
+        }
+        else {
+          next.add(key)
+        }
+        setCollapsedPaths(next)
+        return next
       }
 
       // Alt-click: toggle all groups at the same depth
       if (!currentPivotResult)
-        return
+        return new Set()
 
       // Determine which depth this key belongs to by looking at groupStarts
       let targetDepth = -1
@@ -369,7 +367,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
       }
 
       if (targetDepth < 0)
-        return
+        return new Set()
 
       // Collect all keys at this depth
       const keysAtDepth = new Set<string>()
@@ -381,22 +379,21 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
         }
       }
 
-      setCollapsedPaths((prev) => {
-        // If the clicked key is currently collapsed, expand all; otherwise collapse all
-        const shouldCollapse = !prev.has(key)
-        const next = new Set(prev)
-        for (const k of keysAtDepth) {
-          if (shouldCollapse) {
-            next.add(k)
-          }
-          else {
-            next.delete(k)
-          }
+      // If the clicked key is currently collapsed, expand all; otherwise collapse all
+      const shouldCollapse = !collapsedPaths.has(key)
+      const next = new Set(collapsedPaths)
+      for (const k of keysAtDepth) {
+        if (shouldCollapse) {
+          next.add(k)
         }
-        return next
-      })
+        else {
+          next.delete(k)
+        }
+      }
+      setCollapsedPaths(next)
+      return next
     },
-    [],
+    [collapsedPaths],
   )
 
   return {
