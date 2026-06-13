@@ -351,7 +351,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
 
       // Alt-click: toggle all groups at the same depth
       if (!currentPivotResult)
-        return new Set()
+        return new Set<string>()
 
       // Determine which depth this key belongs to by looking at groupStarts
       let targetDepth = -1
@@ -367,7 +367,7 @@ export function usePivotTable(data: Record<string, unknown>[]): UsePivotTableRet
       }
 
       if (targetDepth < 0)
-        return new Set()
+        return new Set<string>()
 
       // Collect all keys at this depth
       const keysAtDepth = new Set<string>()
