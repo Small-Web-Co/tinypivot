@@ -25,12 +25,17 @@ export function DrillThroughModal({
 }: DrillThroughModalProps) {
   const [currentPage, setCurrentPage] = useState(1)
 
-  // Escape key handler
+  // Reset page when modal opens or result changes
+  useEffect(() => {
+    if (show) {
+      setCurrentPage(1)
+    }
+  }, [show, result])
+
+  // Keyboard listener — only depends on show and onClose
   useEffect(() => {
     if (!show)
       return
-
-    setCurrentPage(1)
 
     const handleKeydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {

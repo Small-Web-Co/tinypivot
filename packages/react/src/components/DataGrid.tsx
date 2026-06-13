@@ -304,6 +304,10 @@ export function DataGrid({
     ],
   )
 
+  const handleCloseDrillThroughModal = useCallback(() => {
+    setShowDrillThroughModal(false)
+  }, [])
+
   // Active filters info for display
   const activeFilterInfo = useMemo(() => {
     if (activeFilters.length === 0)
@@ -1520,7 +1524,7 @@ export function DataGrid({
               rowFields={pivotRowFields}
               columnFields={pivotColumnFields}
               valueFields={pivotValueFields}
-              onClose={() => setShowDrillThroughModal(false)}
+              onClose={handleCloseDrillThroughModal}
             />
           </div>
         </div>
