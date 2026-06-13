@@ -13,6 +13,7 @@ interface CalculatedFieldModalProps {
   existingField?: CalculatedField | null
   onClose: () => void
   onSave: (field: CalculatedField) => void
+  theme?: string
 }
 
 export function CalculatedFieldModal({
@@ -21,6 +22,7 @@ export function CalculatedFieldModal({
   existingField,
   onClose,
   onSave,
+  theme,
 }: CalculatedFieldModalProps) {
   // Form state
   const [name, setName] = useState('')
@@ -111,7 +113,7 @@ export function CalculatedFieldModal({
     return null
 
   const modalContent = (
-    <div className="vpg-modal-overlay" onClick={handleOverlayClick}>
+    <div className={`vpg-modal-overlay vpg-theme-${theme ?? 'light'}`} onClick={handleOverlayClick}>
       <div className="vpg-modal">
         <div className="vpg-modal-header">
           <h3>

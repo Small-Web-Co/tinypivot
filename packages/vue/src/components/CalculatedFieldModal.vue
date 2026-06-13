@@ -13,6 +13,7 @@ const props = defineProps<{
   show: boolean
   availableFields: string[]
   existingField?: CalculatedField | null
+  theme?: string
 }>()
 
 const emit = defineEmits<{
@@ -98,7 +99,7 @@ function save() {
 
 <template>
   <Teleport to="body">
-    <div v-if="show" class="vpg-modal-overlay" @click.self="emit('close')">
+    <div v-if="show" class="vpg-modal-overlay" :class="`vpg-theme-${theme ?? 'light'}`" @click.self="emit('close')">
       <div class="vpg-modal">
         <div class="vpg-modal-header">
           <h3>{{ existingField ? 'Edit' : 'Create' }} Calculated Field</h3>

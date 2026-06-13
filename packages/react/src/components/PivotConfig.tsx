@@ -509,6 +509,7 @@ export function PivotConfig({
         show={showCalcModal}
         availableFields={numericFieldNames}
         existingField={editingCalcField}
+        theme={theme}
         onClose={handleCloseCalcModal}
         onSave={handleSaveCalcField}
       />

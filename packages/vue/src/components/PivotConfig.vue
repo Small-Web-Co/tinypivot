@@ -416,6 +416,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
       :show="showCalcModal"
       :available-fields="numericFieldNames"
       :existing-field="editingCalcField"
+      :theme="theme"
       @close="showCalcModal = false; editingCalcField = null"
       @save="handleSaveCalcField"
     />
