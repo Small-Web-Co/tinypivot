@@ -17,7 +17,9 @@ export {
   copyToClipboard,
   enableDemoMode,
   exportPivotToCSV,
+  exportPivotToXLSX,
   exportToCSV,
+  exportToXLSX,
   formatCellValue,
   formatSelectionForClipboard,
   getAggregationLabel,
@@ -76,4 +78,5 @@ export type {
   SelectionBounds,
   SelectionChangeEvent,
   SortEvent,
+  XlsxExportOptions,
 } from '@smallwebco/tinypivot-core'
