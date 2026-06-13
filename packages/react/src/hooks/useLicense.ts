@@ -3,6 +3,7 @@ import {
   canUseAIAnalyst as coreCanUseAIAnalyst,
   canUseCharts as coreCanUseCharts,
   canUsePivot as coreCanUsePivot,
+  canUseXlsxExport as coreCanUseXlsxExport,
   configureLicenseSecret as coreConfigureLicenseSecret,
   isPro as coreIsPro,
   shouldShowWatermark as coreShouldShowWatermark,
@@ -112,6 +113,11 @@ export function useLicense() {
     [licenseInfo],
   )
 
+  const canUseXlsxExport = useMemo(
+    () => globalDemoMode || coreCanUseXlsxExport(licenseInfo),
+    [licenseInfo],
+  )
+
   const showWatermark = useMemo(
     () => coreShouldShowWatermark(licenseInfo, globalDemoMode),
     [licenseInfo],
@@ -134,6 +140,7 @@ export function useLicense() {
     canUsePercentageMode,
     canUseCharts,
     canUseAIAnalyst,
+    canUseXlsxExport,
     showWatermark,
     requirePro,
   }

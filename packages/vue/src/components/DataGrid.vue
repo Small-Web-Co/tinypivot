@@ -22,7 +22,9 @@ import { useExcelGrid } from '../composables/useExcelGrid'
 import {
   copyToClipboard,
   exportPivotToCSV,
+  exportPivotToXLSX,
   exportToCSV,
+  exportToXLSX,
   formatSelectionForClipboard,
 } from '../composables/useGridFeatures'
 import { useLicense } from '../composables/useLicense'
@@ -109,7 +111,7 @@ const emit = defineEmits<{
   (e: 'drillThrough', payload: DrillThroughResult): void
 }>()
 
-const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro, licenseInfo } = useLicense()
+const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, canUseXlsxExport, isDemo, isPro, licenseInfo } = useLicense()
 
 // Drill-through state
 const drillThroughResult = ref<DrillThroughResult | null>(null)
@@ -367,6 +369,58 @@ function handlePivotExport() {
 
   const rowCount = pivotResult.value.rowHeaders.length
   emit('export', { rowCount, filename: pivotFilename })
+}
+
+async function handleExportXLSX() {
+  if (viewMode.value === 'pivot') {
+    await handlePivotExportXLSX()
+    return
+  }
+
+  const dataToExport = props.enableSearch && globalSearchTerm.value.trim()
+    ? searchFilteredData.value.map(row => row.original)
+    : rows.value.map(row => row.original)
+
+  const xlsxFilename = props.exportFilename.replace('.csv', '.xlsx')
+
+  try {
+    await exportToXLSX(dataToExport, columnKeys.value, { filename: xlsxFilename })
+    emit('export', { rowCount: dataToExport.length, filename: xlsxFilename })
+  }
+  catch (err) {
+    console.error('[TinyPivot] XLSX export failed:', err)
+  }
+}
+
+async function handlePivotExportXLSX() {
+  if (!pivotResult.value)
+    return
+
+  const xlsxFilename = props.exportFilename.replace('.csv', '-pivot.xlsx')
+
+  try {
+    await exportPivotToXLSX(
+      {
+        headers: pivotResult.value.headers,
+        rowHeaders: pivotResult.value.rowHeaders,
+        data: pivotResult.value.data,
+        rowTotals: pivotResult.value.rowTotals,
+        columnTotals: pivotResult.value.columnTotals,
+        grandTotal: pivotResult.value.grandTotal,
+        showRowTotals: pivotShowRowTotals.value,
+        showColumnTotals: pivotShowColumnTotals.value,
+      },
+      pivotRowFields.value,
+      pivotColumnFields.value,
+      pivotValueFields.value,
+      { filename: xlsxFilename },
+    )
+    const rowCount = pivotResult.value.rowHeaders.length
+    emit('export', { rowCount, filename: xlsxFilename })
+  }
+  catch (err) {
+    console.error('[TinyPivot] XLSX pivot export failed:', err)
+  }
 }
 
 // Column resize methods
@@ -1270,6 +1324,19 @@ function handleContainerClick(event: MouseEvent) {
           Export
         </button>
         <button
+          v-if="enableExport && viewMode === 'grid'"
+          class="vpg-export-btn"
+          :class="{ 'vpg-export-btn-disabled': !canUseXlsxExport }"
+          :disabled="!canUseXlsxExport"
+          :title="canUseXlsxExport ? 'Export to XLSX' : 'Export to XLSX (Pro feature)'"
+          @click="canUseXlsxExport && handleExportXLSX()"
+        >
+          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export XLSX{{ !canUseXlsxExport ? ' (Pro)' : '' }}
+        </button>
+        <button
           v-if="enableExport && viewMode === 'pivot' && pivotIsConfigured"
           class="vpg-export-btn"
           :class="{ 'vpg-export-btn-disabled': !isPro }"
@@ -1281,6 +1348,19 @@ function handleContainerClick(event: MouseEvent) {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
           Export Pivot{{ !isPro ? ' (Pro)' : '' }}
+        </button>
+        <button
+          v-if="enableExport && viewMode === 'pivot' && pivotIsConfigured"
+          class="vpg-export-btn"
+          :class="{ 'vpg-export-btn-disabled': !canUseXlsxExport }"
+          :disabled="!canUseXlsxExport"
+          :title="canUseXlsxExport ? 'Export Pivot to XLSX' : 'Export Pivot to XLSX (Pro feature)'"
+          @click="canUseXlsxExport && handleExportXLSX()"
+        >
+          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export Pivot XLSX{{ !canUseXlsxExport ? ' (Pro)' : '' }}
         </button>
       </div>
     </div>

@@ -169,7 +169,7 @@ export function exportPivotToCSV(
 /**
  * Download file helper
  */
-function downloadFile(content: string, filename: string, mimeType: string): void {
+export function downloadFile(content: string, filename: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
 
@@ -222,3 +222,11 @@ export function formatSelectionForClipboard<T extends Record<string, unknown>>(
 
   return lines.join('\n')
 }
+
+// XLSX export (re-exported from xlsx.ts)
+export {
+  buildGridWorkbook,
+  buildPivotWorkbook,
+  exportPivotToXLSX,
+  exportToXLSX,
+} from './xlsx'

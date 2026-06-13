@@ -208,6 +208,7 @@ Supported value types: `string`, `number`, `boolean`, `null`/`undefined` (empty 
 | Calculated fields with formulas | yes | yes |
 | Pivot row group expand/collapse | yes | yes |
 | Pivot drill-through (double-click to inspect source rows) | no | yes |
+| Excel (XLSX) Export (styled, multi-level pivot headers, lazy-loaded) | no | yes |
 | AI Data Analyst (natural language, BYOK) | no | yes |
 | Chart Builder (6 chart types, drag-and-drop) | no | yes |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | no | yes |
@@ -324,23 +325,58 @@ Key CSS tokens: `--vpg-accent`, `--vpg-accent-hover`, `--vpg-surface-bg`, `--vpg
 
 ---
 
-## CSV Export
+## Export
 
-CSV export is free and enabled by default. Use `exportFilename` to set the download filename. The export button appears in the toolbar when `enableExport` is `true`.
+### CSV Export (Free)
 
-Programmatic export via the composable/hook:
+CSV export is enabled by default. Use `exportFilename` to set the download filename. The "Export CSV" button appears in the toolbar when `enableExport` is `true`.
+
+Programmatic API:
 
 ```typescript
-// Vue composable
+// Vue
 import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-vue'
 
-// React hook utility
+// React
 import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-react'
 
-// Example: export the currently displayed rows
 // exportToCSV(data: T[], columns: string[], options?: ExportOptions): void
 exportToCSV(data, Object.keys(data[0] ?? {}), { filename: 'my-data.csv' })
 ```
+
+### Excel (XLSX) Export (Pro)
+
+Styled `.xlsx` downloads for the flat grid and pivot table. Requires a Pro license — the "Export XLSX" button appears in the toolbar automatically when `enableExport` is `true` and a Pro license is active. `exceljs` (~250 KB) loads lazily via dynamic import and is never included in the main bundle.
+
+Both functions are `async` and trigger a browser download:
+
+```typescript
+// Vue
+import { exportToXLSX, exportPivotToXLSX } from '@smallwebco/tinypivot-vue'
+import type { XlsxExportOptions } from '@smallwebco/tinypivot-vue'
+
+// React
+import { exportToXLSX, exportPivotToXLSX } from '@smallwebco/tinypivot-react'
+
+// Flat grid
+// exportToXLSX<T>(data: T[], columns: string[], options?: XlsxExportOptions): Promise<void>
+await exportToXLSX(data, columns, {
+  filename: 'report.xlsx',
+  sheetName: 'Sales',
+  numberFormats: { revenue: '#,##0.00', units: '#,##0' },
+})
+
+// Pivot table
+// exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, options?): Promise<void>
+await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
+  filename: 'pivot-report.xlsx',
+  sheetName: 'Pivot',
+})
+```
+
+`XlsxExportOptions` extends `ExportOptions` and adds:
+- `sheetName?: string` — worksheet name (default: `'Sheet1'`)
+- `numberFormats?: Record<string, string>` — custom Excel number format strings per column key
 
 ---
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DrillThroughResult, PivotValueField } from '@smallwebco/tinypivot-core'
-import { exportToCSV, getAggregationLabel } from '@smallwebco/tinypivot-core'
+import { exportToCSV, exportToXLSX, getAggregationLabel } from '@smallwebco/tinypivot-core'
 /**
  * Drill-Through Modal
  * Displays source rows for a pivot cell in a paginated table
@@ -106,6 +106,17 @@ function handleExport() {
   exportToCSV(props.result.rows, columns.value, { filename: 'drill-through.csv' })
 }
 
+async function handleExportXLSX() {
+  if (!props.result || props.result.rows.length === 0)
+    return
+  try {
+    await exportToXLSX(props.result.rows, columns.value, { filename: 'drill-through.xlsx' })
+  }
+  catch (err) {
+    console.error('[TinyPivot] XLSX export failed:', err)
+  }
+}
+
 function formatCellValue(value: unknown): string {
   if (value === null || value === undefined)
     return ''
@@ -178,6 +189,13 @@ function formatCellValue(value: unknown): string {
             @click="handleExport"
           >
             Export CSV
+          </button>
+          <button
+            v-if="result && result.rows.length > 0"
+            class="vpg-btn vpg-btn-secondary"
+            @click="handleExportXLSX"
+          >
+            Export XLSX
           </button>
           <button class="vpg-btn vpg-btn-primary" @click="emit('close')">
             Close

@@ -3,6 +3,7 @@ import {
   canUseAIAnalyst as coreCanUseAIAnalyst,
   canUseCharts as coreCanUseCharts,
   canUsePivot as coreCanUsePivot,
+  canUseXlsxExport as coreCanUseXlsxExport,
   configureLicenseSecret as coreConfigureLicenseSecret,
   isPro as coreIsPro,
   shouldShowWatermark as coreShouldShowWatermark,
@@ -91,6 +92,8 @@ export function useLicense() {
 
   const canUseAIAnalyst = computed(() => demoMode.value || coreCanUseAIAnalyst(licenseInfo.value))
 
+  const canUseXlsxExport = computed(() => demoMode.value || coreCanUseXlsxExport(licenseInfo.value))
+
   const showWatermark = computed(() => coreShouldShowWatermark(licenseInfo.value, demoMode.value))
 
   function requirePro(feature: string): boolean {
@@ -110,6 +113,7 @@ export function useLicense() {
     canUsePercentageMode,
     canUseCharts,
     canUseAIAnalyst,
+    canUseXlsxExport,
     showWatermark,
     requirePro,
   }

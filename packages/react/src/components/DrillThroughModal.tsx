@@ -3,7 +3,7 @@
  * Displays source rows for a pivot cell in a paginated table
  */
 import type { DrillThroughResult, PivotValueField } from '@smallwebco/tinypivot-core'
-import { exportToCSV, getAggregationLabel } from '@smallwebco/tinypivot-core'
+import { exportToCSV, exportToXLSX, getAggregationLabel } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -105,6 +105,17 @@ export function DrillThroughModal({
     exportToCSV(result.rows, columns, { filename: 'drill-through.csv' })
   }, [result, columns])
 
+  const handleExportXLSX = useCallback(async () => {
+    if (!result || result.rows.length === 0)
+      return
+    try {
+      await exportToXLSX(result.rows, columns, { filename: 'drill-through.xlsx' })
+    }
+    catch (err) {
+      console.error('[TinyPivot] XLSX export failed:', err)
+    }
+  }, [result, columns])
+
   const formatCellValue = (value: unknown): string => {
     if (value === null || value === undefined)
       return ''
@@ -187,6 +198,11 @@ export function DrillThroughModal({
           {result && result.rows.length > 0 && (
             <button className="vpg-btn vpg-btn-secondary" onClick={handleExport}>
               Export CSV
+            </button>
+          )}
+          {result && result.rows.length > 0 && (
+            <button className="vpg-btn vpg-btn-secondary" onClick={handleExportXLSX}>
+              Export XLSX
             </button>
           )}
           <button className="vpg-btn vpg-btn-primary" onClick={onClose}>

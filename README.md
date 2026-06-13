@@ -44,6 +44,7 @@ A lightweight data grid with free pivot tables, Pro charts, and optional AI-powe
 | Calculated fields with formulas | ✅ | ✅ |
 | Pivot row group expand/collapse | ✅ | ✅ |
 | **Pivot drill-through** (double-click to inspect source rows) | ❌ | ✅ |
+| **Excel (XLSX) Export** (styled, multi-level pivot headers, lazy-loaded) | ❌ | ✅ |
 | **AI Data Analyst** (natural language queries, BYOK) | ❌ | ✅ |
 | **Chart Builder** (6 chart types, drag-and-drop) | ❌ | ✅ |
 | All aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
@@ -646,6 +647,44 @@ This is useful when:
 - Low-cardinality numbers (like Likert scores 1-5) arrive as strings and get classified as dimensions
 - You want to force a numeric column to be used as a grouping axis (dimension) instead of an aggregated value
 - A column should be treated as temporal but isn't in a recognizable date format
+
+## Export
+
+### CSV Export (Free)
+
+CSV export is enabled by default. Set `enableExport={true}` and optionally `exportFilename="data.csv"`. The Export CSV button appears in the toolbar. Programmatic API:
+
+```typescript
+import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-vue' // or -react
+
+exportToCSV(data, columns, { filename: 'my-data.csv' })
+```
+
+### Excel (XLSX) Export (Pro)
+
+Pro licenses unlock styled `.xlsx` downloads for both the flat grid and the pivot table. The "Export XLSX" button appears in the toolbar automatically when `enableExport` is `true` and a Pro license is active. `exceljs` (~250 KB) is loaded **lazily** via dynamic import — it is never included in your main bundle.
+
+Programmatic API (both functions are `async` and trigger a browser download):
+
+```typescript
+import { exportToXLSX, exportPivotToXLSX } from '@smallwebco/tinypivot-vue' // or -react
+import type { XlsxExportOptions } from '@smallwebco/tinypivot-vue'
+
+// Flat grid
+await exportToXLSX(data, columns, {
+  filename: 'report.xlsx',
+  sheetName: 'Sales',
+  numberFormats: { revenue: '#,##0.00', units: '#,##0' },
+})
+
+// Pivot table — pass the PivotExportData, field arrays, and options
+await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
+  filename: 'pivot-report.xlsx',
+  sheetName: 'Pivot',
+})
+```
+
+`XlsxExportOptions` extends `ExportOptions` and adds `sheetName?: string` and `numberFormats?: Record<string, string>`.
 
 ## Pivot Drill-Down
 

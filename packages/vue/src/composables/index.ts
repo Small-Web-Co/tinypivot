@@ -4,7 +4,9 @@ export { formatCellValue, getColumnUniqueValues, useExcelGrid } from './useExcel
 export {
   copyToClipboard,
   exportPivotToCSV,
+  exportPivotToXLSX,
   exportToCSV,
+  exportToXLSX,
   formatSelectionForClipboard,
   useColumnResize,
   useGlobalSearch,

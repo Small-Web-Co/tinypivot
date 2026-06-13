@@ -20,6 +20,7 @@ const FREE_LICENSE: LicenseInfo = {
     charts: false, // Chart builder is Pro only
     aiAnalyst: false, // AI Data Analyst is Pro only
     drillThrough: false, // Drill-through is Pro only
+    xlsxExport: false, // XLSX export is Pro only
   },
 }
 
@@ -35,6 +36,7 @@ const INVALID_LICENSE: LicenseInfo = {
     charts: false,
     aiAnalyst: false,
     drillThrough: false,
+    xlsxExport: false,
   },
 }
 
@@ -50,6 +52,7 @@ const DEMO_LICENSE: LicenseInfo = {
     charts: true, // Demo can use charts
     aiAnalyst: true, // Demo can use AI Analyst
     drillThrough: true, // Demo can use drill-through
+    xlsxExport: true, // Demo can use XLSX export
   },
 }
 
@@ -381,6 +384,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
       charts: type !== 'free',
       aiAnalyst: type !== 'free',
       drillThrough: type !== 'free',
+      xlsxExport: type !== 'free',
     },
   }
 }
@@ -470,6 +474,13 @@ export function canUseAIAnalyst(info: LicenseInfo): boolean {
  */
 export function canUseDrillThrough(info: LicenseInfo): boolean {
   return info.features.drillThrough
+}
+
+/**
+ * Check if license allows XLSX export feature
+ */
+export function canUseXlsxExport(info: LicenseInfo): boolean {
+  return info.features.xlsxExport
 }
 
 /**
