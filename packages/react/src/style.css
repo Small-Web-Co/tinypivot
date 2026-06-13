@@ -34,6 +34,9 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Modals teleport to document.body, outside the grid root — set an explicit
+     theme-based text color so content does not inherit the host app's color. */
+  color: var(--vpg-text-primary);
 }
 
 /* ==========================================================================
