@@ -10,6 +10,7 @@ import type {
   DateFormat,
   DrillThroughResult,
   NumberFormat,
+  PivotLayout,
   Theme,
 } from '@smallwebco/tinypivot-core'
 import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
@@ -69,6 +70,8 @@ const props = withDefaults(defineProps<{
   enableDrillDown?: boolean
   /** Enable drill-through on double-click (Pro feature, default true) */
   enableDrillThrough?: boolean
+  /** Pivot row layout: 'grouped' merges repeated parent cells, 'tabular' repeats every value */
+  pivotLayout?: PivotLayout
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -94,6 +97,7 @@ const props = withDefaults(defineProps<{
   dateFormat: 'iso',
   enableDrillDown: true,
   enableDrillThrough: true,
+  pivotLayout: 'grouped',
 })
 
 const emit = defineEmits<{
@@ -1533,6 +1537,7 @@ function handleContainerClick(event: MouseEvent) {
             :theme="currentTheme"
             :enable-drill-down="enableDrillDown"
             :enable-drill-through="enableDrillThrough"
+            :pivot-layout="pivotLayout"
             @add-row-field="addRowField"
             @remove-row-field="removeRowField"
             @add-column-field="addColumnField"
