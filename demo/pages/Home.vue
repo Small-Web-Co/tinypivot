@@ -298,6 +298,7 @@ const freeFeatures = [
 const proFeatures = [
   'Advanced Aggregations (9+)',
   'Pivot Drill-Through',
+  'Excel (XLSX) Export',
   'AI Data Analyst (BYOK)',
   'Natural Language Queries',
   'Chart Builder (6 types)',

@@ -154,6 +154,7 @@ export function MyGrid({ data }) {
 | Calculated fields with formulas | ✅ | ✅ |
 | Pivot row group expand/collapse | ✅ | ✅ |
 | **Pivot drill-through** (double-click to inspect source rows) | ❌ | ✅ |
+| **Excel (XLSX) Export** (styled, multi-level pivot headers, lazy-loaded) | ❌ | ✅ |
 | **AI Data Analyst** (natural language, BYOK) | ❌ | ✅ |
 | **Chart Builder** (6 chart types) | ❌ | ✅ |
 | Advanced aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
@@ -190,6 +191,38 @@ export function MyGrid({ data }) {
 | `onCopy` | `(payload) => void` | Cells copied |
 | `onCollapseChange` | `(collapsedPaths: string[]) => void` | Pivot row groups collapsed/expanded |
 | `onDrillThrough` | `(result: DrillThroughResult) => void` | Pivot cell double-clicked and drill-through modal opened (Pro) |
+
+## Export
+
+### CSV Export (Free)
+
+CSV export is enabled by default. The "Export CSV" button appears in the toolbar when `enableExport` is `true`. Programmatic API:
+
+```typescript
+import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-react'
+
+exportToCSV(data, columns, { filename: 'my-data.csv' })
+```
+
+### Excel (XLSX) Export (Pro)
+
+Styled `.xlsx` downloads for both the flat grid and the pivot table. The "Export XLSX" button appears in the toolbar automatically when a Pro license is active. `exceljs` (~250 KB) loads **lazily** via dynamic import — it is never part of your main bundle.
+
+```typescript
+import { exportToXLSX, exportPivotToXLSX } from '@smallwebco/tinypivot-react'
+
+// Flat grid
+await exportToXLSX(data, columns, {
+  filename: 'report.xlsx',
+  sheetName: 'Sales',
+  numberFormats: { revenue: '#,##0.00' },
+})
+
+// Pivot table
+await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
+  filename: 'pivot.xlsx',
+})
+```
 
 ## Pivot Drill-Down
 
