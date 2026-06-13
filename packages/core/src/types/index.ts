@@ -183,6 +183,14 @@ export interface FieldStats {
   isNumeric: boolean
 }
 
+// Pivot Layout Types
+/**
+ * Controls how repeated parent row-header values are displayed in a pivot table.
+ * - `'grouped'`: merge consecutive identical parent values into a single spanning cell (rowspan).
+ * - `'tabular'`: repeat the value on every row (classic behaviour).
+ */
+export type PivotLayout = 'grouped' | 'tabular'
+
 // Component Props Types
 export interface DataGridProps {
   data: Record<string, unknown>[]
@@ -214,6 +222,12 @@ export interface DataGridProps {
   initialHeight?: number
   minHeight?: number
   maxHeight?: number
+  /**
+   * Controls how repeated parent row-header values are displayed in pivot mode.
+   * - `'grouped'` (default): merge consecutive identical parent values into a single spanning cell.
+   * - `'tabular'`: repeat the value on every row (classic behaviour).
+   */
+  pivotLayout?: PivotLayout
 }
 
 export interface PivotTableProps {

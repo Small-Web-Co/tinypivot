@@ -1896,6 +1896,47 @@
 .vpg-totals-row { background: var(--vpg-highlight-bg); }
 .vpg-total-label { font-weight: 700; color: var(--vpg-highlight-text); background: var(--vpg-highlight-bg); }
 
+/* Collapse toggle (chevron) */
+.vpg-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--vpg-text-secondary);
+  font-size: 1.0625rem;
+  margin-right: 0.375rem;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  pointer-events: none;
+}
+
+/* Whole-cell clickable affordance for grouped parent cells */
+.vpg-row-header-collapsible {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.vpg-row-header-collapsible:hover {
+  background-color: var(--vpg-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.vpg-row-header-collapsible:hover .vpg-collapse-toggle {
+  color: var(--vpg-accent);
+}
+
+/* Subtotal row styling */
+.vpg-subtotal-row .vpg-row-header-cell {
+  font-weight: 700;
+  color: var(--vpg-highlight-text);
+  background: var(--vpg-highlight-bg);
+}
+
+.vpg-subtotal-row .vpg-data-cell {
+  font-weight: 600;
+  background: var(--vpg-highlight-bg);
+}
+
 /* Pivot font sizes */
 .vpg-pivot-skeleton.vpg-font-xs .vpg-data-cell,
 .vpg-pivot-skeleton.vpg-font-xs .vpg-row-header-cell { font-size: 0.75rem; padding: 0.375rem 0.75rem; }

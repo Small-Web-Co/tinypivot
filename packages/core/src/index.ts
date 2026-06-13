@@ -132,6 +132,10 @@ export {
 
 export type { ComputePivotOptions, FormulaFunction } from './pivot'
 
+// Grouped pivot layout helpers
+export { computeRowSpans } from './pivot/rowspan'
+export type { RowSpanCell } from './pivot/rowspan'
+
 // Types
 export type {
   ActiveFilter,
@@ -207,6 +211,7 @@ export type {
   PivotConfig,
   PivotField,
   PivotGroupStart,
+  PivotLayout,
   PivotResult,
   PivotRowMeta,
   PivotTableProps,

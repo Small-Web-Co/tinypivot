@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
-import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotLayout, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import { computeRowSpans, getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display
  * Visual layout for pivot configuration and results
@@ -31,6 +31,7 @@ const props = defineProps<{
   theme?: string
   enableDrillDown?: boolean
   enableDrillThrough?: boolean
+  pivotLayout?: PivotLayout
 }>()
 
 const emit = defineEmits<{
@@ -173,6 +174,13 @@ const sortedRowIndices = computed(() => {
   })
 
   return indices
+})
+
+// Grouped layout: per-cell rowspan information (indexed by [sortedPosition][columnIndex])
+const rowSpans = computed(() => {
+  if (!props.pivotResult || props.pivotLayout !== 'grouped')
+    return null
+  return computeRowSpans(props.pivotResult.rowHeaders, sortedRowIndices.value, props.rowFields.length)
 })
 
 // Column headers
@@ -856,24 +864,50 @@ function onDrillThroughGrandTotal() {
 
           <tbody>
             <tr
-              v-for="sortedIdx in sortedRowIndices"
+              v-for="(sortedIdx, rowPos) in sortedRowIndices"
               :key="sortedIdx"
               class="vpg-data-row"
               :class="{ 'vpg-subtotal-row': pivotResult.rowMeta[sortedIdx]?.isSubtotal }"
             >
-              <th
-                v-for="(val, idx) in pivotResult.rowHeaders[sortedIdx]"
-                :key="`row-${sortedIdx}-${idx}`"
-                class="vpg-row-header-cell"
-                :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }"
-              >
-                <span
-                  v-if="enableDrillDown !== false && findGroupStart(sortedIdx, idx)"
-                  class="vpg-collapse-toggle"
-                  @click.stop="onChevronClick(findGroupStart(sortedIdx, idx)!, $event)"
-                >{{ findGroupStart(sortedIdx, idx)!.isCollapsed ? '▸' : '▾' }}</span>
-                {{ val }}
-              </th>
+              <!-- Grouped layout: merge repeated parent cells via rowspan; omit skipped cells -->
+              <template v-if="rowSpans">
+                <template
+                  v-for="(val, idx) in pivotResult.rowHeaders[sortedIdx]"
+                  :key="`row-${sortedIdx}-${idx}`"
+                >
+                  <th
+                    v-if="rowSpans[rowPos][idx].render"
+                    class="vpg-row-header-cell"
+                    :class="{ 'vpg-row-header-collapsible': enableDrillDown !== false && findGroupStart(sortedIdx, idx) }"
+                    :rowspan="rowSpans[rowPos][idx].rowspan"
+                    :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }"
+                    @click.stop="enableDrillDown !== false && findGroupStart(sortedIdx, idx) ? onChevronClick(findGroupStart(sortedIdx, idx)!, $event) : undefined"
+                  >
+                    <span
+                      v-if="enableDrillDown !== false && findGroupStart(sortedIdx, idx)"
+                      class="vpg-collapse-toggle"
+                    >{{ findGroupStart(sortedIdx, idx)!.isCollapsed ? '▸' : '▾' }}</span>
+                    {{ val }}
+                  </th>
+                </template>
+              </template>
+
+              <!-- Tabular layout: render every cell, always rowspan=1 (current behavior) -->
+              <template v-else>
+                <th
+                  v-for="(val, idx) in pivotResult.rowHeaders[sortedIdx]"
+                  :key="`row-${sortedIdx}-${idx}`"
+                  class="vpg-row-header-cell"
+                  :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }"
+                >
+                  <span
+                    v-if="enableDrillDown !== false && findGroupStart(sortedIdx, idx)"
+                    class="vpg-collapse-toggle"
+                    @click.stop="onChevronClick(findGroupStart(sortedIdx, idx)!, $event)"
+                  >{{ findGroupStart(sortedIdx, idx)!.isCollapsed ? '▸' : '▾' }}</span>
+                  {{ val }}
+                </th>
+              </template>
 
               <td
                 v-for="(cell, colIdx) in pivotResult.data[sortedIdx]"
@@ -1828,17 +1862,27 @@ function onDrillThroughGrandTotal() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  cursor: pointer;
+  width: 1.25rem;
+  height: 1.25rem;
   color: var(--vpg-text-secondary);
-  font-size: 0.6875rem;
-  margin-right: 0.25rem;
+  font-size: 1.0625rem;
+  margin-right: 0.375rem;
   flex-shrink: 0;
   transition: color 0.15s;
+  pointer-events: none;
 }
 
-.vpg-collapse-toggle:hover {
+/* Whole-cell clickable affordance for grouped parent cells */
+.vpg-row-header-collapsible {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.vpg-row-header-collapsible:hover {
+  background-color: var(--vpg-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.vpg-row-header-collapsible:hover .vpg-collapse-toggle {
   color: var(--vpg-accent);
 }
 
