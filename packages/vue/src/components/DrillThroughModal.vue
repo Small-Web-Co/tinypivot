@@ -5,7 +5,7 @@ import { exportToCSV, getAggregationLabel } from '@smallwebco/tinypivot-core'
  * Drill-Through Modal
  * Displays source rows for a pivot cell in a paginated table
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   show: boolean
@@ -39,6 +39,10 @@ watch(() => props.show, (show) => {
   else {
     document.removeEventListener('keydown', handleKeydown)
   }
+}, { immediate: true })
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
 })
 
 // Column keys from the first row
