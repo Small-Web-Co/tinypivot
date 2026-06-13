@@ -19,6 +19,7 @@ const FREE_LICENSE: LicenseInfo = {
     noWatermark: false,
     charts: false, // Chart builder is Pro only
     aiAnalyst: false, // AI Data Analyst is Pro only
+    drillThrough: false, // Drill-through is Pro only
   },
 }
 
@@ -33,6 +34,7 @@ const INVALID_LICENSE: LicenseInfo = {
     noWatermark: false,
     charts: false,
     aiAnalyst: false,
+    drillThrough: false,
   },
 }
 
@@ -47,6 +49,7 @@ const DEMO_LICENSE: LicenseInfo = {
     noWatermark: false, // Still show watermark in demo
     charts: true, // Demo can use charts
     aiAnalyst: true, // Demo can use AI Analyst
+    drillThrough: true, // Demo can use drill-through
   },
 }
 
@@ -377,6 +380,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
       noWatermark: type !== 'free',
       charts: type !== 'free',
       aiAnalyst: type !== 'free',
+      drillThrough: type !== 'free',
     },
   }
 }
@@ -459,6 +463,13 @@ export function canUseCharts(info: LicenseInfo): boolean {
  */
 export function canUseAIAnalyst(info: LicenseInfo): boolean {
   return info.features.aiAnalyst
+}
+
+/**
+ * Check if license allows drill-through feature
+ */
+export function canUseDrillThrough(info: LicenseInfo): boolean {
+  return info.features.drillThrough
 }
 
 /**

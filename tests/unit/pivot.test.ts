@@ -19,6 +19,7 @@ import {
   validateFormula,
   validateSimpleFormula,
 } from '../../packages/core/src/pivot'
+import { getDrillThroughRows } from '../../packages/core/src/pivot/drillthrough'
 
 describe('aggregate', () => {
   it('should calculate sum', () => {
@@ -858,5 +859,202 @@ describe('computePivotResult – 3-level row hierarchy', () => {
     const result = computePivotResult(deepData, deepConfig, { collapsedPaths: collapsed })!
     const idx = result.rowMeta.findIndex(m => m.path[0] === 'West' && m.path[1] === 'Widgets' && m.isSubtotal)
     expect(result.data[idx][0].value).toBe(30) // 10+20
+  })
+})
+
+// ============================================================
+// Task 2: getDrillThroughRows
+// ============================================================
+
+/**
+ * Re-use the drillData fixture from Task 1 (already defined above):
+ *
+ * West/Widgets: Q1=100, Q2=200, Q3=300, Q4=400
+ * West/Gadgets: Q1=50,  Q2=150, Q3=250, Q4=350
+ * East/Widgets: Q1=80,  Q2=160, Q3=240, Q4=320
+ * East/Gadgets: Q1=40,  Q2=120, Q3=200, Q4=280
+ */
+const drillThroughConfig = {
+  rowFields: ['region', 'product'],
+  columnFields: ['quarter'],
+  valueFields: [{ field: 'sales', aggregation: 'sum' as const }],
+  showRowTotals: false,
+  showColumnTotals: false,
+}
+
+describe('getDrillThroughRows – full path slice (West / Widgets × Q3)', () => {
+  it('returns exactly the matching source row', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['West', 'Widgets'],
+      ['Q3'],
+    )
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0]).toEqual({ region: 'West', product: 'Widgets', quarter: 'Q3', sales: 300 })
+  })
+
+  it('descriptor has correct rowPath, columnPath, valueField, aggregation', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['West', 'Widgets'],
+      ['Q3'],
+    )
+    expect(result.descriptor.rowPath).toEqual(['West', 'Widgets'])
+    expect(result.descriptor.columnPath).toEqual(['Q3'])
+    expect(result.descriptor.valueField).toBe('sales')
+    expect(result.descriptor.aggregation).toBe('sum')
+  })
+
+  it('descriptor.rowCount equals rows.length', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['West', 'Widgets'],
+      ['Q3'],
+    )
+    expect(result.descriptor.rowCount).toBe(result.rows.length)
+    expect(result.descriptor.rowCount).toBe(1)
+  })
+
+  it('descriptor.formattedValue is the formatted aggregation result — sum=300 → "300"', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['West', 'Widgets'],
+      ['Q3'],
+    )
+    // sum of [300] = 300, formatAggregatedValue(300, 'sum') = '300'
+    expect(result.descriptor.formattedValue).toBe('300')
+  })
+})
+
+describe('getDrillThroughRows – partial row path + full column path (West subtotal × Q1)', () => {
+  it('returns all West×Q1 rows when only rowPath prefix ["West"] is given', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['West'],
+      ['Q1'],
+    )
+    // West/Widgets Q1=100, West/Gadgets Q1=50 → 2 rows
+    expect(result.rows).toHaveLength(2)
+    const sales = result.rows.map(r => r.sales as number).sort((a, b) => a - b)
+    expect(sales).toEqual([50, 100])
+  })
+
+  it('descriptor.formattedValue for partial row path = sum(100, 50) = 150 → "150"', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['West'],
+      ['Q1'],
+    )
+    expect(result.descriptor.formattedValue).toBe('150')
+  })
+})
+
+describe('getDrillThroughRows – both paths empty (grand total)', () => {
+  it('returns all 16 source rows when rowPath and columnPath are both empty', () => {
+    const result = getDrillThroughRows(drillData, drillThroughConfig, [], [])
+    expect(result.rows).toHaveLength(16)
+  })
+
+  it('grand total formattedValue = sum of all sales = 3240', () => {
+    const result = getDrillThroughRows(drillData, drillThroughConfig, [], [])
+    expect(result.descriptor.formattedValue).toBe('3,240')
+  })
+})
+
+describe('getDrillThroughRows – zero-match slice', () => {
+  it('returns empty rows array when no source rows match', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['South'], // No South region in drillData
+      ['Q1'],
+    )
+    expect(result.rows).toHaveLength(0)
+    expect(result.descriptor.rowCount).toBe(0)
+  })
+
+  it('zero-match formattedValue is "-" (null aggregation)', () => {
+    const result = getDrillThroughRows(
+      drillData,
+      drillThroughConfig,
+      ['South'],
+      ['Q1'],
+    )
+    expect(result.descriptor.formattedValue).toBe('-')
+  })
+})
+
+describe('getDrillThroughRows – formattedValue correctness for median', () => {
+  /**
+   * Use no-columnField config. West sales (all quarters, both products):
+   * [100, 200, 300, 400, 50, 150, 250, 350] sorted = [50,100,150,200,250,300,350,400]
+   * Median of 8 = (200+250)/2 = 225
+   */
+  const medianConfig = {
+    rowFields: ['region', 'product'],
+    columnFields: [],
+    valueFields: [{ field: 'sales', aggregation: 'median' as const }],
+    showRowTotals: false,
+    showColumnTotals: false,
+  }
+
+  it('median formattedValue for West partial path = "225"', () => {
+    const result = getDrillThroughRows(drillData, medianConfig, ['West'], [])
+    // 8 rows: sorted [50,100,150,200,250,300,350,400], median = (200+250)/2 = 225
+    expect(result.descriptor.formattedValue).toBe('225')
+  })
+})
+
+describe('getDrillThroughRows – multi-valueField config picks the correct field', () => {
+  /**
+   * Config with two value fields: sales (sum) and sales again (count).
+   * The caller specifies which valueField/aggregation represents the clicked cell.
+   */
+  const multiVFConfig = {
+    rowFields: ['region'],
+    columnFields: ['quarter'],
+    valueFields: [
+      { field: 'sales', aggregation: 'sum' as const },
+      { field: 'sales', aggregation: 'count' as const },
+    ],
+    showRowTotals: false,
+    showColumnTotals: false,
+  }
+
+  it('when valueFieldIndex=0 (sum), formattedValue uses sum aggregation', () => {
+    // West × Q1: West/Widgets Q1=100, West/Gadgets Q1=50 → sum=150
+    const result = getDrillThroughRows(drillData, multiVFConfig, ['West'], ['Q1'], 0)
+    expect(result.descriptor.aggregation).toBe('sum')
+    expect(result.descriptor.formattedValue).toBe('150')
+  })
+
+  it('when valueFieldIndex=1 (count), formattedValue uses count aggregation', () => {
+    // West × Q1: 2 matching rows → count=2
+    const result = getDrillThroughRows(drillData, multiVFConfig, ['West'], ['Q1'], 1)
+    expect(result.descriptor.aggregation).toBe('count')
+    expect(result.descriptor.formattedValue).toBe('2')
+  })
+})
+
+describe('getDrillThroughRows – null value in row field (blank handling)', () => {
+  /**
+   * makeKey uses String(row[f] ?? '(blank)') — so null/undefined field values
+   * become '(blank)' in the pivot key. The drill-through must match this behavior.
+   */
+  const nullData: Record<string, unknown>[] = [
+    { region: null, product: 'Widgets', quarter: 'Q1', sales: 99 },
+    { region: 'West', product: 'Widgets', quarter: 'Q1', sales: 100 },
+  ]
+
+  it('matches rows where the field value is null using the "(blank)" stringification', () => {
+    const result = getDrillThroughRows(nullData, drillThroughConfig, ['(blank)', 'Widgets'], ['Q1'])
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].sales).toBe(99)
   })
 })

@@ -17,6 +17,8 @@ import type {
 } from '../types'
 import { detectFieldType, formatNumber, makeKey, parseKey } from '../utils'
 
+export { getDrillThroughRows } from './drillthrough'
+
 // ============================================================
 // Path key helpers (NUL-separated, collision-safe)
 // ============================================================

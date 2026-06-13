@@ -77,6 +77,7 @@ export type { PivotExportData } from './export'
 export {
   canUseAIAnalyst,
   canUseCharts,
+  canUseDrillThrough,
   canUsePivot,
   configureLicenseSecret,
   getDemoLicenseInfo,
@@ -104,6 +105,8 @@ export {
   generateStorageKey,
   getAggregationLabel,
   getAggregationSymbol,
+  // Drill-Through
+  getDrillThroughRows,
   getUnassignedFields,
   isConfigValidForFields,
   isPivotConfigured,
@@ -132,9 +135,9 @@ export type {
   // AI Data Analyst Types
   AIAnalystConfig,
   AIColumnOverride,
-
   AIColumnSchema,
   AIConversation,
+
   AIConversationUpdateEvent,
   AIDataLoadedEvent,
   AIDataSource,
@@ -142,9 +145,9 @@ export type {
   AIMessage,
   AIMessageMetadata,
   AIProvider,
-
   AIProxyRequest,
   AIProxyResponse,
+
   AIQueryExecutedEvent,
   AITableSchema,
   CalculatedField,
@@ -154,16 +157,16 @@ export type {
   ChartConfig,
   ChartData,
   ChartField,
-
   ChartFieldInfo,
   ChartOptions,
 
   ChartSeries,
   ChartType,
-  ChartTypeInfo,
 
+  ChartTypeInfo,
   ColumnFilter,
   ColumnFilterValue,
+
   // Grid Types
   ColumnStats,
   CopyEvent,
@@ -174,6 +177,8 @@ export type {
   DataGridProps,
   DateFormat,
   DateRange,
+  DrillThroughDescriptor,
+  DrillThroughResult,
 
   ExportEvent,
   ExportOptions,

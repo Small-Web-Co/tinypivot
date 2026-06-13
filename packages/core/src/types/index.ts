@@ -239,6 +239,8 @@ export interface LicenseFeatures {
   charts: boolean
   /** AI Data Analyst feature (Pro only) */
   aiAnalyst: boolean
+  /** Drill-through to underlying source rows (Pro only) */
+  drillThrough: boolean
 }
 
 export interface LicenseInfo {
@@ -834,4 +836,38 @@ export interface AIErrorEvent {
   query?: string
   /** Error type classification */
   type: 'query' | 'ai' | 'network' | 'validation'
+}
+
+// ============================================================================
+// Drill-Through Types
+// ============================================================================
+
+/**
+ * Describes the cell slice that was drilled through — used to build UI titles
+ * such as "West × Q3 — Sum of sales = 1,234 · 42 rows".
+ */
+export interface DrillThroughDescriptor {
+  /** Row-field path for the drilled cell (e.g. ['West', 'Widgets']). Empty = grand total axis. */
+  rowPath: string[]
+  /** Column-field path for the drilled cell (e.g. ['Q3']). Empty = grand total axis. */
+  columnPath: string[]
+  /** The value field name (e.g. 'sales') */
+  valueField: string
+  /** The aggregation function applied (e.g. 'sum') */
+  aggregation: AggregationFunction
+  /** Pre-formatted aggregation result (e.g. '1,234') — from formatAggregatedValue */
+  formattedValue: string
+  /** Number of source rows matching this slice */
+  rowCount: number
+}
+
+/**
+ * Result returned by getDrillThroughRows — contains the filtered source rows
+ * and a descriptor that summarises the slice for UI display.
+ */
+export interface DrillThroughResult {
+  /** Source data rows that match the drilled cell's row+column path filter */
+  rows: Record<string, unknown>[]
+  /** Descriptor summarising the cell slice for UI title/header */
+  descriptor: DrillThroughDescriptor
 }
