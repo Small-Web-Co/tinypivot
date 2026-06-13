@@ -1,4 +1,4 @@
-import type { AggregationFunction, CalculatedField, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
 import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display for React
@@ -27,6 +27,9 @@ interface PivotSkeletonProps {
   activeFilters?: ActiveFilter[] | null
   totalRowCount?: number
   filteredRowCount?: number
+  enableDrillDown?: boolean
+  enableDrillThrough?: boolean
+  collapsedPaths?: Set<string>
   onAddRowField: (field: string) => void
   onRemoveRowField: (field: string) => void
   onAddColumnField: (field: string) => void
@@ -36,6 +39,8 @@ interface PivotSkeletonProps {
   onUpdateAggregation: (field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction) => void
   onReorderRowFields: (fields: string[]) => void
   onReorderColumnFields: (fields: string[]) => void
+  onToggleCollapse?: (key: string, altKey: boolean) => void
+  onDrillThroughCell?: (payload: { rowPath: string[], columnPath: string[], valueFieldIndex: number }) => void
   theme?: string
 }
 
@@ -51,6 +56,9 @@ export function PivotSkeleton({
   activeFilters,
   totalRowCount,
   filteredRowCount,
+  enableDrillDown,
+  enableDrillThrough,
+  collapsedPaths: _collapsedPaths,
   onAddRowField,
   onRemoveRowField,
   onAddColumnField,
@@ -59,6 +67,8 @@ export function PivotSkeleton({
   onRemoveValueField,
   onReorderRowFields,
   onReorderColumnFields,
+  onToggleCollapse,
+  onDrillThroughCell,
   theme,
 }: PivotSkeletonProps) {
   const { showWatermark, canUsePivot, isDemo } = useLicense()
@@ -509,6 +519,79 @@ export function PivotSkeleton({
 
   const currentFontSize = fontSize
 
+  // Computed column paths: for each colIdx, the column field path
+  const columnPaths = useMemo((): string[][] => {
+    if (!pivotResult || columnFields.length === 0)
+      return []
+
+    const numCols = pivotResult.data[0]?.length ?? 0
+    const numValueFields = valueFields.length || 1
+    const paths: string[][] = []
+
+    for (let colIdx = 0; colIdx < numCols; colIdx++) {
+      const colKeyIndex = Math.floor(colIdx / numValueFields)
+      const path: string[] = []
+      for (let h = 0; h < columnFields.length; h++) {
+        const headerRow = pivotResult.headers[h]
+        if (headerRow) {
+          path.push(headerRow[colKeyIndex * numValueFields] ?? '')
+        }
+      }
+      paths.push(path)
+    }
+
+    return paths
+  }, [pivotResult, columnFields, valueFields])
+
+  // Find groupStart for a given row and column index
+  const findGroupStart = useCallback((sortedIdx: number, idx: number): PivotGroupStart | null => {
+    if (!pivotResult)
+      return null
+    const meta = pivotResult.rowMeta[sortedIdx]
+    if (!meta)
+      return null
+    return meta.groupStarts.find(gs => gs.depth === idx) ?? null
+  }, [pivotResult])
+
+  // Handle chevron click
+  const handleChevronClick = useCallback((groupStart: PivotGroupStart, event: React.MouseEvent) => {
+    onToggleCollapse?.(groupStart.key, event.altKey)
+  }, [onToggleCollapse])
+
+  // Handle drill-through on a data cell
+  const handleDrillThroughCell = useCallback((sortedIdx: number, colIdx: number) => {
+    if (!pivotResult)
+      return
+    const meta = pivotResult.rowMeta[sortedIdx]
+    const rowPath = meta ? meta.path.filter(v => v !== '') : []
+    const colPath = columnPaths[colIdx] ?? []
+    const numValueFields = valueFields.length || 1
+    const valueFieldIndex = colIdx % numValueFields
+    onDrillThroughCell?.({ rowPath, columnPath: colPath, valueFieldIndex })
+  }, [pivotResult, columnPaths, valueFields, onDrillThroughCell])
+
+  // Handle drill-through on a row total cell
+  const handleDrillThroughRowTotal = useCallback((sortedIdx: number) => {
+    if (!pivotResult)
+      return
+    const meta = pivotResult.rowMeta[sortedIdx]
+    const rowPath = meta ? meta.path.filter(v => v !== '') : []
+    onDrillThroughCell?.({ rowPath, columnPath: [], valueFieldIndex: 0 })
+  }, [pivotResult, onDrillThroughCell])
+
+  // Handle drill-through on a column total cell
+  const handleDrillThroughColTotal = useCallback((colIdx: number) => {
+    const colPath = columnPaths[colIdx] ?? []
+    const numValueFields = valueFields.length || 1
+    const valueFieldIndex = colIdx % numValueFields
+    onDrillThroughCell?.({ rowPath: [], columnPath: colPath, valueFieldIndex })
+  }, [columnPaths, valueFields, onDrillThroughCell])
+
+  // Handle drill-through on the grand total cell
+  const handleDrillThroughGrandTotal = useCallback(() => {
+    onDrillThroughCell?.({ rowPath: [], columnPath: [], valueFieldIndex: 0 })
+  }, [onDrillThroughCell])
+
   // Calculate width per row header column
   const rowHeaderWidth = 180
   const rowHeaderColWidth = useMemo(() => {
@@ -896,16 +979,30 @@ export function PivotSkeleton({
 
                 <tbody>
                   {sortedRowIndices.map(sortedIdx => (
-                    <tr key={sortedIdx} className="vpg-data-row">
-                      {pivotResult.rowHeaders[sortedIdx].map((val, idx) => (
-                        <th
-                          key={`row-${sortedIdx}-${idx}`}
-                          className="vpg-row-header-cell"
-                          style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
-                        >
-                          {val}
-                        </th>
-                      ))}
+                    <tr
+                      key={sortedIdx}
+                      className={`vpg-data-row${pivotResult.rowMeta[sortedIdx]?.isSubtotal ? ' vpg-subtotal-row' : ''}`}
+                    >
+                      {pivotResult.rowHeaders[sortedIdx].map((val, idx) => {
+                        const groupStart = findGroupStart(sortedIdx, idx)
+                        return (
+                          <th
+                            key={`row-${sortedIdx}-${idx}`}
+                            className="vpg-row-header-cell"
+                            style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
+                          >
+                            {enableDrillDown !== false && groupStart && (
+                              <span
+                                className="vpg-collapse-toggle"
+                                onClick={e => handleChevronClick(groupStart, e)}
+                              >
+                                {groupStart.isCollapsed ? '▸' : '▾'}
+                              </span>
+                            )}
+                            {val}
+                          </th>
+                        )
+                      })}
 
                       {pivotResult.data[sortedIdx].map((cell, colIdx) => {
                         const displayRowIdx = sortedRowIndices.indexOf(sortedIdx)
@@ -915,6 +1012,7 @@ export function PivotSkeleton({
                             className={`vpg-data-cell ${isCellSelected(displayRowIdx, colIdx) ? 'selected' : ''} ${cell.value === null ? 'vpg-is-null' : ''}`}
                             onMouseDown={e => handleCellMouseDown(displayRowIdx, colIdx, e)}
                             onMouseEnter={() => handleCellMouseEnter(displayRowIdx, colIdx)}
+                            onDoubleClick={enableDrillThrough !== false ? () => handleDrillThroughCell(sortedIdx, colIdx) : undefined}
                           >
                             {cell.formattedValue}
                           </td>
@@ -922,7 +1020,10 @@ export function PivotSkeleton({
                       })}
 
                       {pivotResult.rowTotals[sortedIdx] && (
-                        <td className="vpg-data-cell vpg-total-cell">
+                        <td
+                          className="vpg-data-cell vpg-total-cell"
+                          onDoubleClick={enableDrillThrough !== false ? () => handleDrillThroughRowTotal(sortedIdx) : undefined}
+                        >
                           {pivotResult.rowTotals[sortedIdx].formattedValue}
                         </td>
                       )}
@@ -939,12 +1040,19 @@ export function PivotSkeleton({
                         Total
                       </th>
                       {pivotResult.columnTotals.map((cell, colIdx) => (
-                        <td key={colIdx} className="vpg-data-cell vpg-total-cell">
+                        <td
+                          key={colIdx}
+                          className="vpg-data-cell vpg-total-cell"
+                          onDoubleClick={enableDrillThrough !== false ? () => handleDrillThroughColTotal(colIdx) : undefined}
+                        >
                           {cell.formattedValue}
                         </td>
                       ))}
                       {pivotResult.rowTotals.length > 0 && (
-                        <td className="vpg-data-cell vpg-grand-total-cell">
+                        <td
+                          className="vpg-data-cell vpg-grand-total-cell"
+                          onDoubleClick={enableDrillThrough !== false ? () => handleDrillThroughGrandTotal() : undefined}
+                        >
                           {pivotResult.grandTotal.formattedValue}
                         </td>
                       )}
