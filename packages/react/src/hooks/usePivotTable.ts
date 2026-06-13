@@ -23,7 +23,7 @@ import {
  * Pivot Table Hook for React
  * Wraps core pivot logic with React state management
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLicense } from './useLicense'
 
 // Re-export for convenience
@@ -83,12 +83,6 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
   const [calculatedFields, setCalculatedFields] = useState<CalculatedField[]>(() => loadCalculatedFields())
   const [currentStorageKey, setCurrentStorageKey] = useState<string | null>(null)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
-
-  // Track currentStorageKey in a ref so the collapsedPaths save effect can read it without re-running
-  const currentStorageKeyRef = useRef<string | null>(null)
-  useEffect(() => {
-    currentStorageKeyRef.current = currentStorageKey
-  }, [currentStorageKey])
 
   // Compute available fields from data
   const availableFields = useMemo((): FieldStats[] => {
@@ -200,19 +194,18 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
     savePivotConfig(currentStorageKey, config)
   }, [currentStorageKey, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields])
 
-  // Save collapsedPaths separately when it changes
+  // Save collapsedPaths separately when it or the storage key changes
   useEffect(() => {
-    const key = currentStorageKeyRef.current
-    if (!key)
+    if (!currentStorageKey)
       return
     try {
-      const collapsedKey = `${key}-collapsed`
+      const collapsedKey = `${currentStorageKey}-collapsed`
       sessionStorage.setItem(collapsedKey, JSON.stringify(Array.from(collapsedPaths)))
     }
     catch {
       // sessionStorage not available (SSR or private browsing)
     }
-  }, [collapsedPaths])
+  }, [collapsedPaths, currentStorageKey])
 
   // Actions - pivot is free with sum aggregation, Pro required for other aggregations
   const addRowField = useCallback(
