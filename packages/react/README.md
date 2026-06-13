@@ -180,6 +180,7 @@ export function MyGrid({ data }) {
 | `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override auto-detected chart field roles per column (`'dimension'` \| `'measure'` \| `'temporal'`) |
 | `enableDrillDown` | `boolean` | `true` | Enable pivot row group expand/collapse chevrons |
 | `enableDrillThrough` | `boolean` | `true` | Enable double-click drill-through on pivot cells (Pro feature) |
+| `pivotLayout` | `'grouped' \| 'tabular'` | `'grouped'` | Row layout for multi-field pivots: `'grouped'` merges repeated parent values into a spanning cell; `'tabular'` repeats every value on each row. |
 
 ## Callbacks
 
@@ -229,6 +230,8 @@ await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
 ### Row Group Expand/Collapse (Free)
 
 When a pivot has two or more row fields, each group row displays a `▸`/`▾` chevron. Click to collapse or expand that group. Alt-click collapses/expands every group at the same depth. Collapsed groups still show correct aggregated values over all rows in the group.
+
+By default (`pivotLayout="grouped"`), the parent row value is rendered once as a vertically spanning cell across its children, making the hierarchy immediately readable. Set `pivotLayout="tabular"` to repeat the parent value on every row instead.
 
 ```tsx
 <DataGrid

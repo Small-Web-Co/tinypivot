@@ -141,6 +141,7 @@ All props are identical between Vue and React except for naming convention (Vue:
 | `ai-analyst` / `aiAnalyst` | `AIAnalystConfig` | `undefined` | Pro: AI Data Analyst configuration object |
 | `enable-drill-down` / `enableDrillDown` | `boolean` | `true` | Enable pivot row group expand/collapse chevrons (Free) |
 | `enable-drill-through` / `enableDrillThrough` | `boolean` | `true` | Enable double-click drill-through on pivot value cells (Pro feature) |
+| `pivot-layout` / `pivotLayout` | `'grouped' \| 'tabular'` | `'grouped'` | Row layout for multi-field pivots: `'grouped'` merges repeated parent values into a spanning cell; `'tabular'` repeats every value on each row. |
 | `row-height` / `rowHeight` | `number` | — | Row height in pixels |
 | `header-height` / `headerHeight` | `number` | — | Header row height in pixels |
 | `enable-row-selection` / `enableRowSelection` | `boolean` | `false` | Enable row selection (adds a checkbox column) |
