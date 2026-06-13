@@ -776,7 +776,7 @@ export function computePivotResult(
         emittedSubtotals.add(subtotalKey)
         const groupLeaves = groupLeafMap.get(subtotalKey) ?? []
         // Pad subtotal path to full rowFields width with empty strings
-        const paddedPath = [...ancestor, ...Array.from({ length: rowFields.length - ancestor.length }).fill('')]
+        const paddedPath = [...ancestor, ...Array.from<string>({ length: rowFields.length - ancestor.length }).fill('')]
         entries.push({ rowPath: paddedPath, leafKeys: groupLeaves, isSubtotal: true })
       }
       else {
@@ -802,7 +802,7 @@ export function computePivotResult(
     const starts: PivotGroupStart[] = []
     // The effective path for a subtotal is the collapsed ancestor prefix
     const effectivePath = entry.isSubtotal
-      ? entry.rowPath.slice(0, entry.rowPath.findLastIndex(v => v !== '') + 1)
+      ? entry.rowPath.slice(0, [...entry.rowPath].reduceRight((acc, v, i) => acc === -1 && v !== '' ? i : acc, -1) + 1)
       : entry.rowPath
     // Groups are at depths 0 … rowFields.length - 2 (not the leaf depth)
     const maxGroupDepth = rowFields.length - 2

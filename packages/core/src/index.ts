@@ -201,6 +201,7 @@ export type {
   PivotCell,
   PivotConfig,
   PivotField,
+  PivotGroupStart,
   PivotResult,
   PivotRowMeta,
   PivotTableProps,

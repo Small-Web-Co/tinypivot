@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AggregationFunction, CalculatedField, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
 import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display
@@ -29,6 +29,9 @@ const props = defineProps<{
   totalRowCount?: number
   filteredRowCount?: number
   theme?: string
+  enableDrillDown?: boolean
+  enableDrillThrough?: boolean
+  collapsedPaths?: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -41,6 +44,8 @@ const emit = defineEmits<{
   (e: 'updateAggregation', field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction): void
   (e: 'reorderRowFields', fields: string[]): void
   (e: 'reorderColumnFields', fields: string[]): void
+  (e: 'toggleCollapse', key: string, altKey: boolean): void
+  (e: 'drillThroughCell', payload: { rowPath: string[], columnPath: string[], valueFieldIndex: number }): void
 }>()
 
 // Helper to get display name for value fields (resolves calc IDs to names)
@@ -490,6 +495,79 @@ const rowHeaderColWidth = computed(() => {
 function getRowHeaderLeftOffset(fieldIdx: number): number {
   return fieldIdx * rowHeaderColWidth.value
 }
+
+// Computed column paths: for each colIdx, the column field path
+const columnPaths = computed((): string[][] => {
+  if (!props.pivotResult || props.columnFields.length === 0)
+    return []
+
+  const numCols = props.pivotResult.data[0]?.length ?? 0
+  const numValueFields = props.valueFields.length || 1
+  const paths: string[][] = []
+
+  for (let colIdx = 0; colIdx < numCols; colIdx++) {
+    const colKeyIndex = Math.floor(colIdx / numValueFields)
+    const path: string[] = []
+    for (let h = 0; h < props.columnFields.length; h++) {
+      const headerRow = props.pivotResult.headers[h]
+      if (headerRow) {
+        path.push(headerRow[colKeyIndex * numValueFields] ?? '')
+      }
+    }
+    paths.push(path)
+  }
+
+  return paths
+})
+
+// Find groupStart for a given row and column index
+function findGroupStart(sortedIdx: number, idx: number): PivotGroupStart | null {
+  if (!props.pivotResult)
+    return null
+  const meta = props.pivotResult.rowMeta[sortedIdx]
+  if (!meta)
+    return null
+  return meta.groupStarts.find(gs => gs.depth === idx) ?? null
+}
+
+// Handle chevron click
+function onChevronClick(groupStart: PivotGroupStart, event: MouseEvent) {
+  emit('toggleCollapse', groupStart.key, event.altKey)
+}
+
+// Handle drill-through on a data cell
+function onDrillThroughCell(sortedIdx: number, colIdx: number) {
+  if (!props.pivotResult)
+    return
+  const meta = props.pivotResult.rowMeta[sortedIdx]
+  const rowPath = meta ? meta.path.filter(v => v !== '') : []
+  const colPath = columnPaths.value[colIdx] ?? []
+  const numValueFields = props.valueFields.length || 1
+  const valueFieldIndex = colIdx % numValueFields
+  emit('drillThroughCell', { rowPath, columnPath: colPath, valueFieldIndex })
+}
+
+// Handle drill-through on a row total cell
+function onDrillThroughRowTotal(sortedIdx: number) {
+  if (!props.pivotResult)
+    return
+  const meta = props.pivotResult.rowMeta[sortedIdx]
+  const rowPath = meta ? meta.path.filter(v => v !== '') : []
+  emit('drillThroughCell', { rowPath, columnPath: [], valueFieldIndex: 0 })
+}
+
+// Handle drill-through on a column total cell
+function onDrillThroughColTotal(colIdx: number) {
+  const colPath = columnPaths.value[colIdx] ?? []
+  const numValueFields = props.valueFields.length || 1
+  const valueFieldIndex = colIdx % numValueFields
+  emit('drillThroughCell', { rowPath: [], columnPath: colPath, valueFieldIndex })
+}
+
+// Handle drill-through on the grand total cell
+function onDrillThroughGrandTotal() {
+  emit('drillThroughCell', { rowPath: [], columnPath: [], valueFieldIndex: 0 })
+}
 </script>
 
 <template>
@@ -778,13 +856,23 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
           </thead>
 
           <tbody>
-            <tr v-for="sortedIdx in sortedRowIndices" :key="sortedIdx" class="vpg-data-row">
+            <tr
+              v-for="sortedIdx in sortedRowIndices"
+              :key="sortedIdx"
+              class="vpg-data-row"
+              :class="{ 'vpg-subtotal-row': pivotResult.rowMeta[sortedIdx]?.isSubtotal }"
+            >
               <th
                 v-for="(val, idx) in pivotResult.rowHeaders[sortedIdx]"
                 :key="`row-${sortedIdx}-${idx}`"
                 class="vpg-row-header-cell"
                 :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }"
               >
+                <span
+                  v-if="enableDrillDown !== false && findGroupStart(sortedIdx, idx)"
+                  class="vpg-collapse-toggle"
+                  @click.stop="onChevronClick(findGroupStart(sortedIdx, idx)!, $event)"
+                >{{ findGroupStart(sortedIdx, idx)!.isCollapsed ? '▸' : '▾' }}</span>
                 {{ val }}
               </th>
 
@@ -799,11 +887,16 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
                 :style="{ width: `${dataColWidth}px` }"
                 @mousedown="handleCellMouseDown(sortedRowIndices.indexOf(sortedIdx), colIdx, $event)"
                 @mouseenter="handleCellMouseEnter(sortedRowIndices.indexOf(sortedIdx), colIdx)"
+                @dblclick="enableDrillThrough !== false && onDrillThroughCell(sortedIdx, colIdx)"
               >
                 {{ cell.formattedValue }}
               </td>
 
-              <td v-if="pivotResult.rowTotals[sortedIdx]" class="vpg-data-cell vpg-total-cell">
+              <td
+                v-if="pivotResult.rowTotals[sortedIdx]"
+                class="vpg-data-cell vpg-total-cell"
+                @dblclick="enableDrillThrough !== false && onDrillThroughRowTotal(sortedIdx)"
+              >
                 {{ pivotResult.rowTotals[sortedIdx].formattedValue }}
               </td>
             </tr>
@@ -821,10 +914,15 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
                 :key="colIdx"
                 class="vpg-data-cell vpg-total-cell"
                 :style="{ width: `${dataColWidth}px` }"
+                @dblclick="enableDrillThrough !== false && onDrillThroughColTotal(colIdx)"
               >
                 {{ cell.formattedValue }}
               </td>
-              <td v-if="pivotResult.rowTotals.length > 0" class="vpg-data-cell vpg-grand-total-cell">
+              <td
+                v-if="pivotResult.rowTotals.length > 0"
+                class="vpg-data-cell vpg-grand-total-cell"
+                @dblclick="enableDrillThrough !== false && onDrillThroughGrandTotal()"
+              >
                 {{ pivotResult.grandTotal.formattedValue }}
               </td>
             </tr>
@@ -1724,6 +1822,37 @@ function getRowHeaderLeftOffset(fieldIdx: number): number {
   color: var(--vpg-highlight-text) !important;
   text-decoration: underline;
   opacity: 0.85;
+}
+
+/* Collapse toggle (chevron) */
+.vpg-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  color: var(--vpg-text-secondary);
+  font-size: 0.6875rem;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.vpg-collapse-toggle:hover {
+  color: var(--vpg-accent);
+}
+
+/* Subtotal row styling */
+.vpg-subtotal-row .vpg-row-header-cell {
+  font-weight: 700;
+  color: var(--vpg-highlight-text);
+  background: var(--vpg-highlight-bg);
+}
+
+.vpg-subtotal-row .vpg-data-cell {
+  font-weight: 600;
+  background: var(--vpg-highlight-bg);
 }
 
 /* Scrollbar */

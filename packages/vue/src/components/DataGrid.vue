@@ -8,10 +8,11 @@ import type {
   CalculatedField,
   ChartConfig,
   DateFormat,
+  DrillThroughResult,
   NumberFormat,
   Theme,
 } from '@smallwebco/tinypivot-core'
-import { formatDate as coreFormatDate, formatNumber as coreFormatNumber, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
+import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
@@ -29,6 +30,7 @@ import { usePivotTable } from '../composables/usePivotTable'
 import AIAnalyst from './AIAnalyst.vue'
 import ChartBuilder from './ChartBuilder.vue'
 import ColumnFilter from './ColumnFilter.vue'
+import DrillThroughModal from './DrillThroughModal.vue'
 import PivotConfig from './PivotConfig.vue'
 import PivotSkeleton from './PivotSkeleton.vue'
 
@@ -61,6 +63,10 @@ const props = withDefaults(defineProps<{
   dateFormat?: DateFormat
   /** Override auto-detected chart field roles per column name */
   fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
+  /** Enable row group collapse/expand (default true) */
+  enableDrillDown?: boolean
+  /** Enable drill-through on double-click (Pro feature, default true) */
+  enableDrillThrough?: boolean
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -84,6 +90,8 @@ const props = withDefaults(defineProps<{
   aiAnalyst: undefined,
   numberFormat: 'us',
   dateFormat: 'iso',
+  enableDrillDown: true,
+  enableDrillThrough: true,
 })
 
 const emit = defineEmits<{
@@ -96,9 +104,16 @@ const emit = defineEmits<{
   (e: 'aiConversationUpdate', payload: AIConversationUpdateEvent): void
   (e: 'aiQueryExecuted', payload: AIQueryExecutedEvent): void
   (e: 'aiError', payload: AIErrorEvent): void
+  // Drill-down/through events
+  (e: 'collapseChange', payload: string[]): void
+  (e: 'drillThrough', payload: DrillThroughResult): void
 }>()
 
-const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro } = useLicense()
+const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, isDemo, isPro, licenseInfo } = useLicense()
+
+// Drill-through state
+const drillThroughResult = ref<DrillThroughResult | null>(null)
+const showDrillThroughModal = ref(false)
 
 // Check if AI Analyst should be shown (enabled in config + licensed)
 const showAIAnalyst = computed(() =>
@@ -244,6 +259,8 @@ const {
   updateValueFieldAggregation,
   clearConfig: clearPivotConfig,
   autoSuggestConfig: _autoSuggestConfig,
+  collapsedPaths: pivotCollapsedPaths,
+  toggleCollapsedPath,
 } = usePivotTable(filteredDataForPivot)
 
 // Filtered data based on global search
@@ -560,6 +577,41 @@ function reorderRowFields(fields: string[]) {
 
 function reorderColumnFields(fields: string[]) {
   pivotColumnFields.value = fields
+}
+
+function handleToggleCollapse(key: string, altKey: boolean) {
+  toggleCollapsedPath(key, altKey, pivotRowFields.value, pivotResult.value)
+  emit('collapseChange', Array.from(pivotCollapsedPaths.value))
+}
+
+function handleDrillThroughCell(payload: { rowPath: string[], columnPath: string[], valueFieldIndex: number }) {
+  if (!props.enableDrillThrough)
+    return
+
+  if (!canUseDrillThrough(licenseInfo.value)) {
+    console.warn('[TinyPivot] "Drill-through" requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.')
+    return
+  }
+
+  const pivotConfig = {
+    rowFields: pivotRowFields.value,
+    columnFields: pivotColumnFields.value,
+    valueFields: pivotValueFields.value,
+    showRowTotals: pivotShowRowTotals.value,
+    showColumnTotals: pivotShowColumnTotals.value,
+  }
+
+  const result = getDrillThroughRows(
+    filteredDataForPivot.value,
+    pivotConfig,
+    payload.rowPath,
+    payload.columnPath,
+    payload.valueFieldIndex,
+  )
+
+  drillThroughResult.value = result
+  showDrillThroughModal.value = true
+  emit('drillThrough', result)
 }
 
 // Container refs
@@ -1399,6 +1451,9 @@ function handleContainerClick(event: MouseEvent) {
             :total-row-count="totalRowCount"
             :filtered-row-count="filteredRowCount"
             :theme="currentTheme"
+            :enable-drill-down="enableDrillDown"
+            :enable-drill-through="enableDrillThrough"
+            :collapsed-paths="pivotCollapsedPaths"
             @add-row-field="addRowField"
             @remove-row-field="removeRowField"
             @add-column-field="addColumnField"
@@ -1408,6 +1463,17 @@ function handleContainerClick(event: MouseEvent) {
             @update-aggregation="updateValueFieldAggregation"
             @reorder-row-fields="reorderRowFields"
             @reorder-column-fields="reorderColumnFields"
+            @toggle-collapse="(key, altKey) => handleToggleCollapse(key, altKey)"
+            @drill-through-cell="(payload) => handleDrillThroughCell(payload)"
+          />
+
+          <DrillThroughModal
+            :show="showDrillThroughModal"
+            :result="drillThroughResult"
+            :row-fields="pivotRowFields"
+            :column-fields="pivotColumnFields"
+            :value-fields="pivotValueFields"
+            @close="showDrillThroughModal = false"
           />
         </div>
       </div>

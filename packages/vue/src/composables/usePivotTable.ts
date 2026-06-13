@@ -1,4 +1,4 @@
-import type { AggregationFunction, CalculatedField, FieldStats, PivotConfig, PivotValueField } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, CalculatedField, FieldStats, PivotConfig, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
 import type { Ref } from 'vue'
 import {
   computeAvailableFields,
@@ -36,6 +36,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
   const showRowTotals = ref(true)
   const showColumnTotals = ref(true)
   const calculatedFields = ref<CalculatedField[]>(loadCalculatedFields())
+  const collapsedPaths = ref<Set<string>>(new Set())
 
   // Track current storage key
   const currentStorageKey = ref<string | null>(null)
@@ -82,7 +83,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
       showRowTotals: showRowTotals.value,
       showColumnTotals: showColumnTotals.value,
       calculatedFields: calculatedFields.value,
-    })
+    }, { collapsedPaths: collapsedPaths.value })
   })
 
   // Actions - pivot is free with sum aggregation, Pro required for other aggregations
@@ -167,6 +168,63 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     }
   }
 
+  function toggleCollapsedPath(key: string, altKey: boolean, _rowFields: string[], currentPivotResult: PivotResult | null) {
+    if (!altKey) {
+      const next = new Set(collapsedPaths.value)
+      if (next.has(key)) {
+        next.delete(key)
+      }
+      else {
+        next.add(key)
+      }
+      collapsedPaths.value = next
+      return
+    }
+
+    // Alt-click: toggle all groups at the same depth
+    if (!currentPivotResult)
+      return
+
+    // Determine which depth this key belongs to by looking at groupStarts
+    let targetDepth = -1
+    for (const meta of currentPivotResult.rowMeta) {
+      for (const gs of meta.groupStarts) {
+        if (gs.key === key) {
+          targetDepth = gs.depth
+          break
+        }
+      }
+      if (targetDepth >= 0)
+        break
+    }
+
+    if (targetDepth < 0)
+      return
+
+    // Collect all keys at this depth
+    const keysAtDepth = new Set<string>()
+    for (const meta of currentPivotResult.rowMeta) {
+      for (const gs of meta.groupStarts) {
+        if (gs.depth === targetDepth) {
+          keysAtDepth.add(gs.key)
+        }
+      }
+    }
+
+    // If the clicked key is currently collapsed, expand all; otherwise collapse all
+    const shouldCollapse = !collapsedPaths.value.has(key)
+    const next = new Set(collapsedPaths.value)
+    for (const k of keysAtDepth) {
+      if (shouldCollapse) {
+        next.add(k)
+      }
+      else {
+        next.delete(k)
+      }
+    }
+    collapsedPaths.value = next
+  }
+
   function autoSuggestConfig() {
     if (!requirePro('Pivot Table - Auto Suggest'))
       return
@@ -241,6 +299,22 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
             clearConfig()
           }
         }
+
+        // Load collapsed paths from separate sessionStorage key
+        try {
+          const collapsedKey = `${storageKey}-collapsed`
+          const raw = sessionStorage.getItem(collapsedKey)
+          if (raw) {
+            const parsed = JSON.parse(raw) as string[]
+            collapsedPaths.value = new Set(parsed)
+          }
+          else {
+            collapsedPaths.value = new Set()
+          }
+        }
+        catch {
+          collapsedPaths.value = new Set()
+        }
       }
       else {
         const currentConfig: PivotConfig = {
@@ -278,6 +352,22 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     { deep: true },
   )
 
+  // Watch collapsedPaths separately and save to sessionStorage
+  watch(
+    collapsedPaths,
+    (paths) => {
+      if (!currentStorageKey.value)
+        return
+      try {
+        const collapsedKey = `${currentStorageKey.value}-collapsed`
+        sessionStorage.setItem(collapsedKey, JSON.stringify(Array.from(paths)))
+      }
+      catch {
+        // sessionStorage not available (SSR or private browsing)
+      }
+    },
+  )
+
   return {
     // State
     rowFields,
@@ -286,6 +376,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     showRowTotals,
     showColumnTotals,
     calculatedFields,
+    collapsedPaths,
 
     // Computed
     availableFields,
@@ -306,5 +397,6 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>) {
     autoSuggestConfig,
     addCalculatedField,
     removeCalculatedField,
+    toggleCollapsedPath,
   }
 }
