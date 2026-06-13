@@ -66,9 +66,13 @@ export type { HeatmapSeriesData, ScatterPoint, ScatterSeriesData } from './chart
 
 // Export Utilities
 export {
+  buildGridWorkbook,
+  buildPivotWorkbook,
   copyToClipboard,
   exportPivotToCSV,
+  exportPivotToXLSX,
   exportToCSV,
+  exportToXLSX,
   formatSelectionForClipboard,
 } from './export'
 
@@ -79,6 +83,7 @@ export {
   canUseCharts,
   canUseDrillThrough,
   canUsePivot,
+  canUseXlsxExport,
   configureLicenseSecret,
   getDemoLicenseInfo,
   getFreeLicenseInfo,
@@ -216,6 +221,7 @@ export type {
   SelectionChangeEvent,
   SortEvent,
   Theme,
+  XlsxExportOptions,
 } from './types'
 // Type Guards
 export { isDateRange, isNumericRange } from './types'

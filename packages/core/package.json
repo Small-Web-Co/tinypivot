@@ -46,7 +46,8 @@
   },
   "dependencies": {
     "@noble/curves": "^1.8.0",
-    "@noble/hashes": "^1.7.0"
+    "@noble/hashes": "^1.7.0",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "typescript": "~5.3.3"

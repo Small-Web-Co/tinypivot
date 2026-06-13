@@ -241,6 +241,8 @@ export interface LicenseFeatures {
   aiAnalyst: boolean
   /** Drill-through to underlying source rows (Pro only) */
   drillThrough: boolean
+  /** XLSX export with styling (Pro only) */
+  xlsxExport: boolean
 }
 
 export interface LicenseInfo {
@@ -302,6 +304,13 @@ export interface ExportOptions {
   numberFormat?: NumberFormat
   /** Date format for exported values */
   dateFormat?: DateFormat
+}
+
+export interface XlsxExportOptions extends ExportOptions {
+  /** Worksheet name (default: 'Sheet1') */
+  sheetName?: string
+  /** Custom number formats per column key (e.g. { revenue: '#,##0.00' }) */
+  numberFormats?: Record<string, string>
 }
 
 export interface SelectionBounds {
