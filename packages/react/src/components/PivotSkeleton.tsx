@@ -563,7 +563,7 @@ export function PivotSkeleton({
     if (!pivotResult)
       return
     const meta = pivotResult.rowMeta[sortedIdx]
-    const rowPath = meta ? meta.path.filter(v => v !== '') : []
+    const rowPath = meta ? meta.path : []
     const colPath = columnPaths[colIdx] ?? []
     const numValueFields = valueFields.length || 1
     const valueFieldIndex = colIdx % numValueFields
@@ -575,7 +575,7 @@ export function PivotSkeleton({
     if (!pivotResult)
       return
     const meta = pivotResult.rowMeta[sortedIdx]
-    const rowPath = meta ? meta.path.filter(v => v !== '') : []
+    const rowPath = meta ? meta.path : []
     onDrillThroughCell?.({ rowPath, columnPath: [], valueFieldIndex: 0 })
   }, [pivotResult, onDrillThroughCell])
 

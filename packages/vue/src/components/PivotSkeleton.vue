@@ -540,7 +540,7 @@ function onDrillThroughCell(sortedIdx: number, colIdx: number) {
   if (!props.pivotResult)
     return
   const meta = props.pivotResult.rowMeta[sortedIdx]
-  const rowPath = meta ? meta.path.filter(v => v !== '') : []
+  const rowPath = meta ? meta.path : []
   const colPath = columnPaths.value[colIdx] ?? []
   const numValueFields = props.valueFields.length || 1
   const valueFieldIndex = colIdx % numValueFields
@@ -552,7 +552,7 @@ function onDrillThroughRowTotal(sortedIdx: number) {
   if (!props.pivotResult)
     return
   const meta = props.pivotResult.rowMeta[sortedIdx]
-  const rowPath = meta ? meta.path.filter(v => v !== '') : []
+  const rowPath = meta ? meta.path : []
   emit('drillThroughCell', { rowPath, columnPath: [], valueFieldIndex: 0 })
 }
 
