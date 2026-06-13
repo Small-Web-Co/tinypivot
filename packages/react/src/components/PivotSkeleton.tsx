@@ -1,5 +1,5 @@
-import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
-import { getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
+import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotLayout, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
+import { computeRowSpans, getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display for React
  * Visual layout for pivot configuration and results
@@ -41,6 +41,7 @@ interface PivotSkeletonProps {
   onToggleCollapse?: (key: string, altKey: boolean) => void
   onDrillThroughCell?: (payload: { rowPath: string[], columnPath: string[], valueFieldIndex: number }) => void
   theme?: string
+  pivotLayout?: PivotLayout
 }
 
 export function PivotSkeleton({
@@ -68,6 +69,7 @@ export function PivotSkeleton({
   onToggleCollapse,
   onDrillThroughCell,
   theme,
+  pivotLayout = 'grouped',
 }: PivotSkeletonProps) {
   const { showWatermark, canUsePivot, isDemo } = useLicense()
 
@@ -207,6 +209,13 @@ export function PivotSkeleton({
 
     return indices
   }, [pivotResult, sortTarget, sortDirection])
+
+  // Grouped layout: per-cell rowspan information (indexed by [sortedPosition][columnIndex])
+  const rowSpans = useMemo(() => {
+    if (!pivotResult || pivotLayout !== 'grouped')
+      return null
+    return computeRowSpans(pivotResult.rowHeaders, sortedRowIndices, rowFields.length)
+  }, [pivotResult, pivotLayout, sortedRowIndices, rowFields.length])
 
   // Copy selection to clipboard
   const copySelectionToClipboard = useCallback(() => {
@@ -976,46 +985,69 @@ export function PivotSkeleton({
                 </thead>
 
                 <tbody>
-                  {sortedRowIndices.map(sortedIdx => (
+                  {sortedRowIndices.map((sortedIdx, rowPos) => (
                     <tr
                       key={sortedIdx}
                       className={`vpg-data-row${pivotResult.rowMeta[sortedIdx]?.isSubtotal ? ' vpg-subtotal-row' : ''}`}
                     >
-                      {pivotResult.rowHeaders[sortedIdx].map((val, idx) => {
-                        const groupStart = findGroupStart(sortedIdx, idx)
-                        return (
-                          <th
-                            key={`row-${sortedIdx}-${idx}`}
-                            className="vpg-row-header-cell"
-                            style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
-                          >
-                            {enableDrillDown !== false && groupStart && (
-                              <span
-                                className="vpg-collapse-toggle"
-                                onClick={e => handleChevronClick(groupStart, e)}
+                      {/* Grouped layout: merge repeated parent cells via rowspan; omit skipped cells */}
+                      {rowSpans
+                        ? pivotResult.rowHeaders[sortedIdx].map((val, idx) => {
+                            if (!rowSpans[rowPos][idx].render)
+                              return null
+                            const groupStart = findGroupStart(sortedIdx, idx)
+                            return (
+                              <th
+                                key={`row-${sortedIdx}-${idx}`}
+                                className={`vpg-row-header-cell${enableDrillDown !== false && groupStart ? ' vpg-row-header-collapsible' : ''}`}
+                                rowSpan={rowSpans[rowPos][idx].rowspan}
+                                style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
+                                onClick={enableDrillDown !== false && groupStart
+                                  ? (e) => { e.stopPropagation(); handleChevronClick(groupStart, e) }
+                                  : undefined}
                               >
-                                {groupStart.isCollapsed ? '▸' : '▾'}
-                              </span>
-                            )}
-                            {val}
-                          </th>
-                        )
-                      })}
+                                {enableDrillDown !== false && groupStart && (
+                                  <span className="vpg-collapse-toggle">
+                                    {groupStart.isCollapsed ? '▸' : '▾'}
+                                  </span>
+                                )}
+                                {val}
+                              </th>
+                            )
+                          })
+                        /* Tabular layout: render every cell, always rowspan=1 (current behavior) */
+                        : pivotResult.rowHeaders[sortedIdx].map((val, idx) => {
+                            const groupStart = findGroupStart(sortedIdx, idx)
+                            return (
+                              <th
+                                key={`row-${sortedIdx}-${idx}`}
+                                className="vpg-row-header-cell"
+                                style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
+                              >
+                                {enableDrillDown !== false && groupStart && (
+                                  <span
+                                    className="vpg-collapse-toggle"
+                                    onClick={e => handleChevronClick(groupStart, e)}
+                                  >
+                                    {groupStart.isCollapsed ? '▸' : '▾'}
+                                  </span>
+                                )}
+                                {val}
+                              </th>
+                            )
+                          })}
 
-                      {pivotResult.data[sortedIdx].map((cell, colIdx) => {
-                        const displayRowIdx = sortedRowIndices.indexOf(sortedIdx)
-                        return (
-                          <td
-                            key={colIdx}
-                            className={`vpg-data-cell ${isCellSelected(displayRowIdx, colIdx) ? 'selected' : ''} ${cell.value === null ? 'vpg-is-null' : ''}`}
-                            onMouseDown={e => handleCellMouseDown(displayRowIdx, colIdx, e)}
-                            onMouseEnter={() => handleCellMouseEnter(displayRowIdx, colIdx)}
-                            onDoubleClick={enableDrillThrough !== false ? () => handleDrillThroughCell(sortedIdx, colIdx) : undefined}
-                          >
-                            {cell.formattedValue}
-                          </td>
-                        )
-                      })}
+                      {pivotResult.data[sortedIdx].map((cell, colIdx) => (
+                        <td
+                          key={colIdx}
+                          className={`vpg-data-cell ${isCellSelected(rowPos, colIdx) ? 'selected' : ''} ${cell.value === null ? 'vpg-is-null' : ''}`}
+                          onMouseDown={e => handleCellMouseDown(rowPos, colIdx, e)}
+                          onMouseEnter={() => handleCellMouseEnter(rowPos, colIdx)}
+                          onDoubleClick={enableDrillThrough !== false ? () => handleDrillThroughCell(sortedIdx, colIdx) : undefined}
+                        >
+                          {cell.formattedValue}
+                        </td>
+                      ))}
 
                       {pivotResult.rowTotals[sortedIdx] && (
                         <td

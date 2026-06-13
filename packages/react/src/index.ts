@@ -79,6 +79,7 @@ export type {
   PivotConfig as PivotConfigType,
   PivotField,
   PivotGroupStart,
+  PivotLayout,
   PivotResult,
   PivotRowMeta,
   PivotTableProps,

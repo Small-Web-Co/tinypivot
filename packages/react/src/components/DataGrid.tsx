@@ -13,6 +13,7 @@ import type {
   DateRange,
   DrillThroughResult,
   NumberFormat,
+  PivotLayout,
   Theme,
 } from '@smallwebco/tinypivot-core'
 import type { AIAnalystHandle } from './AIAnalyst'
@@ -72,6 +73,8 @@ interface DataGridProps {
   enableDrillDown?: boolean
   /** Enable drill-through on double-click (Pro feature, default true) */
   enableDrillThrough?: boolean
+  /** Pivot row layout: 'grouped' merges repeated parent cells, 'tabular' repeats every value */
+  pivotLayout?: PivotLayout
   onCellClick?: (payload: {
     row: number
     col: number
@@ -118,6 +121,7 @@ export function DataGrid({
   aiAnalyst,
   enableDrillDown = true,
   enableDrillThrough = true,
+  pivotLayout = 'grouped',
   onCellClick,
   onExport,
   onCopy,
@@ -1605,6 +1609,7 @@ export function DataGrid({
               filteredRowCount={filteredRowCount}
               enableDrillDown={enableDrillDown}
               enableDrillThrough={enableDrillThrough}
+              pivotLayout={pivotLayout}
               onAddRowField={addRowField}
               onRemoveRowField={removeRowField}
               onAddColumnField={addColumnField}
