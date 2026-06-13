@@ -1522,6 +1522,7 @@ export function DataGrid({
               rowFields={pivotRowFields}
               columnFields={pivotColumnFields}
               valueFields={pivotValueFields}
+              theme={currentTheme}
               onClose={handleCloseDrillThroughModal}
             />
           </div>

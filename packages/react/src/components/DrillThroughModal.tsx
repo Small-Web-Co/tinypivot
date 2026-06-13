@@ -14,6 +14,7 @@ interface DrillThroughModalProps {
   columnFields: string[]
   valueFields: PivotValueField[]
   onClose: () => void
+  theme?: string
 }
 
 const PAGE_SIZE = 50
@@ -22,6 +23,7 @@ export function DrillThroughModal({
   show,
   result,
   onClose,
+  theme,
 }: DrillThroughModalProps) {
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -113,7 +115,7 @@ export function DrillThroughModal({
     return null
 
   return createPortal(
-    <div className="vpg-modal-overlay" onClick={handleOverlayClick}>
+    <div className={`vpg-modal-overlay vpg-theme-${theme ?? 'light'}`} onClick={handleOverlayClick}>
       <div className="vpg-modal vpg-drill-modal">
         <div className="vpg-modal-header">
           <h3 className="vpg-drill-title">{modalTitle}</h3>

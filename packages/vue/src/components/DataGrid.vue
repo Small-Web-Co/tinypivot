@@ -1472,6 +1472,7 @@ function handleContainerClick(event: MouseEvent) {
             :row-fields="pivotRowFields"
             :column-fields="pivotColumnFields"
             :value-fields="pivotValueFields"
+            :theme="currentTheme"
             @close="showDrillThroughModal = false"
           />
         </div>

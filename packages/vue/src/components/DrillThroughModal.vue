@@ -13,6 +13,7 @@ const props = defineProps<{
   rowFields: string[]
   columnFields: string[]
   valueFields: PivotValueField[]
+  theme?: string
 }>()
 
 const emit = defineEmits<{
@@ -114,7 +115,7 @@ function formatCellValue(value: unknown): string {
 
 <template>
   <Teleport to="body">
-    <div v-if="show" class="vpg-modal-overlay" @click.self="emit('close')">
+    <div v-if="show" class="vpg-modal-overlay" :class="`vpg-theme-${theme ?? 'light'}`" @click.self="emit('close')">
       <div class="vpg-modal vpg-drill-modal">
         <div class="vpg-modal-header">
           <h3 class="vpg-drill-title">
