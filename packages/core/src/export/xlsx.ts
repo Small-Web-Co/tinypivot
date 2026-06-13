@@ -54,8 +54,8 @@ export async function buildGridWorkbook<T extends Record<string, unknown>>(
   columns: string[],
   options: XlsxExportOptions = {},
 ): Promise<ExcelJSType.Workbook> {
-  const ExcelJS = await import('exceljs')
-  const workbook = new ExcelJS.default.Workbook()
+  const { default: ExcelJSModule } = await import('exceljs')
+  const workbook = new ExcelJSModule.Workbook()
   const sheetName = options.sheetName ?? 'Sheet1'
   const worksheet = workbook.addWorksheet(sheetName)
 
@@ -72,15 +72,16 @@ export async function buildGridWorkbook<T extends Record<string, unknown>>(
   freezeHeaderRow(worksheet)
 
   // Add data rows with optional number formats
+  const formats = options.numberFormats
   for (const record of data) {
     const rowValues = columns.map(col => record[col] ?? '')
     const row = worksheet.addRow(rowValues)
 
-    if (options.numberFormats) {
+    if (formats) {
       row.eachCell((cell, colNumber) => {
         const col = columns[colNumber - 1]
-        if (col && options.numberFormats![col]) {
-          cell.numFmt = options.numberFormats![col]
+        if (col && formats[col]) {
+          cell.numFmt = formats[col]
         }
       })
     }
@@ -253,12 +254,12 @@ function computePivotColumnWidths(
 export async function buildPivotWorkbook(
   pivotData: PivotExportData,
   rowFields: string[],
-  _columnFields: string[],
-  _valueFields: PivotValueField[],
+  _columnFields: string[], // kept for API symmetry with exportPivotToCSV
+  valueFields: PivotValueField[],
   options: XlsxExportOptions = {},
 ): Promise<ExcelJSType.Workbook> {
-  const ExcelJS = await import('exceljs')
-  const workbook = new ExcelJS.default.Workbook()
+  const { default: ExcelJSModule } = await import('exceljs')
+  const workbook = new ExcelJSModule.Workbook()
   const sheetName = options.sheetName ?? 'Pivot'
   const worksheet = workbook.addWorksheet(sheetName)
 
@@ -283,7 +284,7 @@ export async function buildPivotWorkbook(
     // Simple single-level header
     const headerRow = worksheet.addRow([
       ...rowFields,
-      ...(_valueFields.map(vf => `${vf.field} (${vf.aggregation})`)),
+      ...(valueFields.map(vf => `${vf.field} (${vf.aggregation})`)),
     ])
     applyHeaderStyle(headerRow)
   }

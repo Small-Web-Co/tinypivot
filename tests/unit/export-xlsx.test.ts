@@ -102,6 +102,17 @@ describe('buildGridWorkbook', () => {
     const worksheet = workbook.worksheets[0]
     expect(worksheet.rowCount).toBe(1) // header only
   })
+
+  it('applies numberFormats to matching columns', async () => {
+    const priceData = [{ name: 'Widget', price: 9.99 }]
+    const workbook = await buildGridWorkbook(priceData, ['name', 'price'], {
+      numberFormats: { price: '#,##0.00' },
+    })
+    const worksheet = workbook.worksheets[0]
+    // Row 2, column 2 is the price cell
+    const priceCell = worksheet.getRow(2).getCell(2)
+    expect(priceCell.numFmt).toBe('#,##0.00')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -118,9 +129,10 @@ describe('buildPivotWorkbook', () => {
     )
     const worksheet = workbook.worksheets[0]
 
-    // ExcelJS exposes merges as a flat map; check it is non-empty
-    const merges = (worksheet as any)._merges as Record<string, unknown>
-    expect(Object.keys(merges).length).toBeGreaterThan(0)
+    // Row 1 has 'East' spanning B1:C1 — B1 should be a master merge cell
+    // and C1 should be merged into it (isMerged = true on both)
+    expect(worksheet.getCell('B1').isMerged).toBe(true)
+    expect(worksheet.getCell('C1').isMerged).toBe(true)
   })
 
   it('a known data cell value exists in the sheet', async () => {
