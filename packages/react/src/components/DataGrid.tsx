@@ -249,7 +249,6 @@ export function DataGrid({
     setColumnFields,
     addCalculatedField,
     removeCalculatedField,
-    collapsedPaths: pivotCollapsedPaths,
     toggleCollapsedPath,
   } = usePivotTable(filteredDataForPivot, enableDrillDown)
 
