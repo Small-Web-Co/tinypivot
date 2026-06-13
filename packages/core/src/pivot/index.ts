@@ -756,7 +756,7 @@ export function computePivotResult(
   function buildRowEntries(): RowEntry[] {
     if (rowFields.length <= 1) {
       return leafRowKeys.map((lk) => {
-        const parts = lk === '__all__' ? ['Total'] : parseKey(lk)
+        const parts = lk === '__all__' ? [] : parseKey(lk)
         return { rowPath: parts, leafKeys: [lk], isSubtotal: false }
       })
     }

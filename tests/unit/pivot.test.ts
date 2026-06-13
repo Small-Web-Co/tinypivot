@@ -1058,3 +1058,68 @@ describe('getDrillThroughRows – null value in row field (blank handling)', () 
     expect(result.rows[0].sales).toBe(99)
   })
 })
+
+describe('getDrillThroughRows – rowFields=[] (grand total row)', () => {
+  const noRowData: Record<string, unknown>[] = [
+    { region: 'East', sales: 100 },
+    { region: 'West', sales: 200 },
+    { region: 'West', sales: 50 },
+  ]
+
+  // rowFields=[] but columnFields=['region'] makes isPivotConfigured return true
+  const noRowConfig = {
+    rowFields: [] as string[],
+    columnFields: ['region'],
+    valueFields: [{ field: 'sales', aggregation: 'sum' as const }],
+    showRowTotals: false,
+    showColumnTotals: false,
+  }
+
+  it('when rowFields is empty, the single row meta.path must be []', () => {
+    const result = computePivotResult(noRowData, noRowConfig)
+    expect(result).not.toBeNull()
+    expect(result!.rowMeta).toHaveLength(1)
+    expect(result!.rowMeta[0].path).toEqual([])
+  })
+
+  it('drill-through with rowPath=[] returns ALL rows (no row filter)', () => {
+    const drill = getDrillThroughRows(noRowData, noRowConfig, [], [])
+    expect(drill.rows).toHaveLength(3)
+    expect(drill.descriptor.rowCount).toBe(3)
+  })
+})
+
+describe('getDrillThroughRows – empty-string field value round-trip', () => {
+  const emptyStringData: Record<string, unknown>[] = [
+    { category: '', sales: 10 },
+    { category: '', sales: 20 },
+    { category: null, sales: 99 },
+    { category: 'A', sales: 50 },
+  ]
+  const emptyStringConfig = {
+    rowFields: ['category'],
+    columnFields: [] as string[],
+    valueFields: [{ field: 'sales', aggregation: 'sum' as const }],
+    showRowTotals: false,
+    showColumnTotals: false,
+  }
+
+  it('empty-string category has path [""] in rowMeta', () => {
+    const result = computePivotResult(emptyStringData, emptyStringConfig)
+    expect(result).not.toBeNull()
+    const emptyRow = result!.rowMeta.find(m => m.path[0] === '')
+    expect(emptyRow).toBeDefined()
+  })
+
+  it('drill with rowPath=[""] returns only the empty-string rows, not null rows', () => {
+    const drill = getDrillThroughRows(emptyStringData, emptyStringConfig, [''], [])
+    expect(drill.rows).toHaveLength(2)
+    expect(drill.rows.every(r => r.category === '')).toBe(true)
+  })
+
+  it('drill with rowPath=["(blank)"] returns only the null rows', () => {
+    const drill = getDrillThroughRows(emptyStringData, emptyStringConfig, ['(blank)'], [])
+    expect(drill.rows).toHaveLength(1)
+    expect(drill.rows[0].sales).toBe(99)
+  })
+})
