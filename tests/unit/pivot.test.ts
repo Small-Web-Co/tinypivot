@@ -1082,8 +1082,10 @@ describe('getDrillThroughRows – rowFields=[] (grand total row)', () => {
     expect(result!.rowMeta[0].path).toEqual([])
   })
 
-  it('drill-through with rowPath=[] returns ALL rows (no row filter)', () => {
-    const drill = getDrillThroughRows(noRowData, noRowConfig, [], [])
+  it('drill-through using rowMeta.path from computePivotResult returns ALL rows', () => {
+    const pivotResult = computePivotResult(noRowData, noRowConfig)
+    const rowPath = pivotResult!.rowMeta[0].path // must be [] after the fix
+    const drill = getDrillThroughRows(noRowData, noRowConfig, rowPath, [])
     expect(drill.rows).toHaveLength(3)
     expect(drill.descriptor.rowCount).toBe(3)
   })
