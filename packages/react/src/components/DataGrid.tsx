@@ -1503,7 +1503,6 @@ export function DataGrid({
               filteredRowCount={filteredRowCount}
               enableDrillDown={enableDrillDown}
               enableDrillThrough={enableDrillThrough}
-              collapsedPaths={pivotCollapsedPaths}
               onAddRowField={addRowField}
               onRemoveRowField={removeRowField}
               onAddColumnField={addColumnField}

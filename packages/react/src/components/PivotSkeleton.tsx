@@ -29,7 +29,6 @@ interface PivotSkeletonProps {
   filteredRowCount?: number
   enableDrillDown?: boolean
   enableDrillThrough?: boolean
-  collapsedPaths?: Set<string>
   onAddRowField: (field: string) => void
   onRemoveRowField: (field: string) => void
   onAddColumnField: (field: string) => void
@@ -58,7 +57,6 @@ export function PivotSkeleton({
   filteredRowCount,
   enableDrillDown,
   enableDrillThrough,
-  collapsedPaths: _collapsedPaths,
   onAddRowField,
   onRemoveRowField,
   onAddColumnField,

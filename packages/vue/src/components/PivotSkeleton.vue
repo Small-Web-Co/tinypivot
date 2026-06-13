@@ -31,7 +31,6 @@ const props = defineProps<{
   theme?: string
   enableDrillDown?: boolean
   enableDrillThrough?: boolean
-  collapsedPaths?: Set<string>
 }>()
 
 const emit = defineEmits<{

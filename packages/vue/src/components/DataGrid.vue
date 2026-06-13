@@ -1453,7 +1453,6 @@ function handleContainerClick(event: MouseEvent) {
             :theme="currentTheme"
             :enable-drill-down="enableDrillDown"
             :enable-drill-through="enableDrillThrough"
-            :collapsed-paths="pivotCollapsedPaths"
             @add-row-field="addRowField"
             @remove-row-field="removeRowField"
             @add-column-field="addColumnField"
