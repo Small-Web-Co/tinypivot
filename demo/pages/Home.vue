@@ -293,9 +293,11 @@ const freeFeatures = [
   'Row/Col Totals',
   'Calculated Fields',
   'Formula Builder',
+  'Expand/Collapse Row Groups',
 ]
 const proFeatures = [
   'Advanced Aggregations (9+)',
+  'Pivot Drill-Through',
   'AI Data Analyst (BYOK)',
   'Natural Language Queries',
   'Chart Builder (6 types)',
@@ -504,7 +506,7 @@ function trackFreeStart() {
             </svg>
           </div>
           <h3>Pivot Table</h3>
-          <p>Drag-and-drop pivoting with Sum aggregation and totals</p>
+          <p>Drag-and-drop pivoting with Sum aggregation, totals, and expand/collapse row groups</p>
           <span class="feature-badge free">Free</span>
         </div>
 

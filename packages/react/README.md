@@ -152,6 +152,8 @@ export function MyGrid({ data }) {
 | Pivot table with Sum aggregation | ✅ | ✅ |
 | Row/column totals | ✅ | ✅ |
 | Calculated fields with formulas | ✅ | ✅ |
+| Pivot row group expand/collapse | ✅ | ✅ |
+| **Pivot drill-through** (double-click to inspect source rows) | ❌ | ✅ |
 | **AI Data Analyst** (natural language, BYOK) | ❌ | ✅ |
 | **Chart Builder** (6 chart types) | ❌ | ✅ |
 | Advanced aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, %) | ❌ | ✅ |
@@ -175,6 +177,8 @@ export function MyGrid({ data }) {
 | `numberFormat` | `'us' \| 'eu' \| 'plain'` | `'us'` | Number display format: US (1,234.56), EU (1.234,56), plain (1234.56) |
 | `dateFormat` | `'us' \| 'eu' \| 'iso'` | `'iso'` | Date display format: US (MM/DD/YYYY), EU (DD/MM/YYYY), ISO (YYYY-MM-DD) |
 | `fieldRoleOverrides` | `Record<string, FieldRole>` | `undefined` | Override auto-detected chart field roles per column (`'dimension'` \| `'measure'` \| `'temporal'`) |
+| `enableDrillDown` | `boolean` | `true` | Enable pivot row group expand/collapse chevrons |
+| `enableDrillThrough` | `boolean` | `true` | Enable double-click drill-through on pivot cells (Pro feature) |
 
 ## Callbacks
 
@@ -184,6 +188,40 @@ export function MyGrid({ data }) {
 | `onSelectionChange` | `(payload) => void` | Selection changed |
 | `onExport` | `(payload) => void` | CSV exported |
 | `onCopy` | `(payload) => void` | Cells copied |
+| `onCollapseChange` | `(collapsedPaths: string[]) => void` | Pivot row groups collapsed/expanded |
+| `onDrillThrough` | `(result: DrillThroughResult) => void` | Pivot cell double-clicked and drill-through modal opened (Pro) |
+
+## Pivot Drill-Down
+
+### Row Group Expand/Collapse (Free)
+
+When a pivot has two or more row fields, each group row displays a `▸`/`▾` chevron. Click to collapse or expand that group. Alt-click collapses/expands every group at the same depth. Collapsed groups still show correct aggregated values over all rows in the group.
+
+```tsx
+<DataGrid
+  data={data}
+  onCollapseChange={(collapsedPaths) => console.log('Collapsed:', collapsedPaths)}
+/>
+```
+
+### Drill-Through to Source Rows (Pro)
+
+Double-click any pivot value cell (including totals) to open a modal with the underlying source rows. Includes a slice description header, paginated table (50/page), and CSV export. Requires a Pro license.
+
+```tsx
+<DataGrid
+  data={data}
+  onDrillThrough={({ rows, descriptor }) =>
+    console.log(`${descriptor.rowCount} rows for ${descriptor.rowPath.join(' > ')}`)
+  }
+/>
+```
+
+Disable either behaviour individually:
+
+```tsx
+<DataGrid data={data} enableDrillDown={false} enableDrillThrough={false} />
+```
 
 ## AI Data Analyst (Pro)
 
