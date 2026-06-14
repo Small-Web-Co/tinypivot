@@ -105,6 +105,73 @@ export async function exportToXLSX<T extends Record<string, unknown>>(
 }
 
 // ============================================================================
+// Source data sheet helper
+// ============================================================================
+
+export interface SourceData {
+  rows: Record<string, unknown>[]
+  columns: string[]
+}
+
+/**
+ * Sanitize column names: fill empty names with Col1/Col2/etc.,
+ * and de-duplicate by appending _2, _3, etc.
+ */
+function sanitizeColumns(columns: string[]): string[] {
+  const result: string[] = []
+  const seen = new Map<string, number>()
+
+  for (let i = 0; i < columns.length; i++) {
+    const raw = String(columns[i] ?? '').trim()
+    const base = raw.length > 0 ? raw : `Col${i + 1}`
+    const count = seen.get(base) ?? 0
+    seen.set(base, count + 1)
+    result.push(count === 0 ? base : `${base}_${count + 1}`)
+  }
+
+  return result
+}
+
+/**
+ * Write a "Source Data" sheet to the workbook, with an Excel Table when
+ * there is at least one data row, or a plain header row otherwise.
+ */
+async function writeSourceDataSheet(
+  workbook: ExcelJSType.Workbook,
+  sourceData: SourceData,
+): Promise<void> {
+  const cols = sanitizeColumns(sourceData.columns)
+  const sheet = workbook.addWorksheet('Source Data')
+
+  if (sourceData.rows.length === 0) {
+    // addTable requires >=1 data row -- just write a plain header row
+    const headerRow = sheet.addRow(cols)
+    applyHeaderStyle(headerRow)
+    return
+  }
+
+  const dataRows = sourceData.rows.map(r =>
+    sourceData.columns.map(c => r[c] ?? ''),
+  )
+
+  sheet.addTable({
+    name: 'SourceData',
+    ref: 'A1',
+    headerRow: true,
+    style: { theme: 'TableStyleMedium2', showRowStripes: true },
+    columns: cols.map(c => ({ name: c, filterButton: true })),
+    rows: dataRows,
+  } as ExcelJSType.TableProperties)
+
+  // Auto-size columns from header + data
+  const allValues = dataRows.map(r => r.map(v => String(v ?? '')))
+  sheet.columns = cols.map((col, i) => {
+    const colValues = allValues.map(r => r[i] ?? '')
+    return { width: computeWidth([col, ...colValues]) }
+  })
+}
+
+// ============================================================================
 // Pivot workbook builder
 // ============================================================================
 
@@ -248,7 +315,7 @@ function computePivotColumnWidths(
     widths.push(computeWidth(values))
   }
 
-  // Data columns — use last header level as column label source
+  // Data columns -- use last header level as column label source
   const lastHeaderLevel = pivotData.headers[pivotData.headers.length - 1] ?? []
   const colCount = pivotData.data[0]?.length ?? lastHeaderLevel.length
   for (let c = 0; c < colCount; c++) {
@@ -261,7 +328,7 @@ function computePivotColumnWidths(
 }
 
 /**
- * Build an ExcelJS Workbook for a pivot table (no download — testable).
+ * Build an ExcelJS Workbook for a pivot table (no download -- testable).
  */
 export async function buildPivotWorkbook(
   pivotData: PivotExportData,
@@ -269,6 +336,7 @@ export async function buildPivotWorkbook(
   _columnFields: string[], // kept for API symmetry with exportPivotToCSV
   valueFields: PivotValueField[],
   options: XlsxExportOptions = {},
+  sourceData?: SourceData,
 ): Promise<ExcelJSType.Workbook> {
   const { default: ExcelJSModule } = await import('exceljs')
   const workbook = new ExcelJSModule.Workbook()
@@ -321,6 +389,12 @@ export async function buildPivotWorkbook(
   const widths = computePivotColumnWidths(pivotData, rowFields, rowHeaderColCount)
   worksheet.columns = widths.map(w => ({ width: w }))
 
+  // Optionally add a second "Source Data" sheet
+  const hasSourceData = sourceData && sourceData.rows.length > 0 && sourceData.columns.length > 0
+  if (hasSourceData) {
+    await writeSourceDataSheet(workbook, sourceData)
+  }
+
   return workbook
 }
 
@@ -333,8 +407,9 @@ export async function exportPivotToXLSX(
   columnFields: string[],
   valueFields: PivotValueField[],
   options: XlsxExportOptions = {},
+  sourceData?: SourceData,
 ): Promise<void> {
-  const workbook = await buildPivotWorkbook(pivotData, rowFields, columnFields, valueFields, options)
+  const workbook = await buildPivotWorkbook(pivotData, rowFields, columnFields, valueFields, options, sourceData)
   const buffer = await workbook.xlsx.writeBuffer()
   const filename = options.filename ?? 'pivot-export.xlsx'
   downloadBuffer(buffer, filename)
