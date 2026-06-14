@@ -80,6 +80,23 @@ function freezeHeaderRow(worksheet: ExcelWorksheet): void {
   worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }]
 }
 
+/**
+ * Coerce a raw cell value into something exceljs can serialize.
+ *
+ * exceljs JSON-stringifies cell values internally, which throws on BigInt
+ * ("Do not know how to serialize a BigInt"). DuckDB and other SQL sources
+ * return integer columns as BigInt, so normalize those to a Number when they
+ * fit in a safe integer, otherwise to a string to avoid silent precision loss.
+ */
+function normalizeCellValue(value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(value)
+      : value.toString()
+  }
+  return value
+}
+
 // ============================================================================
 // Flat grid workbook builder
 // ============================================================================
@@ -112,7 +129,7 @@ export async function buildGridWorkbook<T extends Record<string, unknown>>(
   // Add data rows with optional number formats
   const formats = options.numberFormats
   for (const record of data) {
-    const rowValues = columns.map(col => record[col] ?? '')
+    const rowValues = columns.map(col => normalizeCellValue(record[col]) ?? '')
     const row = worksheet.addRow(rowValues)
 
     if (formats) {
@@ -189,7 +206,7 @@ async function writeSourceDataSheet(
   }
 
   const dataRows = sourceData.rows.map(r =>
-    sourceData.columns.map(c => r[c] ?? ''),
+    sourceData.columns.map(c => normalizeCellValue(r[c]) ?? ''),
   )
 
   sheet.addTable({
