@@ -232,6 +232,238 @@ describe('buildPivotWorkbook', () => {
     // 2 header rows + 2 data rows + 1 totals row = 5
     expect(worksheet.rowCount).toBe(5)
   })
+
+  // -------------------------------------------------------------------------
+  // Two-sheet workbook: with sourceData
+  // -------------------------------------------------------------------------
+
+  it('with sourceData: workbook has exactly 2 worksheets named "Pivot" and "Source Data"', async () => {
+    const sourceData = {
+      rows: [
+        { product: 'Widgets', region: 'East', quarter: 'Q1', sales: 100 },
+        { product: 'Gadgets', region: 'East', quarter: 'Q1', sales: 110 },
+      ],
+      columns: ['product', 'region', 'quarter', 'sales'],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    expect(workbook.worksheets).toHaveLength(2)
+    expect(workbook.worksheets[0].name).toBe('Pivot')
+    expect(workbook.worksheets[1].name).toBe('Source Data')
+  })
+
+  it('with sourceData: Source Data sheet has an Excel Table named "SourceData"', async () => {
+    const sourceData = {
+      rows: [
+        { product: 'Widgets', region: 'East', quarter: 'Q1', sales: 100 },
+        { product: 'Gadgets', region: 'East', quarter: 'Q1', sales: 110 },
+      ],
+      columns: ['product', 'region', 'quarter', 'sales'],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    const sourceSheet = workbook.worksheets[1]
+    const table = sourceSheet.getTable('SourceData')
+    expect(table).toBeDefined()
+  })
+
+  it('with sourceData: Source Data header row matches sourceData.columns', async () => {
+    const sourceData = {
+      rows: [
+        { product: 'Widgets', region: 'East', quarter: 'Q1', sales: 100 },
+      ],
+      columns: ['product', 'region', 'quarter', 'sales'],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    const sourceSheet = workbook.worksheets[1]
+    // In an ExcelJS table, row 1 is the header row
+    const headerValues: string[] = []
+    sourceSheet.getRow(1).eachCell(cell => headerValues.push(String(cell.value)))
+    expect(headerValues).toEqual(['product', 'region', 'quarter', 'sales'])
+  })
+
+  it('with sourceData: A2 contains the first data row first column value', async () => {
+    const sourceData = {
+      rows: [
+        { product: 'Widgets', region: 'East', quarter: 'Q1', sales: 100 },
+        { product: 'Gadgets', region: 'West', quarter: 'Q2', sales: 260 },
+      ],
+      columns: ['product', 'region', 'quarter', 'sales'],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    const sourceSheet = workbook.worksheets[1]
+    // A2 = first data row, first column (product = 'Widgets')
+    expect(String(sourceSheet.getCell('A2').value)).toBe('Widgets')
+    // D3 = second data row, fourth column (sales = 260)
+    expect(String(sourceSheet.getCell('D3').value)).toBe('260')
+  })
+
+  it('with sourceData: Source Data sheet has correct data row count', async () => {
+    const rows = [
+      { product: 'Widgets', sales: 100 },
+      { product: 'Gadgets', sales: 110 },
+      { product: 'Doohickeys', sales: 90 },
+    ]
+    const sourceData = { rows, columns: ['product', 'sales'] }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    const sourceSheet = workbook.worksheets[1]
+    // 1 header row + 3 data rows = 4
+    expect(sourceSheet.rowCount).toBe(4)
+  })
+
+  // -------------------------------------------------------------------------
+  // Without sourceData: single sheet
+  // -------------------------------------------------------------------------
+
+  it('without sourceData: workbook has exactly 1 worksheet named "Pivot"', async () => {
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+    )
+
+    expect(workbook.worksheets).toHaveLength(1)
+    expect(workbook.worksheets[0].name).toBe('Pivot')
+  })
+
+  it('without sourceData: Pivot sheet structure is unchanged (5 rows)', async () => {
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+    )
+
+    expect(workbook.worksheets[0].rowCount).toBe(5)
+  })
+
+  // -------------------------------------------------------------------------
+  // Empty rows edge case
+  // -------------------------------------------------------------------------
+
+  it('sourceData with empty rows: produces only 1 worksheet (no Source Data sheet added)', async () => {
+    const sourceData = {
+      rows: [],
+      columns: ['product', 'region'],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    // Empty rows + valid columns => hasSourceData is false => single sheet
+    expect(workbook.worksheets).toHaveLength(1)
+    expect(workbook.worksheets[0].name).toBe('Pivot')
+  })
+
+  it('sourceData with empty columns: produces only 1 worksheet', async () => {
+    const sourceData = {
+      rows: [{ product: 'Widgets' }],
+      columns: [],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    expect(workbook.worksheets).toHaveLength(1)
+  })
+
+  // -------------------------------------------------------------------------
+  // Duplicate column names edge case
+  // -------------------------------------------------------------------------
+
+  it('sourceData with duplicate column names: de-duplicates headers', async () => {
+    const sourceData = {
+      rows: [
+        { name: 'Alice', name2: 'Smith' },
+      ],
+      columns: ['name', 'name', 'name'],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    const sourceSheet = workbook.worksheets[1]
+    const headerValues: string[] = []
+    sourceSheet.getRow(1).eachCell(cell => headerValues.push(String(cell.value)))
+    // First occurrence keeps original name, subsequent ones get _2, _3, etc.
+    expect(headerValues).toEqual(['name', 'name_2', 'name_3'])
+  })
+
+  it('sourceData with empty column names: fills with Col1, Col2, etc.', async () => {
+    const sourceData = {
+      rows: [
+        { '': 'val1' },
+      ],
+      columns: ['', '', 'real'],
+    }
+    const workbook = await buildPivotWorkbook(
+      samplePivotData,
+      ['product'],
+      ['region'],
+      [],
+      {},
+      sourceData,
+    )
+
+    const sourceSheet = workbook.worksheets[1]
+    const headerValues: string[] = []
+    sourceSheet.getRow(1).eachCell(cell => headerValues.push(String(cell.value)))
+    expect(headerValues).toEqual(['Col1', 'Col2', 'real'])
+  })
 })
 
 // ---------------------------------------------------------------------------

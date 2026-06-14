@@ -168,7 +168,7 @@ export function MyGrid({ data }) {
 | `loading` | `boolean` | `false` | Show loading spinner |
 | `fontSize` | `'xs' \| 'sm' \| 'base'` | `'xs'` | Font size preset |
 | `showPivot` | `boolean` | `true` | Show pivot toggle |
-| `enableExport` | `boolean` | `true` | Show CSV export button |
+| `enableExport` | `boolean` | `true` | Show the Export dropdown menu (CSV free / Excel .xlsx Pro) |
 | `enableSearch` | `boolean` | `true` | Show global search |
 | `enablePagination` | `boolean` | `false` | Enable pagination |
 | `pageSize` | `number` | `50` | Rows per page |
@@ -195,9 +195,12 @@ export function MyGrid({ data }) {
 
 ## Export
 
-### CSV Export (Free)
+When `enableExport` is `true` (the default), the toolbar shows a single **Export** dropdown button. Clicking it opens a menu with two items:
 
-CSV export is enabled by default. The "Export CSV" button appears in the toolbar when `enableExport` is `true`. Programmatic API:
+- **CSV** — always available (free). Downloads a `.csv` file of the current view.
+- **Excel (.xlsx)** — Pro only. Free users see this item disabled with a **Pro** badge. Pro users get a styled `.xlsx` download. `exceljs` (~250 KB) loads lazily via dynamic import — never part of your main bundle.
+
+### CSV Export (Free)
 
 ```typescript
 import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-react'
@@ -206,8 +209,6 @@ exportToCSV(data, columns, { filename: 'my-data.csv' })
 ```
 
 ### Excel (XLSX) Export (Pro)
-
-Styled `.xlsx` downloads for both the flat grid and the pivot table. The "Export XLSX" button appears in the toolbar automatically when a Pro license is active. `exceljs` (~250 KB) loads **lazily** via dynamic import — it is never part of your main bundle.
 
 ```typescript
 import { exportToXLSX, exportPivotToXLSX } from '@smallwebco/tinypivot-react'
@@ -223,6 +224,16 @@ await exportToXLSX(data, columns, {
 await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
   filename: 'pivot.xlsx',
 })
+```
+
+#### Pivot XLSX: two-sheet workbook
+
+Pivot XLSX export produces a **two-sheet workbook**:
+
+1. **Pivot** — the styled pivot summary (merged column headers, bold totals row, frozen header).
+2. **Source Data** — the underlying source rows as an **interactive Excel Table** (filter/sort dropdowns, `TableStyleMedium2`). Open it in Excel and choose **Insert → PivotTable** to build a native PivotTable in two clicks.
+
+> Note: TinyPivot does not generate a native Excel PivotTable object (exceljs does not support writing pivot table XML). The Source Data sheet is the practical alternative.
 ```
 
 ## Pivot Drill-Down

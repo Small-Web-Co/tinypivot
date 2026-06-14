@@ -134,7 +134,7 @@ export default function App() {
 | `loading` | `boolean` | `false` | Show loading spinner |
 | `fontSize` | `'xs' \| 'sm' \| 'base'` | `'xs'` | Font size preset |
 | `showPivot` | `boolean` | `true` | Show pivot toggle |
-| `enableExport` | `boolean` | `true` | Show CSV export button |
+| `enableExport` | `boolean` | `true` | Show the Export dropdown menu (CSV free / Excel .xlsx Pro) |
 | `enableSearch` | `boolean` | `true` | Show global search |
 | `enablePagination` | `boolean` | `false` | Enable pagination |
 | `pageSize` | `number` | `50` | Rows per page |
@@ -651,9 +651,14 @@ This is useful when:
 
 ## Export
 
+When `enableExport` is `true` (the default), the toolbar shows a single **Export** dropdown button. Clicking it opens a menu with two items:
+
+- **CSV** — always available (free). Downloads a `.csv` file of the current view (grid or pivot).
+- **Excel (.xlsx)** — Pro only. Free users see this item disabled with a **Pro** badge. Pro users get a styled `.xlsx` download. `exceljs` (~250 KB) is loaded lazily via dynamic import and is never part of your main bundle.
+
 ### CSV Export (Free)
 
-CSV export is enabled by default. Set `enableExport={true}` and optionally `exportFilename="data.csv"`. The Export CSV button appears in the toolbar. Programmatic API:
+Programmatic API:
 
 ```typescript
 import { exportToCSV, exportPivotToCSV } from '@smallwebco/tinypivot-vue' // or -react
@@ -663,9 +668,7 @@ exportToCSV(data, columns, { filename: 'my-data.csv' })
 
 ### Excel (XLSX) Export (Pro)
 
-Pro licenses unlock styled `.xlsx` downloads for both the flat grid and the pivot table. The "Export XLSX" button appears in the toolbar automatically when `enableExport` is `true` and a Pro license is active. `exceljs` (~250 KB) is loaded **lazily** via dynamic import — it is never included in your main bundle.
-
-Programmatic API (both functions are `async` and trigger a browser download):
+Styled `.xlsx` downloads for both the flat grid and the pivot table. Both functions are `async` and trigger a browser download:
 
 ```typescript
 import { exportToXLSX, exportPivotToXLSX } from '@smallwebco/tinypivot-vue' // or -react
@@ -678,7 +681,7 @@ await exportToXLSX(data, columns, {
   numberFormats: { revenue: '#,##0.00', units: '#,##0' },
 })
 
-// Pivot table — pass the PivotExportData, field arrays, and options
+// Pivot table
 await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
   filename: 'pivot-report.xlsx',
   sheetName: 'Pivot',
@@ -686,6 +689,15 @@ await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
 ```
 
 `XlsxExportOptions` extends `ExportOptions` and adds `sheetName?: string` and `numberFormats?: Record<string, string>`.
+
+#### Pivot XLSX: two-sheet workbook
+
+When exporting a pivot table to Excel, TinyPivot produces a **two-sheet workbook**:
+
+1. **Pivot** — the styled pivot summary (merged column headers, bold totals row, frozen header, auto-sized columns).
+2. **Source Data** — the underlying source rows written as an **interactive Excel Table** (`TableStyleMedium2` with filter/sort dropdowns on every column). In Excel, select any cell in this table and go to **Insert → PivotTable** to build a native Excel PivotTable in two clicks.
+
+> Note: TinyPivot does not generate a native Excel PivotTable object — the library used (exceljs) does not support writing pivot table XML. The Source Data sheet is the practical alternative: it gives users full access to the raw rows inside Excel so they can create a PivotTable themselves.
 
 ## Pivot Drill-Down
 

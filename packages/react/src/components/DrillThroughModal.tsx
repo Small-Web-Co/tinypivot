@@ -6,6 +6,7 @@ import type { DrillThroughResult, PivotValueField } from '@smallwebco/tinypivot-
 import { exportToCSV, exportToXLSX, getAggregationLabel } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ExportMenu } from './ExportMenu'
 
 interface DrillThroughModalProps {
   show: boolean
@@ -116,6 +117,18 @@ export function DrillThroughModal({
     }
   }, [result, columns])
 
+  const onExport = useCallback(
+    (key: string) => {
+      if (key === 'csv') {
+        handleExport()
+      }
+      else {
+        handleExportXLSX()
+      }
+    },
+    [handleExport, handleExportXLSX],
+  )
+
   const formatCellValue = (value: unknown): string => {
     if (value === null || value === undefined)
       return ''
@@ -196,14 +209,13 @@ export function DrillThroughModal({
 
         <div className="vpg-modal-footer">
           {result && result.rows.length > 0 && (
-            <button className="vpg-btn vpg-btn-secondary" onClick={handleExport}>
-              Export CSV
-            </button>
-          )}
-          {result && result.rows.length > 0 && (
-            <button className="vpg-btn vpg-btn-secondary" onClick={handleExportXLSX}>
-              Export XLSX
-            </button>
+            <ExportMenu
+              formats={[
+                { key: 'csv', label: 'CSV' },
+                { key: 'xlsx', label: 'Excel (.xlsx)' },
+              ]}
+              onSelect={onExport}
+            />
           )}
           <button className="vpg-btn vpg-btn-primary" onClick={onClose}>
             Close

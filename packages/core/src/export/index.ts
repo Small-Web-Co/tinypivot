@@ -230,3 +230,4 @@ export {
   exportPivotToXLSX,
   exportToXLSX,
 } from './xlsx'
+export type { SourceData } from './xlsx'

@@ -76,7 +76,7 @@ export {
   formatSelectionForClipboard,
 } from './export'
 
-export type { PivotExportData } from './export'
+export type { PivotExportData, SourceData } from './export'
 // License Management
 export {
   canUseAIAnalyst,

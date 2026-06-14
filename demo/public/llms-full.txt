@@ -126,7 +126,7 @@ All props are identical between Vue and React except for naming convention (Vue:
 | `loading` | `boolean` | `false` | Show loading spinner |
 | `fontSize` | `'xs' \| 'sm' \| 'base'` | `'xs'` | Font size preset |
 | `show-pivot` / `showPivot` | `boolean` | `true` | Show pivot toggle button |
-| `enable-export` / `enableExport` | `boolean` | `true` | Show CSV export button |
+| `enable-export` / `enableExport` | `boolean` | `true` | Show the Export dropdown menu (CSV free / Excel .xlsx Pro) |
 | `enable-search` / `enableSearch` | `boolean` | `true` | Show global search input |
 | `enable-pagination` / `enablePagination` | `boolean` | `false` | Enable pagination |
 | `page-size` / `pageSize` | `number` | `50` | Rows per page |
@@ -328,9 +328,12 @@ Key CSS tokens: `--vpg-accent`, `--vpg-accent-hover`, `--vpg-surface-bg`, `--vpg
 
 ## Export
 
-### CSV Export (Free)
+When `enableExport` is `true` (the default), the toolbar shows a single **Export** dropdown button. Clicking it opens a two-item menu:
 
-CSV export is enabled by default. Use `exportFilename` to set the download filename. The "Export CSV" button appears in the toolbar when `enableExport` is `true`.
+- **CSV** — always available (free). Downloads a `.csv` file of the current view (grid or pivot).
+- **Excel (.xlsx)** — Pro only. Free users see this item disabled with a **Pro** badge. Pro users get a styled `.xlsx` download. `exceljs` (~250 KB) loads lazily via dynamic import and is never part of the main bundle.
+
+### CSV Export (Free)
 
 Programmatic API:
 
@@ -347,9 +350,7 @@ exportToCSV(data, Object.keys(data[0] ?? {}), { filename: 'my-data.csv' })
 
 ### Excel (XLSX) Export (Pro)
 
-Styled `.xlsx` downloads for the flat grid and pivot table. Requires a Pro license — the "Export XLSX" button appears in the toolbar automatically when `enableExport` is `true` and a Pro license is active. `exceljs` (~250 KB) loads lazily via dynamic import and is never included in the main bundle.
-
-Both functions are `async` and trigger a browser download:
+Styled `.xlsx` downloads for the flat grid and pivot table. Both functions are `async` and trigger a browser download:
 
 ```typescript
 // Vue
@@ -378,6 +379,15 @@ await exportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, {
 `XlsxExportOptions` extends `ExportOptions` and adds:
 - `sheetName?: string` — worksheet name (default: `'Sheet1'`)
 - `numberFormats?: Record<string, string>` — custom Excel number format strings per column key
+
+#### Pivot XLSX: two-sheet workbook
+
+Pivot XLSX export produces a **two-sheet workbook**:
+
+1. **Pivot** — the styled pivot summary (merged column headers, bold totals row, frozen header, auto-sized columns).
+2. **Source Data** — the underlying source rows written as an **interactive Excel Table** (`TableStyleMedium2` with filter/sort dropdowns on every column). In Excel, select any cell in this table and choose **Insert → PivotTable** to build a native Excel PivotTable in two clicks.
+
+Note: TinyPivot does not generate a native Excel PivotTable object — exceljs does not support writing pivot table XML. The Source Data sheet is the practical alternative.
 
 ---
 
