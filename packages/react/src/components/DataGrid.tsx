@@ -677,6 +677,7 @@ export function DataGrid({
     searchFilteredData,
     rows,
     columnKeys,
+    filteredDataForPivot,
     onExport,
   ])
 

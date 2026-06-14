@@ -4,7 +4,7 @@
  * Renders a single "Export ▾" button that opens a list of format options.
  * Disabled items are shown greyed with an optional badge, but cannot be selected.
  */
-import { onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 export interface ExportFormat {
   key: string
@@ -48,8 +48,10 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-document.addEventListener('mousedown', handleClickOutside)
-document.addEventListener('keydown', handleKeydown)
+onMounted(() => {
+  document.addEventListener('mousedown', handleClickOutside)
+  document.addEventListener('keydown', handleKeydown)
+})
 
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside)
