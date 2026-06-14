@@ -229,5 +229,6 @@ export {
   buildPivotWorkbook,
   exportPivotToXLSX,
   exportToXLSX,
+  resolveExcelJS,
 } from './xlsx'
 export type { SourceData } from './xlsx'

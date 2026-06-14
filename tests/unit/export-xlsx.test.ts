@@ -4,8 +4,34 @@ import type { PivotExportData } from '../../packages/core/src/export'
  * Uses buildGridWorkbook / buildPivotWorkbook directly to avoid triggering downloads.
  */
 import { describe, expect, it } from 'vitest'
-import { buildGridWorkbook, buildPivotWorkbook } from '../../packages/core/src/export/xlsx'
+import { buildGridWorkbook, buildPivotWorkbook, resolveExcelJS } from '../../packages/core/src/export/xlsx'
 import { canUseXlsxExport, getFreeLicenseInfo } from '../../packages/core/src/license'
+
+// ---------------------------------------------------------------------------
+// exceljs interop resolution (browser vs Node module shapes)
+// ---------------------------------------------------------------------------
+
+describe('resolveExcelJS (bundler interop shapes)', () => {
+  const fakeExcelJS = { Workbook: class {} }
+
+  it('resolves when Workbook is on the namespace itself', () => {
+    expect(resolveExcelJS(fakeExcelJS)).toBe(fakeExcelJS)
+  })
+
+  it('resolves when wrapped one level under .default (Node CJS interop)', () => {
+    expect(resolveExcelJS({ default: fakeExcelJS })).toBe(fakeExcelJS)
+  })
+
+  it('resolves when wrapped two levels under .default.default (browser bundler interop)', () => {
+    expect(resolveExcelJS({ default: { default: fakeExcelJS } })).toBe(fakeExcelJS)
+  })
+
+  it('returns undefined when no candidate exposes a Workbook constructor', () => {
+    expect(resolveExcelJS({ default: { notExcel: true } })).toBeUndefined()
+    expect(resolveExcelJS(undefined)).toBeUndefined()
+    expect(resolveExcelJS({ Workbook: 'not-a-function' })).toBeUndefined()
+  })
+})
 
 // ---------------------------------------------------------------------------
 // Sample data
