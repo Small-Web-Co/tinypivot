@@ -88,9 +88,59 @@ All keywords below are `queued` and ready for content generation.
 | Vue datagrid with built-in charts | tutorial | vue-datagrid-built-in-charts | queued |
 
 ---
+| React pivot table export to Excel | tutorial | react-pivot-table-excel-export | queued |
+| Vue pivot table export to Excel | tutorial | vue-pivot-table-excel-export | queued |
+| React data grid XLSX export | feature | react-datagrid-xlsx-export | queued |
+| Vue data grid XLSX export | feature | vue-datagrid-xlsx-export | queued |
+| Export a pivot table to Excel in JavaScript | tutorial | export-pivot-table-excel-javascript | queued |
+| React pivot table drill down | feature | react-pivot-table-drilldown | queued |
+| Vue pivot table drill down | feature | vue-pivot-table-drilldown | queued |
+| React data grid expand collapse row groups | feature | react-datagrid-expand-collapse-rows | queued |
+| Vue pivot table grouped row layout | feature | vue-pivot-table-grouped-rows | queued |
+| Pivot table drill through to underlying data | feature | pivot-table-drill-through-data | queued |
+| TinyPivot vs Tabulator | comparison | tinypivot-vs-tabulator | queued |
+| TinyPivot vs react-data-grid | comparison | tinypivot-vs-react-data-grid | queued |
+| TinyPivot vs Glide Data Grid | comparison | tinypivot-vs-glide-data-grid | queued |
+| TinyPivot vs RevoGrid | comparison | tinypivot-vs-revogrid | queued |
+| TinyPivot vs DevExtreme DataGrid | comparison | tinypivot-vs-devextreme-datagrid | queued |
+| TinyPivot vs Material React Table | comparison | tinypivot-vs-material-react-table | queued |
+| TinyPivot vs PrimeVue DataTable | comparison | tinypivot-vs-primevue-datatable | queued |
+| TinyPivot vs PrimeReact DataTable | comparison | tinypivot-vs-primereact-datatable | queued |
+| TinyPivot vs Vuetify data table | comparison | tinypivot-vs-vuetify-data-table | queued |
+| TinyPivot vs Quasar QTable | comparison | tinypivot-vs-quasar-qtable | queued |
+| Lightweight AG Grid alternative that is free | comparison | lightweight-ag-grid-alternative-free | queued |
+| AG Grid pricing alternative | comparison | ag-grid-pricing-alternative | queued |
+| Next.js pivot table Excel export | tutorial | nextjs-pivot-table-excel-export | queued |
+| Nuxt pivot table Excel export | tutorial | nuxt-pivot-table-excel-export | queued |
+| Next.js App Router data grid | tutorial | nextjs-app-router-data-grid | queued |
+| Nuxt 3 data grid with SSR | tutorial | nuxt3-data-grid-ssr | queued |
+| How to build a pivot table in React | tutorial | how-to-build-pivot-table-react | queued |
+| How to build a pivot table in Vue 3 | tutorial | how-to-build-pivot-table-vue3 | queued |
+| React pivot table from JSON data | tutorial | react-pivot-table-from-json | queued |
+| Vue pivot table from API data | tutorial | vue-pivot-table-from-api | queued |
+| React data grid CSV and Excel export tutorial | tutorial | react-datagrid-csv-excel-export | queued |
+| Embed an analytics dashboard in a React SaaS | tutorial | embed-analytics-dashboard-react-saas | queued |
+| Embed an analytics dashboard in a Vue SaaS | tutorial | embed-analytics-dashboard-vue-saas | queued |
+| React pivot table example with sample data | tutorial | react-pivot-table-example | queued |
+| Natural language query data grid in React | feature | natural-language-query-datagrid-react | queued |
+| Text to SQL data grid component | feature | text-to-sql-datagrid-component | queued |
+| BYOK AI data analyst for React and Vue | feature | byok-ai-data-analyst | queued |
+| React data grid clipboard copy and paste | feature | react-datagrid-clipboard-copy | queued |
+| Vue data grid keyboard navigation | feature | vue-datagrid-keyboard-navigation | queued |
+| React pivot table median and standard deviation | feature | react-pivot-table-median-stddev | queued |
+| Vue pivot table count distinct aggregation | feature | vue-pivot-table-count-distinct | queued |
+| React data grid dark mode themes | feature | react-datagrid-dark-mode-themes | queued |
+| React pivot table row and column totals | feature | react-pivot-table-row-column-totals | queued |
+| Vue pivot table grand totals | feature | vue-pivot-table-grand-totals | queued |
+| React lightweight data grid bundle size | feature | react-datagrid-lightweight-bundle | queued |
+| Vue data grid with no subscription license | feature | vue-datagrid-no-subscription | queued |
+| React pivot table perpetual license | feature | react-pivot-table-perpetual-license | queued |
+| React embedded BI component | feature | react-embedded-bi-component | queued |
+| Vue embedded BI component | feature | vue-embedded-bi-component | queued |
+| React data grid for analytics dashboards | feature | react-datagrid-analytics-dashboards | queued |
 
 ## Metrics
 
-- **Total queued keywords:** 56
+- **Total queued keywords:** 106
 - **Existing routes excluded:** 8 (7 marketing guides + vs-ag-grid)
 - **Combination breakdown:** ~7 frameworks × 8 features × 5 competitors + additional tutorials and direct comparisons
