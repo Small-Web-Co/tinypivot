@@ -44,6 +44,29 @@ const sampleData = [
 ]
 const sampleColumns = ['name', 'age', 'city']
 
+describe('buildGridWorkbook with BigInt values (DuckDB/SQL sources)', () => {
+  // exceljs JSON-stringifies cell values internally and throws on BigInt;
+  // writeBuffer is where it surfaces. These rows must export without throwing.
+  const bigIntData = [
+    { name: 'Alice', total: 1234567890123n, qty: 5n },
+    { name: 'Bob', total: 9007199254740993n, qty: 0n }, // > MAX_SAFE_INTEGER -> string
+  ]
+
+  it('exports BigInt cells without throwing and writes a valid buffer', async () => {
+    const wb = await buildGridWorkbook(bigIntData, ['name', 'total', 'qty'])
+    const buffer = await wb.xlsx.writeBuffer()
+    expect(buffer.byteLength).toBeGreaterThan(0)
+  })
+
+  it('coerces safe BigInts to numbers and oversized BigInts to strings', async () => {
+    const wb = await buildGridWorkbook(bigIntData, ['name', 'total', 'qty'])
+    const ws = wb.getWorksheet(1)!
+    expect(ws.getCell('B2').value).toBe(1234567890123) // safe -> Number
+    expect(ws.getCell('C2').value).toBe(5)
+    expect(ws.getCell('B3').value).toBe('9007199254740993') // oversized -> string
+  })
+})
+
 const samplePivotData: PivotExportData = {
   headers: [
     ['East', 'East', 'West', 'West'],
