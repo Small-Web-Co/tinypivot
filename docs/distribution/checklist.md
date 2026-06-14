@@ -179,11 +179,11 @@ After the demo site deploys and `demo/public/llms-full.txt` is live, submit Tiny
 
 ## Submission Checklist
 
-- [ ] awesome-vue PR submitted
-- [ ] awesome-react-components PR submitted
-- [ ] GitHub repo topics added via `gh` CLI
-- [ ] GitHub social preview image verified
-- [ ] AlternativeTo listing created or updated
-- [ ] LibHunt listing created or updated
-- [ ] StackBlitz links verified on README files
-- [ ] Context7 submission (post-deploy)
+- [x] awesome-vue PR submitted — https://github.com/vuejs/awesome-vue/pull/4477 (2026-06-14)
+- [ ] awesome-react-components PR submitted — BLOCKED: their policy requires every PR to also REMOVE one existing entry; needs a human to pick which stale entry to drop (entry copy ready in section 2)
+- [x] GitHub repo topics added via `gh` CLI (15 topics, 2026-06-14)
+- [ ] GitHub social preview image verified (Settings → General → Social preview)
+- [ ] AlternativeTo listing created or updated (web form — copy in section 4)
+- [ ] LibHunt listing created or updated (web form — copy in section 4)
+- [x] StackBlitz links verified on README files (shipped in earlier work)
+- [ ] Context7 submission — submit https://tiny-pivot.com/llms-full.txt at https://context7.com (web form, post-deploy; site is live)
