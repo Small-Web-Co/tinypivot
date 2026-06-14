@@ -1,4 +1,4 @@
-import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds, XlsxExportOptions } from '@smallwebco/tinypivot-core'
+import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds, SourceData, XlsxExportOptions } from '@smallwebco/tinypivot-core'
 import type { Ref } from 'vue'
 import {
   copyToClipboard as coreCopyToClipboard,
@@ -68,8 +68,9 @@ async function exportPivotToXLSX(
   columnFields: string[],
   valueFields: PivotValueField[],
   options?: XlsxExportOptions,
+  sourceData?: SourceData,
 ): Promise<void> {
-  await coreExportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, options)
+  await coreExportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, options, sourceData)
 }
 
 /**

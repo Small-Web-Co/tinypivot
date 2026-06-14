@@ -34,6 +34,7 @@ import AIAnalyst from './AIAnalyst.vue'
 import ChartBuilder from './ChartBuilder.vue'
 import ColumnFilter from './ColumnFilter.vue'
 import DrillThroughModal from './DrillThroughModal.vue'
+import ExportMenu from './ExportMenu.vue'
 import PivotConfig from './PivotConfig.vue'
 import PivotSkeleton from './PivotSkeleton.vue'
 
@@ -115,7 +116,7 @@ const emit = defineEmits<{
   (e: 'drillThrough', payload: DrillThroughResult): void
 }>()
 
-const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, canUseXlsxExport, isDemo, isPro, licenseInfo } = useLicense()
+const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, canUseXlsxExport, isDemo, licenseInfo } = useLicense()
 
 // Drill-through state
 const drillThroughResult = ref<DrillThroughResult | null>(null)
@@ -418,6 +419,7 @@ async function handlePivotExportXLSX() {
       pivotColumnFields.value,
       pivotValueFields.value,
       { filename: xlsxFilename },
+      { rows: filteredDataForPivot.value, columns: columnKeys.value },
     )
     const rowCount = pivotResult.value.rowHeaders.length
     emit('export', { rowCount, filename: xlsxFilename })
@@ -1315,57 +1317,23 @@ function handleContainerClick(event: MouseEvent) {
           </svg>
         </button>
 
-        <!-- Export button - Grid export is free, Pivot export requires Pro -->
-        <button
+        <!-- Export dropdown menu -->
+        <ExportMenu
           v-if="enableExport && viewMode === 'grid'"
-          class="vpg-export-btn"
-          title="Export to CSV"
-          @click="handleExport"
-        >
-          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export
-        </button>
-        <button
-          v-if="enableExport && viewMode === 'grid'"
-          class="vpg-export-btn"
-          :class="{ 'vpg-export-btn-disabled': !canUseXlsxExport }"
-          :disabled="!canUseXlsxExport"
-          :title="canUseXlsxExport ? 'Export to XLSX' : 'Export to XLSX (Pro feature)'"
-          @click="canUseXlsxExport && handleExportXLSX()"
-        >
-          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export XLSX{{ !canUseXlsxExport ? ' (Pro)' : '' }}
-        </button>
-        <button
+          :formats="[
+            { key: 'csv', label: 'CSV' },
+            { key: 'xlsx', label: 'Excel (.xlsx)', disabled: !canUseXlsxExport, badge: !canUseXlsxExport ? 'Pro' : undefined },
+          ]"
+          @select="(key) => key === 'csv' ? handleExport() : handleExportXLSX()"
+        />
+        <ExportMenu
           v-if="enableExport && viewMode === 'pivot' && pivotIsConfigured"
-          class="vpg-export-btn"
-          :class="{ 'vpg-export-btn-disabled': !isPro }"
-          :disabled="!isPro"
-          :title="isPro ? 'Export Pivot to CSV' : 'Export Pivot to CSV (Pro feature)'"
-          @click="isPro && handleExport()"
-        >
-          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export Pivot{{ !isPro ? ' (Pro)' : '' }}
-        </button>
-        <button
-          v-if="enableExport && viewMode === 'pivot' && pivotIsConfigured"
-          class="vpg-export-btn"
-          :class="{ 'vpg-export-btn-disabled': !canUseXlsxExport }"
-          :disabled="!canUseXlsxExport"
-          :title="canUseXlsxExport ? 'Export Pivot to XLSX' : 'Export Pivot to XLSX (Pro feature)'"
-          @click="canUseXlsxExport && handleExportXLSX()"
-        >
-          <svg class="vpg-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export Pivot XLSX{{ !canUseXlsxExport ? ' (Pro)' : '' }}
-        </button>
+          :formats="[
+            { key: 'csv', label: 'CSV' },
+            { key: 'xlsx', label: 'Excel (.xlsx)', disabled: !canUseXlsxExport, badge: !canUseXlsxExport ? 'Pro' : undefined },
+          ]"
+          @select="(key) => key === 'csv' ? handlePivotExport() : handlePivotExportXLSX()"
+        />
       </div>
     </div>
 

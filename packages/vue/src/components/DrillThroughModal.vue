@@ -6,6 +6,7 @@ import { exportToCSV, exportToXLSX, getAggregationLabel } from '@smallwebco/tiny
  * Displays source rows for a pivot cell in a paginated table
  */
 import { computed, onUnmounted, ref, watch } from 'vue'
+import ExportMenu from './ExportMenu.vue'
 
 const props = defineProps<{
   show: boolean
@@ -117,6 +118,15 @@ async function handleExportXLSX() {
   }
 }
 
+function onExport(key: string) {
+  if (key === 'csv') {
+    handleExport()
+  }
+  else {
+    handleExportXLSX()
+  }
+}
+
 function formatCellValue(value: unknown): string {
   if (value === null || value === undefined)
     return ''
@@ -183,20 +193,11 @@ function formatCellValue(value: unknown): string {
         </div>
 
         <div class="vpg-modal-footer">
-          <button
+          <ExportMenu
             v-if="result && result.rows.length > 0"
-            class="vpg-btn vpg-btn-secondary"
-            @click="handleExport"
-          >
-            Export CSV
-          </button>
-          <button
-            v-if="result && result.rows.length > 0"
-            class="vpg-btn vpg-btn-secondary"
-            @click="handleExportXLSX"
-          >
-            Export XLSX
-          </button>
+            :formats="[{ key: 'csv', label: 'CSV' }, { key: 'xlsx', label: 'Excel (.xlsx)' }]"
+            @select="onExport"
+          />
           <button class="vpg-btn vpg-btn-primary" @click="emit('close')">
             Close
           </button>
