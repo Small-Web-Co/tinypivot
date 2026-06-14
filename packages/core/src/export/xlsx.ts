@@ -19,6 +19,44 @@ const MIN_COLUMN_WIDTH = 8
 type ExcelWorksheet = ExcelJSType.Worksheet
 type ExcelRow = ExcelJSType.Row
 
+/**
+ * Dynamically import exceljs and return the module object that actually carries
+ * the `Workbook` constructor.
+ *
+ * exceljs ships a Node build (`main`) and a browser UMD build (`browser`). Under
+ * different bundlers the dynamic import resolves to different interop shapes —
+ * the constructor may sit on the namespace itself, on `.default`, or on
+ * `.default.default`. Probing for `Workbook` makes the loader correct for all of
+ * them instead of assuming a single `.default` level (which works in Node tests
+ * but silently fails in the browser).
+ */
+/**
+ * Pick the object that actually carries the `Workbook` constructor out of an
+ * imported exceljs module, probing the namespace, `.default`, and
+ * `.default.default`. Exported for testing the interop shapes a bundler may
+ * produce. Returns `undefined` when no candidate exposes `Workbook`.
+ */
+export function resolveExcelJS(mod: unknown): typeof ExcelJSType | undefined {
+  const asRecord = mod as Record<string, unknown> | undefined
+  const candidates = [
+    asRecord,
+    asRecord?.default,
+    (asRecord?.default as Record<string, unknown> | undefined)?.default,
+  ]
+  const resolved = candidates.find(
+    candidate => typeof (candidate as { Workbook?: unknown } | undefined)?.Workbook === 'function',
+  )
+  return resolved as typeof ExcelJSType | undefined
+}
+
+async function loadExcelJS(): Promise<typeof ExcelJSType> {
+  const resolved = resolveExcelJS(await import('exceljs'))
+  if (!resolved) {
+    throw new TypeError('[TinyPivot] Failed to load exceljs: Workbook constructor not found on the imported module.')
+  }
+  return resolved
+}
+
 function applyHeaderStyle(row: ExcelRow): void {
   row.eachCell((cell) => {
     cell.font = { bold: true }
@@ -54,8 +92,8 @@ export async function buildGridWorkbook<T extends Record<string, unknown>>(
   columns: string[],
   options: XlsxExportOptions = {},
 ): Promise<ExcelJSType.Workbook> {
-  const { default: ExcelJSModule } = await import('exceljs')
-  const workbook = new ExcelJSModule.Workbook()
+  const ExcelJS = await loadExcelJS()
+  const workbook = new ExcelJS.Workbook()
   const sheetName = options.sheetName ?? 'Sheet1'
   const worksheet = workbook.addWorksheet(sheetName)
 
@@ -338,8 +376,8 @@ export async function buildPivotWorkbook(
   options: XlsxExportOptions = {},
   sourceData?: SourceData,
 ): Promise<ExcelJSType.Workbook> {
-  const { default: ExcelJSModule } = await import('exceljs')
-  const workbook = new ExcelJSModule.Workbook()
+  const ExcelJS = await loadExcelJS()
+  const workbook = new ExcelJS.Workbook()
   const sheetName = options.sheetName ?? 'Pivot'
   const worksheet = workbook.addWorksheet(sheetName)
 
