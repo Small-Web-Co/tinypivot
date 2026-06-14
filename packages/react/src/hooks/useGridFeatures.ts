@@ -1,4 +1,4 @@
-import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds, XlsxExportOptions } from '@smallwebco/tinypivot-core'
+import type { ExportOptions, PaginationOptions, PivotExportData, PivotValueField, SelectionBounds, SourceData, XlsxExportOptions } from '@smallwebco/tinypivot-core'
 import {
   copyToClipboard as coreCopyToClipboard,
   exportPivotToCSV as coreExportPivotToCSV,
@@ -46,8 +46,9 @@ export async function exportPivotToXLSX(
   columnFields: string[],
   valueFields: PivotValueField[],
   options?: XlsxExportOptions,
+  sourceData?: SourceData,
 ): Promise<void> {
-  await coreExportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, options)
+  await coreExportPivotToXLSX(pivotData, rowFields, columnFields, valueFields, options, sourceData)
 }
 
 export function copyToClipboard(
