@@ -209,6 +209,41 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'vue-pivot-table-free': {
+    title: 'Vue 3 Pivot Table Component — Free Tier Guide',
+    eyebrow: 'Vue 3 Feature Guide',
+    description: 'Get a free Vue 3 pivot table with sorting, filtering, CSV export, and Sum aggregation. Upgrade once for advanced analytics — no recurring subscription.',
+    intro: 'TinyPivot for Vue 3 ships as @smallwebco/tinypivot-vue and includes a complete data grid plus a pivot table in its free tier. No account required, no time limit. The free tier adds a small watermark; a one-time Pro license removes it and unlocks advanced analytics.',
+    sections: [
+      {
+        title: 'What is free in TinyPivot for Vue 3',
+        paragraphs: ['The free tier is not a restricted preview — it is a production-ready Vue 3 data grid and pivot table. You get sorting, filtering, search, pagination, column resize, calculated fields, CSV export, and 22 built-in themes at no cost.', 'The pivot workflow in the free tier supports Sum aggregation with row and column totals. Users can drag fields to build pivot views interactively, and the component derives columns from your array of records without a schema definition.'],
+        bullets: [
+          'Sort, filter, search, and paginate any data source',
+          'Sum aggregation with row and column totals in the pivot view',
+          'Calculated fields for metrics like margin, ratio, or growth',
+          'CSV export and column resize built in',
+          '22 themes including dark and light variants — no custom CSS needed',
+        ],
+      },
+      {
+        title: 'Install in a Vue 3 project',
+        paragraphs: ['Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then bind your data array to the data prop. The component is built for Vue 3 Composition API and ships with TypeScript types.', 'The bundle is approximately 50 KB gzipped for the Vue package. It has no mandatory peer dependencies beyond Vue 3 itself.'],
+      },
+      {
+        title: 'Free tier watermark',
+        paragraphs: ['The free tier renders a small "TinyPivot" watermark inside the component. It does not block data or interactions — it signals that the free edition is active. A Pro license removes it immediately without requiring a code change beyond supplying the key.'],
+      },
+      {
+        title: 'What Pro adds',
+        paragraphs: ['Pro is a one-time perpetual purchase with three tiers: Single ($49), Unlimited ($149), and Team ($399). One license covers both @smallwebco/tinypivot-vue and @smallwebco/tinypivot-react.', 'Pro unlocks the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, session persistence, and an optional BYOK AI Data Analyst that supports OpenAI, Anthropic, and OpenRouter.'],
+      },
+      {
+        title: 'Nuxt 3 compatibility',
+        paragraphs: ['TinyPivot renders client-side. In a Nuxt 3 project, wrap the DataGrid in a <ClientOnly> tag or use the component inside a client-only plugin to avoid SSR hydration issues. No additional configuration is required.'],
+      },
+    ],
+  },
 }
 
 const guide = computed(() => guides[props.slug] ?? guides['ag-grid-alternatives'])

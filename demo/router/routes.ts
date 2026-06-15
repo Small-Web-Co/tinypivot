@@ -43,6 +43,11 @@ export const marketingGuides = [
     title: 'React Pivot Table Without Watermark | TinyPivot',
     description: 'Remove the TinyPivot watermark in React with a one-time Pro license. Get full aggregations, charts, AI Analyst, and XLSX export — no subscription.',
   },
+  {
+    slug: 'vue-pivot-table-free',
+    title: 'Vue 3 Pivot Table Component — Free Tier Guide | TinyPivot',
+    description: 'Get a free Vue 3 pivot table with sorting, filtering, CSV export, and Sum aggregation. Upgrade once for advanced analytics — no recurring subscription.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']
