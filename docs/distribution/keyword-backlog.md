@@ -30,7 +30,7 @@ All keywords below are `queued` and ready for content generation.
 
 | Keyword | Intent | Suggested Slug | Status |
 |---------|--------|----------------|--------|
-| React pivot table without watermark | feature | react-pivot-table-no-watermark | queued |
+| React pivot table without watermark | feature | react-pivot-table-no-watermark | drafted |
 | Vue 3 pivot table component free | feature | vue-pivot-table-free | queued |
 | Data grid React CSV export | feature | react-datagrid-csv-export | queued |
 | Vue data grid filter sort search | feature | vue-datagrid-filter-sort-search | queued |
