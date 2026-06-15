@@ -38,6 +38,11 @@ export const marketingGuides = [
     title: 'TinyPivot vs TanStack Table | TinyPivot',
     description: 'Compare TinyPivot and TanStack Table for React or Vue: a batteries-included analytics component versus a flexible headless table foundation.',
   },
+  {
+    slug: 'react-pivot-table-no-watermark',
+    title: 'React Pivot Table Without Watermark | TinyPivot',
+    description: 'Remove the TinyPivot watermark in React with a one-time Pro license. Get full aggregations, charts, AI Analyst, and XLSX export — no subscription.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']

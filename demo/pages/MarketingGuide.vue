@@ -169,6 +169,46 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'react-pivot-table-no-watermark': {
+    title: 'React Pivot Table Without Watermark',
+    eyebrow: 'React Feature Guide',
+    description: 'Remove the TinyPivot watermark in React with a one-time Pro license. Get full aggregations, charts, AI Analyst, and XLSX export — no subscription.',
+    intro: 'TinyPivot ships a fully functional React pivot table in its free tier, including sorting, filtering, search, pagination, CSV export, calculated fields, and 22 themes. The free tier displays a small watermark. A one-time Pro license removes it permanently.',
+    sections: [
+      {
+        title: 'What the free tier includes',
+        paragraphs: ['The free tier of TinyPivot for React is a complete data grid with a built-in pivot workflow. It is not a crippled trial: sorting, filtering, search, pagination, column resize, calculated fields, and CSV export are all available at no cost.', 'The pivot table in the free tier supports Sum aggregation with row and column totals. The free tier also includes 22 built-in themes, so the component can match your application\'s design without writing custom CSS.'],
+        bullets: [
+          'Sort, filter, search, and paginate any array of records',
+          'Sum aggregation with row and column totals in the pivot view',
+          'Calculated fields for derived metrics such as margin or variance',
+          'CSV export and column resize included',
+          '22 built-in themes including dark and light variants',
+        ],
+      },
+      {
+        title: 'How the watermark works',
+        paragraphs: ['The free tier renders a small "TinyPivot" watermark inside the component. It does not obscure your data or prevent interaction. It is visible to your users and signals that the free edition is in use.', 'The watermark is removed as soon as a valid Pro license key is applied. No rebuild or code change is needed beyond supplying the key.'],
+      },
+      {
+        title: 'Remove the watermark with a Pro license',
+        paragraphs: ['TinyPivot Pro is a one-time perpetual purchase — not a subscription. Licenses are available at three tiers: Single ($49), Unlimited ($149), and Team ($399). A license covers both the React and Vue packages.'],
+        bullets: [
+          'Single ($49): one production domain, watermark removed',
+          'Unlimited ($149): unlimited domains, watermark removed',
+          'Team ($399): unlimited domains plus team seat coverage',
+        ],
+      },
+      {
+        title: 'What else Pro unlocks',
+        paragraphs: ['Removing the watermark is one benefit of Pro. The license also unlocks the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, and session persistence that remembers a user\'s pivot configuration across page loads.', 'Pro also includes an optional AI Data Analyst. It follows a bring-your-own-key model, so you configure the provider — OpenAI, Anthropic, or OpenRouter — and TinyPivot routes natural-language queries through your own API key.'],
+      },
+      {
+        title: 'Install TinyPivot in a React project',
+        paragraphs: ['TinyPivot for React ships as @smallwebco/tinypivot-react. The bundle is approximately 40 KB gzipped. Pass an array of flat objects to the DataGrid component and it derives columns automatically — no schema definition required for a basic integration.'],
+      },
+    ],
+  },
 }
 
 const guide = computed(() => guides[props.slug] ?? guides['ag-grid-alternatives'])
