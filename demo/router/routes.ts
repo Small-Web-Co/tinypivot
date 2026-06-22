@@ -48,6 +48,11 @@ export const marketingGuides = [
     title: 'Vue 3 Pivot Table Component — Free Tier Guide | TinyPivot',
     description: 'Get a free Vue 3 pivot table with sorting, filtering, CSV export, and Sum aggregation. Upgrade once for advanced analytics — no recurring subscription.',
   },
+  {
+    slug: 'react-datagrid-csv-export',
+    title: 'React Data Grid with CSV Export | TinyPivot',
+    description: 'React data grid with built-in CSV export. TinyPivot includes one-click export in the free tier alongside sorting, filtering, search, and pivot tables.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']

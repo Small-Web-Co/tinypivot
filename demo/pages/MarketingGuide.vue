@@ -244,6 +244,54 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'react-datagrid-csv-export': {
+    title: 'React Data Grid with CSV Export',
+    eyebrow: 'React Feature Guide',
+    description: 'React data grid with built-in CSV export. TinyPivot includes one-click export in the free tier alongside sorting, filtering, search, and pivot tables.',
+    intro: 'TinyPivot for React includes CSV export as a standard free-tier feature. Users can download the current grid view to a CSV file without additional configuration — filters and sort order applied in the grid are reflected in the output.',
+    sections: [
+      {
+        title: 'CSV export in the free tier',
+        paragraphs: [
+          'TinyPivot ships a CSV export button in the grid toolbar at no cost. No plugin, extra package, or configuration is required — install the component, pass your data, and the export action is immediately available to users.',
+          'The export reflects the current view. If the user has filtered the data or sorted a column, the downloaded CSV contains the filtered and sorted rows rather than the raw unfiltered dataset.',
+        ],
+      },
+      {
+        title: 'Install TinyPivot for React',
+        paragraphs: [
+          'Install @smallwebco/tinypivot-react, import the DataGrid component and its stylesheet, then pass an array of flat objects to the data prop. Column definitions are derived automatically from your object keys — a minimal integration requires no schema.',
+          'The React bundle is approximately 40 KB gzipped. TinyPivot has no mandatory runtime dependencies beyond React itself.',
+        ],
+      },
+      {
+        title: 'What else the free tier includes',
+        paragraphs: [
+          'CSV export is one part of a broader free analytics workflow. The free tier also includes sorting, filtering, full-text search, pagination, column resize, calculated fields, Sum aggregation with row and column totals, and 22 built-in themes.',
+        ],
+        bullets: [
+          'Sort, filter, and search any array of records',
+          'Sum aggregation with row and column totals in the pivot view',
+          'Calculated fields for derived metrics such as margin or growth rate',
+          'Column resize and 22 built-in themes including dark variants',
+        ],
+      },
+      {
+        title: 'Styled XLSX export with Pro',
+        paragraphs: [
+          'If your users need a formatted spreadsheet rather than a plain CSV, TinyPivot Pro includes styled XLSX export. The output preserves column formatting and is compatible with Excel, Google Sheets, and Numbers.',
+          'Pro is a one-time perpetual purchase — not a subscription. Licenses are available at three tiers: Single ($49), Unlimited ($149), and Team ($399). One license covers both the React and Vue packages.',
+        ],
+      },
+      {
+        title: 'When to upgrade from CSV to XLSX',
+        paragraphs: [
+          'CSV export works well for straightforward tabular data transfers. Styled XLSX export is the better choice when users expect formatted output, when column types matter for downstream processing, or when a polished download is part of the product experience.',
+          'Pro also unlocks advanced aggregations, a drag-and-drop chart builder, pivot drill-through, session persistence, and an optional BYOK AI Data Analyst — all from the same component.',
+        ],
+      },
+    ],
+  },
 }
 
 const guide = computed(() => guides[props.slug] ?? guides['ag-grid-alternatives'])
