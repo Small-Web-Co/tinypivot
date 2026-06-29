@@ -244,6 +244,60 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'vue-datagrid-filter-sort-search': {
+    title: 'Vue Data Grid with Filter, Sort, and Search',
+    eyebrow: 'Vue 3 Feature Guide',
+    description: 'Vue 3 data grid with built-in filtering, sorting, and full-text search. Free tier in TinyPivot — no configuration, no plugins, no subscription required.',
+    intro: 'TinyPivot for Vue 3 includes column filtering, multi-column sorting, and full-text search as standard free-tier features. Pass your data array to the DataGrid component and all three are immediately available in the grid toolbar — no extra packages, no plugin configuration.',
+    sections: [
+      {
+        title: 'Filtering, sorting, and search in the free tier',
+        paragraphs: [
+          'All three interactions are part of the core TinyPivot grid and available at no cost. Users can filter any column by value, sort ascending or descending, and run a full-text search across all columns simultaneously. The grid reflects the active filters and sort order in real time.',
+          'When a user exports the current view to CSV, the exported file contains only the filtered and sorted rows — not the original unfiltered dataset. This makes TinyPivot useful for ad-hoc analysis, not just display.',
+        ],
+        bullets: [
+          'Per-column filtering with value matching',
+          'Multi-column sort with ascending and descending controls',
+          'Full-text search across all visible columns',
+          'CSV export reflects active filters and sort order',
+          'Pagination keeps large datasets fast without any server-side setup',
+        ],
+      },
+      {
+        title: 'Install TinyPivot for Vue 3',
+        paragraphs: [
+          'Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then bind your array of flat records to the data prop. Column definitions are derived from your object keys automatically — a minimal integration does not require a schema.',
+          'The Vue package is approximately 50 KB gzipped and has no mandatory dependencies beyond Vue 3 itself. TypeScript types are included.',
+        ],
+      },
+      {
+        title: 'What else the free tier includes',
+        paragraphs: [
+          'Filtering, sorting, and search sit alongside a broader set of free features. The same install also gives users column resize, a pivot table with Sum aggregation and row and column totals, calculated fields for derived metrics, and 22 built-in themes.',
+        ],
+        bullets: [
+          'Pivot table with Sum aggregation and totals — free',
+          'Calculated fields for metrics like margin or growth rate',
+          'Column resize and 22 built-in themes including dark variants',
+          'CSV export of the filtered and sorted view',
+        ],
+      },
+      {
+        title: 'Nuxt 3 compatibility',
+        paragraphs: [
+          'TinyPivot renders client-side. In a Nuxt 3 project, wrap the DataGrid component in a <ClientOnly> tag to avoid SSR hydration issues. No additional configuration is required beyond that.',
+        ],
+      },
+      {
+        title: 'Upgrade to Pro for advanced analytics',
+        paragraphs: [
+          'When an analytics surface needs more than filtering and export, TinyPivot Pro adds the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, and session persistence.',
+          'Pro also includes an optional BYOK AI Data Analyst that lets users ask natural-language questions about the loaded data. You configure the provider — OpenAI, Anthropic, or OpenRouter — and queries run through your own API key. Pro is a one-time perpetual purchase: Single ($49), Unlimited ($149), or Team ($399). One license covers both @smallwebco/tinypivot-vue and @smallwebco/tinypivot-react.',
+        ],
+      },
+    ],
+  },
   'react-datagrid-csv-export': {
     title: 'React Data Grid with CSV Export',
     eyebrow: 'React Feature Guide',
