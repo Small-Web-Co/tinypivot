@@ -53,6 +53,11 @@ export const marketingGuides = [
     title: 'React Data Grid with CSV Export | TinyPivot',
     description: 'React data grid with built-in CSV export. TinyPivot includes one-click export in the free tier alongside sorting, filtering, search, and pivot tables.',
   },
+  {
+    slug: 'vue-datagrid-filter-sort-search',
+    title: 'Vue Data Grid with Filter, Sort, and Search | TinyPivot',
+    description: 'Vue 3 data grid with built-in filtering, sorting, and full-text search. Free tier in TinyPivot — no configuration, no plugins, no subscription required.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']
