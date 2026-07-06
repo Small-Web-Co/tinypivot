@@ -298,6 +298,55 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'react-datagrid-calculated-fields': {
+    title: 'React Data Grid with Calculated Fields',
+    eyebrow: 'React Feature Guide',
+    description: 'Add calculated fields to a React data grid for free with TinyPivot. Define derived metrics like margin or growth rate — no backend changes required.',
+    intro: 'TinyPivot for React includes calculated fields as a free-tier feature. You can define derived metrics directly in the grid — profit margin from revenue and cost, growth rate across two period columns, or any other arithmetic expression — without writing custom cell renderers or modifying your original data.',
+    sections: [
+      {
+        title: 'What calculated fields are',
+        paragraphs: [
+          'A calculated field is a virtual column whose value is derived from a formula applied to other columns in each row. Calculated fields appear alongside regular data columns and participate in sorting, filtering, and pivot aggregations.',
+          'In TinyPivot, calculated fields are defined using a simple expression syntax that supports standard arithmetic operations. The expressions run client-side, so no backend changes or server-side logic are required.',
+        ],
+      },
+      {
+        title: 'Calculated fields in the free tier',
+        paragraphs: [
+          'Calculated fields are included in TinyPivot\'s free tier. You can define as many calculated fields as your dataset requires at no cost. Common use cases include profit margin (revenue minus cost divided by revenue), period-over-period growth (current minus prior divided by prior), and conversion rate (conversions divided by impressions).',
+        ],
+        bullets: [
+          'Define derived metrics entirely in the grid — no backend changes',
+          'Expressions support arithmetic over any numeric column in the dataset',
+          'Calculated fields appear in the pivot table field selector',
+          'Participate in sorting and filtering alongside raw columns',
+          'No custom cell renderers or schema modifications required',
+        ],
+      },
+      {
+        title: 'How calculated fields work with pivot tables',
+        paragraphs: [
+          'Any calculated field you define appears as a selectable metric in the pivot table. Derived metrics — margin, growth rate, ratio — can be aggregated across any row and column grouping exactly like a raw numeric column.',
+          'In the free tier, the pivot table aggregates calculated fields using Sum. Upgrading to Pro adds Count, Count Distinct, Average, Min, Max, Median, and Standard Deviation over calculated and raw fields alike.',
+        ],
+      },
+      {
+        title: 'Install TinyPivot for React',
+        paragraphs: [
+          'Install @smallwebco/tinypivot-react, import the DataGrid component and its stylesheet, then pass an array of flat objects to the data prop. Calculated fields are configured through a prop that accepts a name and expression string — column keys are derived from your objects automatically.',
+          'The React bundle is approximately 40 KB gzipped with no mandatory dependencies beyond React itself. TypeScript types are included.',
+        ],
+      },
+      {
+        title: 'Upgrade to Pro for advanced analytics',
+        paragraphs: [
+          'The free tier with calculated fields covers many analytics dashboard needs. Pro adds the full aggregation set over all fields, a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, session persistence, and an optional BYOK AI Data Analyst that supports OpenAI, Anthropic, and OpenRouter.',
+          'Pro is a one-time perpetual purchase — not a subscription. Tiers: Single ($49), Unlimited ($149), Team ($399). One license covers both @smallwebco/tinypivot-react and @smallwebco/tinypivot-vue.',
+        ],
+      },
+    ],
+  },
   'react-datagrid-csv-export': {
     title: 'React Data Grid with CSV Export',
     eyebrow: 'React Feature Guide',
