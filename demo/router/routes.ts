@@ -63,6 +63,11 @@ export const marketingGuides = [
     title: 'React Data Grid with Calculated Fields | TinyPivot',
     description: 'Add calculated fields to a React data grid for free with TinyPivot. Define derived metrics like margin or growth rate — no backend changes required.',
   },
+  {
+    slug: 'vue-datagrid-column-resize',
+    title: 'Vue 3 Data Grid with Column Resize | TinyPivot',
+    description: 'Vue 3 data grid with built-in column resize. TinyPivot includes drag-to-resize columns in the free tier alongside sorting, filtering, search, and pivot tables.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']
