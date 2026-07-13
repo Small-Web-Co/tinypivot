@@ -347,6 +347,59 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'vue-datagrid-column-resize': {
+    title: 'Vue 3 Data Grid with Column Resize',
+    eyebrow: 'Vue 3 Feature Guide',
+    description: 'Vue 3 data grid with built-in column resize. TinyPivot includes drag-to-resize columns in the free tier alongside sorting, filtering, search, and pivot tables.',
+    intro: 'TinyPivot for Vue 3 includes drag-to-resize columns as a standard free-tier feature. Pass your data to the DataGrid component and every column header is immediately resizable — no configuration, no plugin, no extra package required.',
+    sections: [
+      {
+        title: 'Column resize in the free tier',
+        paragraphs: [
+          'Column resize is part of the core TinyPivot grid and available at no cost. Users drag the right edge of any column header to widen or narrow that column. The resized layout is preserved while the user stays on the page.',
+          'Column resize works alongside all other free-tier interactions. A user can resize a column, sort it, filter it, and export the result to CSV in a single session — all without any additional setup.',
+        ],
+        bullets: [
+          'Drag-to-resize on every column header — no configuration required',
+          'Works alongside sorting, filtering, and full-text search',
+          'Column widths adjust independently without affecting other columns',
+          'Export reflects the data view, not the column widths',
+        ],
+      },
+      {
+        title: 'Install TinyPivot for Vue 3',
+        paragraphs: [
+          'Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then bind your array of flat records to the data prop. Column definitions — including their resize handles — are derived from your object keys automatically.',
+          'The Vue package is approximately 50 KB gzipped and has no mandatory dependencies beyond Vue 3 itself. TypeScript types are included.',
+        ],
+      },
+      {
+        title: 'What else the free tier includes',
+        paragraphs: [
+          'Column resize is one part of a broader set of free features. The same install also provides per-column filtering, multi-column sort, full-text search, pagination, CSV export, a pivot table with Sum aggregation and row and column totals, calculated fields, and 22 built-in themes.',
+        ],
+        bullets: [
+          'Sort, filter, search, and paginate any array of records',
+          'Sum aggregation with row and column totals in the pivot view',
+          'Calculated fields for derived metrics such as margin or growth rate',
+          'CSV export and 22 built-in themes including dark variants',
+        ],
+      },
+      {
+        title: 'Nuxt 3 compatibility',
+        paragraphs: [
+          'TinyPivot renders client-side. In a Nuxt 3 project, wrap the DataGrid in a <ClientOnly> tag to avoid SSR hydration issues. Column resize and all other interactions work as expected once the component is mounted on the client.',
+        ],
+      },
+      {
+        title: 'Upgrade to Pro for advanced analytics',
+        paragraphs: [
+          'When a dashboard needs more than resizable columns and export, TinyPivot Pro adds the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, and session persistence that remembers column widths and pivot configuration across page loads.',
+          'Pro also includes an optional BYOK AI Data Analyst. You configure the provider — OpenAI, Anthropic, or OpenRouter — and natural-language queries run through your own API key. Pro is a one-time perpetual purchase: Single ($49), Unlimited ($149), or Team ($399). One license covers both @smallwebco/tinypivot-vue and @smallwebco/tinypivot-react.',
+        ],
+      },
+    ],
+  },
   'react-datagrid-csv-export': {
     title: 'React Data Grid with CSV Export',
     eyebrow: 'React Feature Guide',
