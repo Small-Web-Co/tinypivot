@@ -63,6 +63,11 @@ export const marketingGuides = [
     title: 'React Data Grid with Calculated Fields | TinyPivot',
     description: 'Add calculated fields to a React data grid for free with TinyPivot. Define derived metrics like margin or growth rate — no backend changes required.',
   },
+  {
+    slug: 'nextjs-datagrid-pivot-table',
+    title: 'Next.js Data Grid with Pivot Table | TinyPivot',
+    description: 'Add a data grid and pivot table to a Next.js app with TinyPivot React. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']
