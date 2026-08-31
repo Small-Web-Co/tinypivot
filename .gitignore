@@ -55,7 +55,8 @@ scripts/verify-license.mjs
 
 README_PERSONAL.md
 
-.claude
+.claude/*
+!.claude/settings.json
 
 CLAUDE.md
 AGENTS.md

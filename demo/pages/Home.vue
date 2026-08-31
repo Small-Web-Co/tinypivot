@@ -1134,7 +1134,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
           </blockquote>
           <div class="testimonial-attribution">
             <div class="testimonial-author">
-              Matias
+              Matias Nombarasco
             </div>
             <div class="testimonial-role">
               Ozone Gliders LTD
