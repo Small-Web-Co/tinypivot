@@ -13,7 +13,7 @@ import type {
   PivotLayout,
   Theme,
 } from '@smallwebco/tinypivot-core'
-import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
+import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
@@ -268,7 +268,15 @@ const {
   autoSuggestConfig: _autoSuggestConfig,
   collapsedPaths: pivotCollapsedPaths,
   toggleCollapsedPath,
+  fieldFilters: pivotFieldFilters,
+  activeFieldFilters: pivotActiveFieldFilters,
+  setFieldFilter: setPivotFieldFilter,
 } = usePivotTable(filteredDataForPivot, computed(() => props.enableDrillDown ?? true))
+
+// Unique values per axis field — powers the axis filter UI in PivotConfig
+function getPivotFieldValues(field: string): string[] {
+  return getFieldUniqueValues(filteredDataForPivot.value, field)
+}
 
 // Filtered data based on global search
 const searchFilteredData = computed(() => {
@@ -659,6 +667,7 @@ function handleDrillThroughCell(payload: { rowPath: string[], columnPath: string
     valueFields: pivotValueFields.value,
     showRowTotals: pivotShowRowTotals.value,
     showColumnTotals: pivotShowColumnTotals.value,
+    fieldFilters: pivotActiveFieldFilters.value,
   }
 
   const result = getDrillThroughRows(
@@ -1471,6 +1480,9 @@ function handleContainerClick(event: MouseEvent) {
             :show-column-totals="pivotShowColumnTotals"
             :calculated-fields="calculatedFields"
             :theme="currentTheme"
+            :field-filters="pivotFieldFilters"
+            :get-field-values="getPivotFieldValues"
+            @update-field-filter="setPivotFieldFilter"
             @update:show-row-totals="pivotShowRowTotals = $event"
             @update:show-column-totals="pivotShowColumnTotals = $event"
             @clear-config="clearPivotConfig"

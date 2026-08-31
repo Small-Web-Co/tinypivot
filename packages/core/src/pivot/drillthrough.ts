@@ -5,7 +5,7 @@
  * No per-cell row storage — computed from the original data on demand.
  */
 import type { DrillThroughResult, PivotConfig } from '../types'
-import { aggregate, formatAggregatedValue } from './index'
+import { aggregate, applyFieldFilters, formatAggregatedValue } from './index'
 
 /**
  * Stringify a field value the same way computePivotResult does via makeKey:
@@ -44,8 +44,12 @@ export function getDrillThroughRows(
 ): DrillThroughResult {
   const { rowFields, columnFields, valueFields } = config
 
+  // Apply the same axis value filters as computePivotResult so drill-through
+  // returns exactly the rows the pivot cell aggregated
+  const filteredData = applyFieldFilters(data, config.fieldFilters)
+
   // Filter rows to only those matching the provided path prefixes
-  const rows = data.filter((row) => {
+  const rows = filteredData.filter((row) => {
     for (let i = 0; i < rowPath.length; i++) {
       if (stringifyFieldValue(row[rowFields[i]]) !== rowPath[i])
         return false

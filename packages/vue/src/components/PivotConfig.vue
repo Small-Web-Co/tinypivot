@@ -32,6 +32,10 @@ const props = defineProps<{
   showColumnTotals: boolean
   calculatedFields?: CalculatedField[]
   theme?: string
+  /** Axis value filters: field → excluded values */
+  fieldFilters?: Record<string, string[]>
+  /** Returns the unique values of a field — enables the axis filter UI */
+  getFieldValues?: (field: string) => string[]
 }>()
 
 const emit = defineEmits<{
@@ -50,6 +54,7 @@ const emit = defineEmits<{
   (e: 'addCalculatedField', field: CalculatedField): void
   (e: 'removeCalculatedField', id: string): void
   (e: 'updateCalculatedField', field: CalculatedField): void
+  (e: 'updateFieldFilter', field: string, excludedValues: string[]): void
 }>()
 
 const { canUseAdvancedAggregations } = useLicense()
@@ -218,6 +223,67 @@ function toggleRowColumn(field: string, currentAssignment: 'row' | 'column') {
   }
 }
 
+// Axis value filter dropdown state
+const openFilterField = ref<string | null>(null)
+const filterValueSearch = ref('')
+
+const openFilterValues = computed(() => {
+  if (!openFilterField.value || !props.getFieldValues)
+    return []
+  return props.getFieldValues(openFilterField.value)
+})
+
+const openFilterExcluded = computed(() => {
+  if (!openFilterField.value)
+    return new Set<string>()
+  return new Set(props.fieldFilters?.[openFilterField.value] ?? [])
+})
+
+const filteredFilterValues = computed(() => {
+  const search = filterValueSearch.value.toLowerCase().trim()
+  if (!search)
+    return openFilterValues.value
+  return openFilterValues.value.filter(v => v.toLowerCase().includes(search))
+})
+
+const openFilterSelectedCount = computed(() =>
+  openFilterValues.value.filter(v => !openFilterExcluded.value.has(v)).length,
+)
+
+function canFilterField(field: { field: string, assignedTo: string, isCalculated: boolean }): boolean {
+  return !!props.getFieldValues
+    && !field.isCalculated
+    && (field.assignedTo === 'row' || field.assignedTo === 'column')
+}
+
+function hasActiveFilter(field: string): boolean {
+  return (props.fieldFilters?.[field]?.length ?? 0) > 0
+}
+
+function toggleFilterDropdown(field: string) {
+  openFilterField.value = openFilterField.value === field ? null : field
+  filterValueSearch.value = ''
+}
+
+function toggleFilterValue(field: string, value: string) {
+  const excluded = new Set(props.fieldFilters?.[field] ?? [])
+  if (excluded.has(value)) {
+    excluded.delete(value)
+  }
+  else {
+    excluded.add(value)
+  }
+  emit('updateFieldFilter', field, Array.from(excluded))
+}
+
+function selectAllFilterValues(field: string) {
+  emit('updateFieldFilter', field, [])
+}
+
+function deselectAllFilterValues(field: string) {
+  emit('updateFieldFilter', field, [...openFilterValues.value])
+}
+
 function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valueConfig?: PivotValueField) {
   if (assignedTo === 'row') {
     emit('removeRowField', field)
@@ -264,61 +330,112 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
         Active
       </div>
       <div class="vpg-assigned-list">
-        <div
-          v-for="field in assignedFields"
-          :key="field.field"
-          class="vpg-assigned-item"
-          :class="[`vpg-type-${field.assignedTo}`, { 'vpg-type-calc': field.isCalculated }]"
-          :title="field.isCalculated ? field.calcFormula : field.field"
-          draggable="true"
-          @dragstart="handleDragStart(field.field, $event)"
-          @dragend="handleDragEnd"
-        >
-          <div class="vpg-item-main">
-            <span class="vpg-item-badge" :class="[field.assignedTo, { calc: field.isCalculated }]">
-              {{ field.isCalculated ? 'ƒ' : (field.assignedTo === 'row' ? 'R' : field.assignedTo === 'column' ? 'C' : getAggregationSymbol(field.valueConfig?.aggregation || 'sum')) }}
-            </span>
-            <span class="vpg-item-name">{{ getFieldDisplayName(field) }}</span>
-          </div>
+        <template v-for="field in assignedFields" :key="field.field">
+          <div
+            class="vpg-assigned-item"
+            :class="[`vpg-type-${field.assignedTo}`, { 'vpg-type-calc': field.isCalculated }]"
+            :title="field.isCalculated ? field.calcFormula : field.field"
+            draggable="true"
+            @dragstart="handleDragStart(field.field, $event)"
+            @dragend="handleDragEnd"
+          >
+            <div class="vpg-item-main">
+              <span class="vpg-item-badge" :class="[field.assignedTo, { calc: field.isCalculated }]">
+                {{ field.isCalculated ? 'ƒ' : (field.assignedTo === 'row' ? 'R' : field.assignedTo === 'column' ? 'C' : getAggregationSymbol(field.valueConfig?.aggregation || 'sum')) }}
+              </span>
+              <span class="vpg-item-name">{{ getFieldDisplayName(field) }}</span>
+            </div>
 
-          <div class="vpg-item-actions">
-            <button
-              v-if="field.assignedTo === 'row' || field.assignedTo === 'column'"
-              class="vpg-toggle-btn"
-              :title="field.assignedTo === 'row' ? 'Move to Columns' : 'Move to Rows'"
-              @click.stop="toggleRowColumn(field.field, field.assignedTo)"
-            >
-              <svg class="vpg-icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-            </button>
-
-            <select
-              v-if="field.assignedTo === 'value' && field.valueConfig"
-              class="vpg-agg-select"
-              :value="field.valueConfig.aggregation"
-              @change="handleAggregationChange(field.field, field.valueConfig!.aggregation, ($event.target as HTMLSelectElement).value as AggregationFunction)"
-              @click.stop
-            >
-              <option
-                v-for="agg in aggregationOptions"
-                :key="agg.value"
-                :value="agg.value"
-                :disabled="aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations"
+            <div class="vpg-item-actions">
+              <button
+                v-if="canFilterField(field)"
+                class="vpg-filter-btn"
+                :class="{ 'vpg-filter-btn-active': hasActiveFilter(field.field) || openFilterField === field.field }"
+                :title="hasActiveFilter(field.field) ? `Filter items (${fieldFilters?.[field.field]?.length} hidden)` : 'Filter items'"
+                @click.stop="toggleFilterDropdown(field.field)"
               >
-                {{ agg.symbol }} {{ agg.label }}{{ aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations ? ' (Pro)' : '' }}
-              </option>
-            </select>
+                <svg class="vpg-icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
+                </svg>
+              </button>
 
-            <button
-              class="vpg-remove-btn"
-              title="Remove"
-              @click.stop="removeField(field.field, field.assignedTo, field.valueConfig)"
-            >
-              ×
-            </button>
+              <button
+                v-if="field.assignedTo === 'row' || field.assignedTo === 'column'"
+                class="vpg-toggle-btn"
+                :title="field.assignedTo === 'row' ? 'Move to Columns' : 'Move to Rows'"
+                @click.stop="toggleRowColumn(field.field, field.assignedTo)"
+              >
+                <svg class="vpg-icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </button>
+
+              <select
+                v-if="field.assignedTo === 'value' && field.valueConfig"
+                class="vpg-agg-select"
+                :value="field.valueConfig.aggregation"
+                @change="handleAggregationChange(field.field, field.valueConfig!.aggregation, ($event.target as HTMLSelectElement).value as AggregationFunction)"
+                @click.stop
+              >
+                <option
+                  v-for="agg in aggregationOptions"
+                  :key="agg.value"
+                  :value="agg.value"
+                  :disabled="aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations"
+                >
+                  {{ agg.symbol }} {{ agg.label }}{{ aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations ? ' (Pro)' : '' }}
+                </option>
+              </select>
+
+              <button
+                class="vpg-remove-btn"
+                title="Remove"
+                @click.stop="removeField(field.field, field.assignedTo, field.valueConfig)"
+              >
+                ×
+              </button>
+            </div>
           </div>
-        </div>
+
+          <!-- Axis value filter panel -->
+          <div v-if="openFilterField === field.field && canFilterField(field)" class="vpg-filter-panel">
+            <div class="vpg-filter-panel-header">
+              <span class="vpg-filter-panel-count">{{ openFilterSelectedCount }} of {{ openFilterValues.length }} shown</span>
+              <div class="vpg-filter-quick-actions">
+                <button class="vpg-filter-quick-btn" @click="selectAllFilterValues(field.field)">
+                  All
+                </button>
+                <button class="vpg-filter-quick-btn" @click="deselectAllFilterValues(field.field)">
+                  None
+                </button>
+              </div>
+            </div>
+            <input
+              v-if="openFilterValues.length > 8"
+              v-model="filterValueSearch"
+              type="text"
+              class="vpg-filter-search"
+              placeholder="Search values..."
+            >
+            <div class="vpg-filter-value-list">
+              <label
+                v-for="value in filteredFilterValues"
+                :key="value"
+                class="vpg-filter-value-item"
+              >
+                <input
+                  type="checkbox"
+                  :checked="!openFilterExcluded.has(value)"
+                  @change="toggleFilterValue(field.field, value)"
+                >
+                <span class="vpg-filter-value-label" :title="value">{{ value }}</span>
+              </label>
+              <div v-if="filteredFilterValues.length === 0" class="vpg-empty-hint">
+                No matching values
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -632,6 +749,134 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
   background: var(--vpg-surface-elevated);
   color: var(--vpg-text-secondary);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.vpg-filter-btn {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  color: var(--vpg-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-filter-btn:hover {
+  background: var(--vpg-surface-elevated);
+  color: var(--vpg-text-secondary);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.vpg-filter-btn-active,
+.vpg-filter-btn-active:hover {
+  color: var(--vpg-accent);
+  background: var(--vpg-surface-elevated);
+}
+
+.vpg-filter-panel {
+  margin: 0 0 0.25rem 0.75rem;
+  padding: 0.375rem;
+  border: 1px solid var(--vpg-border-default);
+  border-radius: 0.375rem;
+  background: var(--vpg-surface-elevated);
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.vpg-filter-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.vpg-filter-panel-count {
+  font-size: 0.625rem;
+  color: var(--vpg-text-muted);
+}
+
+.vpg-filter-quick-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.vpg-filter-quick-btn {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  border-radius: 0.25rem;
+  background: transparent;
+  border: 1px solid var(--vpg-border-default);
+  color: var(--vpg-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vpg-filter-quick-btn:hover {
+  border-color: var(--vpg-border-strong);
+  background: var(--vpg-surface-panel);
+}
+
+.vpg-filter-search {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  border: 1px solid var(--vpg-border-default);
+  border-radius: 0.25rem;
+  background: var(--vpg-surface-bg);
+  color: var(--vpg-text-primary);
+}
+
+.vpg-filter-search::placeholder {
+  color: var(--vpg-text-muted);
+}
+
+.vpg-filter-search:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px #6366f1;
+  border-color: #6366f1;
+}
+
+.vpg-filter-value-list {
+  max-height: 10rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.vpg-filter-value-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--vpg-text-secondary);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vpg-filter-value-item:hover {
+  background: var(--vpg-surface-hover);
+}
+
+.vpg-filter-value-item input {
+  width: 0.75rem;
+  height: 0.75rem;
+  accent-color: var(--vpg-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vpg-filter-value-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vpg-agg-select {
@@ -964,6 +1209,24 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
 
 .vpg-theme-dark .vpg-pivot-config .vpg-agg-select {
   background: var(--vpg-surface-bg);
+}
+
+.vpg-theme-dark .vpg-pivot-config .vpg-filter-panel {
+  background: var(--vpg-surface-bg);
+}
+
+.vpg-theme-dark .vpg-pivot-config .vpg-filter-btn:hover {
+  background: var(--vpg-surface-hover);
+  color: #cbd5e1;
+}
+
+.vpg-theme-dark .vpg-pivot-config .vpg-filter-btn-active,
+.vpg-theme-dark .vpg-pivot-config .vpg-filter-btn-active:hover {
+  color: #a5b4fc;
+}
+
+.vpg-theme-dark .vpg-pivot-config .vpg-filter-search {
+  background: var(--vpg-surface-panel);
 }
 
 .vpg-theme-dark .vpg-pivot-config .vpg-remove-btn:hover {

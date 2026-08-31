@@ -98,6 +98,8 @@ export {
   addCalculatedField,
   aggregate,
   AGGREGATION_OPTIONS,
+  // Axis value filters
+  applyFieldFilters,
   CALCULATED_FIELD_PRESETS,
   computeAvailableFields,
   computePivotResult,
@@ -112,6 +114,7 @@ export {
   getAggregationSymbol,
   // Drill-Through
   getDrillThroughRows,
+  getFieldUniqueValues,
   getUnassignedFields,
   isConfigValidForFields,
   isPivotConfigured,
@@ -126,6 +129,7 @@ export {
   // Calculated Fields Storage
   saveCalculatedFields,
   savePivotConfig,
+  stringifyPivotValue,
   validateFormula,
   validateSimpleFormula,
 } from './pivot'

@@ -46,6 +46,11 @@ interface PivotConfigProps {
   onRemoveCalculatedField?: (id: string) => void
   onUpdateCalculatedField?: (field: CalculatedField) => void
   theme?: string
+  /** Axis value filters: field → excluded values */
+  fieldFilters?: Record<string, string[]>
+  /** Returns the unique values of a field — enables the axis filter UI */
+  getFieldValues?: (field: string) => string[]
+  onUpdateFieldFilter?: (field: string, excludedValues: string[]) => void
 }
 
 function getFieldIcon(type: FieldStats['type'], isCalculated?: boolean): string {
@@ -86,10 +91,15 @@ export function PivotConfig({
   onRemoveCalculatedField,
   onUpdateCalculatedField,
   theme,
+  fieldFilters,
+  getFieldValues,
+  onUpdateFieldFilter,
 }: PivotConfigProps) {
   const [fieldSearch, setFieldSearch] = useState('')
   const [showCalcModal, setShowCalcModal] = useState(false)
   const [editingCalcField, setEditingCalcField] = useState<CalculatedField | null>(null)
+  const [openFilterField, setOpenFilterField] = useState<string | null>(null)
+  const [filterValueSearch, setFilterValueSearch] = useState('')
   const { canUseAdvancedAggregations } = useLicense()
 
   // Check if an aggregation is available based on license
@@ -226,6 +236,65 @@ export function PivotConfig({
     [onRemoveRowField, onRemoveColumnField, onRemoveValueField],
   )
 
+  // Axis value filter helpers
+  const openFilterValues = useMemo(() => {
+    if (!openFilterField || !getFieldValues)
+      return []
+    return getFieldValues(openFilterField)
+  }, [openFilterField, getFieldValues])
+
+  const openFilterExcluded = useMemo(() => {
+    if (!openFilterField)
+      return new Set<string>()
+    return new Set(fieldFilters?.[openFilterField] ?? [])
+  }, [openFilterField, fieldFilters])
+
+  const filteredFilterValues = useMemo(() => {
+    const search = filterValueSearch.toLowerCase().trim()
+    if (!search)
+      return openFilterValues
+    return openFilterValues.filter(v => v.toLowerCase().includes(search))
+  }, [openFilterValues, filterValueSearch])
+
+  const openFilterSelectedCount = useMemo(
+    () => openFilterValues.filter(v => !openFilterExcluded.has(v)).length,
+    [openFilterValues, openFilterExcluded],
+  )
+
+  const canFilterField = useCallback(
+    (field: { assignedTo: string, isCalculated?: boolean }): boolean => {
+      return !!getFieldValues
+        && !!onUpdateFieldFilter
+        && !field.isCalculated
+        && (field.assignedTo === 'row' || field.assignedTo === 'column')
+    },
+    [getFieldValues, onUpdateFieldFilter],
+  )
+
+  const hasActiveFilter = useCallback(
+    (field: string): boolean => (fieldFilters?.[field]?.length ?? 0) > 0,
+    [fieldFilters],
+  )
+
+  const toggleFilterDropdown = useCallback((field: string) => {
+    setOpenFilterField(prev => (prev === field ? null : field))
+    setFilterValueSearch('')
+  }, [])
+
+  const toggleFilterValue = useCallback(
+    (field: string, value: string) => {
+      const excluded = new Set(fieldFilters?.[field] ?? [])
+      if (excluded.has(value)) {
+        excluded.delete(value)
+      }
+      else {
+        excluded.add(value)
+      }
+      onUpdateFieldFilter?.(field, Array.from(excluded))
+    },
+    [fieldFilters, onUpdateFieldFilter],
+  )
+
   // Handle totals toggle (toggle both row and column together)
   const handleTotalsToggle = useCallback((checked: boolean) => {
     onShowRowTotalsChange(checked)
@@ -295,94 +364,167 @@ export function PivotConfig({
           <div className="vpg-section-label">Active</div>
           <div className="vpg-assigned-list">
             {assignedFields.map(field => (
-              <div
-                key={field.field}
-                className={`vpg-assigned-item vpg-type-${field.assignedTo}${field.isCalculated ? ' vpg-type-calc' : ''}`}
-                title={field.isCalculated ? field.calcFormula : field.field}
-                draggable
-                onDragStart={e => handleDragStart(field.field, e)}
-                onDragEnd={onDragEnd}
-              >
-                <div className="vpg-item-main">
-                  <span className={`vpg-item-badge ${field.assignedTo}${field.isCalculated ? ' calc' : ''}`}>
-                    {field.isCalculated
-                      ? 'ƒ'
-                      : field.assignedTo === 'row'
-                        ? 'R'
-                        : field.assignedTo === 'column'
-                          ? 'C'
-                          : getAggregationSymbol(field.valueConfig?.aggregation || 'sum')}
-                  </span>
-                  <span className="vpg-item-name">{getFieldDisplayName(field)}</span>
-                </div>
+              <React.Fragment key={field.field}>
+                <div
+                  className={`vpg-assigned-item vpg-type-${field.assignedTo}${field.isCalculated ? ' vpg-type-calc' : ''}`}
+                  title={field.isCalculated ? field.calcFormula : field.field}
+                  draggable
+                  onDragStart={e => handleDragStart(field.field, e)}
+                  onDragEnd={onDragEnd}
+                >
+                  <div className="vpg-item-main">
+                    <span className={`vpg-item-badge ${field.assignedTo}${field.isCalculated ? ' calc' : ''}`}>
+                      {field.isCalculated
+                        ? 'ƒ'
+                        : field.assignedTo === 'row'
+                          ? 'R'
+                          : field.assignedTo === 'column'
+                            ? 'C'
+                            : getAggregationSymbol(field.valueConfig?.aggregation || 'sum')}
+                    </span>
+                    <span className="vpg-item-name">{getFieldDisplayName(field)}</span>
+                  </div>
 
-                <div className="vpg-item-actions">
-                  {(field.assignedTo === 'row' || field.assignedTo === 'column') && (
+                  <div className="vpg-item-actions">
+                    {canFilterField(field) && (
+                      <button
+                        className={`vpg-filter-btn${hasActiveFilter(field.field) || openFilterField === field.field ? ' vpg-filter-btn-active' : ''}`}
+                        title={hasActiveFilter(field.field) ? `Filter items (${fieldFilters?.[field.field]?.length} hidden)` : 'Filter items'}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleFilterDropdown(field.field)
+                        }}
+                      >
+                        <svg className="vpg-icon-xs" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 4h18l-7 8v6l-4 2v-8L3 4z"
+                          />
+                        </svg>
+                      </button>
+                    )}
+
+                    {(field.assignedTo === 'row' || field.assignedTo === 'column') && (
+                      <button
+                        className="vpg-toggle-btn"
+                        title={field.assignedTo === 'row' ? 'Move to Columns' : 'Move to Rows'}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleRowColumn(field.field, field.assignedTo as 'row' | 'column')
+                        }}
+                      >
+                        <svg
+                          className="vpg-icon-xs"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                          />
+                        </svg>
+                      </button>
+                    )}
+
+                    {field.assignedTo === 'value' && field.valueConfig && (
+                      <select
+                        className="vpg-agg-select"
+                        value={field.valueConfig.aggregation}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleAggregationChange(
+                            field.field,
+                            field.valueConfig!.aggregation,
+                            e.target.value as AggregationFunction,
+                          )
+                        }}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {AGGREGATION_OPTIONS.map(agg => (
+                          <option
+                            key={agg.value}
+                            value={agg.value}
+                            disabled={aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations}
+                          >
+                            {agg.symbol}
+                            {' '}
+                            {agg.label}
+                            {aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations ? ' (Pro)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
                     <button
-                      className="vpg-toggle-btn"
-                      title={field.assignedTo === 'row' ? 'Move to Columns' : 'Move to Rows'}
+                      className="vpg-remove-btn"
+                      title="Remove"
                       onClick={(e) => {
                         e.stopPropagation()
-                        toggleRowColumn(field.field, field.assignedTo as 'row' | 'column')
+                        removeField(field.field, field.assignedTo, field.valueConfig)
                       }}
                     >
-                      <svg
-                        className="vpg-icon-xs"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                        />
-                      </svg>
+                      ×
                     </button>
-                  )}
-
-                  {field.assignedTo === 'value' && field.valueConfig && (
-                    <select
-                      className="vpg-agg-select"
-                      value={field.valueConfig.aggregation}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        handleAggregationChange(
-                          field.field,
-                          field.valueConfig!.aggregation,
-                          e.target.value as AggregationFunction,
-                        )
-                      }}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {AGGREGATION_OPTIONS.map(agg => (
-                        <option
-                          key={agg.value}
-                          value={agg.value}
-                          disabled={aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations}
-                        >
-                          {agg.symbol}
-                          {' '}
-                          {agg.label}
-                          {aggregationRequiresPro(agg.value) && !canUseAdvancedAggregations ? ' (Pro)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                  <button
-                    className="vpg-remove-btn"
-                    title="Remove"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeField(field.field, field.assignedTo, field.valueConfig)
-                    }}
-                  >
-                    ×
-                  </button>
+                  </div>
                 </div>
-              </div>
+
+                {/* Axis value filter panel */}
+                {openFilterField === field.field && canFilterField(field) && (
+                  <div className="vpg-filter-panel">
+                    <div className="vpg-filter-panel-header">
+                      <span className="vpg-filter-panel-count">
+                        {openFilterSelectedCount}
+                        {' of '}
+                        {openFilterValues.length}
+                        {' shown'}
+                      </span>
+                      <div className="vpg-filter-quick-actions">
+                        <button
+                          className="vpg-filter-quick-btn"
+                          onClick={() => onUpdateFieldFilter?.(field.field, [])}
+                        >
+                          All
+                        </button>
+                        <button
+                          className="vpg-filter-quick-btn"
+                          onClick={() => onUpdateFieldFilter?.(field.field, [...openFilterValues])}
+                        >
+                          None
+                        </button>
+                      </div>
+                    </div>
+                    {openFilterValues.length > 8 && (
+                      <input
+                        type="text"
+                        value={filterValueSearch}
+                        onChange={e => setFilterValueSearch(e.target.value)}
+                        placeholder="Search values..."
+                        className="vpg-filter-search"
+                      />
+                    )}
+                    <div className="vpg-filter-value-list">
+                      {filteredFilterValues.map(value => (
+                        <label key={value} className="vpg-filter-value-item">
+                          <input
+                            type="checkbox"
+                            checked={!openFilterExcluded.has(value)}
+                            onChange={() => toggleFilterValue(field.field, value)}
+                          />
+                          <span className="vpg-filter-value-label" title={value}>{value}</span>
+                        </label>
+                      ))}
+                      {filteredFilterValues.length === 0 && (
+                        <div className="vpg-empty-hint">No matching values</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
         </div>

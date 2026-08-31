@@ -38,11 +38,13 @@ interface UsePivotTableReturn {
   showColumnTotals: boolean
   calculatedFields: CalculatedField[]
   collapsedPaths: Set<string>
+  fieldFilters: Record<string, string[]>
 
   // Computed
   availableFields: FieldStats[]
   unassignedFields: FieldStats[]
   isConfigured: boolean
+  activeFieldFilters: Record<string, string[]>
   pivotResult: PivotResult | null
 
   // Actions
@@ -66,6 +68,8 @@ interface UsePivotTableReturn {
   addCalculatedField: (field: CalculatedField) => void
   removeCalculatedField: (id: string) => void
   toggleCollapsedPath: (key: string, altKey: boolean, rowFields: string[], currentPivotResult: PivotResult | null) => Set<string>
+  setFieldFilter: (field: string, excludedValues: string[]) => void
+  clearFieldFilter: (field: string) => void
 }
 
 /**
@@ -83,6 +87,10 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
   const [calculatedFields, setCalculatedFields] = useState<CalculatedField[]>(() => loadCalculatedFields())
   const [currentStorageKey, setCurrentStorageKey] = useState<string | null>(null)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
+  // Axis value filters: field → excluded values. Filters are kept for
+  // unassigned fields too (so re-adding a field restores its filter), but
+  // only filters on current row/column fields are applied to the pivot.
+  const [fieldFilters, setFieldFilters] = useState<Record<string, string[]>>({})
 
   // Compute available fields from data
   const availableFields = useMemo((): FieldStats[] => {
@@ -105,6 +113,17 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
     })
   }, [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals])
 
+  // Filters restricted to fields currently on an axis — the only ones applied
+  const activeFieldFilters = useMemo((): Record<string, string[]> => {
+    const active: Record<string, string[]> = {}
+    for (const [field, excluded] of Object.entries(fieldFilters)) {
+      if (excluded.length > 0 && (rowFields.includes(field) || columnFields.includes(field))) {
+        active[field] = excluded
+      }
+    }
+    return active
+  }, [fieldFilters, rowFields, columnFields])
+
   // Build pivot result
   const pivotResult = useMemo((): PivotResult | null => {
     if (!isConfigured)
@@ -119,8 +138,9 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
       showRowTotals,
       showColumnTotals,
       calculatedFields,
+      fieldFilters: activeFieldFilters,
     }, { collapsedPaths: enableDrillDown ? collapsedPaths : new Set<string>() })
-  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields, collapsedPaths, enableDrillDown])
+  }, [data, isConfigured, canUsePivot, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields, activeFieldFilters, collapsedPaths, enableDrillDown])
 
   // Load/save config from storage
   useEffect(() => {
@@ -143,6 +163,7 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
         if (savedConfig.calculatedFields) {
           setCalculatedFields(savedConfig.calculatedFields)
         }
+        setFieldFilters(savedConfig.fieldFilters ?? {})
       }
       else {
         // Validate current config
@@ -190,9 +211,10 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
       showRowTotals,
       showColumnTotals,
       calculatedFields,
+      fieldFilters,
     }
     savePivotConfig(currentStorageKey, config)
-  }, [currentStorageKey, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields])
+  }, [currentStorageKey, rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields, fieldFilters])
 
   // Save collapsedPaths separately when it or the storage key changes
   useEffect(() => {
@@ -285,7 +307,26 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
     setRowFieldsState([])
     setColumnFieldsState([])
     setValueFields([])
+    setFieldFilters({})
   }, [])
+
+  // Axis value filter management
+  const setFieldFilter = useCallback((field: string, excludedValues: string[]) => {
+    setFieldFilters((prev) => {
+      const next = { ...prev }
+      if (excludedValues.length === 0) {
+        delete next[field]
+      }
+      else {
+        next[field] = [...excludedValues]
+      }
+      return next
+    })
+  }, [])
+
+  const clearFieldFilter = useCallback((field: string) => {
+    setFieldFilter(field, [])
+  }, [setFieldFilter])
 
   const autoSuggestConfig = useCallback(() => {
     if (!requirePro('Pivot Table - Auto Suggest'))
@@ -398,11 +439,13 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
     showColumnTotals,
     calculatedFields,
     collapsedPaths,
+    fieldFilters,
 
     // Computed
     availableFields,
     unassignedFields,
     isConfigured,
+    activeFieldFilters,
     pivotResult,
 
     // Actions
@@ -422,5 +465,7 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
     addCalculatedField,
     removeCalculatedField,
     toggleCollapsedPath,
+    setFieldFilter,
+    clearFieldFilter,
   }
 }
