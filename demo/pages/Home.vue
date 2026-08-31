@@ -1124,6 +1124,26 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
             </a>
           </div>
         </div>
+
+        <div class="testimonial-card">
+          <div class="testimonial-mark">
+            “
+          </div>
+          <blockquote class="testimonial-quote">
+            Amazing plugin. I found it very easy to work with — it looks sleek and fits properly with Vuetify in terms of UI. We were looking into having better reporting on our system, and this plugin landed from heaven to aid the developers’ work. The fact that you can have pivot tables, graphs, and an export tool makes our managers’ life way easier when building reports.
+          </blockquote>
+          <div class="testimonial-attribution">
+            <div class="testimonial-author">
+              Matias
+            </div>
+            <div class="testimonial-role">
+              Ozone Gliders LTD
+            </div>
+            <a href="https://www.flyozone.com" target="_blank" rel="noopener" class="testimonial-link">
+              flyozone.com
+            </a>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -2323,7 +2343,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 
 .testimonial-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
 }
 
