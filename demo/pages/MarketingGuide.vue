@@ -401,6 +401,62 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'nextjs-datagrid-pivot-table': {
+    title: 'Next.js Data Grid with Pivot Table',
+    eyebrow: 'Next.js Feature Guide',
+    description: 'Add a data grid and pivot table to a Next.js app with TinyPivot React. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+    intro: 'TinyPivot for React works in Next.js projects with both the Pages Router and the App Router. The free tier gives your Next.js application a complete data grid with filtering, sorting, CSV export, and a pivot table — no account or subscription required.',
+    sections: [
+      {
+        title: 'Using TinyPivot with the Next.js App Router',
+        paragraphs: [
+          'TinyPivot renders client-side. In a Next.js App Router project, add the "use client" directive to any component that imports from @smallwebco/tinypivot-react. The component itself has no server-side rendering requirement, so this is typically a one-line change to the file that wraps the grid.',
+          'Because TinyPivot handles all data operations in the browser, there is no additional Next.js configuration needed for route handlers or server components.',
+        ],
+        bullets: [
+          'Add "use client" to the file that imports DataGrid',
+          'Pass an array of plain objects to the data prop',
+          'Column definitions are derived from your object keys automatically',
+          'No getServerSideProps or server component changes required',
+        ],
+      },
+      {
+        title: 'Pages Router integration',
+        paragraphs: [
+          'In a Pages Router project, import TinyPivot inside the page component or a child component directly. Because the grid runs client-side, you can fetch data with getStaticProps, getServerSideProps, or a client-side hook and pass the result to the DataGrid prop.',
+          'If you use dynamic imports with next/dynamic, set ssr: false to skip server-side rendering of the grid component entirely. Either approach works — the key constraint is that TinyPivot needs a browser environment.',
+        ],
+      },
+      {
+        title: 'What the free tier includes',
+        paragraphs: [
+          'The free tier of TinyPivot for React is a complete data grid and pivot workflow, not a restricted trial. Install @smallwebco/tinypivot-react, import the DataGrid component and its stylesheet, then pass your data array.',
+          'Free features include sorting, filtering, full-text search, pagination, column resize, CSV export, calculated fields, Sum aggregation with row and column totals, and 22 built-in themes. A small watermark is shown in the free tier.',
+        ],
+        bullets: [
+          'Sort, filter, search, and paginate any array of records',
+          'Pivot table with Sum aggregation, row and column totals — free',
+          'Calculated fields for derived metrics like margin or growth rate',
+          'CSV export and column resize built in',
+          '22 themes including dark variants — no custom CSS needed',
+        ],
+      },
+      {
+        title: 'Bundle size in a Next.js project',
+        paragraphs: [
+          'The @smallwebco/tinypivot-react package is approximately 40 KB gzipped. It has no mandatory runtime dependencies beyond React itself, so the addition to your Next.js bundle is straightforward to reason about.',
+          'TinyPivot does not add server-side weight. All rendering is client-side, and the component is tree-shaken like any other React library in a Next.js build.',
+        ],
+      },
+      {
+        title: 'Upgrade to Pro for advanced analytics',
+        paragraphs: [
+          'TinyPivot Pro adds the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, session persistence, and watermark removal.',
+          'Pro also includes an optional BYOK AI Data Analyst. You configure the provider — OpenAI, Anthropic, or OpenRouter — and queries run through your own API key, keeping data in your environment. Pro is a one-time perpetual purchase: Single ($49), Unlimited ($149), or Team ($399). One license covers both @smallwebco/tinypivot-react and @smallwebco/tinypivot-vue.',
+        ],
+      },
+    ],
+  },
   'react-datagrid-csv-export': {
     title: 'React Data Grid with CSV Export',
     eyebrow: 'React Feature Guide',

@@ -68,6 +68,11 @@ export const marketingGuides = [
     title: 'Vue 3 Data Grid with Column Resize | TinyPivot',
     description: 'Vue 3 data grid with built-in column resize. TinyPivot includes drag-to-resize in the free tier — no configuration, no plugins, no subscription.',
   },
+  {
+    slug: 'nextjs-datagrid-pivot-table',
+    title: 'Next.js Data Grid with Pivot Table | TinyPivot',
+    description: 'Add a data grid and pivot table to a Next.js app with TinyPivot React. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']
