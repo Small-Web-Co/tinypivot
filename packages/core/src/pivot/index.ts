@@ -51,6 +51,60 @@ export interface ComputePivotOptions {
   collapsedPaths?: Set<string>
 }
 
+// ============================================================
+// Axis value filters (field filters)
+// ============================================================
+
+/**
+ * Stringify a raw field value the same way pivot keys are built via makeKey:
+ * `String(value ?? '(blank)')`. Filter values compared with this always
+ * match what the pivot displays.
+ */
+export function stringifyPivotValue(value: unknown): string {
+  return String(value ?? '(blank)')
+}
+
+/**
+ * Sorted unique stringified values for a field — powers axis filter UIs.
+ */
+export function getFieldUniqueValues(data: Record<string, unknown>[], field: string): string[] {
+  const values = new Set<string>()
+  for (const row of data) {
+    values.add(stringifyPivotValue(row[field]))
+  }
+  return Array.from(values).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+  )
+}
+
+/**
+ * Remove rows whose field values are excluded by `fieldFilters`.
+ * Returns the original array when no filter is active.
+ */
+export function applyFieldFilters(
+  data: Record<string, unknown>[],
+  fieldFilters?: Record<string, string[]>,
+): Record<string, unknown>[] {
+  if (!fieldFilters)
+    return data
+
+  const active: Array<[string, Set<string>]> = []
+  for (const [field, excluded] of Object.entries(fieldFilters)) {
+    if (excluded && excluded.length > 0)
+      active.push([field, new Set(excluded)])
+  }
+  if (active.length === 0)
+    return data
+
+  return data.filter((row) => {
+    for (const [field, excluded] of active) {
+      if (excluded.has(stringifyPivotValue(row[field])))
+        return false
+    }
+    return true
+  })
+}
+
 /**
  * Calculate median of an array
  */
@@ -600,6 +654,12 @@ export function computePivotResult(
   if (data.length === 0)
     return null
 
+  // Apply axis value filters before any aggregation so cells and totals
+  // all reflect the filtered dataset
+  const rows = applyFieldFilters(data, config.fieldFilters)
+  if (rows.length === 0)
+    return null
+
   // Build a map of calculated field IDs to their definitions
   const calcFieldMap = new Map<string, CalculatedField>()
   if (calculatedFields) {
@@ -608,14 +668,14 @@ export function computePivotResult(
     }
   }
 
-  const allDataFieldNames = data.length > 0 ? Object.keys(data[0]) : []
+  const allDataFieldNames = Object.keys(data[0])
   const colKeySet = new Set<string>()
 
   // leafDataMap: leaf rowKey → colKey → values per value field
   const leafDataMap = new Map<string, Map<string, number[][]>>()
   const leafRowKeySet = new Set<string>()
 
-  for (const row of data) {
+  for (const row of rows) {
     const rowKey = rowFields.length > 0 ? makeKey(row, rowFields) : '__all__'
     const colKey = columnFields.length > 0 ? makeKey(row, columnFields) : '__all__'
 
@@ -643,7 +703,7 @@ export function computePivotResult(
   // Pre-calculate grand totals for percentOfTotal
   const grandTotals: number[] = valueFields.map((vf) => {
     let total = 0
-    for (const row of data) {
+    for (const row of rows) {
       const num = extractNumericValue(row, vf, calcFieldMap, allDataFieldNames)
       if (num !== null)
         total += num

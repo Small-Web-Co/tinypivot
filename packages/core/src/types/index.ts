@@ -127,6 +127,15 @@ export interface PivotConfig {
   showColumnTotals: boolean
   /** Calculated fields that derive values from other aggregations */
   calculatedFields?: CalculatedField[]
+  /**
+   * Per-field value filters for axis (row/column) fields.
+   * Maps a field name to the list of EXCLUDED values, stringified the same
+   * way pivot keys are built: `String(value ?? '(blank)')`.
+   * Rows whose value is excluded are removed before aggregation, so cells,
+   * totals, and grand totals all reflect the filter.
+   * An absent or empty entry means the field is not filtered.
+   */
+  fieldFilters?: Record<string, string[]>
 }
 
 export interface PivotCell {

@@ -17,7 +17,7 @@ import type {
   Theme,
 } from '@smallwebco/tinypivot-core'
 import type { AIAnalystHandle } from './AIAnalyst'
-import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows } from '@smallwebco/tinypivot-core'
+import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useExcelGrid } from '../hooks/useExcelGrid'
@@ -257,7 +257,16 @@ export function DataGrid({
     addCalculatedField,
     removeCalculatedField,
     toggleCollapsedPath,
+    fieldFilters: pivotFieldFilters,
+    activeFieldFilters: pivotActiveFieldFilters,
+    setFieldFilter: setPivotFieldFilter,
   } = usePivotTable(filteredDataForPivot, enableDrillDown)
+
+  // Unique values per axis field — powers the axis filter UI in PivotConfig
+  const getPivotFieldValues = useCallback(
+    (field: string): string[] => getFieldUniqueValues(filteredDataForPivot, field),
+    [filteredDataForPivot],
+  )
 
   const handleToggleCollapse = useCallback(
     (key: string, altKey: boolean) => {
@@ -283,6 +292,7 @@ export function DataGrid({
         valueFields: pivotValueFields,
         showRowTotals: pivotShowRowTotals,
         showColumnTotals: pivotShowColumnTotals,
+        fieldFilters: pivotActiveFieldFilters,
       }
 
       const result = getDrillThroughRows(
@@ -305,6 +315,7 @@ export function DataGrid({
       pivotValueFields,
       pivotShowRowTotals,
       pivotShowColumnTotals,
+      pivotActiveFieldFilters,
       filteredDataForPivot,
       onDrillThrough,
     ],
@@ -1537,6 +1548,9 @@ export function DataGrid({
                 onRemoveCalculatedField={removeCalculatedField}
                 onUpdateCalculatedField={addCalculatedField}
                 theme={currentTheme}
+                fieldFilters={pivotFieldFilters}
+                getFieldValues={getPivotFieldValues}
+                onUpdateFieldFilter={setPivotFieldFilter}
               />
             </div>
           )}

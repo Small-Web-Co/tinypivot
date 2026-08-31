@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   aggregate,
+  applyFieldFilters,
   computeAvailableFields,
   computePivotResult,
   evaluateFormula,
@@ -11,6 +12,7 @@ import {
   formatCalculatedValue,
   getAggregationLabel,
   getAggregationSymbol,
+  getFieldUniqueValues,
   getUnassignedFields,
   isPivotConfigured,
   parseFormula,
@@ -1123,5 +1125,159 @@ describe('getDrillThroughRows – empty-string field value round-trip', () => {
     const drill = getDrillThroughRows(emptyStringData, emptyStringConfig, ['(blank)'], [])
     expect(drill.rows).toHaveLength(1)
     expect(drill.rows[0].sales).toBe(99)
+  })
+})
+
+// ============================================================
+// Axis value filters (fieldFilters)
+// ============================================================
+
+describe('applyFieldFilters', () => {
+  const data = [
+    { region: 'North', product: 'A', sales: 100 },
+    { region: 'North', product: 'B', sales: 200 },
+    { region: 'South', product: 'A', sales: 150 },
+    { region: 'South', product: 'B', sales: 250 },
+    { region: null, product: 'A', sales: 50 },
+  ]
+
+  it('returns original array when no filters given', () => {
+    expect(applyFieldFilters(data)).toBe(data)
+    expect(applyFieldFilters(data, {})).toBe(data)
+    expect(applyFieldFilters(data, { region: [] })).toBe(data)
+  })
+
+  it('excludes rows matching excluded values', () => {
+    const result = applyFieldFilters(data, { region: ['South'] })
+    expect(result).toHaveLength(3)
+    expect(result.every(r => r.region !== 'South')).toBe(true)
+  })
+
+  it('combines filters on multiple fields with AND', () => {
+    const result = applyFieldFilters(data, { region: ['South'], product: ['B'] })
+    expect(result).toHaveLength(2)
+    expect(result.map(r => r.sales).sort((a, b) => (a as number) - (b as number))).toEqual([50, 100])
+  })
+
+  it('matches null values via the "(blank)" placeholder', () => {
+    const result = applyFieldFilters(data, { region: ['(blank)'] })
+    expect(result).toHaveLength(4)
+    expect(result.every(r => r.region !== null)).toBe(true)
+  })
+})
+
+describe('getFieldUniqueValues', () => {
+  it('returns sorted unique stringified values', () => {
+    const data = [
+      { region: 'South' },
+      { region: 'North' },
+      { region: 'South' },
+      { region: null },
+    ]
+    expect(getFieldUniqueValues(data, 'region')).toEqual(['(blank)', 'North', 'South'])
+  })
+
+  it('sorts numerically when values are numeric', () => {
+    const data = [{ year: 2024 }, { year: 2010 }, { year: 2 }]
+    expect(getFieldUniqueValues(data, 'year')).toEqual(['2', '2010', '2024'])
+  })
+})
+
+describe('computePivotResult – fieldFilters', () => {
+  const sampleData = [
+    { region: 'North', product: 'A', sales: 100 },
+    { region: 'North', product: 'B', sales: 200 },
+    { region: 'South', product: 'A', sales: 150 },
+    { region: 'South', product: 'B', sales: 250 },
+  ]
+
+  const baseConfig = {
+    rowFields: ['region'],
+    columnFields: ['product'],
+    valueFields: [{ field: 'sales', aggregation: 'sum' as const }],
+    showRowTotals: true,
+    showColumnTotals: true,
+  }
+
+  it('excludes filtered row-axis values', () => {
+    const result = computePivotResult(sampleData, {
+      ...baseConfig,
+      fieldFilters: { region: ['South'] },
+    })
+    expect(result).not.toBeNull()
+    expect(result!.rowHeaders).toEqual([['North']])
+  })
+
+  it('excludes filtered column-axis values', () => {
+    const result = computePivotResult(sampleData, {
+      ...baseConfig,
+      fieldFilters: { product: ['B'] },
+    })
+    expect(result).not.toBeNull()
+    // Only the "A" column remains
+    expect(result!.headers[0]).toEqual(['A'])
+    expect(result!.data.map(row => row[0].value)).toEqual([100, 150])
+  })
+
+  it('totals reflect the filtered dataset', () => {
+    const result = computePivotResult(sampleData, {
+      ...baseConfig,
+      fieldFilters: { region: ['South'] },
+    })
+    expect(result).not.toBeNull()
+    // North A=100, North B=200 → row total 300
+    expect(result!.rowTotals[0].value).toBe(300)
+  })
+
+  it('percentOfTotal uses the filtered grand total', () => {
+    const result = computePivotResult(sampleData, {
+      rowFields: ['region'],
+      columnFields: [],
+      valueFields: [{ field: 'sales', aggregation: 'percentOfTotal' as const }],
+      showRowTotals: false,
+      showColumnTotals: false,
+      fieldFilters: { product: ['B'] },
+    })
+    expect(result).not.toBeNull()
+    // Remaining: North A=100, South A=150 → 40% / 60%
+    expect(result!.data[0][0].value).toBe(40)
+    expect(result!.data[1][0].value).toBe(60)
+  })
+
+  it('returns null when a filter excludes every row', () => {
+    const result = computePivotResult(sampleData, {
+      ...baseConfig,
+      fieldFilters: { region: ['North', 'South'] },
+    })
+    expect(result).toBeNull()
+  })
+
+  it('empty filter map behaves like no filter', () => {
+    const unfiltered = computePivotResult(sampleData, baseConfig)
+    const withEmpty = computePivotResult(sampleData, { ...baseConfig, fieldFilters: {} })
+    expect(withEmpty).toEqual(unfiltered)
+  })
+})
+
+describe('getDrillThroughRows – respects fieldFilters', () => {
+  const data = [
+    { region: 'North', product: 'A', sales: 100 },
+    { region: 'North', product: 'B', sales: 200 },
+    { region: 'South', product: 'A', sales: 150 },
+  ]
+
+  it('drilled rows exclude filtered values', () => {
+    const config = {
+      rowFields: ['region'],
+      columnFields: [],
+      valueFields: [{ field: 'sales', aggregation: 'sum' as const }],
+      showRowTotals: true,
+      showColumnTotals: true,
+      fieldFilters: { product: ['B'] },
+    }
+    const drill = getDrillThroughRows(data, config, ['North'], [])
+    expect(drill.rows).toHaveLength(1)
+    expect(drill.rows[0].sales).toBe(100)
+    expect(drill.descriptor.rowCount).toBe(1)
   })
 })

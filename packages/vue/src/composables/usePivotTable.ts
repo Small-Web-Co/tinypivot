@@ -37,6 +37,10 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
   const showColumnTotals = ref(true)
   const calculatedFields = ref<CalculatedField[]>(loadCalculatedFields())
   const collapsedPaths = ref<Set<string>>(new Set())
+  // Axis value filters: field → excluded values. Filters are kept for
+  // unassigned fields too (so re-adding a field restores its filter), but
+  // only filters on current row/column fields are applied to the pivot.
+  const fieldFilters = ref<Record<string, string[]>>({})
 
   // Track current storage key
   const currentStorageKey = ref<string | null>(null)
@@ -67,6 +71,17 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
     })
   })
 
+  // Filters restricted to fields currently on an axis — the only ones applied
+  const activeFieldFilters = computed<Record<string, string[]>>(() => {
+    const active: Record<string, string[]> = {}
+    for (const [field, excluded] of Object.entries(fieldFilters.value)) {
+      if (excluded.length > 0 && (rowFields.value.includes(field) || columnFields.value.includes(field))) {
+        active[field] = excluded
+      }
+    }
+    return active
+  })
+
   // Build pivot result
   const pivotResult = computed(() => {
     if (!isConfigured.value)
@@ -83,6 +98,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
       showRowTotals: showRowTotals.value,
       showColumnTotals: showColumnTotals.value,
       calculatedFields: calculatedFields.value,
+      fieldFilters: activeFieldFilters.value,
     }, { collapsedPaths: enableDrillDown.value ? collapsedPaths.value : new Set() })
   })
 
@@ -146,6 +162,23 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
     rowFields.value = []
     columnFields.value = []
     valueFields.value = []
+    fieldFilters.value = {}
+  }
+
+  // Axis value filter management
+  function setFieldFilter(field: string, excludedValues: string[]) {
+    const next = { ...fieldFilters.value }
+    if (excludedValues.length === 0) {
+      delete next[field]
+    }
+    else {
+      next[field] = [...excludedValues]
+    }
+    fieldFilters.value = next
+  }
+
+  function clearFieldFilter(field: string) {
+    setFieldFilter(field, [])
   }
 
   function moveField(
@@ -286,6 +319,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
           if (savedConfig.calculatedFields) {
             calculatedFields.value = savedConfig.calculatedFields
           }
+          fieldFilters.value = savedConfig.fieldFilters ?? {}
         }
         else {
           const currentConfig: PivotConfig = {
@@ -334,7 +368,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
 
   // Watch config changes and save to sessionStorage
   watch(
-    [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields],
+    [rowFields, columnFields, valueFields, showRowTotals, showColumnTotals, calculatedFields, fieldFilters],
     () => {
       if (!currentStorageKey.value)
         return
@@ -346,6 +380,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
         showRowTotals: showRowTotals.value,
         showColumnTotals: showColumnTotals.value,
         calculatedFields: calculatedFields.value,
+        fieldFilters: fieldFilters.value,
       }
       savePivotConfig(currentStorageKey.value, config)
     },
@@ -377,11 +412,13 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
     showColumnTotals,
     calculatedFields,
     collapsedPaths,
+    fieldFilters,
 
     // Computed
     availableFields,
     unassignedFields,
     isConfigured,
+    activeFieldFilters,
     pivotResult,
 
     // Actions
@@ -398,5 +435,7 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
     addCalculatedField,
     removeCalculatedField,
     toggleCollapsedPath,
+    setFieldFilter,
+    clearFieldFilter,
   }
 }

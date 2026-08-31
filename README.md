@@ -43,6 +43,7 @@ A lightweight data grid with free pivot tables, Pro charts, and optional AI-powe
 | Row/column totals | ✅ | ✅ |
 | Calculated fields with formulas | ✅ | ✅ |
 | Pivot row group expand/collapse | ✅ | ✅ |
+| Axis value filters (filter row/column items) | ✅ | ✅ |
 | **Pivot drill-through** (double-click to inspect source rows) | ❌ | ✅ |
 | **Excel (XLSX) Export** (styled, multi-level pivot headers, lazy-loaded) | ❌ | ✅ |
 | **AI Data Analyst** (natural language queries, BYOK) | ❌ | ✅ |
