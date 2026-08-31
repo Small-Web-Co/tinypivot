@@ -35,7 +35,7 @@ All keywords below are `queued` and ready for content generation.
 | Data grid React CSV export | feature | react-datagrid-csv-export | drafted |
 | Vue data grid filter sort search | feature | vue-datagrid-filter-sort-search | drafted |
 | React data grid calculated fields | feature | react-datagrid-calculated-fields | drafted |
-| Vue 3 data grid column resize | feature | vue-datagrid-column-resize | queued |
+| Vue 3 data grid column resize | feature | vue-datagrid-column-resize | drafted |
 | Next.js data grid pivot table | feature | nextjs-datagrid-pivot-table | queued |
 | Nuxt 3 data grid pivot table | feature | nuxt-datagrid-pivot-table | queued |
 | React pivot table with charts | feature | react-pivot-table-charts | queued |

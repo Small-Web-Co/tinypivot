@@ -347,6 +347,60 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'vue-datagrid-column-resize': {
+    title: 'Vue 3 Data Grid with Column Resize',
+    eyebrow: 'Vue 3 Feature Guide',
+    description: 'Vue 3 data grid with built-in column resize. TinyPivot includes drag-to-resize in the free tier — no configuration, no plugins, no subscription.',
+    intro: 'TinyPivot for Vue 3 includes column resize as a standard free-tier feature. Users can drag column edges directly in the grid to adjust widths — no configuration prop, no plugin, no custom handler required.',
+    sections: [
+      {
+        title: 'Column resize in the free tier',
+        paragraphs: [
+          'Column resize is part of the core TinyPivot grid and is available at no cost. Users can drag any column edge to adjust its width, and the new width persists while the component is mounted. No configuration is needed — the behavior is on by default.',
+          'Resizable columns make the grid practical for datasets where column labels and values vary in length. Product names, descriptions, and date strings often need wider columns; numeric columns are usually more compact. TinyPivot lets users adjust widths to fit their current view without developer intervention.',
+        ],
+        bullets: [
+          'Drag column edges to resize — enabled by default with no configuration',
+          'Works alongside sorting, filtering, search, and pagination in the same view',
+          'Column widths persist while the component is mounted',
+          'Available in the free tier — no Pro license required',
+        ],
+      },
+      {
+        title: 'Install TinyPivot for Vue 3',
+        paragraphs: [
+          'Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then bind your array of flat records to the data prop. Column resize is enabled automatically — no additional props are required for the default behavior.',
+          'The Vue package is approximately 50 KB gzipped and has no mandatory dependencies beyond Vue 3 itself. TypeScript types are included.',
+        ],
+      },
+      {
+        title: 'What else the free tier includes',
+        paragraphs: [
+          'Column resize sits alongside a broader set of free-tier features. The same install also gives users per-column filtering, multi-column sorting, full-text search, pagination, calculated fields, a pivot table with Sum aggregation and row and column totals, CSV export, and 22 built-in themes.',
+        ],
+        bullets: [
+          'Filter, sort, and search any array of records',
+          'Sum aggregation with row and column totals in the pivot view',
+          'Calculated fields for derived metrics such as margin or growth rate',
+          'CSV export of the filtered and sorted view',
+          '22 built-in themes including dark and light variants',
+        ],
+      },
+      {
+        title: 'Nuxt 3 compatibility',
+        paragraphs: [
+          'TinyPivot renders client-side. In a Nuxt 3 project, wrap the DataGrid component in a <ClientOnly> tag to avoid SSR hydration issues. No additional configuration is required beyond that.',
+        ],
+      },
+      {
+        title: 'Upgrade to Pro for advanced analytics',
+        paragraphs: [
+          'When an analytics surface needs more than column resize and export, TinyPivot Pro adds the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, and session persistence that remembers column widths and pivot configuration across page loads.',
+          'Pro also includes an optional BYOK AI Data Analyst that lets users ask natural-language questions about the loaded data. You configure the provider — OpenAI, Anthropic, or OpenRouter — and queries run through your own API key. Pro is a one-time perpetual purchase: Single ($49), Unlimited ($149), or Team ($399). One license covers both @smallwebco/tinypivot-vue and @smallwebco/tinypivot-react.',
+        ],
+      },
+    ],
+  },
   'react-datagrid-csv-export': {
     title: 'React Data Grid with CSV Export',
     eyebrow: 'React Feature Guide',
