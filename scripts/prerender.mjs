@@ -16,6 +16,7 @@
  *     built dist-demo/index.html shell, replacing <div id="app"></div>.
  *  6. Write the resulting HTML to dist-demo/<slug>/index.html (and
  *     dist-demo/index.html for the root route).
+ *  7. Generate dist-demo/sitemap.xml from that same route list.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -70,6 +71,41 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
     : null
 
   return { url: path, outFile, title, description, canonical, jsonLd }
+}
+
+/**
+ * Build sitemap.xml from the same route list that drives prerendering.
+ *
+ * Generating this at build time (rather than hand-maintaining a static file in
+ * demo/public/) means a newly added marketing guide is always submitted to
+ * search engines — previously the checked-in sitemap silently fell behind
+ * router/routes.ts and several live pages were never listed.
+ *
+ * <changefreq> and <priority> are advisory hints that major search engines
+ * effectively ignore; <loc> and <lastmod> are what matter.
+ */
+function buildSitemap(routes) {
+  const lastmod = new Date().toISOString().slice(0, 10)
+
+  const entries = routes.map((route) => {
+    const isHome = route.url === '/'
+    return [
+      '  <url>',
+      `    <loc>${route.canonical}</loc>`,
+      `    <lastmod>${lastmod}</lastmod>`,
+      `    <changefreq>${isHome ? 'weekly' : 'monthly'}</changefreq>`,
+      `    <priority>${isHome ? '1.0' : '0.8'}</priority>`,
+      '  </url>',
+    ].join('\n')
+  })
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...entries,
+    '</urlset>',
+    '',
+  ].join('\n')
 }
 
 /**
@@ -274,6 +310,9 @@ async function main() {
       writeFileSync(outPath, html, 'utf-8')
       console.log(`[prerender] Wrote ${route.outFile}`)
     }
+
+    writeFileSync(resolve(DIST, 'sitemap.xml'), buildSitemap(ROUTES), 'utf-8')
+    console.log(`[prerender] Wrote sitemap.xml (${ROUTES.length} URLs)`)
   }
   finally {
     await viteServer.close()
