@@ -249,6 +249,11 @@ export function PivotConfig({
     return new Set(fieldFilters?.[openFilterField] ?? [])
   }, [openFilterField, fieldFilters])
 
+  // Cap the rendered checkbox list — a high-cardinality field (IDs,
+  // timestamp-like columns) would otherwise mount tens of thousands of
+  // DOM nodes and freeze the tab. All/None still act on the full value set.
+  const MAX_RENDERED_FILTER_VALUES = 200
+
   const filteredFilterValues = useMemo(() => {
     const search = filterValueSearch.toLowerCase().trim()
     if (!search)
@@ -508,7 +513,7 @@ export function PivotConfig({
                       />
                     )}
                     <div className="vpg-filter-value-list">
-                      {filteredFilterValues.map(value => (
+                      {filteredFilterValues.slice(0, MAX_RENDERED_FILTER_VALUES).map(value => (
                         <label key={value} className="vpg-filter-value-item">
                           <input
                             type="checkbox"
@@ -518,6 +523,12 @@ export function PivotConfig({
                           <span className="vpg-filter-value-label" title={value}>{value}</span>
                         </label>
                       ))}
+                      {filteredFilterValues.length > MAX_RENDERED_FILTER_VALUES && (
+                        <div className="vpg-empty-hint">
+                          {filteredFilterValues.length - MAX_RENDERED_FILTER_VALUES}
+                          {' more — search to narrow the list'}
+                        </div>
+                      )}
                       {filteredFilterValues.length === 0 && (
                         <div className="vpg-empty-hint">No matching values</div>
                       )}

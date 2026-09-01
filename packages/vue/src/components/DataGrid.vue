@@ -1510,6 +1510,7 @@ function handleContainerClick(event: MouseEvent) {
             :is-configured="pivotIsConfigured"
             :dragging-field="draggingField"
             :pivot-result="pivotResult"
+            :has-active-field-filters="Object.keys(pivotFieldFilters).length > 0"
             :font-size="currentFontSize"
             :active-filters="activeFilterInfo"
             :total-row-count="totalRowCount"
