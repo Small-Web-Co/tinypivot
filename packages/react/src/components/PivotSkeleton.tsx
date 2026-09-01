@@ -23,6 +23,7 @@ interface PivotSkeletonProps {
   isConfigured: boolean
   draggingField: string | null
   pivotResult: PivotResult | null
+  hasActiveFieldFilters?: boolean
   fontSize?: 'xs' | 'sm' | 'base'
   activeFilters?: ActiveFilter[] | null
   totalRowCount?: number
@@ -52,6 +53,7 @@ export function PivotSkeleton({
   isConfigured,
   draggingField,
   pivotResult,
+  hasActiveFieldFilters,
   fontSize = 'xs',
   activeFilters,
   totalRowCount,
@@ -920,9 +922,13 @@ export function PivotSkeleton({
                             fields to group your data
                           </>
                         )
-                      : (
-                          'Your pivot table will appear here'
-                        )}
+                      : hasActiveFieldFilters
+                        ? (
+                            'All rows are hidden by axis filters — adjust or clear the filters to see results'
+                          )
+                        : (
+                            'Your pivot table will appear here'
+                          )}
                 </span>
               </div>
             </div>

@@ -246,6 +246,15 @@ const filteredFilterValues = computed(() => {
   return openFilterValues.value.filter(v => v.toLowerCase().includes(search))
 })
 
+// Cap the rendered checkbox list — a high-cardinality field (IDs,
+// timestamp-like columns) would otherwise mount tens of thousands of
+// DOM nodes and freeze the tab. All/None still act on the full value set.
+const MAX_RENDERED_FILTER_VALUES = 200
+
+const visibleFilterValues = computed(() => filteredFilterValues.value.slice(0, MAX_RENDERED_FILTER_VALUES))
+
+const hiddenFilterValueCount = computed(() => filteredFilterValues.value.length - visibleFilterValues.value.length)
+
 const openFilterSelectedCount = computed(() =>
   openFilterValues.value.filter(v => !openFilterExcluded.value.has(v)).length,
 )
@@ -419,7 +428,7 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
             >
             <div class="vpg-filter-value-list">
               <label
-                v-for="value in filteredFilterValues"
+                v-for="value in visibleFilterValues"
                 :key="value"
                 class="vpg-filter-value-item"
               >
@@ -430,6 +439,9 @@ function removeField(field: string, assignedTo: 'row' | 'column' | 'value', valu
                 >
                 <span class="vpg-filter-value-label" :title="value">{{ value }}</span>
               </label>
+              <div v-if="hiddenFilterValueCount > 0" class="vpg-empty-hint">
+                {{ hiddenFilterValueCount }} more — search to narrow the list
+              </div>
               <div v-if="filteredFilterValues.length === 0" class="vpg-empty-hint">
                 No matching values
               </div>

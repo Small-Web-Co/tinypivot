@@ -1564,6 +1564,7 @@ export function DataGrid({
               isConfigured={pivotIsConfigured}
               draggingField={draggingField}
               pivotResult={pivotResult}
+              hasActiveFieldFilters={Object.keys(pivotFieldFilters).length > 0}
               fontSize={currentFontSize}
               activeFilters={activeFilterInfo}
               totalRowCount={totalRowCount}

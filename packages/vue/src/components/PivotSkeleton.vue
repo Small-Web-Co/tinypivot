@@ -24,6 +24,7 @@ const props = defineProps<{
   isConfigured: boolean
   draggingField: string | null
   pivotResult: PivotResult | null
+  hasActiveFieldFilters?: boolean
   fontSize?: 'xs' | 'sm' | 'base'
   activeFilters?: ActiveFilter[] | null
   totalRowCount?: number
@@ -807,6 +808,9 @@ function onDrillThroughGrandTotal() {
             </template>
             <template v-else-if="rowFields.length === 0 && columnFields.length === 0">
               Add <strong>Row</strong> or <strong>Column</strong> fields to group your data
+            </template>
+            <template v-else-if="hasActiveFieldFilters">
+              All rows are hidden by axis filters — adjust or clear the filters to see results
             </template>
             <template v-else>
               Your pivot table will appear here

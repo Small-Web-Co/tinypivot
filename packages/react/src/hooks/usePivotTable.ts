@@ -175,9 +175,12 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
           showColumnTotals,
         }
         if (!isConfigValidForFields(currentConfig, newKeys)) {
+          // Mirror Vue's clearConfig(): stale filters from the previous
+          // dataset must not silently apply to (and persist under) the new one
           setRowFieldsState([])
           setColumnFieldsState([])
           setValueFields([])
+          setFieldFilters({})
         }
       }
 
