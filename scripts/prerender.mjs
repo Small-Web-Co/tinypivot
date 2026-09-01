@@ -16,8 +16,10 @@
  *     built dist-demo/index.html shell, replacing <div id="app"></div>.
  *  6. Write the resulting HTML to dist-demo/<slug>/index.html (and
  *     dist-demo/index.html for the root route).
+ *  7. Generate dist-demo/sitemap.xml from that same route list.
  */
 
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -70,6 +72,84 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
     : null
 
   return { url: path, outFile, title, description, canonical, jsonLd }
+}
+
+/**
+ * Source files whose git history dates a route's content.
+ * Guide pages all render through MarketingGuide.vue, with their copy and
+ * meta split between that component and router/routes.ts.
+ */
+function routeContentFiles(route, guideSlugSet) {
+  if (route.url === '/')
+    return ['demo/pages/Home.vue']
+  if (guideSlugSet.has(route.url.replace(/^\//, '')))
+    return ['demo/pages/MarketingGuide.vue', 'demo/router/routes.ts']
+  return ['demo/pages/VsAgGrid.vue']
+}
+
+/**
+ * Last commit date (YYYY-MM-DD) touching any of the given files, or null when
+ * git can't say — no repo, or a shallow CI clone whose truncated history
+ * contains no commit touching them. Callers omit <lastmod> in that case:
+ * per the sitemap protocol the tag is optional, and no date is better than a
+ * wrong one.
+ */
+function gitLastModified(files) {
+  try {
+    const out = execFileSync('git', ['log', '-1', '--format=%cs', '--', ...files], {
+      cwd: ROOT,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return /^\d{4}-\d{2}-\d{2}$/.test(out) ? out : null
+  }
+  catch {
+    return null
+  }
+}
+
+/**
+ * Build sitemap.xml from the same route list that drives prerendering.
+ *
+ * Generating this at build time (rather than hand-maintaining a static file in
+ * demo/public/) means a newly added marketing guide is always submitted to
+ * search engines — previously the checked-in sitemap silently fell behind
+ * router/routes.ts and several live pages were never listed.
+ *
+ * <lastmod> comes from the git history of each route's content files, so it
+ * only moves when the content actually changed — stamping the build date on
+ * every URL would teach crawlers to distrust the sitemap's dates.
+ * <changefreq> and <priority> are advisory hints that major search engines
+ * effectively ignore.
+ */
+function buildSitemap(routes, guideSlugSet) {
+  const lastmodCache = new Map()
+
+  const entries = routes.map((route) => {
+    const isHome = route.url === '/'
+    const files = routeContentFiles(route, guideSlugSet)
+    const cacheKey = files.join('|')
+    if (!lastmodCache.has(cacheKey))
+      lastmodCache.set(cacheKey, gitLastModified(files))
+    const lastmod = lastmodCache.get(cacheKey)
+
+    return [
+      '  <url>',
+      `    <loc>${route.canonical}</loc>`,
+      ...(lastmod ? [`    <lastmod>${lastmod}</lastmod>`] : []),
+      `    <changefreq>${isHome ? 'weekly' : 'monthly'}</changefreq>`,
+      `    <priority>${isHome ? '1.0' : '0.8'}</priority>`,
+      '  </url>',
+    ].join('\n')
+  })
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...entries,
+    '</urlset>',
+    '',
+  ].join('\n')
 }
 
 /**
@@ -274,6 +354,9 @@ async function main() {
       writeFileSync(outPath, html, 'utf-8')
       console.log(`[prerender] Wrote ${route.outFile}`)
     }
+
+    writeFileSync(resolve(DIST, 'sitemap.xml'), buildSitemap(ROUTES, guideSlugSet), 'utf-8')
+    console.log(`[prerender] Wrote sitemap.xml (${ROUTES.length} URLs)`)
   }
   finally {
     await viteServer.close()
