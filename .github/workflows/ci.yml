@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 # Cancel in-progress runs for the same branch
 concurrency:
@@ -31,6 +31,11 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      # Workspace packages type-check against each other's built dist,
+      # so the packages must be built before type-check can pass.
+      - name: Build packages
+        run: pnpm build
 
       - name: Type check
         run: pnpm type-check
