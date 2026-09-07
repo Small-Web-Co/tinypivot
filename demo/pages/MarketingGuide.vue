@@ -457,6 +457,62 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'nuxt-datagrid-pivot-table': {
+    title: 'Nuxt 3 Data Grid with Pivot Table',
+    eyebrow: 'Nuxt 3 Feature Guide',
+    description: 'Add a data grid and pivot table to a Nuxt 3 app with TinyPivot Vue. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+    intro: 'TinyPivot for Vue 3 works in Nuxt 3 projects with a small client-only wrapper. The free tier gives your Nuxt application a complete data grid with filtering, sorting, CSV export, and a pivot table — no account or subscription required.',
+    sections: [
+      {
+        title: 'Using TinyPivot with Nuxt 3',
+        paragraphs: [
+          'TinyPivot renders client-side. In a Nuxt 3 project, wrap the DataGrid component in a <ClientOnly> tag to avoid SSR hydration issues. This is a standard Nuxt pattern for any component that depends on browser APIs.',
+          'No additional Nuxt configuration is required. You do not need to add the package to the build.transpile list, and there are no Nuxt-specific plugins to register.',
+        ],
+        bullets: [
+          'Wrap DataGrid in <ClientOnly> to skip SSR rendering',
+          'Pass your array of flat objects to the data prop',
+          'Column definitions are derived from your object keys automatically',
+          'No special Nuxt config, no build.transpile changes needed',
+        ],
+      },
+      {
+        title: 'Install TinyPivot for Vue 3',
+        paragraphs: [
+          'Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then bind your data array to the data prop. The component is built for Vue 3 Composition API and ships with TypeScript types.',
+          'The Vue package is approximately 50 KB gzipped and has no mandatory dependencies beyond Vue 3 itself.',
+        ],
+      },
+      {
+        title: 'What the free tier includes',
+        paragraphs: [
+          'The free tier of TinyPivot is a complete data grid and pivot workflow, not a restricted trial. Install the package, import the component, and all of these are immediately available.',
+          'Free features include sorting, filtering, full-text search, pagination, column resize, CSV export, calculated fields, Sum aggregation with row and column totals, and 22 built-in themes. A small watermark is shown in the free tier.',
+        ],
+        bullets: [
+          'Sort, filter, search, and paginate any array of records',
+          'Pivot table with Sum aggregation, row and column totals — free',
+          'Calculated fields for derived metrics like margin or growth rate',
+          'CSV export and column resize built in',
+          '22 themes including dark variants — no custom CSS needed',
+        ],
+      },
+      {
+        title: 'Fetching data in Nuxt 3',
+        paragraphs: [
+          'You can fetch data with useFetch or useAsyncData and pass the result directly to TinyPivot. Because TinyPivot handles all grid operations client-side, data fetched server-side is passed to the component as a prop and processed in the browser.',
+          'For large datasets loaded asynchronously, render a loading state alongside the <ClientOnly> wrapper while the fetch completes, then pass the resolved data array to DataGrid.',
+        ],
+      },
+      {
+        title: 'Upgrade to Pro for advanced analytics',
+        paragraphs: [
+          'TinyPivot Pro adds the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, session persistence, and watermark removal.',
+          'Pro also includes an optional BYOK AI Data Analyst. You configure the provider — OpenAI, Anthropic, or OpenRouter — and queries run through your own API key, keeping data in your environment. Pro is a one-time perpetual purchase: Single ($49), Unlimited ($149), or Team ($399). One license covers both @smallwebco/tinypivot-vue and @smallwebco/tinypivot-react.',
+        ],
+      },
+    ],
+  },
   'react-datagrid-csv-export': {
     title: 'React Data Grid with CSV Export',
     eyebrow: 'React Feature Guide',
