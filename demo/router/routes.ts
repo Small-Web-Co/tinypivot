@@ -76,7 +76,7 @@ export const marketingGuides = [
   {
     slug: 'nuxt-datagrid-pivot-table',
     title: 'Nuxt 3 Data Grid with Pivot Table | TinyPivot',
-    description: 'Add a data grid and pivot table to a Nuxt 3 app with TinyPivot Vue. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+    description: 'Add a data grid with pivot tables to Nuxt 3 using TinyPivot Vue. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
   },
 ] as const
 
