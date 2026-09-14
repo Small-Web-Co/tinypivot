@@ -73,6 +73,11 @@ export const marketingGuides = [
     title: 'Next.js Data Grid with Pivot Table | TinyPivot',
     description: 'Add a data grid and pivot table to a Next.js app with TinyPivot React. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
   },
+  {
+    slug: 'nuxt-datagrid-pivot-table',
+    title: 'Nuxt 3 Data Grid with Pivot Table | TinyPivot',
+    description: 'Add a data grid with pivot tables to Nuxt 3 using TinyPivot Vue. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+  },
 ] as const
 
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']
