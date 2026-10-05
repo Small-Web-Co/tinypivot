@@ -460,33 +460,27 @@ const guides: Record<string, Guide> = {
   'nuxt-datagrid-pivot-table': {
     title: 'Nuxt 3 Data Grid with Pivot Table',
     eyebrow: 'Nuxt 3 Feature Guide',
-    description: 'Add a data grid with pivot tables to Nuxt 3 using TinyPivot Vue. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
-    intro: 'TinyPivot for Vue 3 works in Nuxt 3 projects with minimal configuration. The free tier gives your Nuxt application a complete data grid with filtering, sorting, CSV export, and a pivot table — no account or subscription required.',
+    description: 'Add a data grid and pivot table to Nuxt 3 with TinyPivot Vue. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+    intro: 'TinyPivot for Vue 3 works in Nuxt 3 projects with both client-side and universal rendering. The free tier gives your Nuxt 3 application a complete data grid with filtering, sorting, CSV export, and a pivot table — no account or subscription required.',
     sections: [
       {
-        title: 'Using TinyPivot with Nuxt 3',
+        title: 'Using TinyPivot in a Nuxt 3 project',
         paragraphs: [
-          'TinyPivot renders client-side. In a Nuxt 3 project, wrap the DataGrid component in a <ClientOnly> tag to avoid SSR hydration issues. The component itself has no server-side rendering requirement, so this is typically a one-line change to the template that hosts the grid.',
-          'Because TinyPivot handles all data operations in the browser, there is no additional Nuxt configuration needed for server-side data fetching or hydration mismatches.',
+          'TinyPivot renders entirely client-side. In a Nuxt 3 project, wrap the DataGrid component in a <ClientOnly> tag to prevent SSR hydration issues. This is a one-line change and does not affect the component\'s behavior or functionality.',
+          'Because TinyPivot handles all data operations in the browser, no Nuxt server routes or server middleware are required. You can fetch data using useFetch, useAsyncData, or any client-side composable and pass the result to the DataGrid prop.',
         ],
         bullets: [
-          'Wrap the DataGrid in <ClientOnly> to skip SSR for that component',
-          'Pass an array of plain objects to the data prop',
+          'Wrap the DataGrid component in <ClientOnly> to avoid SSR hydration issues',
+          'Fetch data with useFetch or useAsyncData and pass the result to the data prop',
           'Column definitions are derived from your object keys automatically',
-          'No Nuxt server plugins or module configuration required',
-        ],
-      },
-      {
-        title: 'Install TinyPivot for Nuxt 3',
-        paragraphs: [
-          'Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then bind your data array to the data prop. The component is built for Vue 3 Composition API and ships with TypeScript types.',
-          'The Vue package is approximately 50 KB gzipped. It has no mandatory dependencies beyond Vue 3 itself, so the addition to your Nuxt bundle is straightforward to reason about.',
+          'No Nuxt server routes or API configuration required',
         ],
       },
       {
         title: 'What the free tier includes',
         paragraphs: [
-          'The free tier of TinyPivot for Vue 3 is a complete data grid and pivot workflow, not a restricted trial. Free features include sorting, filtering, full-text search, pagination, column resize, CSV export, calculated fields, Sum aggregation with row and column totals, and 22 built-in themes. A small watermark is shown in the free tier.',
+          'The free tier of TinyPivot for Vue 3 is a complete data grid and pivot workflow, not a restricted trial. Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then pass your data array.',
+          'Free features include sorting, filtering, full-text search, pagination, column resize, CSV export, calculated fields, Sum aggregation with row and column totals, and 22 built-in themes. A small watermark is shown in the free tier.',
         ],
         bullets: [
           'Sort, filter, search, and paginate any array of records',
@@ -497,10 +491,17 @@ const guides: Record<string, Guide> = {
         ],
       },
       {
+        title: 'Nuxt composables and data flow',
+        paragraphs: [
+          'A typical Nuxt 3 integration uses useAsyncData or useFetch to load records from an API or a Nuxt server route, then passes the resolved data to the DataGrid component\'s data prop. Because TinyPivot works with plain JavaScript arrays of objects, any data source that returns flat records integrates without transformation.',
+          'Reactivity is handled through Vue\'s Composition API. Passing a computed ref or a reactive array to the data prop keeps the grid in sync when the underlying data changes.',
+        ],
+      },
+      {
         title: 'Bundle size in a Nuxt 3 project',
         paragraphs: [
-          'The @smallwebco/tinypivot-vue package is approximately 50 KB gzipped. TinyPivot does not add server-side weight. All rendering is client-side, and the component integrates as a standard Vue 3 library in a Nuxt build.',
-          'Because the DataGrid is wrapped in <ClientOnly>, Nuxt excludes it from the server-rendered HTML entirely. It hydrates in the browser after the initial page load, which keeps the Nuxt server payload lean.',
+          'The @smallwebco/tinypivot-vue package is approximately 50 KB gzipped. It has no mandatory peer dependencies beyond Vue 3 itself, which Nuxt 3 already provides.',
+          'TinyPivot is client-side only and does not add weight to Nuxt\'s server bundle. The component is code-split like any other dynamic import in a Nuxt project, so it does not affect initial server response time.',
         ],
       },
       {
