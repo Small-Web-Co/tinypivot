@@ -457,6 +457,62 @@ const guides: Record<string, Guide> = {
       },
     ],
   },
+  'nuxt-datagrid-pivot-table': {
+    title: 'Nuxt 3 Data Grid with Pivot Table',
+    eyebrow: 'Nuxt 3 Feature Guide',
+    description: 'Add a data grid and pivot table to Nuxt 3 with TinyPivot Vue. Free tier includes sorting, filtering, CSV export, and Sum aggregation — no subscription.',
+    intro: 'TinyPivot for Vue 3 works in Nuxt 3 projects with both client-side and universal rendering. The free tier gives your Nuxt 3 application a complete data grid with filtering, sorting, CSV export, and a pivot table — no account or subscription required.',
+    sections: [
+      {
+        title: 'Using TinyPivot in a Nuxt 3 project',
+        paragraphs: [
+          'TinyPivot renders entirely client-side. In a Nuxt 3 project, wrap the DataGrid component in a <ClientOnly> tag to prevent SSR hydration issues. This is a one-line change and does not affect the component\'s behavior or functionality.',
+          'Because TinyPivot handles all data operations in the browser, no Nuxt server routes or server middleware are required. You can fetch data using useFetch, useAsyncData, or any client-side composable and pass the result to the DataGrid prop.',
+        ],
+        bullets: [
+          'Wrap the DataGrid component in <ClientOnly> to avoid SSR hydration issues',
+          'Fetch data with useFetch or useAsyncData and pass the result to the data prop',
+          'Column definitions are derived from your object keys automatically',
+          'No Nuxt server routes or API configuration required',
+        ],
+      },
+      {
+        title: 'What the free tier includes',
+        paragraphs: [
+          'The free tier of TinyPivot for Vue 3 is a complete data grid and pivot workflow, not a restricted trial. Install @smallwebco/tinypivot-vue, import the DataGrid component and its stylesheet, then pass your data array.',
+          'Free features include sorting, filtering, full-text search, pagination, column resize, CSV export, calculated fields, Sum aggregation with row and column totals, and 22 built-in themes. A small watermark is shown in the free tier.',
+        ],
+        bullets: [
+          'Sort, filter, search, and paginate any array of records',
+          'Pivot table with Sum aggregation, row and column totals — free',
+          'Calculated fields for derived metrics like margin or growth rate',
+          'CSV export and column resize built in',
+          '22 themes including dark variants — no custom CSS needed',
+        ],
+      },
+      {
+        title: 'Nuxt composables and data flow',
+        paragraphs: [
+          'A typical Nuxt 3 integration uses useAsyncData or useFetch to load records from an API or a Nuxt server route, then passes the resolved data to the DataGrid component\'s data prop. Because TinyPivot works with plain JavaScript arrays of objects, any data source that returns flat records integrates without transformation.',
+          'Reactivity is handled through Vue\'s Composition API. Passing a computed ref or a reactive array to the data prop keeps the grid in sync when the underlying data changes.',
+        ],
+      },
+      {
+        title: 'Bundle size in a Nuxt 3 project',
+        paragraphs: [
+          'The @smallwebco/tinypivot-vue package is approximately 50 KB gzipped. It has no mandatory peer dependencies beyond Vue 3 itself, which Nuxt 3 already provides.',
+          'TinyPivot is client-side only and does not add weight to Nuxt\'s server bundle. The component is code-split like any other dynamic import in a Nuxt project, so it does not affect initial server response time.',
+        ],
+      },
+      {
+        title: 'Upgrade to Pro for advanced analytics',
+        paragraphs: [
+          'TinyPivot Pro adds the full aggregation set (Count, Count Distinct, Average, Min, Max, Median, Standard Deviation), a drag-and-drop chart builder, pivot drill-through to underlying rows, styled XLSX export, session persistence, and watermark removal.',
+          'Pro also includes an optional BYOK AI Data Analyst. You configure the provider — OpenAI, Anthropic, or OpenRouter — and queries run through your own API key, keeping data in your environment. Pro is a one-time perpetual purchase: Single ($49), Unlimited ($149), or Team ($399). One license covers both @smallwebco/tinypivot-vue and @smallwebco/tinypivot-react.',
+        ],
+      },
+    ],
+  },
   'react-datagrid-csv-export': {
     title: 'React Data Grid with CSV Export',
     eyebrow: 'React Feature Guide',
