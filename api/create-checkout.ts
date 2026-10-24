@@ -91,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   catch (error) {
     console.error('Stripe error:', error)
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return res.status(500).json({ error: `Stripe error: ${message}` })
+    // Do not echo Stripe internals back to the browser.
+    return res.status(500).json({ error: 'Could not create checkout session' })
   }
 }

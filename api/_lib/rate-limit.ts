@@ -40,7 +40,7 @@ end
 return count
 `
 
-function getRedisConfig(): { url: string, token: string } | null {
+export function getRedisConfig(): { url: string, token: string } | null {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
   if (!url || !token) {
