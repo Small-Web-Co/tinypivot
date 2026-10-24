@@ -97,6 +97,15 @@ export interface TinyPivotHandlerOptions {
   timeout?: number
 
   /**
+   * Reject queries the SQL parser cannot understand instead of falling back
+   * to keyword heuristics.
+   *
+   * Default: `false` (keeps exotic-but-valid PostgreSQL syntax working).
+   * Set to `true` for a fail-closed allowlist.
+   */
+  strictSqlValidation?: boolean
+
+  /**
    * Override the AI model.
    *
    * Priority: options.model > AI_MODEL env var > cheap default per provider
@@ -405,6 +414,7 @@ export function createTinyPivotHandler(options: TinyPivotHandlerOptions = {}): R
     tables: tableOptions = {},
     maxRows,
     timeout,
+    strictSqlValidation = false,
     maxTokens = 2048,
     onError,
   } = options
@@ -445,6 +455,7 @@ export function createTinyPivotHandler(options: TinyPivotHandlerOptions = {}): R
             maxRows,
             timeout,
             onError,
+            strictSqlValidation,
           )
 
         case 'chat':
@@ -775,6 +786,7 @@ async function handleQuery(
   maxRows: number | undefined,
   timeout: number | undefined,
   onError?: (error: Error) => void,
+  strictSqlValidation = false,
 ): Promise<Response> {
   if (!sql || typeof sql !== 'string') {
     return createErrorResponse('Missing or invalid SQL query', 400)
@@ -810,10 +822,18 @@ async function handleQuery(
   }
   const pool = new Pool(poolConfig)
 
+  let client: import('pg').PoolClient | undefined
+
   try {
+    client = await pool.connect()
+
+    // Defense in depth: the session is opened READ ONLY, so even a query that
+    // slips past validation cannot modify data.
+    await client.query('SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY')
+
     // Get allowed tables
     const schemaPlaceholders = schemas.map((_, i) => `$${i + 1}`).join(', ')
-    const tablesResult = await pool.query(
+    const tablesResult = await client.query(
       `
       SELECT table_name
       FROM information_schema.tables
@@ -832,7 +852,9 @@ async function handleQuery(
     }
 
     // Validate SQL safety
-    const validation = validateSQL(sql, allowedTables)
+    const validation = validateSQL(sql, allowedTables, {
+      strict: strictSqlValidation,
+    })
     if (!validation.valid) {
       return createErrorResponse(validation.error || 'Invalid SQL', 400)
     }
@@ -842,7 +864,7 @@ async function handleQuery(
 
     // Execute query
     const startTime = Date.now()
-    const result = await pool.query(finalSQL)
+    const result = await client.query(finalSQL)
     const duration = Date.now() - startTime
 
     // Check if results were truncated (only if maxRows was set)
@@ -867,6 +889,7 @@ async function handleQuery(
     return createErrorResponse(sanitizeErrorMessage(err.message), 500)
   }
   finally {
+    client?.release()
     await pool.end()
   }
 }

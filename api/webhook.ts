@@ -8,6 +8,12 @@
  * - STRIPE_WEBHOOK_SECRET: Webhook signing secret (whsec_...)
  * - LICENSE_PRIVATE_KEY: ECDSA P-256 private key (PEM format) for signing licenses
  * - RESEND_API_KEY: (Optional) For sending license emails via Resend
+ * - STRIPE_PRICE_SINGLE / STRIPE_PRICE_UNLIMITED / STRIPE_PRICE_TEAM: Price IDs,
+ *   used to verify that the purchased line item matches the plan
+ * - SKIP_PRICE_VERIFICATION=1: fulfill paid checkouts even when the line item
+ *   does not match the configured price (escape hatch for legacy/manual prices)
+ * - ALLOW_UNVERIFIED_WEBHOOKS=1: (Local development only) skip signature
+ *   verification because `vercel dev` rewrites the request body
  *
  * Setup in Stripe Dashboard:
  * 1. Go to Developers → Webhooks
@@ -18,6 +24,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Stripe from 'stripe'
+import { signLicensePayload } from './_lib/license'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -28,6 +35,13 @@ const PLAN_CODES: Record<string, string> = {
   single: 'PRO1',
   unlimited: 'PROU',
   team: 'PROT',
+}
+
+// Price IDs per plan, used to verify the purchased line item.
+const PLAN_PRICES: Record<string, string | undefined> = {
+  single: process.env.STRIPE_PRICE_SINGLE,
+  unlimited: process.env.STRIPE_PRICE_UNLIMITED,
+  team: process.env.STRIPE_PRICE_TEAM,
 }
 
 /**
@@ -46,102 +60,24 @@ async function generateLicenseKey(plan: string): Promise<string> {
   // Keep the key format stable while making the lifetime nature of the license explicit.
   const expiry = '20991231'
 
-  const privateKeyPem = process.env.LICENSE_PRIVATE_KEY
-  if (!privateKeyPem) {
-    throw new Error('LICENSE_PRIVATE_KEY environment variable is required')
-  }
-
   const payload = `TP-${typeCode}-${expiry}`
+  const signature = await signLicensePayload(payload)
 
-  // Import private key for signing
-  const pemContents = privateKeyPem
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\s/g, '')
-
-  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0))
-
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    binaryKey.buffer,
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign'],
-  )
-
-  const encoder = new TextEncoder()
-  const msgData = encoder.encode(payload)
-
-  const rawSignature = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    cryptoKey,
-    msgData,
-  )
-
-  // Convert raw signature (r || s) to DER format for compatibility with Node.js verification
-  const derSignature = rawToDer(new Uint8Array(rawSignature))
-
-  // Convert to URL-safe base64 (replace +/ with -_)
-  const sigBase64 = btoa(String.fromCharCode.apply(null, Array.from(derSignature)))
-  const safeSig = sigBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-
-  return `TP-${typeCode}-${safeSig}-${expiry}`
+  return `TP-${typeCode}-${signature}-${expiry}`
 }
 
-/**
- * Concatenate byte arrays
- */
-function concatBytes(prefix: number[], arr: Uint8Array): Uint8Array {
-  const result = new Uint8Array(prefix.length + arr.length)
-  result.set(prefix, 0)
-  result.set(arr, prefix.length)
-  return result
-}
-
-/**
- * Convert raw ECDSA signature (r || s) to DER format
- * DER format: 0x30 [length] 0x02 [r-length] [r] 0x02 [s-length] [s]
- */
-function rawToDer(raw: Uint8Array): Uint8Array {
-  const r = raw.slice(0, 32)
-  const s = raw.slice(32, 64)
-
-  // Add leading zero if high bit is set (to indicate positive integer)
-  const rPadded = r[0] >= 0x80 ? concatBytes([0], r) : r
-  const sPadded = s[0] >= 0x80 ? concatBytes([0], s) : s
-
-  // Remove leading zeros (except one if needed for sign)
-  const rTrimmed = trimLeadingZeros(rPadded)
-  const sTrimmed = trimLeadingZeros(sPadded)
-
-  const totalLen = 2 + rTrimmed.length + 2 + sTrimmed.length
-
-  const der = new Uint8Array(2 + totalLen)
-  let offset = 0
-
-  der[offset++] = 0x30 // SEQUENCE
-  der[offset++] = totalLen
-  der[offset++] = 0x02 // INTEGER
-  der[offset++] = rTrimmed.length
-  der.set(rTrimmed, offset)
-  offset += rTrimmed.length
-  der[offset++] = 0x02 // INTEGER
-  der[offset++] = sTrimmed.length
-  der.set(sTrimmed, offset)
-
-  return der
-}
-
-function trimLeadingZeros(arr: Uint8Array): Uint8Array {
-  let start = 0
-  while (start < arr.length - 1 && arr[start] === 0 && arr[start + 1] < 0x80) {
-    start++
-  }
-  return arr.slice(start)
-}
-
-// Check if running in development
+// Local development detection (only affects the email sender/subject)
 const isDev = process.env.VERCEL_ENV !== 'production' && process.env.NODE_ENV !== 'production'
+
+/**
+ * Signature verification is fail-closed: it is skipped only when an operator
+ * explicitly opts in with ALLOW_UNVERIFIED_WEBHOOKS=1 on a deployment that is
+ * not Vercel production or preview.
+ */
+const allowUnverifiedWebhook
+  = process.env.ALLOW_UNVERIFIED_WEBHOOKS === '1'
+    && process.env.VERCEL_ENV !== 'production'
+    && process.env.VERCEL_ENV !== 'preview'
 
 /**
  * Send license email via Resend
@@ -214,6 +150,49 @@ setLicenseKey('${licenseKey}')
   }
 }
 
+/**
+ * Verify that a checkout session was actually paid and that the purchased
+ * line item matches the plan recorded in metadata.
+ */
+async function verifyPaidCheckout(
+  session: Stripe.Checkout.Session,
+): Promise<{ ok: boolean, reason?: string }> {
+  if (session.payment_status !== 'paid') {
+    return { ok: false, reason: `payment_status is "${session.payment_status}"` }
+  }
+
+  const plan = session.metadata?.plan
+  if (!plan || !Object.hasOwn(PLAN_CODES, plan)) {
+    return { ok: false, reason: 'missing or unknown plan metadata' }
+  }
+
+  const expectedPrice = PLAN_PRICES[plan]
+  if (!expectedPrice || process.env.SKIP_PRICE_VERIFICATION === '1') {
+    // Price ID not configured (or verification disabled) - we cannot verify,
+    // but do not block fulfillment.
+    return { ok: true }
+  }
+
+  try {
+    const full = await stripe.checkout.sessions.retrieve(session.id, {
+      expand: ['line_items'],
+    })
+    const priceIds = (full.line_items?.data ?? [])
+      .map(item => item.price?.id)
+      .filter((id): id is string => Boolean(id))
+
+    if (!priceIds.includes(expectedPrice)) {
+      return { ok: false, reason: `line item does not match the "${plan}" price` }
+    }
+  }
+  catch (error) {
+    // A transient Stripe API failure must not deny a paying customer.
+    console.error('⚠️ Could not verify checkout line items:', error)
+  }
+
+  return { ok: true }
+}
+
 export const config = {
   api: {
     bodyParser: false, // Required for webhook signature verification
@@ -281,10 +260,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let event: Stripe.Event
 
-  // In dev mode, skip signature verification (vercel dev mangles the body)
-  // This is safe because we're using Stripe CLI locally
-  if (isDev) {
-    console.log('🔧 DEV MODE: Skipping signature verification')
+  if (allowUnverifiedWebhook) {
+    console.log('🔧 DEV MODE: Skipping signature verification (ALLOW_UNVERIFIED_WEBHOOKS=1)')
 
     // Get the body - either already parsed or from stream
     let body: unknown
@@ -301,6 +278,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   else {
     // Production: verify signature
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+    if (!webhookSecret) {
+      console.error('❌ STRIPE_WEBHOOK_SECRET is not configured')
+      return res.status(500).json({ error: 'Webhook not configured' })
+    }
+
     const signature = req.headers['stripe-signature'] as string
     console.log(`🔍 req.body type: ${typeof req.body}, isBuffer: ${Buffer.isBuffer(req.body)}, isNull: ${req.body === null}, isUndefined: ${req.body === undefined}`)
 
@@ -323,7 +306,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       event = stripe.webhooks.constructEvent(
         rawBody,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET!,
+        webhookSecret,
       )
       console.log(`✅ Webhook verified: ${event.type}`)
     }
@@ -333,18 +316,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  if (event.type === 'checkout.session.completed') {
+  const isPaidCheckoutEvent
+    = event.type === 'checkout.session.completed'
+      || event.type === 'checkout.session.async_payment_succeeded'
+
+  if (isPaidCheckoutEvent) {
     const session = event.data.object as Stripe.Checkout.Session
 
-    // Only process TinyPivot checkouts — must have a "plan" metadata key
+    // Only process TinyPivot checkouts — must have a known "plan" metadata key
     // (other products on this Stripe account use different metadata like "clerkUserId")
-    if (!session.metadata?.plan) {
-      console.log('Ignoring checkout event: not a TinyPivot purchase (no "plan" metadata)')
+    const plan = session.metadata?.plan
+    if (!plan || !Object.hasOwn(PLAN_CODES, plan)) {
+      console.log('Ignoring checkout event: not a TinyPivot purchase (missing or unknown "plan" metadata)')
+      return res.status(200).json({ received: true })
+    }
+
+    const verdict = await verifyPaidCheckout(session)
+    if (!verdict.ok) {
+      // Do not issue a license. Stripe sends checkout.session.async_payment_succeeded
+      // once a delayed payment actually clears.
+      console.warn(
+        `⚠️ Not issuing a license for session ${session.id}: ${verdict.reason}.`
+        + ` Customer: ${session.customer_details?.email ?? 'unknown'}`,
+      )
       return res.status(200).json({ received: true })
     }
 
     const email = session.customer_details?.email
-    const plan = session.metadata.plan
 
     if (email) {
       const licenseKey = await generateLicenseKey(plan)

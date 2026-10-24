@@ -12,78 +12,17 @@
  * - AI_MODEL: Override the default model
  * - AI_RATE_LIMIT_PER_MINUTE: Max requests per IP per minute (default: 10)
  * - AI_RATE_LIMIT_DAILY: Max requests per IP per day (default: 100)
+ * - ALLOWED_ORIGINS: Comma-separated extra browser origins allowed to call this endpoint
+ * - UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL /
+ *   KV_REST_API_TOKEN): enables durable, cross-instance rate limiting
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-
-// Simple in-memory rate limiting (resets on cold start, but good enough for demo)
-const rateLimitStore = new Map<string, { count: number, resetAt: number }>()
-const dailyLimitStore = new Map<string, { count: number, resetAt: number }>()
+import { applyCors, getClientIP, handlePreflight, rejectDisallowedOrigin } from './_lib/http'
+import { checkRateLimit } from './_lib/rate-limit'
 
 const RATE_LIMIT_PER_MINUTE = Number(process.env.AI_RATE_LIMIT_PER_MINUTE) || 10
 const RATE_LIMIT_DAILY = Number(process.env.AI_RATE_LIMIT_DAILY) || 100
-
-function getClientIP(req: VercelRequest): string {
-  const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0].trim()
-  }
-  return req.socket?.remoteAddress || 'unknown'
-}
-
-function checkRateLimit(ip: string): { allowed: boolean, retryAfter?: number, reason?: string } {
-  const now = Date.now()
-
-  // Check per-minute limit
-  const minuteKey = `${ip}-minute`
-  const minuteData = rateLimitStore.get(minuteKey)
-
-  if (minuteData) {
-    if (now < minuteData.resetAt) {
-      if (minuteData.count >= RATE_LIMIT_PER_MINUTE) {
-        return {
-          allowed: false,
-          retryAfter: Math.ceil((minuteData.resetAt - now) / 1000),
-          reason: `Rate limit exceeded. Max ${RATE_LIMIT_PER_MINUTE} requests per minute.`,
-        }
-      }
-      minuteData.count++
-    }
-    else {
-      rateLimitStore.set(minuteKey, { count: 1, resetAt: now + 60_000 })
-    }
-  }
-  else {
-    rateLimitStore.set(minuteKey, { count: 1, resetAt: now + 60_000 })
-  }
-
-  // Check daily limit
-  const dailyKey = `${ip}-daily`
-  const dailyData = dailyLimitStore.get(dailyKey)
-  const endOfDay = new Date()
-  endOfDay.setHours(23, 59, 59, 999)
-
-  if (dailyData) {
-    if (now < dailyData.resetAt) {
-      if (dailyData.count >= RATE_LIMIT_DAILY) {
-        return {
-          allowed: false,
-          retryAfter: Math.ceil((dailyData.resetAt - now) / 1000),
-          reason: `Daily limit exceeded. Max ${RATE_LIMIT_DAILY} requests per day.`,
-        }
-      }
-      dailyData.count++
-    }
-    else {
-      dailyLimitStore.set(dailyKey, { count: 1, resetAt: endOfDay.getTime() })
-    }
-  }
-  else {
-    dailyLimitStore.set(dailyKey, { count: 1, resetAt: endOfDay.getTime() })
-  }
-
-  return { allowed: true }
-}
 
 // Detect AI provider from API key format
 type AIProvider = 'anthropic' | 'openai' | 'openrouter'
@@ -196,22 +135,26 @@ async function callOpenRouter(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  const cors = applyCors(req, res)
+
+  if (!cors.allowed) {
+    return rejectDisallowedOrigin(res)
+  }
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+    return handlePreflight(res)
   }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // Check rate limit
+  // Check rate limit (durable store when configured, in-memory fallback)
   const clientIP = getClientIP(req)
-  const rateCheck = checkRateLimit(clientIP)
+  const rateCheck = await checkRateLimit(clientIP, {
+    perMinute: RATE_LIMIT_PER_MINUTE,
+    perDay: RATE_LIMIT_DAILY,
+  })
 
   if (!rateCheck.allowed) {
     res.setHeader('Retry-After', String(rateCheck.retryAfter))

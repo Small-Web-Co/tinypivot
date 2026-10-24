@@ -1,7 +1,9 @@
 import type { Plugin } from 'vite'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig, loadEnv } from 'vite'
+import { base64UrlEncode, signLicensePayload } from './api/_lib/license'
 
 /**
  * Vite plugin to handle AI proxy requests locally
@@ -164,12 +166,82 @@ function aiProxyPlugin(): Plugin {
   }
 }
 
+/**
+ * Vite plugin that mints demo tokens locally, mirroring /api/demo-token so
+ * `pnpm demo` works without `vercel dev`.
+ *
+ * Uses LICENSE_PRIVATE_KEY when set, otherwise the local private-key.pem.
+ * Dev only - production tokens come from the serverless function.
+ */
+function demoTokenPlugin(): Plugin {
+  return {
+    name: 'demo-token',
+    configureServer(server) {
+      server.middlewares.use('/api/demo-token', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
+        }
+
+        if (!process.env.LICENSE_PRIVATE_KEY) {
+          try {
+            process.env.LICENSE_PRIVATE_KEY = readFileSync(
+              resolve(__dirname, 'private-key.pem'),
+              'utf-8',
+            )
+          }
+          catch {
+            // No local key available.
+          }
+        }
+
+        if (!process.env.LICENSE_PRIVATE_KEY) {
+          res.statusCode = 500
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({
+            error: 'LICENSE_PRIVATE_KEY is not configured (or private-key.pem is missing).',
+          }))
+          return
+        }
+
+        const originHeader = req.headers.origin
+        const origin = typeof originHeader === 'string' && originHeader
+          ? originHeader
+          : `http://${req.headers.host}`
+
+        try {
+          const expiry = Date.now() + 24 * 3_600_000
+          const payload = `TPDEMO|${expiry}|${origin}`
+          const signature = await signLicensePayload(payload)
+          const encodedOrigin = base64UrlEncode(new TextEncoder().encode(origin))
+
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'application/json')
+          res.setHeader('Cache-Control', 'no-store')
+          res.end(JSON.stringify({
+            token: `TPDEMO.${expiry}.${encodedOrigin}.${signature}`,
+            expiresAt: new Date(expiry).toISOString(),
+          }))
+        }
+        catch (error) {
+          console.error('[Demo Token Error]', error)
+          res.statusCode = 500
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Could not create demo token' }))
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   // Load env vars from project root
   const env = loadEnv(mode, resolve(__dirname), '')
 
   return {
-    plugins: [vue(), aiProxyPlugin()],
+    plugins: [vue(), aiProxyPlugin(), demoTokenPlugin()],
     resolve: {
       alias: {
         '@': resolve(__dirname, 'packages/vue/src'),
