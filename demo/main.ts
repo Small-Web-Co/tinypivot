@@ -3,7 +3,7 @@ import { enableDemoMode } from 'tinypivot'
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import '../src/style.css'
+import './style.css'
 
 /**
  * Ask the API for a short-lived demo token.

@@ -13,6 +13,7 @@
  * - AI_RATE_LIMIT_PER_MINUTE: Max requests per IP per minute (default: 10)
  * - AI_RATE_LIMIT_DAILY: Max requests per IP per day (default: 100)
  * - ALLOWED_ORIGINS: Comma-separated extra browser origins allowed to call this endpoint
+ * - AI_MAX_MESSAGES / AI_MAX_MESSAGE_CHARS / AI_MAX_TOTAL_CHARS: request caps
  * - UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL /
  *   KV_REST_API_TOKEN): enables durable, cross-instance rate limiting
  */
@@ -23,6 +24,63 @@ import { checkRateLimit } from './_lib/rate-limit.js'
 
 const RATE_LIMIT_PER_MINUTE = Number(process.env.AI_RATE_LIMIT_PER_MINUTE) || 10
 const RATE_LIMIT_DAILY = Number(process.env.AI_RATE_LIMIT_DAILY) || 100
+
+// Request caps - bound token spend and memory per request.
+const MAX_MESSAGES = Number(process.env.AI_MAX_MESSAGES) || 50
+const MAX_MESSAGE_CHARS = Number(process.env.AI_MAX_MESSAGE_CHARS) || 20_000
+const MAX_TOTAL_CHARS = Number(process.env.AI_MAX_TOTAL_CHARS) || 100_000
+
+interface ChatMessage {
+  role: string
+  content: string
+}
+
+/**
+ * Validate and normalize the incoming messages array.
+ */
+function validateMessages(
+  messages: unknown,
+): { ok: true, messages: ChatMessage[] } | { ok: false, error: string } {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return { ok: false, error: 'messages array is required' }
+  }
+
+  if (messages.length > MAX_MESSAGES) {
+    return { ok: false, error: `Too many messages (max ${MAX_MESSAGES})` }
+  }
+
+  const normalized: ChatMessage[] = []
+  let totalChars = 0
+
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') {
+      return { ok: false, error: 'Each message must be an object' }
+    }
+
+    const { role, content } = message as { role?: unknown, content?: unknown }
+
+    if (typeof role !== 'string' || !['user', 'assistant', 'system'].includes(role)) {
+      return { ok: false, error: 'Invalid message role' }
+    }
+
+    if (typeof content !== 'string') {
+      return { ok: false, error: 'Message content must be a string' }
+    }
+
+    if (content.length > MAX_MESSAGE_CHARS) {
+      return { ok: false, error: `Message exceeds ${MAX_MESSAGE_CHARS} characters` }
+    }
+
+    totalChars += content.length
+    if (totalChars > MAX_TOTAL_CHARS) {
+      return { ok: false, error: `Conversation exceeds ${MAX_TOTAL_CHARS} characters` }
+    }
+
+    normalized.push({ role, content })
+  }
+
+  return { ok: true, messages: normalized }
+}
 
 // Detect AI provider from API key format
 type AIProvider = 'anthropic' | 'openai' | 'openrouter'
@@ -174,22 +232,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Parse request - supports unified handler format { action: 'chat', messages }
-  const body = req.body
+  const body = (req.body ?? {}) as Record<string, unknown>
 
   // This endpoint only handles 'chat' action (or no action for backwards compatibility)
   // Other actions (list-tables, get-schema, query) need a database - use the demo's
   // client-side DuckDB via queryExecutor instead
-  if (body.action && body.action !== 'chat') {
+  const action = typeof body.action === 'string' ? body.action : undefined
+  if (action && action !== 'chat') {
     return res.status(400).json({
-      error: `Action '${body.action}' is not supported by this endpoint. This endpoint only handles AI chat.`,
+      error: `Action '${action}' is not supported by this endpoint. This endpoint only handles AI chat.`,
     })
   }
 
-  // Extract messages from either format
-  const messages = body.messages
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'messages array is required' })
+  // Extract and validate messages (caps size and normalizes roles/content)
+  const validated = validateMessages(body.messages)
+  if (!validated.ok) {
+    return res.status(400).json({ error: validated.error })
   }
+  const messages = validated.messages
 
   try {
     const provider = detectProvider(apiKey)
@@ -217,7 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   catch (error) {
     console.error('[AI Proxy] Error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    return res.status(500).json({ error: errorMessage })
+    // Do not echo provider or runtime details back to the browser.
+    return res.status(500).json({ error: 'AI request failed' })
   }
 }

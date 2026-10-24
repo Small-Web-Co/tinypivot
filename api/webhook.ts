@@ -24,6 +24,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Stripe from 'stripe'
+import { claimEvent } from './_lib/idempotency.js'
 import { signLicensePayload } from './_lib/license.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -82,12 +83,32 @@ const allowUnverifiedWebhook
     && process.env.VERCEL_ENV !== 'preview'
 
 /**
+ * Mask an email address for logs: first character plus the domain.
+ */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@')
+  if (at <= 0) {
+    return '[redacted]'
+  }
+  const local = email.slice(0, at)
+  const domain = email.slice(at + 1)
+  return `${local[0]}${'*'.repeat(Math.max(2, local.length - 1))}@${domain}`
+}
+
+/**
  * Send license email via Resend
  */
 async function sendLicenseEmail(email: string, licenseKey: string, plan: string): Promise<boolean> {
   if (!process.env.RESEND_API_KEY) {
-    console.log('⚠️ RESEND_API_KEY not set - logging license for manual fulfillment')
-    console.log('LICENSE GENERATED:', { email, licenseKey, plan })
+    // No delivery channel: the key has to be logged so the order can be
+    // fulfilled by hand. Configure RESEND_API_KEY in production so this
+    // branch never runs, and treat this log line as a secret.
+    console.warn('⚠️ RESEND_API_KEY not set - license NOT emailed. Manual fulfillment required.')
+    console.log('LICENSE FOR MANUAL FULFILLMENT (treat as secret):', {
+      email: maskEmail(email),
+      plan,
+      licenseKey,
+    })
     return false
   }
 
@@ -105,7 +126,7 @@ async function sendLicenseEmail(email: string, licenseKey: string, plan: string)
   const subjectPrefix = isDev ? '[TEST] ' : ''
 
   try {
-    console.log(`📧 Sending license email to ${email}... (${isDev ? 'DEV MODE' : 'PRODUCTION'})`)
+    console.log(`📧 Sending license email to ${maskEmail(email)}... (${isDev ? 'DEV MODE' : 'PRODUCTION'})`)
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -297,7 +318,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let rawBody: Buffer
     try {
       rawBody = await getRawBody(req)
-      console.log(`📥 Received webhook body (${rawBody.length} bytes), first 100 chars: ${rawBody.toString('utf8').slice(0, 100)}`)
+      console.log(`📥 Received webhook body (${rawBody.length} bytes)`)
     }
     catch (err) {
       console.error('❌ Failed to read request body:', err)
@@ -323,6 +344,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       || event.type === 'checkout.session.async_payment_succeeded'
 
   if (isPaidCheckoutEvent) {
+    // Stripe retries deliveries: only issue a license once per event.
+    const isFirstDelivery = await claimEvent(event.id)
+    if (!isFirstDelivery) {
+      console.log(`Ignoring duplicate webhook event: ${event.id}`)
+      return res.status(200).json({ received: true, duplicate: true })
+    }
+
     const session = event.data.object as Stripe.Checkout.Session
 
     // Only process TinyPivot checkouts — must have a known "plan" metadata key
@@ -339,7 +367,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // once a delayed payment actually clears.
       console.warn(
         `⚠️ Not issuing a license for session ${session.id}: ${verdict.reason}.`
-        + ` Customer: ${session.customer_details?.email ?? 'unknown'}`,
+        + ` Customer: ${session.customer_details?.email ? maskEmail(session.customer_details.email) : 'unknown'}`,
       )
       return res.status(200).json({ received: true })
     }
@@ -349,7 +377,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (email) {
       const licenseKey = await generateLicenseKey(plan)
       const emailSent = await sendLicenseEmail(email, licenseKey, plan)
-      console.log(`📋 License: ${licenseKey} | Email: ${email} | Sent: ${emailSent ? 'YES' : 'NO'}`)
+      console.log(`📋 License issued | Session: ${session.id} | Plan: ${plan} | Email: ${maskEmail(email)} | Sent: ${emailSent ? 'YES' : 'NO'}`)
     }
     else {
       console.error('⚠️ No email found in checkout session!')
