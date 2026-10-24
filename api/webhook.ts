@@ -24,7 +24,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Stripe from 'stripe'
-import { signLicensePayload } from './_lib/license'
+import { signLicensePayload } from './_lib/license.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -36,6 +36,8 @@ const PLAN_CODES: Record<string, string> = {
   unlimited: 'PROU',
   team: 'PROT',
 }
+
+const VALID_PLANS = new Set(Object.keys(PLAN_CODES))
 
 // Price IDs per plan, used to verify the purchased line item.
 const PLAN_PRICES: Record<string, string | undefined> = {
@@ -162,7 +164,7 @@ async function verifyPaidCheckout(
   }
 
   const plan = session.metadata?.plan
-  if (!plan || !Object.hasOwn(PLAN_CODES, plan)) {
+  if (!plan || !VALID_PLANS.has(plan)) {
     return { ok: false, reason: 'missing or unknown plan metadata' }
   }
 
@@ -326,7 +328,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Only process TinyPivot checkouts — must have a known "plan" metadata key
     // (other products on this Stripe account use different metadata like "clerkUserId")
     const plan = session.metadata?.plan
-    if (!plan || !Object.hasOwn(PLAN_CODES, plan)) {
+    if (!plan || !VALID_PLANS.has(plan)) {
       console.log('Ignoring checkout event: not a TinyPivot purchase (missing or unknown "plan" metadata)')
       return res.status(200).json({ received: true })
     }

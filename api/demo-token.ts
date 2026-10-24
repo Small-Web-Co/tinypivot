@@ -18,9 +18,9 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { applyCors, getClientIP, handlePreflight, isSameOriginRequest, rejectDisallowedOrigin } from './_lib/http'
-import { base64UrlEncode, signLicensePayload } from './_lib/license'
-import { checkRateLimit } from './_lib/rate-limit'
+import { applyCors, getClientIP, handlePreflight, isSameOriginRequest, rejectDisallowedOrigin } from './_lib/http.js'
+import { base64UrlEncode, signLicensePayload } from './_lib/license.js'
+import { checkRateLimit } from './_lib/rate-limit.js'
 
 const TOKEN_PREFIX = 'TPDEMO'
 const TOKEN_TTL_MS = (Number(process.env.DEMO_TOKEN_TTL_HOURS) || 24) * 3_600_000
