@@ -4,8 +4,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Stripe from 'stripe'
-import { applyCors, getClientIP, handlePreflight, rejectDisallowedOrigin } from './_lib/http'
-import { checkRateLimit } from './_lib/rate-limit'
+import { applyCors, getClientIP, handlePreflight, rejectDisallowedOrigin } from './_lib/http.js'
+import { checkRateLimit } from './_lib/rate-limit.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cors = applyCors(req, res)
@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     unlimited: process.env.STRIPE_PRICE_UNLIMITED,
     team: process.env.STRIPE_PRICE_TEAM,
   }
+  const VALID_PLANS = new Set(Object.keys(PRICES))
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -56,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { plan } = req.body as { plan: string }
     console.log('Received plan:', plan)
 
-    if (!plan || !Object.hasOwn(PRICES, plan) || !PRICES[plan]) {
+    if (!plan || !VALID_PLANS.has(plan) || !PRICES[plan]) {
       console.error('Invalid plan or missing price:', { plan, price: PRICES[plan] })
       return res.status(400).json({ error: `Invalid plan: ${plan}` })
     }

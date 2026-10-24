@@ -18,8 +18,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { applyCors, getClientIP, handlePreflight, rejectDisallowedOrigin } from './_lib/http'
-import { checkRateLimit } from './_lib/rate-limit'
+import { applyCors, getClientIP, handlePreflight, rejectDisallowedOrigin } from './_lib/http.js'
+import { checkRateLimit } from './_lib/rate-limit.js'
 
 const RATE_LIMIT_PER_MINUTE = Number(process.env.AI_RATE_LIMIT_PER_MINUTE) || 10
 const RATE_LIMIT_DAILY = Number(process.env.AI_RATE_LIMIT_DAILY) || 100
