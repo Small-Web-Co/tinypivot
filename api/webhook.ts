@@ -10,10 +10,6 @@
  * - RESEND_API_KEY: (Optional) For sending license emails via Resend
  * - STRIPE_PRICE_SINGLE / STRIPE_PRICE_UNLIMITED / STRIPE_PRICE_TEAM: Price IDs,
  *   used to verify that the purchased line item matches the plan
- * - SKIP_PRICE_VERIFICATION=1: fulfill paid checkouts even when the line item
- *   does not match the configured price (escape hatch for legacy/manual prices)
- * - ALLOW_UNVERIFIED_WEBHOOKS=1: (Local development only) skip signature
- *   verification because `vercel dev` rewrites the request body
  *
  * Setup in Stripe Dashboard:
  * 1. Go to Developers → Webhooks
@@ -72,11 +68,7 @@ async function generateLicenseKey(plan: string): Promise<string> {
 // Local development detection (only affects the email sender/subject)
 const isDev = process.env.VERCEL_ENV !== 'production' && process.env.NODE_ENV !== 'production'
 
-/**
- * Signature verification is fail-closed: it is skipped only when an operator
- * explicitly opts in with ALLOW_UNVERIFIED_WEBHOOKS=1 on a deployment that is
- * not Vercel production or preview.
- */
+// Local development escape hatch (never active on Vercel production/preview).
 const allowUnverifiedWebhook
   = process.env.ALLOW_UNVERIFIED_WEBHOOKS === '1'
     && process.env.VERCEL_ENV !== 'production'
@@ -100,11 +92,9 @@ function maskEmail(email: string): string {
  */
 async function sendLicenseEmail(email: string, licenseKey: string, plan: string): Promise<boolean> {
   if (!process.env.RESEND_API_KEY) {
-    // No delivery channel: the key has to be logged so the order can be
-    // fulfilled by hand. Configure RESEND_API_KEY in production so this
-    // branch never runs, and treat this log line as a secret.
+    // Fallback delivery path when email is not configured.
     console.warn('⚠️ RESEND_API_KEY not set - license NOT emailed. Manual fulfillment required.')
-    console.log('LICENSE FOR MANUAL FULFILLMENT (treat as secret):', {
+    console.log('LICENSE FOR MANUAL FULFILLMENT:', {
       email: maskEmail(email),
       plan,
       licenseKey,
