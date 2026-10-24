@@ -561,9 +561,13 @@ const aiConfig = {
 ### Security
 
 The server handler includes built-in protections:
-- **SQL Validation**: Only SELECT queries allowed
+- **Parser-based SQL Validation**: Only SELECT queries allowed; every table reference (including subqueries and CTEs) is checked against the allowlist
+- **Read-only session**: Queries run on a connection opened `READ ONLY`, so writes cannot succeed even if validation is bypassed
 - **Table Whitelisting**: Only configured tables are queryable
+- **Function Denylist**: File, network, and session-config functions (`pg_read_file`, `dblink`, `set_config`, ...) are rejected
 - **Error Sanitization**: Connection strings stripped from errors
+
+The handler does not authenticate callers — put it behind your own auth and rate limiting.
 
 See [@smallwebco/tinypivot-server](./packages/server/README.md) for full documentation
 

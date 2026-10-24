@@ -4,15 +4,18 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Stripe from 'stripe'
+import { applyCors, getClientIP, handlePreflight, rejectDisallowedOrigin } from './_lib/http'
+import { checkRateLimit } from './_lib/rate-limit'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  const cors = applyCors(req, res)
+
+  if (!cors.allowed) {
+    return rejectDisallowedOrigin(res)
+  }
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+    return handlePreflight(res)
   }
 
   if (req.method !== 'POST') {
@@ -23,6 +26,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!process.env.STRIPE_SECRET_KEY) {
     console.error('Missing STRIPE_SECRET_KEY')
     return res.status(500).json({ error: 'Server configuration error: Missing Stripe key' })
+  }
+
+  // Generous limit: a real shopper only needs a handful of sessions.
+  const rateCheck = await checkRateLimit(getClientIP(req), {
+    perMinute: Number(process.env.CHECKOUT_RATE_LIMIT_PER_MINUTE) || 20,
+    perDay: Number(process.env.CHECKOUT_RATE_LIMIT_DAILY) || 200,
+  })
+
+  if (!rateCheck.allowed) {
+    res.setHeader('Retry-After', String(rateCheck.retryAfter))
+    return res.status(429).json({
+      error: rateCheck.reason,
+      retryAfter: rateCheck.retryAfter,
+    })
   }
 
   const PRICES: Record<string, string | undefined> = {
@@ -39,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { plan } = req.body as { plan: string }
     console.log('Received plan:', plan)
 
-    if (!plan || !PRICES[plan]) {
+    if (!plan || !Object.hasOwn(PRICES, plan) || !PRICES[plan]) {
       console.error('Invalid plan or missing price:', { plan, price: PRICES[plan] })
       return res.status(400).json({ error: `Invalid plan: ${plan}` })
     }

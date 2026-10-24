@@ -3,15 +3,5 @@
   "buildCommand": "pnpm build:demo",
   "outputDirectory": "dist-demo",
   "installCommand": "pnpm install",
-  "devCommand": "vite --config vite.demo.config.ts --port $PORT",
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
-      ]
-    }
-  ]
+  "devCommand": "vite --config vite.demo.config.ts --port $PORT"
 }

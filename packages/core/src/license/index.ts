@@ -268,12 +268,10 @@ function getSpkiBytes(): Uint8Array {
  * Verifies that the license was signed with our private key
  * Falls back to @noble/curves when SubtleCrypto is unavailable
  */
-async function verifySignature(
-  typeCode: string,
+async function verifyPayload(
+  payload: string,
   signature: string,
-  expiry: string,
 ): Promise<boolean> {
-  const payload = `TP-${typeCode}-${expiry}`
   const encoder = new TextEncoder()
   const msgData = encoder.encode(payload)
   const derSig = base64ToUint8Array(signature)
@@ -308,6 +306,14 @@ async function verifySignature(
   catch {
     return false
   }
+}
+
+async function verifySignature(
+  typeCode: string,
+  signature: string,
+  expiry: string,
+): Promise<boolean> {
+  return verifyPayload(`TP-${typeCode}-${expiry}`, signature)
 }
 
 /**
@@ -398,8 +404,82 @@ export function configureLicenseSecret(_secret: string): void {
   console.warn('[TinyPivot] configureLicenseSecret() is deprecated and no longer needed.')
 }
 
-// Hardcoded SHA-256 hash of the demo secret
+// Hardcoded SHA-256 hash of the demo secret (legacy secret-based demo mode)
 const DEMO_SECRET_HASH = 'A48AA0618518D3E62F31FCFCA2DD2B86E7FE0863E2F90756FB0A960AE7A51583'
+
+// Prefix for server-minted demo tokens
+const DEMO_TOKEN_PREFIX = 'TPDEMO'
+
+/**
+ * Decode a base64url string to UTF-8.
+ */
+function decodeBase64Url(value: string): string {
+  let standardBase64 = value.replace(/-/g, '+').replace(/_/g, '/')
+  while (standardBase64.length % 4) {
+    standardBase64 += '='
+  }
+
+  const binaryString = atob(standardBase64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+
+  return new TextDecoder().decode(bytes)
+}
+
+/**
+ * The current page origin, when running in a browser.
+ */
+function getCurrentOrigin(): string | null {
+  const location = (globalThis as { location?: { origin?: unknown } }).location
+  const origin = location?.origin
+  if (typeof origin === 'string' && origin.length > 0 && origin !== 'null') {
+    return origin
+  }
+  return null
+}
+
+/**
+ * Verify a server-minted demo token.
+ *
+ * Format: `TPDEMO.<expiry>.<base64url(origin)>.<signature>`
+ * Payload: `TPDEMO|<expiry>|<origin>`
+ */
+async function verifyDemoToken(token: string): Promise<LicenseInfo | null> {
+  const parts = token.split('.')
+  if (parts.length !== 4 || parts[0] !== DEMO_TOKEN_PREFIX) {
+    return null
+  }
+
+  const expiryStr = parts[1]
+  const expiry = Number.parseInt(expiryStr, 10)
+  if (!Number.isFinite(expiry) || expiry <= Date.now()) {
+    return null
+  }
+
+  let origin: string
+  try {
+    origin = decodeBase64Url(parts[2])
+  }
+  catch {
+    return null
+  }
+
+  // The token only unlocks the site it was minted for. In non-browser
+  // environments (SSR, tests) there is no origin to compare against.
+  const currentOrigin = getCurrentOrigin()
+  if (currentOrigin && origin !== currentOrigin) {
+    return null
+  }
+
+  const valid = await verifyPayload(
+    `${DEMO_TOKEN_PREFIX}|${expiryStr}|${origin}`,
+    parts[3],
+  )
+
+  return valid ? DEMO_LICENSE : null
+}
 
 /**
  * Hash a string using SHA-256 (async for Web Crypto API)
@@ -425,12 +505,20 @@ async function hashSecret(secret: string): Promise<string> {
 }
 
 /**
- * Validate demo secret and return demo license info if valid
- * Returns null if secret is invalid
+ * Validate a demo secret or a server-minted demo token and return demo
+ * license info if valid. Returns null if invalid.
+ *
+ * - `TPDEMO.…` tokens are signed with the license private key, bound to the
+ *   requesting origin, and expire.
+ * - Legacy secrets are still accepted (SHA-256 compared to a hardcoded hash).
  */
 export async function getDemoLicenseInfo(secret?: string): Promise<LicenseInfo | null> {
   if (!secret) {
     return null
+  }
+
+  if (secret.startsWith(`${DEMO_TOKEN_PREFIX}.`)) {
+    return verifyDemoToken(secret)
   }
 
   const hash = await hashSecret(secret)

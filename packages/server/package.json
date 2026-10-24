@@ -54,7 +54,8 @@
     }
   },
   "dependencies": {
-    "@smallwebco/tinypivot-core": "workspace:*"
+    "@smallwebco/tinypivot-core": "workspace:*",
+    "pgsql-ast-parser": "^12.0.2"
   },
   "devDependencies": {
     "@types/pg": "^8.11.6",

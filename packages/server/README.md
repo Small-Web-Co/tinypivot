@@ -262,6 +262,11 @@ createTinyPivotHandler({
   // Query limits (optional)
   maxRows: 10000,
   timeout: 30000,
+
+  // Reject SQL the parser cannot understand (fail closed).
+  // Default false: exotic-but-valid PostgreSQL syntax falls back to
+  // keyword heuristics so existing queries keep working.
+  strictSqlValidation: false,
   
   // AI settings
   model: 'claude-sonnet-4-20250514',      // Override default model
@@ -341,10 +346,26 @@ The endpoint accepts POST requests with an `action` field:
 
 Built-in protections:
 
-1. **SQL Validation**: Only SELECT queries allowed
-2. **Table Whitelisting**: Only configured tables are queryable
-3. **LIMIT Enforcement**: Auto-added if missing
-4. **Error Sanitization**: Connection strings stripped from errors
+1. **Parser-based SQL validation**: the query is parsed and every table
+   reference — including CTEs and nested subqueries — is checked against the
+   allowed-table list. Data-modifying statements and data-modifying CTEs are
+   rejected.
+2. **Function denylist**: functions that read files, open outbound
+   connections, change session settings, or disrupt the server
+   (`pg_read_file`, `pg_ls_dir`, `lo_import`, `dblink`, `pg_sleep`,
+   `set_config`, ...) are rejected.
+3. **Read-only database session**: queries run on a connection opened with
+   `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY`, so writes cannot
+   succeed even if validation is bypassed.
+4. **LIMIT Enforcement**: the outer limit is detected via the parser and the
+   query is wrapped when the existing limit exceeds `maxRows`.
+5. **Error Sanitization**: connection strings stripped from errors.
+
+This handler does not authenticate callers. Put it behind your own auth and
+rate limiting before exposing it publicly.
+
+Set `strictSqlValidation: true` to reject queries the parser cannot
+understand instead of falling back to keyword heuristics.
 
 ---
 
