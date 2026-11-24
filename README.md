@@ -2,7 +2,7 @@
 
 **The Interactive Data IDE for AI Agents (MCP) — plus Lightweight React & Vue 3 Data Grids, Pivot Tables, Charts & Embedded AI Analyst.**
 
-**[TinyPivot MCP](https://tiny-pivot.com/mcp)** · **[Live Demo](https://tiny-pivot.com)** · **[Pricing](https://tiny-pivot.com/#pricing)** · **[npm (`@smallwebco/tinypivot-mcp`)](https://www.npmjs.com/package/@smallwebco/tinypivot-mcp)**
+**[TinyPivot MCP](https://tiny-pivot.com)** · **[Docs](https://tiny-pivot.com/docs)** · **[Live Demo](https://tiny-pivot.com/ui#demo)** · **[Pricing](https://tiny-pivot.com/pricing)** · **[npm (`@smallwebco/tinypivot-mcp`)](https://www.npmjs.com/package/@smallwebco/tinypivot-mcp)**
 
 ⭐ **If you find TinyPivot useful, please consider giving it a star!** It helps others discover the project.
 
@@ -54,7 +54,7 @@ npx @smallwebco/tinypivot-mcp tui
 duckdb -csv -c "SELECT * FROM 'sales.parquet'" | npx @smallwebco/tinypivot-mcp --open
 ```
 
-> **Privacy & Optional Env Vars:** Row data, column names, SQL, and file paths never leave your machine. Disable minimal anonymous telemetry anytime with `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1`. Set `TINYPIVOT_LICENSE_KEY` for Pro/Team features and optionally `DATABASE_URL` (+ `TINYPIVOT_ALLOWED_TABLES`) for direct read-only PostgreSQL (`query_postgres`). See the full [In-Agent Analytics (MCP) Guide](https://tiny-pivot.com/mcp) and [`packages/mcp/README.md`](./packages/mcp/README.md).
+> **Privacy & Optional Env Vars:** Row data, column names, SQL, and file paths never leave your machine. Disable minimal anonymous telemetry anytime with `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1`. Set `TINYPIVOT_LICENSE_KEY` for Pro/Team features and optionally `DATABASE_URL` (+ `TINYPIVOT_ALLOWED_TABLES`) for direct read-only PostgreSQL (`query_postgres`). See the full [In-Agent Analytics (MCP) Guide](https://tiny-pivot.com/docs) and [`packages/mcp/README.md`](./packages/mcp/README.md).
 
 ## Why TinyPivot?
 
@@ -969,7 +969,7 @@ setLicenseKey('YOUR_LICENSE_KEY')
 | Unlimited Projects | $149 | All your projects |
 | Team License | $399 | Up to 10 developers |
 
-**[Purchase at tiny-pivot.com/#pricing](https://tiny-pivot.com/#pricing)**
+**[Purchase at tiny-pivot.com/pricing](https://tiny-pivot.com/pricing?product=ui)**
 
 ## Styling
 

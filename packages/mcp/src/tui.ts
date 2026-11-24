@@ -564,7 +564,7 @@ export async function runTuiCommand(args: string[]): Promise<void> {
 
     const lines: string[] = [topBorder, frameTuiLine(navLine, innerWidth, pal), divider]
     if (payload?.truncatedForFreeTier && payload.sourceTotalRows) {
-      const warn = fgBold([251, 191, 36], truncateVisual(`⚠ Free tier limit: showing ${payload.totalRows.toLocaleString()} of ${payload.sourceTotalRows.toLocaleString()} rows — tiny-pivot.com/mcp`, innerWidth))
+      const warn = fgBold([251, 191, 36], truncateVisual(`⚠ Free tier limit: showing ${payload.totalRows.toLocaleString()} of ${payload.sourceTotalRows.toLocaleString()} rows — tiny-pivot.com/pricing`, innerWidth))
       lines.push(frameTuiLine(warn, innerWidth, pal), divider)
     }
 

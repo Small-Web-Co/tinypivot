@@ -997,7 +997,7 @@ function onDrillThroughGrandTotal() {
       <template v-if="isDemo">
         <span class="vpg-demo-badge">DEMO</span>
         <span>Pro features unlocked for evaluation</span>
-        <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener" class="vpg-get-pro">
+        <a href="https://tiny-pivot.com/pricing?product=ui" target="_blank" rel="noopener" class="vpg-get-pro">
           Get Pro License →
         </a>
       </template>

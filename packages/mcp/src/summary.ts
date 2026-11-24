@@ -503,7 +503,7 @@ export function formatDatasetSummary(
   if (dataset.truncatedForFreeTier) {
     parts.push(
       '',
-      `> **Notice (Free tier row limit):** Showing the first **${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows**. Charts, pivots, and totals reflect this ${dataset.rows.length.toLocaleString()}-row subset only. Set \`TINYPIVOT_LICENSE_KEY\` for full unlimited rows: https://tiny-pivot.com/mcp`,
+      `> **Notice (Free tier row limit):** Showing the first **${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows**. Charts, pivots, and totals reflect this ${dataset.rows.length.toLocaleString()}-row subset only. Set \`TINYPIVOT_LICENSE_KEY\` for full unlimited rows: https://tiny-pivot.com/pricing`,
     )
   }
 

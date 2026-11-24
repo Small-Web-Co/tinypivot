@@ -111,7 +111,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 
 > **High-Trust Row Limit:** If a dataset exceeds 2,500 rows on the Free tier, TinyPivot never truncates silently — both the UI (amber top banner) and the tool summary sent to the LLM explicitly state `Showing first 2,500 of N rows — totals reflect this subset only`.
 
-Unlock Pro or Team at [tiny-pivot.com/mcp](https://tiny-pivot.com/mcp).
+Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 
 ## Tools
 

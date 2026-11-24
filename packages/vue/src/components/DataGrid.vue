@@ -712,7 +712,7 @@ function handleDrillThroughCell(payload: { rowPath: string[], columnPath: string
     return
 
   if (!canUseDrillThrough(licenseInfo.value)) {
-    console.warn('[TinyPivot] "Drill-through" requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.')
+    console.warn('[TinyPivot] "Drill-through" requires a Pro license. Visit https://tiny-pivot.com/pricing?product=ui to upgrade.')
     return
   }
 
@@ -1725,7 +1725,7 @@ function handleContainerClick(event: MouseEvent) {
         <div v-if="isDemo" class="vpg-demo-banner">
           <span class="vpg-demo-badge">DEMO</span>
           <span>Pro features enabled</span>
-          <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener">Get License →</a>
+          <a href="https://tiny-pivot.com/pricing?product=ui" target="_blank" rel="noopener">Get License →</a>
         </div>
         <span v-else-if="showWatermark" class="vpg-watermark-inline">
           <a href="https://tiny-pivot.com" target="_blank" rel="noopener">

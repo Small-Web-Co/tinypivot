@@ -438,7 +438,7 @@ export function McpApp() {
   }, [modelCatalog, transportMode])
 
   const handleOpenUpgrade = useCallback(() => {
-    const url = 'https://tiny-pivot.com/mcp#pricing'
+    const url = 'https://tiny-pivot.com/pricing'
     const app = appRef.current
     if (transportMode === 'mcp' && app) {
       void app.openLink({ url }).catch(() => {

@@ -146,4 +146,4 @@ The `@smallwebco/tinypivot-server` package includes built-in protections:
 
 - [TinyPivot Documentation](https://tiny-pivot.com)
 - [GitHub Repository](https://github.com/Small-Web-Co/tinypivot)
-- [Purchase Pro License](https://tiny-pivot.com/#pricing)
+- [Purchase Pro License](https://tiny-pivot.com/pricing?product=ui)

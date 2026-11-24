@@ -206,7 +206,7 @@ function handleDragEnd() {
 function handleAggregationChange(field: string, currentAgg: AggregationFunction, newAgg: AggregationFunction) {
   // Prevent changing to Pro aggregations without license
   if (!isAggregationAvailable(newAgg)) {
-    console.warn(`[TinyPivot] "${newAgg}" aggregation requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.`)
+    console.warn(`[TinyPivot] "${newAgg}" aggregation requires a Pro license. Visit https://tiny-pivot.com/pricing?product=ui to upgrade.`)
     return
   }
   emit('updateAggregation', field, currentAgg, newAgg)

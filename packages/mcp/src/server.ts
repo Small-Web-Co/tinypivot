@@ -256,7 +256,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const rawLicenseKey = resolveLicenseKey(options.licenseKey)
   const licenseKey = isMcpLicenseKey(rawLicenseKey) ? rawLicenseKey : undefined
   if (rawLicenseKey && !licenseKey && rawLicenseKey.startsWith('TP-PRO')) {
-    console.error('[tinypivot-mcp] Notice: UI Library keys (TP-PRO*) apply to @smallwebco/tinypivot-react/-vue. TinyPivot MCP Pro requires an MCP license key (TP-MCPP* / TP-MCPT*) from https://tiny-pivot.com/mcp')
+    console.error('[tinypivot-mcp] Notice: UI Library keys (TP-PRO*) apply to @smallwebco/tinypivot-react/-vue. TinyPivot MCP Pro requires an MCP license key (TP-MCPP* / TP-MCPT*) from https://tiny-pivot.com/pricing')
   }
   const demoToken = options.demoToken ?? process.env.TINYPIVOT_DEMO_TOKEN
   const isPro = Boolean(licenseKey || demoToken)
@@ -655,7 +655,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       const summaryParts: string[] = []
       if (ds.truncatedForFreeTier) {
         summaryParts.push(
-          `> **WARNING — FREE TIER ROW LIMIT**: Showing the first **${ds.rows.length.toLocaleString()} of ${ds.sourceTotalRows.toLocaleString()}** rows. Chart values reflect this ${ds.rows.length.toLocaleString()}-row subset only, not the full dataset. Unlock unlimited rows with TinyPivot Pro: https://tiny-pivot.com/mcp`,
+          `> **WARNING — FREE TIER ROW LIMIT**: Showing the first **${ds.rows.length.toLocaleString()} of ${ds.sourceTotalRows.toLocaleString()}** rows. Chart values reflect this ${ds.rows.length.toLocaleString()}-row subset only, not the full dataset. Unlock unlimited rows with TinyPivot Pro: https://tiny-pivot.com/pricing`,
           '',
         )
       }
@@ -714,7 +714,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           isError: true,
           content: [{
             type: 'text',
-            text: 'Read-only PostgreSQL querying (`query_postgres`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). Free tier includes local CSV/TSV/JSON files and inline data up to 2,500 rows. Upgrade at https://tiny-pivot.com/mcp',
+            text: 'Read-only PostgreSQL querying (`query_postgres`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). Free tier includes local CSV/TSV/JSON files and inline data up to 2,500 rows. Upgrade at https://tiny-pivot.com/pricing',
           }],
         }
       }
@@ -930,7 +930,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     async ({ theme }) => {
       if (!isPro && theme !== 'code') {
         return {
-          content: [{ type: 'text', text: 'Additional chart themes require TinyPivot Pro (https://tiny-pivot.com/mcp).' }],
+          content: [{ type: 'text', text: 'Additional chart themes require TinyPivot Pro (https://tiny-pivot.com/pricing).' }],
           structuredContent: { chartTheme: 'code', proRequired: true },
         }
       }

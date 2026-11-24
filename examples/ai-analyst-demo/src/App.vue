@@ -3,7 +3,7 @@ import { DataGrid, setLicenseKey } from '@smallwebco/tinypivot-vue'
 import '@smallwebco/tinypivot-vue/style.css'
 
 // Set your Pro license key for AI Analyst features
-// Get one at: https://tiny-pivot.com/#pricing
+// Get one at: https://tiny-pivot.com/pricing?product=ui
 const LICENSE_KEY = import.meta.env.VITE_TINYPIVOT_LICENSE_KEY || ''
 if (LICENSE_KEY) {
   setLicenseKey(LICENSE_KEY)

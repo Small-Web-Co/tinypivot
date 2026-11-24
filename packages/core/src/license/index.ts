@@ -595,6 +595,6 @@ export function shouldShowWatermark(info: LicenseInfo, isDemo: boolean): boolean
 export function logProRequired(feature: string): void {
   console.warn(
     `[TinyPivot] "${feature}" requires a Pro license. `
-    + `Visit https://tiny-pivot.com/#pricing to upgrade.`,
+    + `Visit https://tiny-pivot.com/pricing?product=ui to upgrade.`,
   )
 }

@@ -341,7 +341,7 @@ export function DataGrid({
         return
 
       if (!canUseDrillThrough(licenseInfo)) {
-        console.warn('[TinyPivot] "Drill-through" requires a Pro license. Visit https://tiny-pivot.com/#pricing to upgrade.')
+        console.warn('[TinyPivot] "Drill-through" requires a Pro license. Visit https://tiny-pivot.com/pricing?product=ui to upgrade.')
         return
       }
 
@@ -1860,7 +1860,7 @@ export function DataGrid({
                 <div className="vpg-demo-banner">
                   <span className="vpg-demo-badge">DEMO</span>
                   <span>Pro features enabled</span>
-                  <a href="https://tiny-pivot.com/#pricing" target="_blank" rel="noopener noreferrer">
+                  <a href="https://tiny-pivot.com/pricing?product=ui" target="_blank" rel="noopener noreferrer">
                     Get License →
                   </a>
                 </div>

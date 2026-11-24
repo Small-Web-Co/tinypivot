@@ -1147,7 +1147,7 @@ export function PivotSkeleton({
                   <span className="vpg-demo-badge">DEMO</span>
                   <span>Pro features unlocked for evaluation</span>
                   <a
-                    href="https://tiny-pivot.com/#pricing"
+                    href="https://tiny-pivot.com/pricing?product=ui"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="vpg-get-pro"

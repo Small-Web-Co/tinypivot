@@ -2,7 +2,7 @@
 
 A lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3. **Under 50KB gzipped** — 10x smaller than AG Grid.
 
-**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/#pricing)**
+**[Live Demo](https://tiny-pivot.com)** · **[Buy License](https://tiny-pivot.com/pricing?product=ui)**
 
 [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-vue)
 
@@ -361,7 +361,7 @@ See the [full documentation](https://github.com/Small-Web-Co/tinypivot) for comp
 - **Free Tier**: MIT License for core grid and pivot features
 - **Pro Features**: Commercial license required
 
-**[Purchase at tiny-pivot.com/#pricing](https://tiny-pivot.com/#pricing)**
+**[Purchase at tiny-pivot.com/pricing](https://tiny-pivot.com/pricing?product=ui)**
 
 ---
 
