@@ -92,7 +92,6 @@ export const routeDefinitions = [
     name: 'ui',
     component: () => import('../pages/Ui.vue'),
     meta: {
-      legacy: true,
       title: 'TinyPivot UI — React & Vue 3 Data Grid, Pivot Tables, Charts & AI Analyst',
       description: 'Lightweight React and Vue 3 data grid with free pivot tables, charts, calculated fields and a BYOK AI Data Analyst. One-time licenses from $49.',
     },

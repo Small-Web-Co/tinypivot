@@ -29,18 +29,18 @@ const capabilities = [
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <p class="label rise" style="--i: 0">
+          <p class="label">
             MCP server for AI coding agents
           </p>
-          <h1 class="display rise" style="--i: 1">
+          <h1 class="display">
             Your agent reads the <em>summary.</em> You read the data.
           </h1>
-          <p class="lede rise" style="--i: 2">
+          <p class="lede">
             TinyPivot renders charts and pivot tables inside Claude, Cursor, Antigravity, OpenCode and pi.
             The model sees a ~200-token schema. The rows never touch its context.
           </p>
         </div>
-        <div id="install" class="hero-install rise" style="--i: 3">
+        <div id="install" class="hero-install">
           <InstallBox source="hero" />
           <ul class="facts" aria-label="Free tier">
             <li v-for="fact in facts" :key="fact">
