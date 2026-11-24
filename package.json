@@ -60,6 +60,7 @@
     "build:server": "pnpm --filter @smallwebco/tinypivot-server build",
     "build:vue": "pnpm --filter @smallwebco/tinypivot-vue build",
     "build:react": "pnpm --filter @smallwebco/tinypivot-react build",
+    "build:mcp": "pnpm --filter @smallwebco/tinypivot-mcp build",
     "demo": "vite --config vite.demo.config.ts",
     "build:demo": "vite build --config vite.demo.config.ts && node scripts/prerender.mjs",
     "type-check": "pnpm run -r type-check",

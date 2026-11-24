@@ -42,6 +42,8 @@ coverage
 # License signing (keep private key secret!)
 private-key.pem
 *.pem
+.license
+*.license
 
 .vercel
 .env*.local

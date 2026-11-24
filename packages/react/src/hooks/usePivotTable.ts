@@ -70,6 +70,7 @@ interface UsePivotTableReturn {
   toggleCollapsedPath: (key: string, altKey: boolean, rowFields: string[], currentPivotResult: PivotResult | null) => Set<string>
   setFieldFilter: (field: string, excludedValues: string[]) => void
   clearFieldFilter: (field: string) => void
+  applyConfig: (config: Partial<PivotConfig>) => void
 }
 
 /**
@@ -433,6 +434,23 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
     [collapsedPaths],
   )
 
+  const applyConfig = useCallback((config: Partial<PivotConfig>) => {
+    if (config.rowFields !== undefined)
+      setRowFieldsState([...config.rowFields])
+    if (config.columnFields !== undefined)
+      setColumnFieldsState([...config.columnFields])
+    if (config.valueFields !== undefined)
+      setValueFields(config.valueFields.map(v => ({ ...v })))
+    if (config.showRowTotals !== undefined)
+      setShowRowTotals(config.showRowTotals)
+    if (config.showColumnTotals !== undefined)
+      setShowColumnTotals(config.showColumnTotals)
+    if (config.calculatedFields !== undefined)
+      setCalculatedFields([...config.calculatedFields])
+    if (config.fieldFilters !== undefined)
+      setFieldFilters({ ...config.fieldFilters })
+  }, [])
+
   return {
     // State
     rowFields,
@@ -470,5 +488,6 @@ export function usePivotTable(data: Record<string, unknown>[], enableDrillDown =
     toggleCollapsedPath,
     setFieldFilter,
     clearFieldFilter,
+    applyConfig,
   }
 }

@@ -403,6 +403,23 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
     },
   )
 
+  function applyConfig(config: Partial<PivotConfig>) {
+    if (config.rowFields !== undefined)
+      rowFields.value = [...config.rowFields]
+    if (config.columnFields !== undefined)
+      columnFields.value = [...config.columnFields]
+    if (config.valueFields !== undefined)
+      valueFields.value = config.valueFields.map(v => ({ ...v }))
+    if (config.showRowTotals !== undefined)
+      showRowTotals.value = config.showRowTotals
+    if (config.showColumnTotals !== undefined)
+      showColumnTotals.value = config.showColumnTotals
+    if (config.calculatedFields !== undefined)
+      calculatedFields.value = [...config.calculatedFields]
+    if (config.fieldFilters !== undefined)
+      fieldFilters.value = { ...config.fieldFilters }
+  }
+
   return {
     // State
     rowFields,
@@ -437,5 +454,6 @@ export function usePivotTable(data: Ref<Record<string, unknown>[]>, enableDrillD
     toggleCollapsedPath,
     setFieldFilter,
     clearFieldFilter,
+    applyConfig,
   }
 }

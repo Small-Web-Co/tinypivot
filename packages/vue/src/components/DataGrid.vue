@@ -7,9 +7,12 @@ import type {
   AIQueryExecutedEvent,
   CalculatedField,
   ChartConfig,
+  ChartThemePreset,
+  DataGridViewMode,
   DateFormat,
   DrillThroughResult,
   NumberFormat,
+  PivotConfig as PivotConfigType,
   PivotLayout,
   Theme,
 } from '@smallwebco/tinypivot-core'
@@ -73,6 +76,14 @@ const props = withDefaults(defineProps<{
   enableDrillThrough?: boolean
   /** Pivot row layout: 'grouped' merges repeated parent cells, 'tabular' repeats every value */
   pivotLayout?: PivotLayout
+  /** Optional controlled/initial active view mode ('grid' | 'pivot' | 'chart' | 'ai') */
+  viewMode?: DataGridViewMode
+  /** Optional initial or programmatically updated pivot configuration */
+  pivotConfig?: Partial<PivotConfigType>
+  /** Optional initial or programmatically updated chart configuration */
+  chartConfig?: Partial<ChartConfig>
+  /** Optional visual palette preset for charts ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
+  chartTheme?: ChartThemePreset
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -114,6 +125,11 @@ const emit = defineEmits<{
   // Drill-down/through events
   (e: 'collapseChange', payload: string[]): void
   (e: 'drillThrough', payload: DrillThroughResult): void
+  // View / config change events
+  (e: 'viewModeChange', mode: DataGridViewMode): void
+  (e: 'pivotConfigChange', config: PivotConfigType): void
+  (e: 'chartConfigChange', config: ChartConfig): void
+  (e: 'chartThemeChange', preset: import('@smallwebco/tinypivot-core').ChartThemePreset): void
 }>()
 
 const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, canUseXlsxExport, isDemo, licenseInfo } = useLicense()
@@ -271,7 +287,35 @@ const {
   fieldFilters: pivotFieldFilters,
   activeFieldFilters: pivotActiveFieldFilters,
   setFieldFilter: setPivotFieldFilter,
+  applyConfig: applyPivotConfig,
 } = usePivotTable(filteredDataForPivot, computed(() => props.enableDrillDown ?? true))
+
+// Sync externally supplied pivotConfig (e.g. from AI/MCP tools)
+watch(
+  [() => props.pivotConfig, displayData],
+  ([nextConfig]) => {
+    if (nextConfig) {
+      applyPivotConfig(nextConfig)
+    }
+  },
+  { immediate: true, deep: true },
+)
+
+// Notify parent when pivot configuration changes
+watch(
+  [pivotRowFields, pivotColumnFields, pivotValueFields, pivotShowRowTotals, pivotShowColumnTotals, pivotFieldFilters],
+  () => {
+    emit('pivotConfigChange', {
+      rowFields: pivotRowFields.value,
+      columnFields: pivotColumnFields.value,
+      valueFields: pivotValueFields.value,
+      showRowTotals: pivotShowRowTotals.value,
+      showColumnTotals: pivotShowColumnTotals.value,
+      fieldFilters: pivotFieldFilters.value,
+    })
+  },
+  { deep: true },
+)
 
 // Unique values per axis field — powers the axis filter UI in PivotConfig
 function getPivotFieldValues(field: string): string[] {
@@ -532,7 +576,17 @@ function copySelectionToClipboard() {
 }
 
 // View mode
-const viewMode = ref<'ai' | 'grid' | 'pivot' | 'chart'>('grid')
+const viewMode = ref<DataGridViewMode>(props.viewMode ?? 'grid')
+
+watch(() => props.viewMode, (next) => {
+  if (next !== undefined) {
+    viewMode.value = next
+  }
+})
+
+watch(viewMode, (next) => {
+  emit('viewModeChange', next)
+})
 
 function handleAIDataLoaded(payload: AIDataLoadedEvent) {
   aiLoadedData.value = payload.data
@@ -599,6 +653,7 @@ const chartConfig = ref<ChartConfig | null>(null)
 
 function handleChartConfigChange(config: ChartConfig) {
   chartConfig.value = config
+  emit('chartConfigChange', config)
 }
 const showPivotConfig = ref(true)
 const draggingField = ref<string | null>(null)
@@ -1561,8 +1616,11 @@ function handleContainerClick(event: MouseEvent) {
         <ChartBuilder
           :data="filteredDataForPivot"
           :theme="currentTheme"
+          :chart-theme="props.chartTheme"
           :field-role-overrides="props.fieldRoleOverrides"
+          :initial-config="props.chartConfig"
           @config-change="handleChartConfigChange"
+          @chart-theme-change="(preset) => emit('chartThemeChange', preset)"
         />
       </div>
     </template>

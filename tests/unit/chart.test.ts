@@ -2,7 +2,7 @@
  * Unit tests for chart field role detection and overrides
  */
 import { describe, expect, it } from 'vitest'
-import { analyzeFieldsForChart, detectFieldRole } from '../../packages/core/src/chart'
+import { analyzeFieldsForChart, detectFieldRole, processChartData } from '../../packages/core/src/chart'
 
 describe('detectFieldRole', () => {
   it('should classify high-cardinality numbers as measure', () => {
@@ -138,5 +138,60 @@ describe('analyzeFieldsForChart', () => {
   it('should return empty array for empty data', () => {
     expect(analyzeFieldsForChart([])).toEqual([])
     expect(analyzeFieldsForChart([], { foo: 'measure' })).toEqual([])
+  })
+})
+
+describe('processChartData sorting', () => {
+  const projectRows = [
+    { project: 'Alpha', revenue: 100 },
+    { project: 'Beta', revenue: 500 },
+    { project: 'Gamma', revenue: 250 },
+  ]
+
+  it('defaults non-temporal bar charts to descending value order', () => {
+    const res = processChartData(projectRows, {
+      type: 'bar',
+      xAxis: { field: 'project', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      options: {},
+    })
+    expect(res.categories).toEqual(['Beta', 'Gamma', 'Alpha'])
+    expect(res.series[0].data).toEqual([500, 250, 100])
+  })
+
+  it('sorts ascending when sortOrder is value-asc', () => {
+    const res = processChartData(projectRows, {
+      type: 'bar',
+      xAxis: { field: 'project', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      options: { sortOrder: 'value-asc' },
+    })
+    expect(res.categories).toEqual(['Alpha', 'Gamma', 'Beta'])
+    expect(res.series[0].data).toEqual([100, 250, 500])
+  })
+
+  it('preserves input DataGrid row order when sortOrder is data', () => {
+    const res = processChartData(projectRows, {
+      type: 'bar',
+      xAxis: { field: 'project', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      options: { sortOrder: 'data' },
+    })
+    expect(res.categories).toEqual(['Alpha', 'Beta', 'Gamma'])
+  })
+
+  it('keeps temporal categories chronological by default', () => {
+    const monthly = [
+      { month: '2026-03', hours: 10 },
+      { month: '2026-01', hours: 50 },
+      { month: '2026-02', hours: 25 },
+    ]
+    const res = processChartData(monthly, {
+      type: 'stackedBar',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'hours', role: 'measure', aggregation: 'sum' },
+      options: {},
+    })
+    expect(res.categories).toEqual(['2026-01', '2026-02', '2026-03'])
   })
 })

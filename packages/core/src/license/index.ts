@@ -17,7 +17,7 @@ const FREE_LICENSE: LicenseInfo = {
     percentageMode: false,
     sessionPersistence: false,
     noWatermark: false,
-    charts: false, // Chart builder is Pro only
+    charts: true, // Core charts included in Free tier
     aiAnalyst: false, // AI Data Analyst is Pro only
     drillThrough: false, // Drill-through is Pro only
     xlsxExport: false, // XLSX export is Pro only
@@ -33,7 +33,7 @@ const INVALID_LICENSE: LicenseInfo = {
     percentageMode: false,
     sessionPersistence: false,
     noWatermark: false,
-    charts: false,
+    charts: true, // Core charts remain available on free fallback
     aiAnalyst: false,
     drillThrough: false,
     xlsxExport: false,

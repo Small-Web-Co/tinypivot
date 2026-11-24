@@ -3,6 +3,8 @@ import type {
   ChartAggregation,
   ChartConfig,
   ChartFieldInfo,
+  ChartSortOrder,
+  ChartThemePreset,
   ChartType,
   ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
@@ -14,10 +16,11 @@ import type { ApexOptions } from 'apexcharts'
 import {
   analyzeFieldsForChart,
   CHART_AGGREGATIONS,
-  CHART_COLORS,
+  CHART_THEME_PRESETS,
   CHART_TYPES,
   createDefaultChartConfig,
   getChartGuidance,
+  getChartThemeColors,
   isChartConfigValid,
   processChartData,
   processChartDataForHeatmap,
@@ -29,20 +32,88 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 const props = defineProps<{
   data: Record<string, unknown>[]
   theme?: ResolvedTheme
+  chartTheme?: ChartThemePreset
   fieldRoleOverrides?: Record<string, import('@smallwebco/tinypivot-core').FieldRole>
+  initialConfig?: Partial<ChartConfig>
 }>()
 
 const emit = defineEmits<{
   (e: 'configChange', config: ChartConfig): void
+  (e: 'chartThemeChange', preset: ChartThemePreset): void
 }>()
+
+const CHART_THEME_LIST = Object.entries(CHART_THEME_PRESETS) as Array<[ChartThemePreset, (typeof CHART_THEME_PRESETS)[ChartThemePreset]]>
+
+const SORT_CYCLE: Array<{ value: ChartSortOrder, label: string, title: string }> = [
+  { value: 'value-desc', label: '↓ Desc', title: 'Sorted highest to lowest value — click to switch to ascending' },
+  { value: 'value-asc', label: '↑ Asc', title: 'Sorted lowest to highest value — click to switch to A–Z' },
+  { value: 'label-asc', label: 'A–Z', title: 'Sorted alphabetically / chronologically — click to follow Data Grid sort' },
+  { value: 'data', label: 'Grid', title: 'Following Data Grid sort order — click to switch to descending' },
+]
 
 // Lazy load ApexCharts only on client side to avoid SSR issues
 const VueApexCharts = defineAsyncComponent(() =>
   import('vue3-apexcharts').then(m => m.default),
 )
 
+function mergeChartConfig(partial?: Partial<ChartConfig>): ChartConfig {
+  const defaults = createDefaultChartConfig()
+  if (!partial)
+    return defaults
+  return {
+    ...defaults,
+    ...partial,
+    options: {
+      ...defaults.options,
+      ...(partial.options ?? {}),
+    },
+  }
+}
+
 // Chart configuration state
-const chartConfig = ref<ChartConfig>(createDefaultChartConfig())
+const chartConfig = ref<ChartConfig>(mergeChartConfig(props.initialConfig))
+const localChartTheme = ref<ChartThemePreset>(props.chartTheme ?? props.initialConfig?.options?.chartTheme ?? 'code')
+
+watch(() => props.initialConfig, (next) => {
+  if (next) {
+    chartConfig.value = mergeChartConfig(next)
+  }
+}, { deep: true })
+
+watch(() => props.chartTheme, (next) => {
+  if (next) {
+    localChartTheme.value = next
+  }
+})
+
+const activeChartTheme = computed<ChartThemePreset>(() => props.chartTheme ?? localChartTheme.value)
+
+function selectChartTheme(preset: ChartThemePreset) {
+  localChartTheme.value = preset
+  chartConfig.value = {
+    ...chartConfig.value,
+    options: {
+      ...chartConfig.value.options,
+      chartTheme: preset,
+    },
+  }
+  emit('configChange', chartConfig.value)
+  emit('chartThemeChange', preset)
+}
+
+const activeSortOrder = computed<ChartSortOrder>(() => chartConfig.value.options?.sortOrder ?? 'value-desc')
+const activeSortMeta = computed(() => SORT_CYCLE.find(s => s.value === activeSortOrder.value) ?? SORT_CYCLE[0])
+
+function selectSortOrder(nextOrder: ChartSortOrder) {
+  chartConfig.value = {
+    ...chartConfig.value,
+    options: {
+      ...chartConfig.value.options,
+      sortOrder: nextOrder,
+    },
+  }
+  emit('configChange', chartConfig.value)
+}
 
 // Field analysis (applies consumer overrides when provided)
 const fieldInfos = computed(() => analyzeFieldsForChart(props.data, props.fieldRoleOverrides))
@@ -252,11 +323,25 @@ const chartOptions = computed<ApexOptions>(() => {
   const config = chartConfig.value
   const options = config.options || {}
 
+  const activePreset = activeChartTheme.value ?? options.chartTheme ?? 'code'
+  const resolvedColors = options.colors && options.colors.length > 0
+    ? options.colors
+    : getChartThemeColors(activePreset)
+  const monoFont = 'ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, monospace'
+  const sansFont = 'var(--font-sans, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif)'
+  const mutedColor = isDark ? '#94a3b8' : '#64748b'
+  const hairlineColor = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(100, 116, 139, 0.16)'
+  const isLineOrArea = config.type === 'line' || config.type === 'area'
+  const isBarLike = config.type === 'bar' || config.type === 'stackedBar'
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const animationsEnabled = (options.animated ?? true) && !prefersReducedMotion
+
   const baseOptions: ApexOptions = {
     chart: {
       type: getApexChartType(config.type),
       background: 'transparent',
-      foreColor: isDark ? '#e2e8f0' : '#334155',
+      foreColor: isDark ? '#e2e8f0' : '#1e293b',
       toolbar: {
         show: true,
         tools: {
@@ -275,60 +360,160 @@ const chartOptions = computed<ApexOptions>(() => {
         },
       },
       animations: {
-        enabled: options.animated ?? true,
-        speed: 400,
-        dynamicAnimation: { enabled: true, speed: 300 },
+        enabled: animationsEnabled,
+        speed: isLineOrArea ? 560 : isBarLike ? 520 : 480,
+        animateGradually: {
+          enabled: animationsEnabled,
+          delay: isBarLike ? 48 : isLineOrArea ? 65 : 55,
+        },
+        dynamicAnimation: {
+          enabled: animationsEnabled,
+          speed: 320,
+        },
       },
-      fontFamily: 'system-ui, -apple-system, sans-serif',
+      dropShadow: isLineOrArea && isDark
+        ? {
+            enabled: true,
+            top: 4,
+            left: 0,
+            blur: 8,
+            opacity: 0.22,
+            color: resolvedColors[0],
+          }
+        : { enabled: false },
+      fontFamily: sansFont,
     },
-    colors: options.colors || CHART_COLORS,
+    colors: resolvedColors,
     theme: {
       mode: isDark ? 'dark' : 'light',
     },
     grid: {
       show: options.showGrid ?? true,
-      borderColor: isDark ? '#334155' : '#e2e8f0',
+      borderColor: hairlineColor,
+      strokeDashArray: 3,
+      xaxis: { lines: { show: false } },
+      yaxis: { lines: { show: true } },
+      padding: { top: 4, right: 12, bottom: 10, left: 6 },
     },
     legend: {
       show: options.showLegend ?? true,
       position: options.legendPosition || 'top',
+      horizontalAlign: 'left',
+      fontFamily: monoFont,
+      fontSize: '11px',
+      markers: {
+        size: 5,
+        shape: 'square',
+        strokeWidth: 0,
+      },
+      itemMargin: { horizontal: 10, vertical: 4 },
     },
     dataLabels: {
       enabled: options.showDataLabels ?? false,
+      style: {
+        fontFamily: monoFont,
+        fontSize: '11px',
+        fontWeight: 500,
+      },
     },
     tooltip: {
       theme: isDark ? 'dark' : 'light',
       style: {
         fontSize: '12px',
+        fontFamily: monoFont,
       },
-      // Override light mode tooltip text color for better contrast
       cssClass: isDark ? '' : 'apexcharts-tooltip-light',
+      marker: { show: true },
     },
+    markers: isLineOrArea
+      ? {
+          size: 3,
+          strokeWidth: 2,
+          strokeColors: isDark ? '#0f172a' : '#ffffff',
+          hover: { size: 6 },
+        }
+      : { size: 0 },
     stroke: {
-      curve: 'smooth',
-      width: config.type === 'line' ? 3 : config.type === 'area' ? 2 : 0,
+      curve: 'monotoneCubic',
+      width: config.type === 'line' ? 2.5 : config.type === 'area' ? 2 : isBarLike ? 0 : 1.5,
+      ...(config.type === 'pie' || config.type === 'donut'
+        ? { colors: [isDark ? '#0f172a' : '#ffffff'] }
+        : {}),
     },
-    fill: {
-      opacity: config.type === 'area' ? 0.4 : 1,
+    fill: config.type === 'area'
+      ? {
+          type: 'gradient',
+          gradient: {
+            shadeIntensity: 1,
+            opacityFrom: isDark ? 0.42 : 0.34,
+            opacityTo: 0.02,
+            stops: [0, 95, 100],
+          },
+        }
+      : {
+          opacity: isBarLike ? 0.92 : 1,
+        },
+    ...(isBarLike
+      ? {
+          plotOptions: {
+            bar: {
+              borderRadius: 4,
+              borderRadiusApplication: 'end',
+              borderRadiusWhenStacked: 'last',
+              columnWidth: '54%',
+            },
+          },
+        }
+      : {}),
+    states: {
+      hover: {
+        filter: { type: 'lighten' },
+      },
     },
   }
 
-  // Add axis titles
+  // Add axis titles with monospace tabular numerals
   if (config.xAxis) {
     baseOptions.xaxis = {
       ...baseOptions.xaxis,
-      title: { text: options.xAxisTitle || config.xAxis.label },
+      axisBorder: { show: true, color: hairlineColor },
+      axisTicks: { show: false },
+      title: {
+        text: options.xAxisTitle || config.xAxis.label,
+        style: {
+          color: mutedColor,
+          fontSize: '11px',
+          fontWeight: 600,
+          fontFamily: monoFont,
+        },
+      },
       labels: {
-        style: { colors: isDark ? '#94a3b8' : '#64748b' },
+        style: {
+          colors: mutedColor,
+          fontSize: '11px',
+          fontFamily: monoFont,
+        },
       },
     }
   }
 
   if (config.yAxis && !['pie', 'donut', 'radar'].includes(config.type)) {
     baseOptions.yaxis = {
-      title: { text: options.yAxisTitle || config.yAxis.label },
+      title: {
+        text: options.yAxisTitle || config.yAxis.label,
+        style: {
+          color: mutedColor,
+          fontSize: '11px',
+          fontWeight: 600,
+          fontFamily: monoFont,
+        },
+      },
       labels: {
-        style: { colors: isDark ? '#94a3b8' : '#64748b' },
+        style: {
+          colors: mutedColor,
+          fontSize: '11px',
+          fontFamily: monoFont,
+        },
         formatter: (val: number) => formatValue(val, options.valueFormat, options.decimals),
       },
     }
@@ -338,10 +523,13 @@ const chartOptions = computed<ApexOptions>(() => {
   if (options.title) {
     baseOptions.title = {
       text: options.title,
+      align: 'left',
+      margin: 8,
       style: {
-        fontSize: '16px',
+        fontSize: '14px',
         fontWeight: 600,
-        color: isDark ? '#e2e8f0' : '#334155',
+        fontFamily: sansFont,
+        color: isDark ? '#f1f5f9' : '#0f172a',
       },
     }
   }
@@ -356,12 +544,15 @@ const chartOptions = computed<ApexOptions>(() => {
     baseOptions.plotOptions = {
       pie: {
         donut: {
-          size: config.type === 'donut' ? '55%' : '0%',
+          size: config.type === 'donut' ? '62%' : '0%',
           labels: {
             show: config.type === 'donut',
+            value: { fontFamily: monoFont, fontWeight: 700 },
             total: {
               show: true,
-              label: 'Total',
+              label: 'TOTAL',
+              fontFamily: monoFont,
+              fontSize: '11px',
               formatter: (w) => {
                 const total = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0)
                 return formatValue(total, options.valueFormat, options.decimals)
@@ -378,8 +569,8 @@ const chartOptions = computed<ApexOptions>(() => {
     baseOptions.plotOptions = {
       radar: {
         polygons: {
-          strokeColors: isDark ? '#334155' : '#e2e8f0',
-          fill: { colors: isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#f1f5f9'] },
+          strokeColors: hairlineColor,
+          fill: { colors: isDark ? ['rgba(30,41,59,0.45)', 'transparent'] : ['rgba(241,245,249,0.7)', 'transparent'] },
         },
       },
     }
@@ -485,8 +676,8 @@ const chartOptionsWithCategories = computed<ApexOptions>(() => {
         },
       },
     }
-    // Use a single color that varies by intensity
-    options.colors = ['#6366f1']
+    // Use primary accent color from the active visual theme preset
+    options.colors = [getChartThemeColors(activeChartTheme.value)[0]]
     // Disable legend for heatmap (color scale is self-explanatory)
     options.legend = { show: false }
   }
@@ -579,6 +770,38 @@ onMounted(() => {
         </svg>
         <span class="vpg-chart-type-label">{{ ct.label.replace(' Chart', '') }}</span>
       </button>
+
+      <!-- Direct 1-click sort dropdown & theme palette controls -->
+      <div class="vpg-chart-theme-strip" role="radiogroup" aria-label="Chart visual theme">
+        <select
+          class="vpg-chart-theme-swatch"
+          aria-label="Sort chart bars"
+          :title="activeSortMeta.title"
+          :value="activeSortOrder"
+          @change="selectSortOrder(($event.target as HTMLSelectElement).value as ChartSortOrder)"
+        >
+          <option v-for="opt in SORT_CYCLE" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+        <button
+          v-for="[presetId, presetMeta] in CHART_THEME_LIST"
+          :key="presetId"
+          type="button"
+          role="radio"
+          :aria-checked="activeChartTheme === presetId"
+          class="vpg-chart-theme-swatch"
+          :class="{ active: activeChartTheme === presetId }"
+          :title="`${presetMeta.label} — ${presetMeta.description}`"
+          @click="selectChartTheme(presetId)"
+        >
+          <span class="vpg-chart-theme-dots" aria-hidden="true">
+            <span class="vpg-chart-theme-dot" :style="{ backgroundColor: presetMeta.colors[0] }" />
+            <span class="vpg-chart-theme-dot" :style="{ backgroundColor: presetMeta.colors[1] }" />
+          </span>
+          <span v-if="activeChartTheme === presetId" class="vpg-chart-theme-name">{{ presetMeta.label }}</span>
+        </button>
+      </div>
     </div>
 
     <div class="vpg-chart-builder-content">

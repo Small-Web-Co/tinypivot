@@ -1,0 +1,939 @@
+:root {
+  color-scheme: light dark;
+  --tp-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+  --tp-sans: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif);
+  --tp-accent: #38bdf8;
+  --tp-accent-2: #34d399;
+  --tp-accent-soft: rgba(56, 189, 248, 0.14);
+  --tp-accent-border: rgba(56, 189, 248, 0.35);
+}
+
+/* Visual preset tokens — transform Charts, Pivot Tables, AND Data Grids together */
+.tp-theme-code {
+  --tp-accent: #38bdf8;
+  --tp-accent-2: #34d399;
+  --tp-accent-soft: rgba(56, 189, 248, 0.14);
+  --tp-accent-border: rgba(56, 189, 248, 0.35);
+}
+
+.tp-theme-phosphor {
+  --tp-accent: #22c55e;
+  --tp-accent-2: #34d399;
+  --tp-accent-soft: rgba(34, 197, 94, 0.14);
+  --tp-accent-border: rgba(34, 197, 94, 0.38);
+}
+
+.tp-theme-nord {
+  --tp-accent: #88c0d0;
+  --tp-accent-2: #a3be8c;
+  --tp-accent-soft: rgba(136, 192, 208, 0.14);
+  --tp-accent-border: rgba(136, 192, 208, 0.38);
+}
+
+.tp-theme-thermal {
+  --tp-accent: #f97316;
+  --tp-accent-2: #f43f5e;
+  --tp-accent-soft: rgba(249, 115, 22, 0.14);
+  --tp-accent-border: rgba(249, 115, 22, 0.38);
+}
+
+.tp-theme-mono {
+  --tp-accent: #818cf8;
+  --tp-accent-2: #94a3b8;
+  --tp-accent-soft: rgba(129, 140, 248, 0.14);
+  --tp-accent-border: rgba(129, 140, 248, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  background: var(--color-background-primary, #0b101b);
+  color: var(--color-text-primary, #e2e8f0);
+  font-family: var(--tp-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tp-mcp-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  min-height: 360px;
+  background: var(--color-background-primary, #0b101b);
+  color: var(--color-text-primary, #e2e8f0);
+}
+
+/* Explicit light/dark override when user toggles surface mode directly */
+.tp-mcp-shell.tp-surface-light {
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f8fafc;
+  --color-background-tertiary: #f1f5f9;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #64748b;
+  --color-border-primary: rgba(15, 23, 42, 0.14);
+  --color-border-secondary: rgba(15, 23, 42, 0.22);
+}
+
+.tp-mcp-shell.tp-surface-dark {
+  --color-background-primary: #0b101b;
+  --color-background-secondary: #111827;
+  --color-background-tertiary: rgba(148, 163, 184, 0.1);
+  --color-text-primary: #e2e8f0;
+  --color-text-secondary: #94a3b8;
+  --color-text-tertiary: #64748b;
+  --color-border-primary: rgba(148, 163, 184, 0.2);
+  --color-border-secondary: rgba(148, 163, 184, 0.32);
+}
+
+/* Single sleek 36px IDE header bar — strictly single-line */
+.tp-mcp-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 36px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.18));
+  background: var(--color-background-secondary, rgba(15, 23, 42, 0.72));
+  flex-wrap: nowrap;
+}
+
+.tp-mcp-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.tp-mcp-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.tp-mcp-brand {
+  display: inline-block;
+  font-family: var(--tp-mono);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary, inherit);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.tp-mcp-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 20px 0 7px;
+  height: 24px;
+  line-height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.24));
+  background-color: var(--color-background-primary, transparent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M3 4.5l3 3 3-3z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  color: inherit;
+  font-family: var(--tp-mono);
+  font-size: 10.5px;
+  max-width: 155px;
+  min-width: 68px;
+  flex: 0 1 155px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Compact visual theme dropdown trigger + popover */
+.tp-mcp-theme-wrap {
+  position: relative;
+}
+
+.tp-mcp-theme-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.24));
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
+  color: var(--color-text-primary, inherit);
+  font-family: var(--tp-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.tp-mcp-theme-trigger:hover,
+.tp-mcp-theme-trigger.active {
+  background: var(--tp-accent-soft);
+  border-color: var(--tp-accent-border);
+  color: var(--tp-accent);
+}
+
+.tp-mcp-theme-caret {
+  font-size: 9px;
+  opacity: 0.7;
+  margin-left: -1px;
+}
+
+.tp-mcp-theme-dots {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tp-mcp-theme-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35);
+}
+
+.tp-mcp-theme-dot + .tp-mcp-theme-dot {
+  margin-left: -2.5px;
+}
+
+.tp-mcp-theme-name {
+  line-height: 1;
+}
+
+.tp-mcp-theme-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 240px;
+  z-index: 65;
+  padding: 5px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-secondary, rgba(148, 163, 184, 0.32));
+  background: var(--color-background-primary, #0f172a);
+  color: var(--color-text-primary, #f3f4f6);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tp-mcp-theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+
+.tp-mcp-theme-option:hover {
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.tp-mcp-theme-option.active {
+  background: var(--tp-accent-soft);
+  border-color: var(--tp-accent-border);
+}
+
+.tp-mcp-theme-opt-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tp-mcp-theme-opt-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--tp-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.tp-mcp-theme-option.locked {
+  opacity: 0.72;
+}
+
+.tp-mcp-pro-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.38);
+}
+
+/* High-trust amber truncation warning banner for Free tier (>2,500 rows) */
+.tp-mcp-truncation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 10px;
+  font-family: var(--tp-mono);
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: #fef3c7;
+  background: rgba(217, 119, 6, 0.18);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.45);
+}
+
+.tp-mcp-shell.tp-surface-light .tp-mcp-truncation-banner {
+  color: #78350f;
+  background: #fef3c7;
+  border-bottom-color: #f59e0b;
+}
+
+.tp-mcp-truncation-text {
+  min-width: 0;
+}
+
+.tp-mcp-truncation-cta {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.22);
+  color: inherit;
+  font-family: var(--tp-mono);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tp-mcp-truncation-cta:hover {
+  background: rgba(245, 158, 11, 0.34);
+}
+
+.tp-mcp-theme-opt-desc {
+  font-size: 10px;
+  color: var(--color-text-secondary, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tp-mcp-theme-sep {
+  height: 1px;
+  margin: 3px 4px;
+  background: var(--color-border-primary, rgba(148, 163, 184, 0.2));
+}
+
+.tp-mcp-theme-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.tp-mcp-sort-popover {
+  width: 210px;
+}
+
+/* Hide built-in ApexCharts hamburger toolbar inside MCP/Companion views */
+.tp-mcp-shell .apexcharts-toolbar {
+  display: none !important;
+}
+
+/* Segmented Chart | Pivot | Data view switcher */
+.tp-mcp-segmented {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.18));
+}
+
+.tp-mcp-seg-btn {
+  padding: 2px 8px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary, #94a3b8);
+  font-family: var(--tp-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.tp-mcp-seg-btn:hover {
+  color: var(--color-text-primary, inherit);
+}
+
+.tp-mcp-seg-btn.active {
+  background: var(--tp-accent-soft);
+  color: var(--tp-accent);
+  box-shadow: inset 0 0 0 1px var(--tp-accent-border);
+}
+
+.tp-mcp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-family: var(--tp-mono);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.12));
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.tp-mcp-pill-accent {
+  color: var(--tp-accent-2);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  cursor: pointer;
+}
+
+.tp-mcp-pill-accent:hover {
+  background: rgba(52, 211, 153, 0.14);
+}
+
+.tp-mcp-pill-live {
+  color: var(--tp-accent);
+  border: 1px solid var(--tp-accent-border);
+}
+
+.tp-mcp-savings-wrap {
+  position: relative;
+}
+
+.tp-mcp-savings-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 310px;
+  z-index: 60;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-secondary, rgba(148, 163, 184, 0.32));
+  background: var(--color-background-primary, #0f172a);
+  color: var(--color-text-primary, #f3f4f6);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.tp-mcp-savings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tp-mcp-savings-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.tp-mcp-model-select {
+  padding: 3px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.32));
+  background: var(--color-background-secondary, #1e293b);
+  color: inherit;
+  font-family: var(--tp-mono);
+  font-size: 10.5px;
+  max-width: 175px;
+}
+
+.tp-mcp-savings-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tp-mcp-savings-card {
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--color-background-secondary, rgba(148, 163, 184, 0.08));
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.16));
+}
+
+.tp-mcp-savings-label {
+  font-family: var(--tp-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.tp-mcp-savings-val {
+  font-family: var(--tp-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tp-accent-2);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.tp-mcp-savings-sub {
+  font-family: var(--tp-mono);
+  font-size: 10.5px;
+  color: var(--color-text-secondary, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-mcp-savings-meta {
+  color: var(--color-text-secondary, #94a3b8);
+  font-size: 11px;
+}
+
+.tp-mcp-savings-note {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--color-text-tertiary, #64748b);
+}
+
+.tp-mcp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.24));
+  background: var(--color-background-primary, transparent);
+  color: inherit;
+  font-family: var(--tp-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tp-mcp-btn:hover:not(:disabled) {
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.14));
+}
+
+.tp-mcp-btn.active {
+  border-color: var(--tp-accent-border);
+  color: var(--tp-accent);
+  background: var(--tp-accent-soft);
+}
+
+.tp-mcp-btn-primary {
+  background: var(--tp-accent);
+  border-color: var(--tp-accent);
+  color: #0b101b;
+  font-weight: 600;
+}
+
+.tp-mcp-btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.tp-mcp-status {
+  padding: 5px 10px;
+  font-family: var(--tp-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary, #94a3b8);
+  border-bottom: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.14));
+}
+
+.tp-mcp-grid-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+}
+
+.tp-mcp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 300px;
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+/* ============================================================================
+   Map TinyPivot --vpg-* tokens directly to host IDE theme + active visual preset
+   ============================================================================ */
+.tp-mcp-shell .vpg-data-grid,
+.tp-mcp-shell .vpg-pivot-config,
+.tp-mcp-shell .vpg-pivot-skeleton,
+.tp-mcp-shell .vpg-filter-dropdown,
+.tp-mcp-shell .vpg-modal-overlay,
+.vpg-filter-portal .vpg-filter-dropdown {
+  --vpg-surface-bg: var(--color-background-primary, #0b101b);
+  --vpg-surface-panel: var(--color-background-secondary, #111827);
+  --vpg-surface-elevated: var(--color-background-tertiary, #1e293b);
+  --vpg-surface-hover: var(--tp-accent-soft);
+  --vpg-surface-selected: var(--tp-accent-soft);
+  --vpg-surface-striped: rgba(148, 163, 184, 0.035);
+  --vpg-text-primary: var(--color-text-primary, #e2e8f0);
+  --vpg-text-secondary: var(--color-text-secondary, #94a3b8);
+  --vpg-text-muted: var(--color-text-tertiary, #64748b);
+  --vpg-text-inverse: var(--color-text-inverse, #0b101b);
+  --vpg-border-default: var(--color-border-primary, rgba(148, 163, 184, 0.16));
+  --vpg-border-strong: var(--color-border-secondary, rgba(148, 163, 184, 0.3));
+  --vpg-border-subtle: rgba(148, 163, 184, 0.1);
+  --vpg-accent: var(--tp-accent);
+  --vpg-accent-hover: var(--tp-accent);
+  --vpg-accent-soft-bg: var(--tp-accent-soft);
+  --vpg-accent-soft-text: var(--tp-accent);
+  --vpg-focus-ring: var(--tp-accent);
+  --vpg-state-error: var(--color-text-danger, #f87171);
+  --vpg-state-warning: var(--color-text-warning, #fbbf24);
+  --vpg-state-success: var(--tp-accent-2);
+  --vpg-state-info: var(--tp-accent);
+  --vpg-scrollbar-thumb: var(--color-border-secondary, rgba(148, 163, 184, 0.28));
+  --vpg-scrollbar-track: transparent;
+  font-family: var(--tp-sans);
+}
+
+/* Frameless full-bleed stretch inside MCP iframe & Companion browser */
+.tp-mcp-shell .vpg-data-grid {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin-bottom: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.tp-mcp-shell .vpg-grid-container {
+  flex: 1 1 auto !important;
+  background: var(--vpg-surface-bg) !important;
+}
+
+/* ============================================================================
+   Serious Code-Style Data Grid & Pivot Tables (monospace headers, tabular nums,
+   crisp hairlines, subtle hover accent, distinct Bloomberg/Linear totals)
+   ============================================================================ */
+.tp-mcp-shell .vpg-table {
+  width: 100% !important;
+  min-width: 100% !important;
+  table-layout: auto !important;
+}
+
+.tp-mcp-shell .vpg-table th,
+.tp-mcp-shell .vpg-table td {
+  width: auto !important;
+  min-width: 88px !important;
+}
+
+.tp-mcp-shell .vpg-header-cell {
+  padding: 6px 10px !important;
+  font-family: var(--tp-mono) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: var(--vpg-text-secondary) !important;
+  background: var(--vpg-surface-panel) !important;
+  border-bottom: 1px solid var(--tp-accent-border) !important;
+  border-right: 1px solid var(--vpg-border-subtle) !important;
+}
+
+.tp-mcp-shell .vpg-data-grid .vpg-cell,
+.tp-mcp-shell .vpg-data-grid.vpg-font-sm .vpg-cell {
+  padding: 5px 10px !important;
+  font-family: var(--tp-mono) !important;
+  font-size: 12.5px !important;
+  line-height: 1.35 !important;
+  font-variant-numeric: tabular-nums !important;
+  border-bottom: 1px solid var(--vpg-border-subtle) !important;
+  border-right: 1px solid var(--vpg-border-subtle) !important;
+}
+
+.tp-mcp-shell .vpg-row:hover .vpg-cell {
+  background: var(--tp-accent-soft) !important;
+}
+
+/* Edge-to-edge Pivot container & code-style pivot matrix */
+.tp-mcp-shell .vpg-pivot-container {
+  padding: 0 !important;
+  gap: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+.tp-mcp-shell .vpg-pivot-main {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.tp-mcp-shell .vpg-pivot-skeleton,
+.tp-mcp-shell .vpg-pivot-table-wrapper {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.tp-mcp-shell .vpg-pivot-table {
+  width: 100% !important;
+  min-width: max-content;
+  font-family: var(--tp-mono) !important;
+  font-size: 12.5px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.tp-mcp-shell .vpg-pivot-table thead th {
+  font-family: var(--tp-mono) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  background: var(--vpg-surface-panel) !important;
+  color: var(--vpg-text-secondary) !important;
+  border-bottom: 1px solid var(--tp-accent-border) !important;
+  border-right: 1px solid var(--vpg-border-subtle) !important;
+  padding: 6px 10px !important;
+}
+
+.tp-mcp-shell .vpg-pivot-table tbody td {
+  padding: 5px 10px !important;
+  line-height: 1.35 !important;
+  border-bottom: 1px solid var(--vpg-border-subtle) !important;
+  border-right: 1px solid var(--vpg-border-subtle) !important;
+}
+
+.tp-mcp-shell .vpg-pivot-table tbody tr:hover td {
+  background: var(--tp-accent-soft) !important;
+}
+
+.tp-mcp-shell .vpg-pivot-table .vpg-pivot-total-cell,
+.tp-mcp-shell .vpg-pivot-table .vpg-pivot-grand-total,
+.tp-mcp-shell .vpg-pivot-table tfoot td {
+  font-weight: 700 !important;
+  color: var(--tp-accent) !important;
+  background: var(--tp-accent-soft) !important;
+  border-top: 1px solid var(--tp-accent-border) !important;
+}
+
+/* Edge-to-edge Chart view stretching to fill full available height & width */
+.tp-mcp-shell .vpg-chart-view,
+.tp-mcp-shell .vpg-chart-builder {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.tp-mcp-shell .vpg-chart-builder-content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+.tp-mcp-shell .vpg-chart-preview-panel {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.tp-mcp-shell .vpg-chart-container {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 6px 10px 4px !important;
+}
+
+.tp-mcp-shell .vpg-vertical-resize-handle {
+  display: none !important;
+}
+
+/* Avoid double view-switcher chrome; the MCP top bar owns Chart | Pivot | Data */
+.tp-mcp-shell .vpg-view-toggle {
+  display: none !important;
+}
+
+/* Compact inner toolbar in Data/Customize views */
+.tp-mcp-shell .vpg-toolbar {
+  padding: 4px 10px !important;
+  min-height: 34px !important;
+}
+
+/* ============================================================================
+   Focus Mode (default): clean, full-bleed Chart & Pivot with zero sidebar clutter.
+   Clicking "Customize" removes .tp-mcp-focus to reveal full drag-and-drop panels.
+   ============================================================================ */
+.tp-mcp-focus.tp-mcp-view-chart .vpg-toolbar,
+.tp-mcp-focus.tp-mcp-view-pivot .vpg-toolbar {
+  display: none !important;
+}
+
+.tp-mcp-focus .vpg-chart-type-bar,
+.tp-mcp-focus .vpg-chart-fields-panel,
+.tp-mcp-focus .vpg-chart-config-panel {
+  display: none !important;
+}
+
+.tp-mcp-focus .vpg-chart-builder-content {
+  grid-template-columns: 1fr !important;
+  display: flex !important;
+}
+
+.tp-mcp-focus .vpg-chart-preview-panel {
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  border: none !important;
+}
+
+.tp-mcp-focus .vpg-pivot-config-panel {
+  display: none !important;
+}
+
+.tp-mcp-focus .vpg-pivot-main {
+  width: 100% !important;
+  flex: 1 1 100% !important;
+}
+
+.tp-mcp-shell .vpg-footer,
+.tp-mcp-focus .vpg-footer {
+  padding: 4px 10px !important;
+  font-family: var(--tp-mono) !important;
+  font-size: 10.5px !important;
+  background: var(--color-background-secondary, rgba(15, 23, 42, 0.72)) !important;
+  color: var(--color-text-secondary, #94a3b8) !important;
+  border-top: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.16)) !important;
+}
+
+.tp-mcp-shell .vpg-footer .vpg-chart-label,
+.tp-mcp-shell .vpg-footer .vpg-pivot-label,
+.tp-mcp-shell .vpg-footer .vpg-filtered-count {
+  color: var(--tp-accent) !important;
+}
+
+/* ============================================================================
+   Subtle, precision entrance motion (blocks settling into place, crisp reveals)
+   Respects prefers-reduced-motion automatically.
+   ============================================================================ */
+@keyframes tp-fade-settle {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tp-block-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scaleY(0.92);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(1px) scaleY(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+.tp-mcp-shell .vpg-chart-container,
+.tp-mcp-shell .vpg-pivot-table-wrapper,
+.tp-mcp-shell .vpg-grid-container {
+  animation: tp-fade-settle 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Staggered block settle on bar chart columns, stacked segments, & heatmap tiles */
+.tp-mcp-shell .apexcharts-series {
+  --tp-series-delay: 0ms;
+}
+.tp-mcp-shell .apexcharts-series:nth-child(2) { --tp-series-delay: 85ms; }
+.tp-mcp-shell .apexcharts-series:nth-child(3) { --tp-series-delay: 165ms; }
+.tp-mcp-shell .apexcharts-series:nth-child(4) { --tp-series-delay: 235ms; }
+
+.tp-mcp-shell .apexcharts-bar-area,
+.tp-mcp-shell .apexcharts-heatmap-rect {
+  --tp-bar-delay: 0ms;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: tp-block-drop 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--tp-series-delay, 0ms) + var(--tp-bar-delay, 0ms));
+}
+
+.tp-mcp-shell .apexcharts-bar-area:nth-child(2),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(2) { --tp-bar-delay: 28ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(3),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(3) { --tp-bar-delay: 56ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(4),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(4) { --tp-bar-delay: 84ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(5),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(5) { --tp-bar-delay: 112ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(6),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(6) { --tp-bar-delay: 140ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(7),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(7) { --tp-bar-delay: 168ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(8),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(8) { --tp-bar-delay: 196ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(9),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(9) { --tp-bar-delay: 224ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(10),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(10) { --tp-bar-delay: 252ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(11),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(11) { --tp-bar-delay: 280ms; }
+.tp-mcp-shell .apexcharts-bar-area:nth-child(12),
+.tp-mcp-shell .apexcharts-heatmap-rect:nth-child(12) { --tp-bar-delay: 308ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-mcp-shell .vpg-chart-container,
+  .tp-mcp-shell .vpg-pivot-table-wrapper,
+  .tp-mcp-shell .vpg-grid-container,
+  .tp-mcp-shell .apexcharts-bar-area,
+  .tp-mcp-shell .apexcharts-heatmap-rect {
+    animation: none !important;
+  }
+}

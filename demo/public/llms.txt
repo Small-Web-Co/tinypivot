@@ -1,14 +1,15 @@
 # TinyPivot
 
-> Lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3 and React.
+> In-Agent Analytics (MCP App) and lightweight React & Vue 3 data grid with free core charts & pivot tables, Pro unlimited rows, drill-through, read-only PostgreSQL, and Excel export.
 
-TinyPivot is a batteries-included analytics grid for Vue 3 and React. The free tier includes an Excel-like data grid, pivot tables with Sum aggregation, row/column totals, calculated fields, CSV export, and clipboard support. Pro adds advanced aggregations (Count, Avg, Min, Max, Unique, Median, Std Dev, % of Total), a drag-and-drop Chart Builder (6 chart types), and an AI Data Analyst with natural language queries using your own API key (OpenAI, Anthropic, or OpenRouter).
+TinyPivot is both an **In-Agent Analytics MCP App** (`@smallwebco/tinypivot-mcp` — 1-command install via `npx @smallwebco/tinypivot-mcp init` across Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, and pi) and a batteries-included analytics grid for Vue 3 and React. The MCP server streams CSV, TSV, JSON, inline MCP tool outputs, and read-only PostgreSQL results straight into an interactive Chart, Pivot Table, and Data Grid without burning LLM context tokens. Free includes core charts and basic pivot up to 2,500 rows (with explicit UI/LLM truncation banners); Pro ($19/mo, $149/yr, or $249 lifetime) and Team ($79/mo or $699/yr for 5 seats) unlock unlimited rows, 5 themes, drill-through, Excel export, and read-only Postgres.
 
 ## Docs
 
+- [In-Agent Analytics (TinyPivot MCP Guide)](https://tiny-pivot.com/mcp): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference
 - [Full AI-friendly developer reference](https://tiny-pivot.com/llms-full.txt): Complete install, quick-start code, all props, free vs Pro feature matrix, pricing, aggregations, theming, and AI Data Analyst setup for both Vue and React
 - [Homepage](https://tiny-pivot.com): Live demo, feature overview, and pricing
-- [GitHub repository & README](https://github.com/Small-Web-Co/tinypivot): Source code, examples, and AI Analyst demo
+- [GitHub repository & README](https://github.com/Small-Web-Co/tinypivot): Source code, MCP server (`packages/mcp`), examples, and AI Analyst demo
 
 ## Examples
 

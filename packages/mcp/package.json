@@ -1,0 +1,80 @@
+{
+  "name": "@smallwebco/tinypivot-mcp",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "TinyPivot MCP Server & Interactive MCP App — turn CSV, JSON, and PostgreSQL queries into interactive pivot tables, charts, drill-through, and Excel exports directly inside AI chats.",
+  "author": "Small Web, LLC",
+  "license": "MIT",
+  "homepage": "https://tiny-pivot.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Small-Web-Co/tinypivot.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-app",
+    "model-context-protocol",
+    "tinypivot",
+    "pivot-table",
+    "data-grid",
+    "analytics",
+    "charts",
+    "csv",
+    "postgres",
+    "excel",
+    "ai-workflows"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "tinypivot-mcp": "./dist/cli.js"
+  },
+  "files": [
+    "README.md",
+    "dist",
+    "rules"
+  ],
+  "scripts": {
+    "build": "pnpm run build:server && pnpm run build:app",
+    "build:app": "vite build --config vite.app.config.ts",
+    "build:server": "tsup",
+    "dev:app": "vite --config vite.app.config.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "pg": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@smallwebco/tinypivot-core": "workspace:*",
+    "@smallwebco/tinypivot-react": "workspace:*",
+    "@smallwebco/tinypivot-server": "workspace:*",
+    "@types/node": "^20.19.41",
+    "@types/pg": "^8.11.6",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsup": "^8.0.1",
+    "typescript": "~5.6.2",
+    "vite": "^6.4.6",
+    "vite-plugin-singlefile": "^2.2.0"
+  }
+}

@@ -82,6 +82,8 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
 function routeContentFiles(route, guideSlugSet) {
   if (route.url === '/')
     return ['demo/pages/Home.vue']
+  if (route.url === '/mcp')
+    return ['demo/pages/McpGuide.vue']
   if (guideSlugSet.has(route.url.replace(/^\//, '')))
     return ['demo/pages/MarketingGuide.vue', 'demo/router/routes.ts']
   return ['demo/pages/VsAgGrid.vue']
@@ -298,7 +300,7 @@ async function main() {
     define: {
       __AI_MODEL__: JSON.stringify('AI Assistant'),
     },
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, watch: null },
     appType: 'custom',
     ssr: {
       // Externalize node-compatible packages so Vite doesn't try to bundle them.

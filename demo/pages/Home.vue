@@ -331,6 +331,9 @@ function trackFreeStart() {
           <span>TinyPivot</span>
         </div>
         <div class="nav-links">
+          <router-link to="/mcp" class="nav-link-highlight">
+            MCP (In-Agent)
+          </router-link>
           <a href="#features">Features</a>
           <a href="#ai-analyst">AI Analyst</a>
           <a href="#quickstart">Quick Start</a>
@@ -419,9 +422,9 @@ function trackFreeStart() {
           </button>
         </div>
         <p class="hero-note">
-          <a href="https://bvallieres.com/product/development/2026/03/23/tinypivot-free-pivot-tables-lifetime-license.html" target="_blank" rel="noopener">
-            Read the latest update: free pivot tables + lifetime Pro licensing →
-          </a>
+          <router-link to="/mcp">
+            NEW: TinyPivot MCP — In-Agent Analytics Data IDE for Antigravity, Claude & Cursor →
+          </router-link>
         </p>
       </div>
     </section>

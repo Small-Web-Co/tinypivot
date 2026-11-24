@@ -46,12 +46,14 @@ export {
   analyzeFieldsForChart,
   CHART_AGGREGATIONS,
   CHART_COLORS,
+  CHART_THEME_PRESETS,
   CHART_TYPES,
   createDefaultChartConfig,
   detectFieldRole,
   formatFieldLabel,
   generateChartStorageKey,
   getChartGuidance,
+  getChartThemeColors,
   getChartTypeInfo,
   isChartConfigValid,
   loadChartConfig,
@@ -59,6 +61,7 @@ export {
   processChartDataForHeatmap,
   processChartDataForPie,
   processChartDataForScatter,
+  resolveChartSortOrder,
   saveChartConfig,
 } from './chart'
 
@@ -172,8 +175,9 @@ export type {
   ChartField,
   ChartFieldInfo,
   ChartOptions,
-
   ChartSeries,
+  ChartSortOrder,
+  ChartThemePreset,
   ChartType,
 
   ChartTypeInfo,
@@ -188,6 +192,7 @@ export type {
   DatabaseEndpointRequest,
   // Component Props Types
   DataGridProps,
+  DataGridViewMode,
   DateFormat,
   DateRange,
   DrillThroughDescriptor,

@@ -8,6 +8,8 @@ import type {
   ChartData,
   ChartFieldInfo,
   ChartSeries,
+  ChartSortOrder,
+  ChartThemePreset,
   ChartType,
   ChartTypeInfo,
   FieldRole,
@@ -133,20 +135,47 @@ export const CHART_AGGREGATIONS: Array<{ value: ChartAggregation, label: string,
 ]
 
 /**
- * Default color palette for charts (works in light and dark mode)
+ * Curated code-style & quantitative color palettes for charts and MCP views.
  */
-export const CHART_COLORS = [
-  '#6366f1', // indigo
-  '#22c55e', // green
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // violet
-  '#06b6d4', // cyan
-  '#ec4899', // pink
-  '#14b8a6', // teal
-  '#f97316', // orange
-  '#3b82f6', // blue
-]
+export const CHART_THEME_PRESETS: Record<ChartThemePreset, { label: string, description: string, colors: string[] }> = {
+  code: {
+    label: 'Code',
+    description: 'Crisp IDE cyan, emerald, violet, and amber accents',
+    colors: ['#38bdf8', '#34d399', '#a78bfa', '#fbbf24', '#fb7185', '#22d3ee', '#818cf8', '#f97316'],
+  },
+  phosphor: {
+    label: 'Phosphor',
+    description: 'Terminal emerald and teal monochrome-accent ramp',
+    colors: ['#22c55e', '#34d399', '#2dd4bf', '#a3e635', '#06b6d4', '#10b981', '#84cc16', '#4ade80'],
+  },
+  nord: {
+    label: 'Nord',
+    description: 'Calm frost, glacier, and aurora editorial palette',
+    colors: ['#88c0d0', '#81a1c1', '#a3be8c', '#ebcb8b', '#d08770', '#b48ead', '#5e81ac', '#bf616a'],
+  },
+  thermal: {
+    label: 'Thermal',
+    description: 'High-contrast quantitative coral, rose, gold, and sky',
+    colors: ['#f97316', '#f43f5e', '#eab308', '#d946ef', '#38bdf8', '#10b981', '#ef4444', '#fb923c'],
+  },
+  mono: {
+    label: 'Mono',
+    description: 'Minimal print ink ramp with a single electric accent',
+    colors: ['#6366f1', '#94a3b8', '#64748b', '#cbd5e1', '#475569', '#a5b4fc', '#334155', '#e2e8f0'],
+  },
+}
+
+/**
+ * Resolve palette colors for a named chart theme preset (defaults to 'code').
+ */
+export function getChartThemeColors(preset: ChartThemePreset = 'code'): string[] {
+  return CHART_THEME_PRESETS[preset]?.colors ?? CHART_THEME_PRESETS.code.colors
+}
+
+/**
+ * Default color palette for charts (Code IDE preset — works in light and dark mode)
+ */
+export const CHART_COLORS = CHART_THEME_PRESETS.code.colors
 
 /**
  * Detect the role of a field based on its data.
@@ -441,6 +470,36 @@ export function aggregateValues(values: number[], aggregation: ChartAggregation)
   }
 }
 
+const TEMPORAL_CATEGORY_RE = /^(?:\d{4}(?:-\d{2}(?:-\d{2})?)?|Q[1-4](?:\s*\d{4})?|\d{4}\s*Q[1-4]|FY\d{2,4}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i
+
+function isTemporalCategories(config: ChartConfig, categories: string[]): boolean {
+  if (config.xAxis?.role === 'temporal')
+    return true
+  if (categories.length === 0)
+    return false
+  const matches = categories.filter(c => TEMPORAL_CATEGORY_RE.test(c.trim())).length
+  return matches / categories.length >= 0.7
+}
+
+export function resolveChartSortOrder(config: ChartConfig, categories: string[]): ChartSortOrder {
+  if (config.options?.sortOrder)
+    return config.options.sortOrder
+  if (isTemporalCategories(config, categories))
+    return 'label-asc'
+  if (config.type === 'bar' || config.type === 'stackedBar' || config.type === 'pie' || config.type === 'donut')
+    return 'value-desc'
+  return 'label-asc'
+}
+
+function compareLabels(a: string, b: string): number {
+  const numA = Number.parseFloat(a)
+  const numB = Number.parseFloat(b)
+  if (!Number.isNaN(numA) && !Number.isNaN(numB) && String(numA) === a.trim() && String(numB) === b.trim()) {
+    return numA - numB
+  }
+  return a.localeCompare(b)
+}
+
 /**
  * Process raw data into chart-ready format
  */
@@ -457,7 +516,7 @@ export function processChartData(
   const yAggregation = config.yAxis.aggregation || 'sum'
   const seriesField = config.seriesField?.field
 
-  // Group data by x-axis values
+  // Group data by x-axis values (preserving Map insertion order for 'data' sort mode)
   const grouped = new Map<string, Map<string, number[]>>()
 
   for (const row of data) {
@@ -479,22 +538,42 @@ export function processChartData(
     xGroup.get(seriesValue)!.push(yValue)
   }
 
-  // Get sorted categories
-  const categories = Array.from(grouped.keys()).sort((a, b) => {
-    const numA = Number.parseFloat(a)
-    const numB = Number.parseFloat(b)
-    if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
-      return numA - numB
-    }
-    return a.localeCompare(b)
-  })
-
   // Get all series names
   const seriesNames = new Set<string>()
   for (const xGroup of grouped.values()) {
     for (const seriesName of xGroup.keys()) {
       seriesNames.add(seriesName)
     }
+  }
+
+  // Determine effective category order (value-desc, value-asc, label-asc, label-desc, or data/grid order)
+  const rawCategories = Array.from(grouped.keys())
+  const sortOrder = resolveChartSortOrder(config, rawCategories)
+
+  let categories: string[]
+  if (sortOrder === 'data') {
+    categories = rawCategories
+  }
+  else if (sortOrder === 'value-desc' || sortOrder === 'value-asc') {
+    const totals = new Map<string, number>()
+    for (const category of rawCategories) {
+      const xGroup = grouped.get(category)!
+      let sum = 0
+      for (const seriesName of seriesNames) {
+        const values = xGroup.get(seriesName) || []
+        sum += aggregateValues(values, yAggregation)
+      }
+      totals.set(category, sum)
+    }
+    const dir = sortOrder === 'value-desc' ? -1 : 1
+    categories = [...rawCategories].sort((a, b) => {
+      const diff = ((totals.get(a) ?? 0) - (totals.get(b) ?? 0)) * dir
+      return diff !== 0 ? diff : compareLabels(a, b)
+    })
+  }
+  else {
+    const dir = sortOrder === 'label-desc' ? -1 : 1
+    categories = [...rawCategories].sort((a, b) => compareLabels(a, b) * dir)
   }
 
   // Build series data
@@ -551,13 +630,25 @@ export function processChartDataForPie(
     grouped.get(xValue)!.push(yValue)
   }
 
-  // Sort by aggregated value descending
-  const entries = Array.from(grouped.entries())
-    .map(([category, values]) => ({
-      category,
-      value: aggregateValues(values, yAggregation),
-    }))
-    .sort((a, b) => b.value - a.value)
+  const rawEntries = Array.from(grouped.entries()).map(([category, values]) => ({
+    category,
+    value: aggregateValues(values, yAggregation),
+  }))
+
+  const sortOrder = resolveChartSortOrder(config, rawEntries.map(e => e.category))
+  let entries = rawEntries
+  if (sortOrder === 'value-desc') {
+    entries = [...rawEntries].sort((a, b) => b.value - a.value)
+  }
+  else if (sortOrder === 'value-asc') {
+    entries = [...rawEntries].sort((a, b) => a.value - b.value)
+  }
+  else if (sortOrder === 'label-asc') {
+    entries = [...rawEntries].sort((a, b) => compareLabels(a.category, b.category))
+  }
+  else if (sortOrder === 'label-desc') {
+    entries = [...rawEntries].sort((a, b) => compareLabels(b.category, a.category))
+  }
 
   return {
     categories: entries.map(e => e.category),
@@ -737,11 +828,11 @@ export function createDefaultChartConfig(): ChartConfig {
   return {
     type: 'bar',
     options: {
+      chartTheme: 'code',
       showDataLabels: false,
       showLegend: true,
       legendPosition: 'top',
       animated: true,
-      colors: CHART_COLORS,
       showGrid: true,
       enableZoom: false,
       stacked: false,

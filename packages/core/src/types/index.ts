@@ -201,6 +201,8 @@ export interface FieldStats {
 export type PivotLayout = 'grouped' | 'tabular'
 
 // Component Props Types
+export type DataGridViewMode = 'ai' | 'grid' | 'pivot' | 'chart'
+
 export interface DataGridProps {
   data: Record<string, unknown>[]
   loading?: boolean
@@ -237,6 +239,14 @@ export interface DataGridProps {
    * - `'tabular'`: repeat the value on every row (classic behaviour).
    */
   pivotLayout?: PivotLayout
+  /** Optional controlled/initial active view mode ('grid' | 'pivot' | 'chart' | 'ai') */
+  viewMode?: DataGridViewMode
+  /** Optional initial or programmatically updated pivot configuration */
+  pivotConfig?: Partial<PivotConfig>
+  /** Optional initial or programmatically updated chart configuration */
+  chartConfig?: Partial<ChartConfig>
+  /** Optional visual palette preset for charts ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
+  chartTheme?: ChartThemePreset
 }
 
 export interface PivotTableProps {
@@ -441,8 +451,18 @@ export interface ChartConfig {
   options?: ChartOptions
 }
 
+/** Built-in visual palette & code-style aesthetic presets for charts and MCP views */
+export type ChartThemePreset = 'code' | 'phosphor' | 'nord' | 'thermal' | 'mono'
+
+/** Category sort order for charts ('data' preserves active DataGrid row order) */
+export type ChartSortOrder = 'value-desc' | 'value-asc' | 'label-asc' | 'label-desc' | 'data'
+
 /** Visual and display options for charts */
 export interface ChartOptions {
+  /** Built-in palette preset ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
+  chartTheme?: ChartThemePreset
+  /** Category sort order ('value-desc' | 'value-asc' | 'label-asc' | 'label-desc' | 'data') */
+  sortOrder?: ChartSortOrder
   /** Show data labels on chart */
   showDataLabels?: boolean
   /** Show legend */

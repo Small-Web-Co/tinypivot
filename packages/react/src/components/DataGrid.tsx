@@ -9,10 +9,13 @@ import type {
   AIErrorEvent,
   AIQueryExecutedEvent,
   ChartConfig,
+  ChartThemePreset,
+  DataGridViewMode,
   DateFormat,
   DateRange,
   DrillThroughResult,
   NumberFormat,
+  PivotConfig as PivotConfigType,
   PivotLayout,
   Theme,
 } from '@smallwebco/tinypivot-core'
@@ -76,6 +79,14 @@ interface DataGridProps {
   enableDrillThrough?: boolean
   /** Pivot row layout: 'grouped' merges repeated parent cells, 'tabular' repeats every value */
   pivotLayout?: PivotLayout
+  /** Optional controlled/initial active view mode ('grid' | 'pivot' | 'chart' | 'ai') */
+  viewMode?: DataGridViewMode
+  /** Optional initial or programmatically updated pivot configuration */
+  pivotConfig?: Partial<PivotConfigType>
+  /** Optional initial or programmatically updated chart configuration */
+  chartConfig?: Partial<ChartConfig>
+  /** Optional visual palette preset for charts ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
+  chartTheme?: ChartThemePreset
   onCellClick?: (payload: {
     row: number
     col: number
@@ -93,6 +104,11 @@ interface DataGridProps {
   // Drill-down/through events
   onCollapseChange?: (collapsedPaths: string[]) => void
   onDrillThrough?: (result: DrillThroughResult) => void
+  // View / config change callbacks
+  onViewModeChange?: (mode: DataGridViewMode) => void
+  onPivotConfigChange?: (config: PivotConfigType) => void
+  onChartConfigChange?: (config: ChartConfig) => void
+  onChartThemeChange?: (preset: import('@smallwebco/tinypivot-core').ChartThemePreset) => void
 }
 
 const MIN_COL_WIDTH = 120
@@ -123,6 +139,10 @@ export function DataGrid({
   enableDrillDown = true,
   enableDrillThrough = true,
   pivotLayout = 'grouped',
+  viewMode: controlledViewMode,
+  pivotConfig: controlledPivotConfig,
+  chartConfig: controlledChartConfig,
+  chartTheme,
   onCellClick,
   onExport,
   onCopy,
@@ -132,6 +152,10 @@ export function DataGrid({
   onAIError,
   onCollapseChange,
   onDrillThrough,
+  onViewModeChange,
+  onPivotConfigChange,
+  onChartConfigChange,
+  onChartThemeChange,
 }: DataGridProps) {
   const { showWatermark, canUsePivot, canUseCharts, canUseAIAnalyst, canUseXlsxExport, isDemo, licenseInfo } = useLicense()
 
@@ -165,7 +189,18 @@ export function DataGrid({
   const [verticalResizeStartHeight, setVerticalResizeStartHeight] = useState(0)
   const [showCopyToast, setShowCopyToast] = useState(false)
   const [copyToastMessage, setCopyToastMessage] = useState('')
-  const [viewMode, setViewMode] = useState<'ai' | 'grid' | 'pivot' | 'chart'>('grid')
+  const [viewMode, setViewModeState] = useState<DataGridViewMode>(controlledViewMode ?? 'grid')
+
+  const setViewMode = useCallback((next: DataGridViewMode) => {
+    setViewModeState(next)
+    onViewModeChange?.(next)
+  }, [onViewModeChange])
+
+  useEffect(() => {
+    if (controlledViewMode !== undefined) {
+      setViewModeState(controlledViewMode)
+    }
+  }, [controlledViewMode])
 
   // AI Analyst ref (for accessing loadFullData)
   const aiAnalystRef = useRef<AIAnalystHandle>(null)
@@ -182,7 +217,8 @@ export function DataGrid({
 
   const handleChartConfigChange = useCallback((config: ChartConfig) => {
     setChartConfig(config)
-  }, [])
+    onChartConfigChange?.(config)
+  }, [onChartConfigChange])
   const [showPivotConfig, setShowPivotConfig] = useState(true)
   const [draggingField, setDraggingField] = useState<string | null>(null)
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null)
@@ -224,11 +260,13 @@ export function DataGrid({
     getDateRangeFilter,
   } = useExcelGrid({ data: displayData, enableSorting: true, enableFiltering: true })
 
+  const sortingState = table.getState().sorting
+
   // Filtered data for pivot table
   const filteredDataForPivot = useMemo(() => {
     const filteredRows = table.getFilteredRowModel().rows
     return filteredRows.map(row => row.original)
-  }, [table, columnFilters])
+  }, [table, displayData, columnFilters, sortingState])
 
   // Pivot table composable
   const {
@@ -260,7 +298,28 @@ export function DataGrid({
     fieldFilters: pivotFieldFilters,
     activeFieldFilters: pivotActiveFieldFilters,
     setFieldFilter: setPivotFieldFilter,
+    applyConfig: applyPivotConfig,
   } = usePivotTable(filteredDataForPivot, enableDrillDown)
+
+  // Sync externally supplied pivotConfig (e.g. from AI/MCP tools)
+  useEffect(() => {
+    if (controlledPivotConfig) {
+      applyPivotConfig(controlledPivotConfig)
+    }
+  }, [controlledPivotConfig, displayData, applyPivotConfig])
+
+  // Notify parent when pivot configuration changes
+  useEffect(() => {
+    onPivotConfigChange?.({
+      rowFields: pivotRowFields,
+      columnFields: pivotColumnFields,
+      valueFields: pivotValueFields,
+      showRowTotals: pivotShowRowTotals,
+      showColumnTotals: pivotShowColumnTotals,
+      calculatedFields: pivotCalculatedFields,
+      fieldFilters: pivotFieldFilters,
+    })
+  }, [pivotRowFields, pivotColumnFields, pivotValueFields, pivotShowRowTotals, pivotShowColumnTotals, pivotCalculatedFields, pivotFieldFilters, onPivotConfigChange])
 
   // Unique values per axis field — powers the axis filter UI in PivotConfig
   const getPivotFieldValues = useCallback(
@@ -367,8 +426,8 @@ export function DataGrid({
     })
   }, [activeFilters, dateFormat])
 
-  // Rows - depends on columnFilters to recompute when filters change
-  const rows = useMemo(() => table.getFilteredRowModel().rows, [table, columnFilters])
+  // Rows - depends on displayData, columnFilters, and sortingState to recompute when data/filters/sort change
+  const rows = useMemo(() => table.getFilteredRowModel().rows, [table, displayData, columnFilters, sortingState])
 
   // Filtered data based on global search
   const searchFilteredData = useMemo(() => {
@@ -1625,8 +1684,11 @@ export function DataGrid({
           <ChartBuilder
             data={filteredDataForPivot}
             theme={currentTheme}
+            chartTheme={chartTheme}
             fieldRoleOverrides={fieldRoleOverrides}
+            initialConfig={controlledChartConfig}
             onConfigChange={handleChartConfigChange}
+            onChartThemeChange={onChartThemeChange}
           />
         </div>
       )}

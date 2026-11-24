@@ -88,6 +88,15 @@ export const routeDefinitions = [
     },
   },
   {
+    path: '/mcp',
+    name: 'mcp',
+    component: () => import('../pages/McpGuide.vue'),
+    meta: {
+      title: 'TinyPivot MCP — In-Agent Analytics & Data IDE for AI Workflows',
+      description: 'Add interactive charts, pivot tables, drill-through, and Excel export directly inside Antigravity, Claude Desktop, Cursor, and any MCP Apps host — while saving 90%+ LLM tokens.',
+    },
+  },
+  {
     path: '/vs-ag-grid',
     name: 'vs-ag-grid',
     component: () => import('../pages/VsAgGrid.vue'),
