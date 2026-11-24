@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 interface SlideMeta {
   id: number
@@ -104,6 +104,34 @@ function stepSlide(delta: number) {
   activeSlide.value = (activeSlide.value + delta + slides.length) % slides.length
   progressPct.value = 0
   isPaused.value = true
+}
+
+// Phones: tabs become a sideways-scrolling row (keep the active one visible) and the stage takes swipes.
+const tabsEl = ref<HTMLElement | null>(null)
+watch(activeSlide, (idx) => {
+  const row = tabsEl.value
+  const tab = row?.children[idx] as HTMLElement | undefined
+  if (row && tab && row.scrollWidth > row.clientWidth)
+    row.scrollTo({ left: tab.offsetLeft - row.offsetLeft - 12, behavior: 'smooth' })
+})
+
+const SWIPE_MIN_PX = 50
+let touchStart: { x: number, y: number } | null = null
+
+function onStageTouchStart(event: TouchEvent) {
+  const target = event.target as Element
+  // Leave horizontally scrollable content (code, wide tables) to scroll normally.
+  touchStart = target.closest('pre, .widget-table-wrap, .browser-content') ? null : { x: event.touches[0].clientX, y: event.touches[0].clientY }
+}
+
+function onStageTouchEnd(event: TouchEvent) {
+  if (!touchStart)
+    return
+  const dx = event.changedTouches[0].clientX - touchStart.x
+  const dy = event.changedTouches[0].clientY - touchStart.y
+  touchStart = null
+  if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy) * 1.5)
+    stepSlide(dx < 0 ? 1 : -1)
 }
 
 function togglePlay() {
@@ -364,7 +392,7 @@ function selectDb(id: DbId) {
   >
     <!-- Top Tab Switcher + Progress Bar -->
     <div class="reel-topbar">
-      <div class="reel-tabs" role="tablist" aria-label="TinyPivot MCP Highlight Reel">
+      <div ref="tabsEl" class="reel-tabs" role="tablist" aria-label="TinyPivot MCP Highlight Reel">
         <button
           v-for="(slide, idx) in slides"
           :key="slide.id"
@@ -433,7 +461,7 @@ function selectDb(id: DbId) {
     </div>
 
     <!-- Stage -->
-    <div class="reel-stage">
+    <div class="reel-stage" @touchstart.passive="onStageTouchStart" @touchend="onStageTouchEnd">
       <!-- SLIDE 1: IDE INLINE WIDGET -->
       <div v-if="activeSlide === 0" class="slide-panel slide-ide">
         <div class="ide-chat-bar">
@@ -1153,14 +1181,12 @@ function selectDb(id: DbId) {
 <style scoped>
 .reel-shell {
   width: 100%;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(17, 21, 34, 0.94), rgba(10, 10, 15, 0.98));
-  border: 1px solid rgba(16, 185, 129, 0.28);
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  border-radius: var(--radius, 6px);
+  background: var(--win, #0f1013);
+  border: 1px solid var(--win-rule, #2a2d34);
+  box-shadow: 0 40px 80px -48px rgba(27, 26, 23, 0.75);
   overflow: hidden;
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #e2e8f0;
 }
 
@@ -2538,6 +2564,97 @@ function selectDb(id: DbId) {
 
   .chart-bars-grid {
     gap: 6px;
+  }
+}
+@media (max-width: 640px) {
+  .reel-topbar {
+    flex-wrap: nowrap;
+    padding: 10px 0 10px 12px;
+  }
+
+  .reel-tabs {
+    display: flex;
+    min-width: 0;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-right: 12px;
+  }
+
+  .reel-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reel-tab {
+    flex: none;
+    min-height: 40px;
+  }
+
+  .reel-controls,
+  .reel-slide-sub,
+  .bar-val-top {
+    display: none;
+  }
+
+  .reel-slide-meta {
+    padding: 14px 14px 12px;
+  }
+
+  .reel-slide-title {
+    font-size: 17px;
+  }
+
+  .reel-stage {
+    min-height: 0;
+  }
+
+  .ghostty-tag {
+    display: none;
+  }
+
+  .ghostty-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .term-cards-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tui-card {
+    min-width: 0;
+    padding: 12px 10px;
+  }
+
+  .tui-braille-cell {
+    font-size: 10px;
+  }
+
+  .tui-pivot-row {
+    grid-template-columns: minmax(64px, 1.2fr) repeat(3, minmax(0, 1fr)) 40px;
+    font-size: 11px;
+  }
+
+  .tui-pivot-row > span {
+    padding: 4px 3px;
+  }
+
+  .companion-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .browser-content {
+    overflow-x: auto;
+  }
+
+  .companion-table {
+    font-size: 11px;
+  }
+
+  .companion-table th,
+  .companion-table td {
+    padding: 6px 5px;
   }
 }
 </style>
