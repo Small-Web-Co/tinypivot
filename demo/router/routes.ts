@@ -75,6 +75,19 @@ export const marketingGuides = [
   },
 ] as const
 
+/**
+ * Anchors from the old single-page site. Published package versions, READMEs and
+ * upgrade prompts link to these, so they must keep landing somewhere useful.
+ */
+export const legacyAnchors: Readonly<Record<string, string>> = {
+  '/#pricing': '/pricing?product=ui',
+  '/#demo': '/ui#demo',
+  '/#features': '/ui',
+  '/#quickstart': '/ui#quickstart',
+  '/#ai-analyst': '/ui#ai-analyst',
+  '/docs#pricing': '/pricing',
+}
+
 export type MarketingGuideSlug = typeof marketingGuides[number]['slug']
 
 export const routeDefinitions = [

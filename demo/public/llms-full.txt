@@ -32,7 +32,7 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 - **npm package:** `@smallwebco/tinypivot-mcp` (`npx -y @smallwebco/tinypivot-mcp`)
 - **Official MCP Registry ID:** `io.github.Small-Web-Co/tinypivot`
 - **Discovery endpoint:** `https://tiny-pivot.com/.well-known/mcp.json`
-- **Guide & Pricing:** `https://tiny-pivot.com/mcp`
+- **Docs:** `https://tiny-pivot.com/docs` · **Pricing:** `https://tiny-pivot.com/pricing`
 
 ### Supported AI Harnesses
 
@@ -316,7 +316,7 @@ Lifetime license — one-time purchase, no subscription, no per-seat fees.
 | Unlimited Projects | $149 | All your personal/company projects |
 | Team License | $399 | Up to 10 developers |
 
-Purchase at: https://tiny-pivot.com/#pricing
+Purchase at: https://tiny-pivot.com/pricing?product=ui
 
 ---
 
@@ -764,7 +764,7 @@ Chrome 80+, Firefox 75+, Safari 14+, Edge 80+
 - Free tier: MIT — core grid, pivot (Sum only), pivot row group expand/collapse, export, clipboard
 - Pro features: Commercial license required (pivot drill-through, charts, advanced aggregations, AI Data Analyst, no watermark)
 
-Purchase: https://tiny-pivot.com/#pricing
+Purchase: https://tiny-pivot.com/pricing?product=ui
 GitHub: https://github.com/Small-Web-Co/tinypivot
 npm (Vue): https://www.npmjs.com/package/@smallwebco/tinypivot-vue
 npm (React): https://www.npmjs.com/package/@smallwebco/tinypivot-react

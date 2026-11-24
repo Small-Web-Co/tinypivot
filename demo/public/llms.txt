@@ -6,9 +6,11 @@ TinyPivot is an **In-Agent Analytics MCP App** (`@smallwebco/tinypivot-mcp` — 
 
 ## Docs
 
-- [In-Agent Analytics (TinyPivot MCP Guide)](https://tiny-pivot.com/mcp): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference
+- [In-Agent Analytics (TinyPivot MCP Docs)](https://tiny-pivot.com/docs): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference
 - [Full AI-friendly developer reference](https://tiny-pivot.com/llms-full.txt): Complete install, quick-start code, all props, free vs Pro feature matrix, pricing, aggregations, theming, and AI Data Analyst setup for both Vue and React
-- [Homepage](https://tiny-pivot.com): Live demo, feature overview, and pricing
+- [Homepage](https://tiny-pivot.com): TinyPivot MCP overview, install command, and token savings
+- [React & Vue library](https://tiny-pivot.com/ui): Live 10,000-row demo, quick start, and AI Data Analyst setup
+- [Pricing](https://tiny-pivot.com/pricing): MCP plans and React/Vue one-time licenses
 - [GitHub repository & README](https://github.com/Small-Web-Co/tinypivot): Source code, MCP server (`packages/mcp`), examples, and AI Analyst demo
 
 ## Examples
