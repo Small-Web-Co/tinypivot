@@ -108,6 +108,15 @@ export const routeDefinitions = [
     },
   },
   {
+    path: '/pricing',
+    name: 'pricing',
+    component: () => import('../pages/Pricing.vue'),
+    meta: {
+      title: 'TinyPivot Pricing — MCP Server & React/Vue Library',
+      description: 'TinyPivot MCP is free up to 2,500 rows; Pro adds unlimited rows, drill-through and Excel export from $19/month or $399 lifetime. React & Vue licenses from $49 one-time.',
+    },
+  },
+  {
     path: '/mcp',
     redirect: (to: { hash: string }) => ({ path: '/docs', hash: to.hash }),
   },

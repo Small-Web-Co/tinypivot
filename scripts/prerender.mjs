@@ -83,6 +83,7 @@ const PAGE_FILES = {
   '/': ['demo/pages/Home.vue'],
   '/ui': ['demo/pages/Ui.vue'],
   '/docs': ['demo/pages/McpGuide.vue'],
+  '/pricing': ['demo/pages/Pricing.vue', 'demo/site/pricing.ts'],
   '/vs-ag-grid': ['demo/pages/VsAgGrid.vue'],
 }
 
