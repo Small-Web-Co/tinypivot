@@ -58,6 +58,11 @@ body {
   overflow-x: hidden;
 }
 
+/* Keep anchor targets clear of the sticky nav. */
+[id] {
+  scroll-margin-top: 76px;
+}
+
 ::selection {
   background: var(--ink);
   color: var(--paper);

@@ -82,7 +82,7 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
 const PAGE_FILES = {
   '/': ['demo/pages/Home.vue'],
   '/ui': ['demo/pages/Ui.vue'],
-  '/docs': ['demo/pages/McpGuide.vue'],
+  '/docs': ['demo/pages/Docs.vue', 'demo/site/docs.ts'],
   '/pricing': ['demo/pages/Pricing.vue', 'demo/site/pricing.ts'],
   '/vs-ag-grid': ['demo/pages/VsAgGrid.vue'],
 }

@@ -1,6 +1,21 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { routeDefinitions } from './routes'
 
+/** Pages are lazy-loaded, so a #hash target may not exist yet when scrolling runs. */
+function waitForElement(selector: string, timeoutMs = 1500): Promise<boolean> {
+  const started = performance.now()
+  return new Promise((resolve) => {
+    const check = () => {
+      if (document.querySelector(selector))
+        return resolve(true)
+      if (performance.now() - started > timeoutMs)
+        return resolve(false)
+      requestAnimationFrame(check)
+    }
+    check()
+  })
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: routeDefinitions,
@@ -9,7 +24,7 @@ const router = createRouter({
       return savedPosition
     }
     if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
+      return waitForElement(to.hash).then(found => (found ? { el: to.hash, behavior: 'smooth' as const } : { top: 0 }))
     }
     return { top: 0 }
   },

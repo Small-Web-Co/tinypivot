@@ -100,9 +100,8 @@ export const routeDefinitions = [
   {
     path: '/docs',
     name: 'docs',
-    component: () => import('../pages/McpGuide.vue'),
+    component: () => import('../pages/Docs.vue'),
     meta: {
-      legacy: true,
       title: 'TinyPivot MCP Docs — Setup, Tools & Token Savings Calculator',
       description: 'Set up TinyPivot MCP in Claude, Cursor, Antigravity, OpenCode and pi. Tool reference and a prompt-cache-adjusted token savings calculator.',
     },

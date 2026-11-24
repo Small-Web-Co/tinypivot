@@ -1,38 +1,24 @@
 <script setup lang="ts">
-/**
- * Worked example using the /docs calculator's assumptions:
- * ~5 tokens per cell, cached re-reads billed at 10%, ~600 output tokens per rewritten table.
- */
-const ROWS = 2000
-const COLS = 6
-const FOLLOW_UPS = 5
-const TOKENS_PER_CELL = 5
-const CACHED_REREAD = 0.1
-const OUTPUT_PER_REWRITE = 600
-const SCHEMA_SUMMARY = 200
+import { estimateTokens } from '../../site/savings'
 
-const pasted = ROWS * COLS * TOKENS_PER_CELL
-const rereads = pasted * CACHED_REREAD * FOLLOW_UPS
-const rewrites = OUTPUT_PER_REWRITE * FOLLOW_UPS
-const without = pasted + rereads + rewrites
-const saved = without - SCHEMA_SUMMARY
-const savedPct = Math.floor((saved / without) * 1000) / 10
+const workload = { rows: 2000, cols: 6, followUps: 5, cached: true }
+const e = estimateTokens(workload)
+const savedPct = Math.floor(e.savedShare * 1000) / 10
+const fmt = (n: number) => n.toLocaleString('en-US')
 
 const lines = [
-  { sign: '-', label: `${ROWS.toLocaleString('en-US')} rows pasted into context`, tokens: pasted },
-  { sign: '-', label: `${FOLLOW_UPS} follow-ups re-read them (cached)`, tokens: rereads },
-  { sign: '-', label: `${FOLLOW_UPS} tables rewritten by the model`, tokens: rewrites },
-  { sign: '+', label: 'tinypivot.load_file schema summary', tokens: SCHEMA_SUMMARY },
-  { sign: '+', label: `${FOLLOW_UPS} follow-ups as local clicks`, tokens: 0 },
+  { sign: '-', label: `${fmt(workload.rows)} rows pasted into context`, tokens: e.pasted },
+  { sign: '-', label: `${workload.followUps} follow-ups re-read them (cached)`, tokens: e.rereads },
+  { sign: '-', label: `${workload.followUps} tables rewritten by the model`, tokens: e.rewrites },
+  { sign: '+', label: 'tinypivot schema summary, re-read too', tokens: e.withInput },
+  { sign: '+', label: `${workload.followUps} follow-ups as local clicks`, tokens: 0 },
 ] as const
-
-const fmt = (n: number) => n.toLocaleString('en-US')
 </script>
 
 <template>
   <figure class="receipt">
     <figcaption class="receipt-head">
-      <span>{{ ROWS.toLocaleString('en-US') }} rows × {{ COLS }} cols · {{ FOLLOW_UPS }} follow-up questions</span>
+      <span>{{ fmt(workload.rows) }} rows × {{ workload.cols }} cols · {{ workload.followUps }} follow-up questions</span>
     </figcaption>
     <ol class="receipt-lines">
       <li v-for="line in lines" :key="line.label" :class="line.sign === '-' ? 'minus' : 'plus'">
@@ -43,7 +29,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
     </ol>
     <div class="receipt-total">
       <span class="what">Context you don't pay for</span>
-      <span class="tok">{{ fmt(saved) }} <small>tok · {{ savedPct }}%</small></span>
+      <span class="tok">{{ fmt(e.totalSaved) }} <small>tok · {{ savedPct }}%</small></span>
     </div>
   </figure>
 </template>
