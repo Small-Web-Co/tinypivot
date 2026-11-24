@@ -491,11 +491,77 @@ export function resolveChartSortOrder(config: ChartConfig, categories: string[])
   return 'label-asc'
 }
 
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+}
+
+function parseTemporalSortKey(label: string): number | null {
+  const trimmed = label.trim()
+
+  // Quarter formats: "Q1", "Q2 2026", "2026 Q3", "2026-Q4"
+  const qFirst = /^Q([1-4])(?:\s*[-/]?\s*(\d{4}))?$/i.exec(trimmed)
+  if (qFirst) {
+    const year = qFirst[2] ? Number.parseInt(qFirst[2], 10) : 0
+    return year * 10 + Number.parseInt(qFirst[1], 10)
+  }
+  const yFirst = /^(\d{4})\s*[-/]?\s*Q([1-4])$/i.exec(trimmed)
+  if (yFirst) {
+    return Number.parseInt(yFirst[1], 10) * 10 + Number.parseInt(yFirst[2], 10)
+  }
+
+  // Month formats: "Jan", "January", "Jan 2026", "2026 Jan"
+  const mFirst = /^([a-z]+)(?:\s+(\d{4}))?$/i.exec(trimmed)
+  if (mFirst) {
+    const mIdx = MONTH_INDEX[mFirst[1].toLowerCase()]
+    if (mIdx !== undefined) {
+      const year = mFirst[2] ? Number.parseInt(mFirst[2], 10) : 0
+      return year * 100 + mIdx
+    }
+  }
+  const ymMatch = /^(\d{4})\s+([a-z]+)$/i.exec(trimmed)
+  if (ymMatch) {
+    const mIdx = MONTH_INDEX[ymMatch[2].toLowerCase()]
+    if (mIdx !== undefined) {
+      return Number.parseInt(ymMatch[1], 10) * 100 + mIdx
+    }
+  }
+
+  return null
+}
+
 function compareLabels(a: string, b: string): number {
   const numA = Number.parseFloat(a)
   const numB = Number.parseFloat(b)
   if (!Number.isNaN(numA) && !Number.isNaN(numB) && String(numA) === a.trim() && String(numB) === b.trim()) {
     return numA - numB
+  }
+  const tempA = parseTemporalSortKey(a)
+  const tempB = parseTemporalSortKey(b)
+  if (tempA !== null && tempB !== null) {
+    return tempA - tempB
   }
   return a.localeCompare(b)
 }
@@ -520,8 +586,12 @@ export function processChartData(
   const grouped = new Map<string, Map<string, number[]>>()
 
   for (const row of data) {
+    const rawY = row[yField]
+    if (rawY === null || rawY === undefined || rawY === '')
+      continue
+
     const xValue = String(row[xField] ?? '(blank)')
-    const yValue = Number(row[yField])
+    const yValue = Number(rawY)
     const seriesValue = seriesField ? String(row[seriesField] ?? '(blank)') : '_default'
 
     if (Number.isNaN(yValue))
@@ -618,8 +688,12 @@ export function processChartDataForPie(
   const grouped = new Map<string, number[]>()
 
   for (const row of data) {
+    const rawY = row[yField]
+    if (rawY === null || rawY === undefined || rawY === '')
+      continue
+
     const xValue = String(row[xField] ?? '(blank)')
-    const yValue = Number(row[yField])
+    const yValue = Number(rawY)
 
     if (Number.isNaN(yValue))
       continue

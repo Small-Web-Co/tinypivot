@@ -67,6 +67,49 @@ interface SelectedContext {
   summary: string
 }
 
+interface ActionToast {
+  message: string
+  upgradeCta?: boolean
+}
+
+const SURFACE_CSS_VARS: Record<'light' | 'dark', Record<string, string>> = {
+  light: {
+    '--color-background-primary': '#ffffff',
+    '--color-background-secondary': '#f8fafc',
+    '--color-background-tertiary': '#f1f5f9',
+    '--color-text-primary': '#0f172a',
+    '--color-text-secondary': '#475569',
+    '--color-text-tertiary': '#64748b',
+    '--color-text-inverse': '#ffffff',
+    '--color-border-primary': 'rgba(15, 23, 42, 0.14)',
+    '--color-border-secondary': 'rgba(15, 23, 42, 0.22)',
+  },
+  dark: {
+    '--color-background-primary': '#0b101b',
+    '--color-background-secondary': '#111827',
+    '--color-background-tertiary': 'rgba(148, 163, 184, 0.1)',
+    '--color-text-primary': '#e2e8f0',
+    '--color-text-secondary': '#94a3b8',
+    '--color-text-tertiary': '#64748b',
+    '--color-text-inverse': '#0b101b',
+    '--color-border-primary': 'rgba(148, 163, 184, 0.2)',
+    '--color-border-secondary': 'rgba(148, 163, 184, 0.32)',
+  },
+}
+
+function applySurfaceCssVars(mode: 'light' | 'dark') {
+  if (typeof document === 'undefined')
+    return
+  const root = document.documentElement
+  root.style.colorScheme = mode
+  root.classList.remove('tp-surface-light', 'tp-surface-dark')
+  root.classList.add(`tp-surface-${mode}`)
+  const vars = SURFACE_CSS_VARS[mode]
+  for (const [key, value] of Object.entries(vars)) {
+    root.style.setProperty(key, value)
+  }
+}
+
 const FALLBACK_MODELS: ModelPricing[] = [
   { id: 'gemini-4-neon', name: 'Gemini 4 Neon', provider: 'Google', ratePerMillion: 3.0 },
   { id: 'gemini-4-pro', name: 'Gemini 4 Pro', provider: 'Google', ratePerMillion: 2.0 },
@@ -166,7 +209,27 @@ export function McpApp() {
   const [canMessageHost, setCanMessageHost] = useState(false)
   const [canUpdateContext, setCanUpdateContext] = useState(false)
   const [selectedContext, setSelectedContext] = useState<SelectedContext | null>(null)
-  const [actionFeedback, setActionFeedback] = useState<string | null>(null)
+  const [actionToast, setActionToast] = useState<ActionToast | null>(null)
+  const [userSurfaceOverride, setUserSurfaceOverride] = useState(false)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showToast = useCallback((message: string, options?: { upgradeCta?: boolean, durationMs?: number }) => {
+    if (toastTimerRef.current)
+      clearTimeout(toastTimerRef.current)
+    setActionToast({ message, upgradeCta: options?.upgradeCta })
+    const duration = options?.durationMs ?? (options?.upgradeCta ? 5000 : 2500)
+    toastTimerRef.current = setTimeout(() => {
+      setActionToast(null)
+      toastTimerRef.current = null
+    }, duration)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current)
+        clearTimeout(toastTimerRef.current)
+    }
+  }, [])
 
   const activeModel = tokenStats?.session?.model ?? modelCatalog[0] ?? FALLBACK_MODELS[0]
 
@@ -388,8 +451,8 @@ export function McpApp() {
 
   const handleVisualThemeChange = useCallback(async (nextTheme: ChartThemePreset) => {
     if (tier === 'free' && nextTheme !== 'code') {
-      setActionFeedback('Pro theme — tiny-pivot.com/mcp')
-      setTimeout(setActionFeedback, 2600, null)
+      const themeLabel = CHART_THEME_PRESETS[nextTheme]?.label ?? nextTheme
+      showToast(`${themeLabel} is a Pro theme`, { upgradeCta: true, durationMs: 5000 })
       return
     }
     userPickedThemeRef.current = true
@@ -413,7 +476,7 @@ export function McpApp() {
       name: 'set_visual_theme',
       arguments: { theme: nextTheme },
     }).catch(() => {})
-  }, [tier, transportMode])
+  }, [showToast, tier, transportMode])
 
   const activeChartSort: ChartSortOrder = chartConfig?.options?.sortOrder ?? 'value-desc'
   const activeSortMeta = CHART_SORT_OPTIONS.find(s => s.value === activeChartSort) ?? CHART_SORT_OPTIONS[0]
@@ -432,8 +495,10 @@ export function McpApp() {
 
   const handleToggleColorMode = useCallback(() => {
     userPickedModeRef.current = true
+    setUserSurfaceOverride(true)
     const next: 'light' | 'dark' = gridTheme === 'dark' ? 'light' : 'dark'
     applyDocumentTheme(next)
+    applySurfaceCssVars(next)
     setGridTheme(next)
   }, [gridTheme])
 
@@ -525,7 +590,7 @@ export function McpApp() {
     app.onhostcontextchanged = (ctx) => {
       if (ctx.theme)
         applyThemeFromHost(ctx.theme)
-      if (ctx.styles?.variables)
+      if (!userPickedModeRef.current && ctx.styles?.variables)
         applyHostStyleVariables(ctx.styles.variables)
       applyHostDimensions(ctx)
     }
@@ -538,7 +603,7 @@ export function McpApp() {
         const ctx = app.getHostContext()
         if (ctx?.theme)
           applyThemeFromHost(ctx.theme)
-        if (ctx?.styles?.variables)
+        if (!userPickedModeRef.current && ctx?.styles?.variables)
           applyHostStyleVariables(ctx.styles.variables)
         applyHostDimensions(ctx)
 
@@ -650,15 +715,14 @@ export function McpApp() {
         const md = [header, sep, ...body].join('\n')
         try {
           await navigator.clipboard.writeText(md)
-          setActionFeedback('Markdown copied')
+          showToast('Markdown copied')
         }
         catch {
-          setActionFeedback('Copy blocked')
+          showToast('Copy blocked')
         }
-        setTimeout(setActionFeedback, 2200, null)
       }
     }
-  }, [chartConfig?.options?.title, datasetId, datasetName, gridTheme, totalRows, viewMode, visualTheme])
+  }, [showToast])
 
   const handleSendToChat = useCallback(async () => {
     const app = appRef.current
@@ -670,25 +734,24 @@ export function McpApp() {
           role: 'user',
           content: [{ type: 'text', text: `Analyze this slice from TinyPivot:\n\n${selectedContext.summary}` }],
         })
-        setActionFeedback('Sent to chat')
+        showToast('Sent to chat')
       }
       else if (canUpdateContext) {
         await app.updateModelContext({
           content: [{ type: 'text', text: selectedContext.summary }],
         })
-        setActionFeedback('Attached to next message')
+        showToast('Attached to next message')
       }
-      setTimeout(setActionFeedback, 2500, null)
     }
     catch (err) {
-      setActionFeedback(`Could not send: ${err instanceof Error ? err.message : String(err)}`)
+      showToast(`Could not send: ${err instanceof Error ? err.message : String(err)}`)
     }
-  }, [canMessageHost, canUpdateContext, selectedContext])
+  }, [canMessageHost, canUpdateContext, selectedContext, showToast])
 
   const shellClass = [
     'tp-mcp-shell',
     `tp-theme-${visualTheme}`,
-    (userPickedModeRef.current || transportMode === 'companion') ? `tp-surface-${gridTheme === 'dark' ? 'dark' : 'light'}` : '',
+    (userSurfaceOverride || transportMode === 'companion') ? `tp-surface-${gridTheme === 'dark' ? 'dark' : 'light'}` : '',
     !customizeOpen ? 'tp-mcp-focus' : '',
     `tp-mcp-view-${viewMode}`,
   ].filter(Boolean).join(' ')
@@ -996,8 +1059,6 @@ export function McpApp() {
               {selectedContext.label}
             </button>
           )}
-
-          {actionFeedback && <span className="tp-mcp-pill">{actionFeedback}</span>}
         </div>
       </header>
 
@@ -1073,6 +1134,29 @@ export function McpApp() {
                 </div>
               )}
       </main>
+
+      {actionToast && (
+        <div className="tp-mcp-toast" role="status" aria-live="polite">
+          <span className="tp-mcp-toast-msg">{actionToast.message}</span>
+          {actionToast.upgradeCta && (
+            <button
+              type="button"
+              className="tp-mcp-toast-cta"
+              onClick={handleOpenUpgrade}
+            >
+              Upgrade to Pro →
+            </button>
+          )}
+          <button
+            type="button"
+            className="tp-mcp-toast-close"
+            aria-label="Dismiss notification"
+            onClick={() => setActionToast(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }

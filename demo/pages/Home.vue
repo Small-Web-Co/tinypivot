@@ -3,6 +3,7 @@ import type { AIAnalystConfig, AIDataSource, AITableSchema, QueryExecutorResult 
 import { track } from '@vercel/analytics'
 import { DataGrid } from 'tinypivot'
 import { computed, onMounted, ref } from 'vue'
+import McpHighlightReel from '../components/McpHighlightReel.vue'
 import { DATASETS, getDataset } from '../datasets'
 import { executeQuery as executeDuckDBQuery, initDuckDB, loadData } from '../utils/duckdb'
 
@@ -465,6 +466,23 @@ function trackFreeStart() {
       </div>
     </section>
 
+    <!-- Interactive MCP Highlight Reel -->
+    <section id="mcp-reel" class="mcp-reel-showcase">
+      <div class="section-header">
+        <div class="badge">
+          Interactive Preview · IDEs &amp; Terminals
+        </div>
+        <h2>See <span class="gradient-text">TinyPivot MCP</span> in Action</h2>
+        <p>Inline IDE charts &amp; pivots, screenshot-ready terminal cards, live SSE companion drill-through, and universal database piping.</p>
+      </div>
+      <McpHighlightReel />
+      <div class="mcp-reel-cta">
+        <router-link to="/mcp" class="mcp-reel-link">
+          Explore full MCP setup, ROI calculator &amp; pricing →
+        </router-link>
+      </div>
+    </section>
+
     <!-- Use Cases Section: Clear Track Per User Type -->
     <section id="use-cases" class="use-cases">
       <div class="section-header">
@@ -488,7 +506,7 @@ function trackFreeStart() {
           <ul class="use-case-points">
             <li>1-command setup across Claude, Antigravity, Cursor, OpenCode &amp; pi</li>
             <li>Core charts &amp; Sum pivot free up to 2,500 rows (transparent warning if exceeded)</li>
-            <li>Pro unlocks unlimited rows, 5 themes, drill-through, .xlsx &amp; Postgres</li>
+            <li>Works with any database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>) in Pro</li>
           </ul>
           <router-link to="/mcp" class="btn btn-primary use-case-cta">
             Set Up TinyPivot MCP →
@@ -1205,7 +1223,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
             <li>Double-click Drill-Through &amp; AI slice selection</li>
             <li>All 9+ aggregations (median, stdDev, % of total)</li>
             <li>Formatted .xlsx export + no watermark</li>
-            <li>Read-only query_postgres (AST SQL safety)</li>
+            <li>Works with any database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>)</li>
           </ul>
           <button
             type="button"
@@ -1253,7 +1271,7 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
           <ul class="pricing-features">
             <li>Everything in MCP Pro for up to 5 seats</li>
             <li>Shared offline-verifiable team key (TP-MCPT)</li>
-            <li>Read-only Postgres + CSV/JSON across harnesses</li>
+            <li>Works with any database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>) across harnesses</li>
             <li>Priority email support &amp; Stripe tax invoices</li>
           </ul>
           <button
@@ -1522,6 +1540,31 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
   font-size: 0.75rem;
   font-weight: 600;
   color: #34d399;
+}
+
+/* MCP Highlight Reel Showcase */
+.mcp-reel-showcase {
+  padding: 2.5rem 2rem 4rem;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.mcp-reel-cta {
+  text-align: center;
+  margin-top: 1.25rem;
+}
+
+.mcp-reel-link {
+  color: #34d399;
+  text-decoration: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: color 0.15s;
+}
+
+.mcp-reel-link:hover {
+  color: #6ee7b7;
+  text-decoration: underline;
 }
 
 /* Use Cases Track Section */

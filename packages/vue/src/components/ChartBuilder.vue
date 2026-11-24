@@ -26,6 +26,7 @@ import {
   processChartDataForHeatmap,
   processChartDataForPie,
   processChartDataForScatter,
+  resolveChartSortOrder,
 } from '@smallwebco/tinypivot-core'
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 
@@ -100,9 +101,6 @@ function selectChartTheme(preset: ChartThemePreset) {
   emit('configChange', chartConfig.value)
   emit('chartThemeChange', preset)
 }
-
-const activeSortOrder = computed<ChartSortOrder>(() => chartConfig.value.options?.sortOrder ?? 'value-desc')
-const activeSortMeta = computed(() => SORT_CYCLE.find(s => s.value === activeSortOrder.value) ?? SORT_CYCLE[0])
 
 function selectSortOrder(nextOrder: ChartSortOrder) {
   chartConfig.value = {
@@ -303,16 +301,40 @@ function selectChartType(type: ChartType) {
 }
 
 function updateAggregation(zone: string, aggregation: ChartAggregation) {
-  const field = zone === 'yAxis' ? chartConfig.value.yAxis : chartConfig.value.sizeField
+  let field
+  switch (zone) {
+    case 'xAxis':
+      field = chartConfig.value.xAxis
+      break
+    case 'yAxis':
+      field = chartConfig.value.yAxis
+      break
+    case 'size':
+      field = chartConfig.value.sizeField
+      break
+    case 'color':
+      field = chartConfig.value.colorField
+      break
+    default:
+      return
+  }
   if (!field)
     return
 
   const updated = { ...field, aggregation }
-  if (zone === 'yAxis') {
-    chartConfig.value = { ...chartConfig.value, yAxis: updated }
-  }
-  else if (zone === 'size') {
-    chartConfig.value = { ...chartConfig.value, sizeField: updated }
+  switch (zone) {
+    case 'xAxis':
+      chartConfig.value = { ...chartConfig.value, xAxis: updated }
+      break
+    case 'yAxis':
+      chartConfig.value = { ...chartConfig.value, yAxis: updated }
+      break
+    case 'size':
+      chartConfig.value = { ...chartConfig.value, sizeField: updated }
+      break
+    case 'color':
+      chartConfig.value = { ...chartConfig.value, colorField: updated }
+      break
   }
   emit('configChange', chartConfig.value)
 }
@@ -333,6 +355,7 @@ const chartOptions = computed<ApexOptions>(() => {
   const hairlineColor = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(100, 116, 139, 0.16)'
   const isLineOrArea = config.type === 'line' || config.type === 'area'
   const isBarLike = config.type === 'bar' || config.type === 'stackedBar'
+  const isStacked = config.type === 'stackedBar' || (Boolean(options.stacked) && ['bar', 'area'].includes(config.type))
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const animationsEnabled = (options.animated ?? true) && !prefersReducedMotion
@@ -340,6 +363,7 @@ const chartOptions = computed<ApexOptions>(() => {
   const baseOptions: ApexOptions = {
     chart: {
       type: getApexChartType(config.type),
+      stacked: isStacked,
       background: 'transparent',
       foreColor: isDark ? '#e2e8f0' : '#1e293b',
       toolbar: {
@@ -405,8 +429,9 @@ const chartOptions = computed<ApexOptions>(() => {
         size: 5,
         shape: 'square',
         strokeWidth: 0,
+        offsetX: -4,
       },
-      itemMargin: { horizontal: 10, vertical: 4 },
+      itemMargin: { horizontal: 12, vertical: 4 },
     },
     dataLabels: {
       enabled: options.showDataLabels ?? false,
@@ -415,15 +440,24 @@ const chartOptions = computed<ApexOptions>(() => {
         fontSize: '11px',
         fontWeight: 500,
       },
+      formatter: (val: unknown) => {
+        if (isStacked && val === 0)
+          return ''
+        return formatValue(val, options.valueFormat, options.decimals)
+      },
     },
     tooltip: {
       theme: isDark ? 'dark' : 'light',
+      ...(isStacked ? { shared: true, intersect: false } : {}),
       style: {
         fontSize: '12px',
         fontFamily: monoFont,
       },
       cssClass: isDark ? '' : 'apexcharts-tooltip-light',
       marker: { show: true },
+      y: {
+        formatter: (val: number) => formatValue(val, options.valueFormat, options.decimals),
+      },
     },
     markers: isLineOrArea
       ? {
@@ -438,7 +472,9 @@ const chartOptions = computed<ApexOptions>(() => {
       width: config.type === 'line' ? 2.5 : config.type === 'area' ? 2 : isBarLike ? 0 : 1.5,
       ...(config.type === 'pie' || config.type === 'donut'
         ? { colors: [isDark ? '#0f172a' : '#ffffff'] }
-        : {}),
+        : isBarLike
+          ? { colors: ['transparent'] }
+          : {}),
     },
     fill: config.type === 'area'
       ? {
@@ -451,7 +487,7 @@ const chartOptions = computed<ApexOptions>(() => {
           },
         }
       : {
-          opacity: isBarLike ? 0.92 : 1,
+          opacity: isStacked ? 1 : isBarLike ? 0.92 : 1,
         },
     ...(isBarLike
       ? {
@@ -534,11 +570,6 @@ const chartOptions = computed<ApexOptions>(() => {
     }
   }
 
-  // Stacking — forced on for stackedBar, optional for bar/area
-  if (config.type === 'stackedBar' || (options.stacked && ['bar', 'area'].includes(config.type))) {
-    baseOptions.chart!.stacked = true
-  }
-
   // Pie/Donut specific
   if (config.type === 'pie' || config.type === 'donut') {
     baseOptions.plotOptions = {
@@ -579,47 +610,44 @@ const chartOptions = computed<ApexOptions>(() => {
   return baseOptions
 })
 
-const chartSeries = computed(() => {
+const processedChartData = computed(() => {
   const config = chartConfig.value
-
   if (!chartIsValid.value)
-    return []
+    return { categories: [] as string[], series: [] as ApexAxisChartSeries | ApexNonAxisChartSeries }
 
-  // Process based on chart type
   if (config.type === 'pie' || config.type === 'donut') {
     const data = processChartDataForPie(props.data, config)
-    return data.series[0]?.data || []
+    return {
+      categories: data.categories,
+      series: data.series[0]?.data || [],
+    }
   }
 
   if (config.type === 'scatter' || config.type === 'bubble') {
     const scatterData = processChartDataForScatter(props.data, config)
-    return scatterData.series
+    return {
+      categories: [] as string[],
+      series: scatterData.series,
+    }
   }
 
   if (config.type === 'heatmap') {
     const heatmapData = processChartDataForHeatmap(props.data, config)
-    return heatmapData.series
+    return {
+      categories: [] as string[],
+      series: heatmapData.series,
+    }
   }
 
-  // Standard charts (bar, line, area, etc.)
-  const data = processChartData(props.data, config)
-  return data.series
+  // Standard charts (bar, stackedBar, line, area, radar)
+  return processChartData(props.data, config)
 })
 
-const chartLabels = computed(() => {
-  const config = chartConfig.value
+const chartSeries = computed(() => processedChartData.value.series)
+const chartLabels = computed(() => processedChartData.value.categories)
 
-  if (!chartIsValid.value)
-    return []
-
-  if (config.type === 'pie' || config.type === 'donut') {
-    const data = processChartDataForPie(props.data, config)
-    return data.categories
-  }
-
-  const data = processChartData(props.data, config)
-  return data.categories
-})
+const activeSortOrder = computed<ChartSortOrder>(() => resolveChartSortOrder(chartConfig.value, chartLabels.value))
+const activeSortMeta = computed(() => SORT_CYCLE.find(s => s.value === activeSortOrder.value) ?? SORT_CYCLE[0])
 
 // Update xaxis categories in options
 const chartOptionsWithCategories = computed<ApexOptions>(() => {
@@ -1013,7 +1041,7 @@ onMounted(() => {
         <div v-if="chartIsValid" class="vpg-chart-container">
           <Suspense>
             <VueApexCharts
-              :key="`${chartConfig.type}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}`"
+              :key="`${chartConfig.type}-${Boolean(chartOptions.chart?.stacked)}-${props.theme ?? 'light'}-${activeChartTheme}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}-${JSON.stringify(chartConfig.seriesField)}`"
               :type="getApexChartType(chartConfig.type)"
               :options="chartOptionsWithCategories"
               :series="chartSeries"

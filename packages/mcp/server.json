@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Small-Web-Co/tinypivot",
+  "title": "TinyPivot — Interactive Data IDE for AI Agents",
+  "description": "Interactive charts, pivot tables, terminal cards, live TUI, and Excel export inside AI agents.",
+  "version": "0.1.2",
+  "websiteUrl": "https://tiny-pivot.com/mcp",
+  "repository": {
+    "url": "https://github.com/Small-Web-Co/tinypivot",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@smallwebco/tinypivot-mcp",
+      "version": "0.1.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TINYPIVOT_LICENSE_KEY",
+          "description": "Optional TinyPivot MCP Pro/Team license key (TP-MCPP-* or TP-MCPT-*) unlocking unlimited rows, 5 visual themes, drill-through, Excel export, and direct query_postgres. Free tier works out of the box up to 2,500 rows.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "DATABASE_URL",
+          "description": "Optional PostgreSQL connection string for direct AST-validated read-only query_postgres (Pro). Any other database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) works without this via load_file or load_data.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "TINYPIVOT_TELEMETRY",
+          "description": "Set to 0 to disable anonymous zero-PII usage telemetry (DO_NOT_TRACK=1 is also respected).",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

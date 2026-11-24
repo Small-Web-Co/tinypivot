@@ -1,0 +1,28 @@
+{
+  "name": "tinypivot",
+  "version": "0.1.2",
+  "description": "Interactive Data IDE inside Claude — turn CSV, TSV, JSON, JSONL, API/MCP outputs, and SQL results from any database into interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, and Excel exports.",
+  "author": {
+    "name": "Small Web, LLC",
+    "url": "https://tiny-pivot.com"
+  },
+  "homepage": "https://tiny-pivot.com/mcp",
+  "repository": "https://github.com/Small-Web-Co/tinypivot",
+  "license": "MIT",
+  "keywords": [
+    "tinypivot",
+    "mcp",
+    "mcp-app",
+    "charts",
+    "pivot-table",
+    "data-grid",
+    "analytics",
+    "terminal-ui",
+    "csv",
+    "sql",
+    "bigquery",
+    "snowflake",
+    "postgres",
+    "excel"
+  ]
+}

@@ -25,6 +25,7 @@ import {
   processChartDataForHeatmap,
   processChartDataForPie,
   processChartDataForScatter,
+  resolveChartSortOrder,
 } from '@smallwebco/tinypivot-core'
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -108,9 +109,6 @@ export function ChartBuilder({
     })
     onChartThemeChange?.(preset)
   }, [onChartThemeChange, onConfigChange])
-
-  const activeSortOrder: ChartSortOrder = chartConfig.options?.sortOrder ?? 'value-desc'
-  const activeSortMeta = SORT_CYCLE.find(s => s.value === activeSortOrder) ?? SORT_CYCLE[0]
 
   // Drag state
   const [draggingField, setDraggingField] = useState<ChartFieldInfo | null>(null)
@@ -410,6 +408,7 @@ export function ChartBuilder({
     const hairlineColor = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(100, 116, 139, 0.16)'
     const isLineOrArea = config.type === 'line' || config.type === 'area'
     const isBarLike = config.type === 'bar' || config.type === 'stackedBar'
+    const isStacked = config.type === 'stackedBar' || (Boolean(options.stacked) && ['bar', 'area'].includes(config.type))
     const prefersReducedMotion = typeof window !== 'undefined'
       && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     const animationsEnabled = (options.animated ?? true) && !prefersReducedMotion
@@ -417,6 +416,7 @@ export function ChartBuilder({
     const baseOptions: ApexOptions = {
       chart: {
         type: getApexChartType(config.type),
+        stacked: isStacked,
         background: 'transparent',
         foreColor: isDark ? '#e2e8f0' : '#1e293b',
         toolbar: {
@@ -482,8 +482,9 @@ export function ChartBuilder({
           size: 5,
           shape: 'square',
           strokeWidth: 0,
+          offsetX: -4,
         },
-        itemMargin: { horizontal: 10, vertical: 4 },
+        itemMargin: { horizontal: 12, vertical: 4 },
       },
       dataLabels: {
         enabled: options.showDataLabels ?? false,
@@ -492,14 +493,24 @@ export function ChartBuilder({
           fontSize: '11px',
           fontWeight: 500,
         },
+        formatter: (val: unknown) => {
+          if (isStacked && val === 0)
+            return ''
+          return formatValue(val, options.valueFormat, options.decimals)
+        },
       },
       tooltip: {
         theme: isDark ? 'dark' : 'light',
+        ...(isStacked ? { shared: true, intersect: false } : {}),
         style: {
           fontSize: '12px',
           fontFamily: monoFont,
         },
+        cssClass: isDark ? '' : 'apexcharts-tooltip-light',
         marker: { show: true },
+        y: {
+          formatter: (val: number) => formatValue(val, options.valueFormat, options.decimals),
+        },
       },
       markers: isLineOrArea
         ? {
@@ -514,7 +525,9 @@ export function ChartBuilder({
         width: config.type === 'line' ? 2.5 : config.type === 'area' ? 2 : isBarLike ? 0 : 1.5,
         ...(config.type === 'pie' || config.type === 'donut'
           ? { colors: [isDark ? '#0f172a' : '#ffffff'] }
-          : {}),
+          : isBarLike
+            ? { colors: ['transparent'] }
+            : {}),
       },
       fill: config.type === 'area'
         ? {
@@ -527,7 +540,7 @@ export function ChartBuilder({
             },
           }
         : {
-            opacity: isBarLike ? 0.92 : 1,
+            opacity: isStacked ? 1 : isBarLike ? 0.92 : 1,
           },
       ...(isBarLike
         ? {
@@ -610,11 +623,6 @@ export function ChartBuilder({
       }
     }
 
-    // Stacking — forced on for stackedBar, optional for bar/area
-    if (config.type === 'stackedBar' || (options.stacked && ['bar', 'area'].includes(config.type))) {
-      baseOptions.chart!.stacked = true
-    }
-
     // Pie/Donut specific
     if (config.type === 'pie' || config.type === 'donut') {
       baseOptions.plotOptions = {
@@ -655,47 +663,47 @@ export function ChartBuilder({
     return baseOptions
   }, [chartConfig, theme, activeChartTheme, getApexChartType, formatValue])
 
-  const chartSeries = useMemo(() => {
+  const processedChartData = useMemo(() => {
     const config = chartConfig
-
     if (!chartIsValid)
-      return []
+      return { categories: [] as string[], series: [] as ApexAxisChartSeries | ApexNonAxisChartSeries }
 
-    // Process based on chart type
     if (config.type === 'pie' || config.type === 'donut') {
       const chartData = processChartDataForPie(data, config)
-      return chartData.series[0]?.data || []
+      return {
+        categories: chartData.categories,
+        series: chartData.series[0]?.data || [],
+      }
     }
 
     if (config.type === 'scatter' || config.type === 'bubble') {
       const scatterData = processChartDataForScatter(data, config)
-      return scatterData.series
+      return {
+        categories: [] as string[],
+        series: scatterData.series,
+      }
     }
 
     if (config.type === 'heatmap') {
       const heatmapData = processChartDataForHeatmap(data, config)
-      return heatmapData.series
+      return {
+        categories: [] as string[],
+        series: heatmapData.series,
+      }
     }
 
-    // Standard charts (bar, line, area, etc.)
-    const chartData = processChartData(data, config)
-    return chartData.series
+    // Standard charts (bar, stackedBar, line, area, radar)
+    return processChartData(data, config)
   }, [data, chartConfig, chartIsValid])
 
-  const chartLabels = useMemo(() => {
-    const config = chartConfig
+  const chartSeries = processedChartData.series
+  const chartLabels = processedChartData.categories
 
-    if (!chartIsValid)
-      return []
-
-    if (config.type === 'pie' || config.type === 'donut') {
-      const chartData = processChartDataForPie(data, config)
-      return chartData.categories
-    }
-
-    const chartData = processChartData(data, config)
-    return chartData.categories
-  }, [data, chartConfig, chartIsValid])
+  const activeSortOrder: ChartSortOrder = useMemo(
+    () => resolveChartSortOrder(chartConfig, chartLabels),
+    [chartConfig, chartLabels],
+  )
+  const activeSortMeta = SORT_CYCLE.find(s => s.value === activeSortOrder) ?? SORT_CYCLE[0]
 
   // Update xaxis categories in options
   const chartOptionsWithCategories = useMemo<ApexOptions>(() => {
@@ -1096,7 +1104,7 @@ export function ChartBuilder({
                   )}
                   >
                     <Chart
-                      key={`${chartConfig.type}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}`}
+                      key={`${chartConfig.type}-${Boolean(chartOptions.chart?.stacked)}-${theme}-${activeChartTheme}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}-${JSON.stringify(chartConfig.seriesField)}`}
                       type={getApexChartType(chartConfig.type)}
                       options={chartOptionsWithCategories}
                       series={chartSeries}

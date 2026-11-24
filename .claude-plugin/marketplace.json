@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "tinypivot",
+  "owner": {
+    "name": "Small Web, LLC",
+    "url": "https://tiny-pivot.com"
+  },
+  "metadata": {
+    "description": "TinyPivot — Interactive Data IDE, Charts, Pivot Tables, Terminal Cards & Live TUI for Claude Code and Claude Desktop.",
+    "version": "0.1.2"
+  },
+  "plugins": [
+    {
+      "name": "tinypivot",
+      "source": "./packages/mcp",
+      "description": "Interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, live Ghostty TUI, and Excel export inside Claude for CSV, JSON, API/MCP outputs, and any database.",
+      "version": "0.1.2",
+      "author": {
+        "name": "Small Web, LLC",
+        "url": "https://tiny-pivot.com"
+      },
+      "homepage": "https://tiny-pivot.com/mcp",
+      "repository": "https://github.com/Small-Web-Co/tinypivot",
+      "license": "MIT",
+      "category": "data-analytics",
+      "keywords": [
+        "tinypivot",
+        "mcp",
+        "mcp-app",
+        "charts",
+        "pivot-table",
+        "data-grid",
+        "analytics",
+        "terminal-ui",
+        "sql",
+        "csv",
+        "excel"
+      ]
+    }
+  ]
+}

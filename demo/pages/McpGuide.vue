@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import McpHighlightReel from '../components/McpHighlightReel.vue'
 
 type HarnessId = 'antigravity' | 'terminal' | 'claude' | 'cursor' | 'postgres'
 type ProBillingMode = 'monthly' | 'yearly' | 'lifetime'
@@ -180,7 +181,7 @@ claude mcp add tinypivot -- npx -y @smallwebco/tinypivot-mcp --open`,
   },
   cursor: {
     label: 'Cursor',
-    subtitle: 'Drop into ~/.cursor/mcp.json so agents can inspect CSVs, JSON logs, or Postgres queries visually.',
+    subtitle: 'Drop into ~/.cursor/mcp.json so agents can inspect CSVs, JSON logs, or SQL queries from any database visually.',
     filename: '~/.cursor/mcp.json',
     code: `{
   "mcpServers": {
@@ -192,9 +193,9 @@ claude mcp add tinypivot -- npx -y @smallwebco/tinypivot-mcp --open`,
 }`,
   },
   postgres: {
-    label: 'PostgreSQL (Pro)',
-    subtitle: 'Connect read-only Postgres with AST SQL validation and optional table allowlists — zero writes possible.',
-    filename: 'mcp_config.json (with DATABASE_URL)',
+    label: 'Direct Postgres (Pro)',
+    subtitle: 'Works with any database via CSV/JSON piping (BigQuery, Snowflake, MySQL, DuckDB, Databricks) — plus optional direct read-only Postgres with AST SQL validation and table allowlists.',
+    filename: 'mcp_config.json (optional direct DATABASE_URL)',
     code: `{
   "mcpServers": {
     "tinypivot": {
@@ -203,7 +204,7 @@ claude mcp add tinypivot -- npx -y @smallwebco/tinypivot-mcp --open`,
       "env": {
         "DATABASE_URL": "postgresql://readonly:pass@localhost:5432/analytics",
         "TINYPIVOT_ALLOWED_TABLES": "orders,customers,products",
-        "TINYPIVOT_LICENSE_KEY": "TP-PROU-..."
+        "TINYPIVOT_LICENSE_KEY": "TP-MCP..."
       }
     }
   }
@@ -213,18 +214,18 @@ claude mcp add tinypivot -- npx -y @smallwebco/tinypivot-mcp --open`,
 
 const tools = [
   { name: 'open_tinypivot', role: 'Launch the Data IDE', desc: 'Opens the interactive Chart / Pivot / Data view in the side pane, sidebar, or inline. Works zero-arg with built-in sample data.' },
-  { name: 'load_file', role: 'Local CSV / TSV / JSON', desc: 'Loads local data files directly on disk and renders a chart in 1 tool call without stuffing raw rows into LLM context.' },
-  { name: 'load_data', role: 'Pipe Any MCP Tool', desc: 'Accepts JSON rows from Stripe, GitHub, APIs, or SQL and immediately renders a chart + matching pivot table.' },
+  { name: 'load_file', role: 'Local CSV / TSV / JSON', desc: 'Loads local files or exports from BigQuery, Snowflake, MySQL, DuckDB, or Databricks in 1 call without stuffing raw rows into LLM context.' },
+  { name: 'load_data', role: 'Pipe Any MCP Tool', desc: 'Accepts JSON rows from Stripe, GitHub, APIs, or any SQL MCP server and immediately renders a chart + matching pivot table.' },
   { name: 'configure_pivot', role: 'Deterministic Pivot', desc: 'Computes exact sums, averages, medians, and totals in TinyPivot Core — zero LLM arithmetic hallucinations.' },
   { name: 'configure_chart', role: 'Chart-First Answers', desc: 'Switches to Bar, Stacked Bar, Line, Area, Pie, Donut, Scatter, Heatmap, or Radar pre-configured for the question.' },
-  { name: 'query_postgres', role: 'Pro · Read-Only SQL', desc: 'AST-validated SELECT queries executed inside a READ ONLY Postgres transaction with optional table allowlists.' },
+  { name: 'query_postgres', role: 'Pro · Direct Postgres', desc: 'Optional direct AST-validated READ ONLY Postgres connector with table allowlists. Works alongside universal CSV/JSON piping for any database.' },
 ]
 
 const samplePrompts = [
   'Open TinyPivot and show me a chart of sample SaaS revenue by quarter and region.',
   'Load ./exports/q3_orders.csv into TinyPivot and chart net revenue by category and channel.',
   'Pull our last 100 Stripe charges and load them into TinyPivot so I can pivot revenue by month and country.',
-  'Query Postgres for monthly active accounts by plan over the last 12 months and open it in TinyPivot.',
+  'Export monthly active accounts by plan from BigQuery, Snowflake, DuckDB, or Postgres and chart it in TinyPivot.',
 ]
 
 function copyText(key: string, text: string) {
@@ -253,6 +254,7 @@ function copyText(key: string, text: string) {
           <router-link to="/">
             UI Library
           </router-link>
+          <a href="#reel">Highlight Reel</a>
           <a href="#savings">ROI Calculator</a>
           <a href="#setup">Setup</a>
           <a href="#tools">Tools</a>
@@ -288,6 +290,14 @@ function copyText(key: string, text: string) {
         </a>
       </div>
     </header>
+
+    <section id="reel" class="mcp-section mcp-reel-section">
+      <div class="section-head">
+        <h2>See TinyPivot MCP Across Every Workflow</h2>
+        <p>Interactive IDE widget, screenshot-ready terminal cards, live SSE companion IDE, and universal database piping.</p>
+      </div>
+      <McpHighlightReel />
+    </section>
 
     <section id="why" class="mcp-section">
       <div class="section-head">
@@ -432,7 +442,7 @@ function copyText(key: string, text: string) {
         <div class="how-savings-grid">
           <div class="how-savings-item">
             <strong>1. Raw rows bypass the LLM</strong>
-            <p><code>load_file</code> and <code>query_postgres</code> send only a ~200-token schema &amp; summary to the model; the full rows stream locally from the MCP server straight to the UI.</p>
+            <p><code>load_file</code>, stdin piping, and optional <code>query_postgres</code> send only a ~200-token schema &amp; summary to the model; the full rows stream locally from the MCP server straight to the UI.</p>
           </div>
           <div class="how-savings-item">
             <strong>2. Local clicks cost $0</strong>
@@ -440,7 +450,7 @@ function copyText(key: string, text: string) {
           </div>
           <div class="how-savings-item">
             <strong>3. Works with any database today</strong>
-            <p>Export any BigQuery, Snowflake, MySQL, DuckDB, or Databricks query to CSV/JSON and pass the file to <code>load_file</code> — or query Postgres directly. Native multi-DB + Parquet adapters arrive in v0.2.</p>
+            <p>Pipe any BigQuery, Snowflake, MySQL, DuckDB, or Databricks query (via CSV/JSON export or CLI stdin) into <code>load_file</code> — plus an optional direct read-only Postgres connector (<code>query_postgres</code>).</p>
           </div>
         </div>
 
@@ -532,7 +542,7 @@ function copyText(key: string, text: string) {
             <li><strong>Double-click Drill-Through</strong> &amp; closed-loop AI slice selection</li>
             <li><strong>All 9+ aggregations</strong> (median, stdDev, % of total, countDistinct)</li>
             <li><strong>Formatted <code>.xlsx</code> export</strong> + watermark-free UI</li>
-            <li><strong>Read-only <code>query_postgres</code></strong> with AST SQL safety</li>
+            <li><strong>Works with any database</strong> (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>)</li>
           </ul>
           <button
             type="button"
@@ -578,7 +588,7 @@ function copyText(key: string, text: string) {
           <ul class="pricing-list">
             <li>Everything in <strong>MCP Pro</strong> for up to <strong>5 developers/analysts</strong></li>
             <li>Single shared offline-verifiable team key (no SSO wall)</li>
-            <li>Read-only Postgres + CSV/JSON across all team AI harnesses</li>
+            <li>Works with any database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>) across all team AI harnesses</li>
             <li>Priority email support &amp; Stripe tax invoices</li>
             <li>Early access to team token-spend analytics</li>
           </ul>
@@ -866,6 +876,10 @@ function copyText(key: string, text: string) {
   max-width: 1060px;
   margin: 0 auto;
   padding: 40px 24px;
+}
+
+.mcp-reel-section {
+  padding-top: 12px;
 }
 
 .section-head {

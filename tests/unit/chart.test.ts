@@ -2,7 +2,7 @@
  * Unit tests for chart field role detection and overrides
  */
 import { describe, expect, it } from 'vitest'
-import { analyzeFieldsForChart, detectFieldRole, processChartData } from '../../packages/core/src/chart'
+import { analyzeFieldsForChart, detectFieldRole, processChartData, resolveChartSortOrder } from '../../packages/core/src/chart'
 
 describe('detectFieldRole', () => {
   it('should classify high-cardinality numbers as measure', () => {
@@ -193,5 +193,132 @@ describe('processChartData sorting', () => {
       options: {},
     })
     expect(res.categories).toEqual(['2026-01', '2026-02', '2026-03'])
+  })
+
+  it('sorts month names and quarter+year temporal labels chronologically', () => {
+    const months = [
+      { month: 'Mar 2026', revenue: 300 },
+      { month: 'Jan 2026', revenue: 100 },
+      { month: 'Feb 2026', revenue: 200 },
+      { month: 'Dec 2025', revenue: 400 },
+    ]
+    const monthRes = processChartData(months, {
+      type: 'stackedBar',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      options: {},
+    })
+    expect(monthRes.categories).toEqual(['Dec 2025', 'Jan 2026', 'Feb 2026', 'Mar 2026'])
+
+    const quarters = [
+      { period: 'Q2 2026', revenue: 200 },
+      { period: 'Q4 2025', revenue: 500 },
+      { period: 'Q1 2026', revenue: 100 },
+    ]
+    const quarterRes = processChartData(quarters, {
+      type: 'stackedBar',
+      xAxis: { field: 'period', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      options: {},
+    })
+    expect(quarterRes.categories).toEqual(['Q4 2025', 'Q1 2026', 'Q2 2026'])
+  })
+})
+
+describe('processChartData stackedBar multi-series alignment & zero-filling', () => {
+  const sparseMultiSeriesRows = [
+    // East total: Enterprise 100 + Growth 50 = 150 (missing Starter)
+    { region: 'East', segment: 'Enterprise', revenue: 100 },
+    { region: 'East', segment: 'Growth', revenue: 50 },
+    // West total: Enterprise 200 + Growth 150 + Starter 100 = 450
+    { region: 'West', segment: 'Enterprise', revenue: 200 },
+    { region: 'West', segment: 'Growth', revenue: 150 },
+    { region: 'West', segment: 'Starter', revenue: 100 },
+    // North total: Starter 300 (missing Enterprise & Growth)
+    { region: 'North', segment: 'Starter', revenue: 300 },
+    // South total: Enterprise 80 + Growth 20 (plus a null cell that must not skew count/avg)
+    { region: 'South', segment: 'Enterprise', revenue: 80 },
+    { region: 'South', segment: 'Growth', revenue: 20 },
+    { region: 'South', segment: 'Starter', revenue: null },
+  ]
+
+  it('aligns every series 1:1 with sorted categories by stacked total (value-desc) and zero-fills sparse cells', () => {
+    const res = processChartData(sparseMultiSeriesRows, {
+      type: 'stackedBar',
+      xAxis: { field: 'region', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      seriesField: { field: 'segment', role: 'dimension' },
+      options: {},
+    })
+
+    // Stacked totals: West (450) > North (300) > East (150) > South (100)
+    expect(res.categories).toEqual(['West', 'North', 'East', 'South'])
+    expect(res.series).toHaveLength(3)
+
+    const byName = Object.fromEntries(res.series.map(s => [s.name, s.data]))
+    expect(byName.Enterprise).toEqual([200, 0, 100, 80])
+    expect(byName.Growth).toEqual([150, 0, 50, 20])
+    expect(byName.Starter).toEqual([100, 300, 0, 0])
+
+    // Every series aligns 1:1 with categories and contains finite numbers (never null/undefined/NaN)
+    for (const s of res.series) {
+      expect(s.data).toHaveLength(res.categories.length)
+      for (const v of s.data) {
+        expect(typeof v).toBe('number')
+        expect(Number.isFinite(v)).toBe(true)
+      }
+    }
+
+    // Column totals match descending order
+    const totals = res.categories.map((_, idx) =>
+      res.series.reduce((acc, s) => acc + s.data[idx], 0),
+    )
+    expect(totals).toEqual([450, 300, 150, 100])
+  })
+
+  it('reorders categories and every series identically when sorting ascending (value-asc)', () => {
+    const res = processChartData(sparseMultiSeriesRows, {
+      type: 'stackedBar',
+      xAxis: { field: 'region', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      seriesField: { field: 'segment', role: 'dimension' },
+      options: { sortOrder: 'value-asc' },
+    })
+
+    expect(res.categories).toEqual(['South', 'East', 'North', 'West'])
+    const byName = Object.fromEntries(res.series.map(s => [s.name, s.data]))
+    expect(byName.Enterprise).toEqual([80, 100, 0, 200])
+    expect(byName.Growth).toEqual([20, 50, 0, 150])
+    expect(byName.Starter).toEqual([0, 0, 300, 100])
+  })
+
+  it('does not let null or empty measure cells skew avg aggregation while still zero-filling missing cells', () => {
+    const rows = [
+      { quarter: 'Q1', region: 'West', revenue: 100 },
+      { quarter: 'Q1', region: 'West', revenue: null },
+      { quarter: 'Q1', region: 'West', revenue: '' },
+      { quarter: 'Q1', region: 'East', revenue: 50 },
+      { quarter: 'Q2', region: 'West', revenue: 200 },
+    ]
+    const res = processChartData(rows, {
+      type: 'stackedBar',
+      xAxis: { field: 'quarter', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'avg' },
+      seriesField: { field: 'region', role: 'dimension' },
+      options: {},
+    })
+
+    expect(res.categories).toEqual(['Q1', 'Q2'])
+    const byName = Object.fromEntries(res.series.map(s => [s.name, s.data]))
+    // Avg of [100] must be 100, NOT 100/3 = 33.33
+    expect(byName.West).toEqual([100, 200])
+    // Missing Q2/East cell is zero-filled as 0
+    expect(byName.East).toEqual([50, 0])
+  })
+
+  it('resolves default sortOrder for stackedBar (categorical vs temporal vs explicit)', () => {
+    expect(resolveChartSortOrder({ type: 'stackedBar' }, ['West', 'East', 'North'])).toBe('value-desc')
+    expect(resolveChartSortOrder({ type: 'stackedBar' }, ['Q1', 'Q2', 'Q3', 'Q4'])).toBe('label-asc')
+    expect(resolveChartSortOrder({ type: 'stackedBar', options: { sortOrder: 'data' } }, ['West', 'East'])).toBe('data')
   })
 })

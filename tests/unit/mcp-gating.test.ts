@@ -1,8 +1,46 @@
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import {
+  clientSupportsMcpAppsUi,
+  createTinyPivotMcpServer,
+  DatasetStore,
+  formatDatasetSummary,
+  formatPivotSummary,
+  formatTerminalChart,
+  runTuiCommand,
+  startCompanionServer,
+  TINYPIVOT_CLAUDE_RULE_BLOCK,
+  TINYPIVOT_MCP_INSTRUCTIONS,
+  upsertTinyPivotRuleBlock,
+} from '../../packages/mcp/src/index'
 import { isMcpLicenseKey } from '../../packages/mcp/src/server'
-import { DatasetStore, FREE_TIER_ROW_LIMIT } from '../../packages/mcp/src/store'
-import { formatDatasetSummary, formatPivotSummary } from '../../packages/mcp/src/summary'
+import { FREE_TIER_ROW_LIMIT } from '../../packages/mcp/src/store'
+import { visualWidth } from '../../packages/mcp/src/summary'
 import { bucketRowCount, isTelemetryEnabled } from '../../packages/mcp/src/telemetry'
+import { getCompanionSessionFile, isProcessAlive, resolveCompanionUrl } from '../../packages/mcp/src/tui'
+
+function extractFencedCardLines(markdown: string): string[] {
+  const match = markdown.match(/```text\n([\s\S]*?)\n```/)
+  if (!match)
+    return []
+  return match[1].split('\n')
+}
+
+function assertUniformCardBorderWidth(markdown: string) {
+  const lines = extractFencedCardLines(markdown)
+  expect(lines.length).toBeGreaterThanOrEqual(4)
+  const expectedWidth = visualWidth(lines[0])
+  expect(expectedWidth).toBeGreaterThanOrEqual(40)
+  for (const line of lines) {
+    expect(visualWidth(line)).toBe(expectedWidth)
+  }
+  expect(lines[0].startsWith('╭─')).toBe(true)
+  expect(lines[0].endsWith('─╮')).toBe(true)
+  expect(lines[lines.length - 1].startsWith('╰')).toBe(true)
+  expect(lines[lines.length - 1].endsWith('╯')).toBe(true)
+}
 
 describe('mCP Free-Tier Row Gating & High-Trust Truncation', () => {
   it('truncates datasets above FREE_TIER_ROW_LIMIT and flags sourceTotalRows accurately', () => {
@@ -106,5 +144,249 @@ describe('mcp license scoping (prevents UI Library key arbitrage)', () => {
     expect(isMcpLicenseKey('TP-PROT-abc123-20991231')).toBe(false)
     expect(isMcpLicenseKey('')).toBe(false)
     expect(isMcpLicenseKey(null)).toBe(false)
+  })
+})
+
+describe('shareable terminal chart and pivot cards', () => {
+  it('exports terminal formatting and TUI helpers from package index', () => {
+    expect(typeof formatTerminalChart).toBe('function')
+    expect(typeof formatDatasetSummary).toBe('function')
+    expect(typeof formatPivotSummary).toBe('function')
+    expect(typeof runTuiCommand).toBe('function')
+  })
+
+  it('renders a framed Braille line chart with exact border width alignment and removes branding on Pro', () => {
+    const store = new DatasetStore()
+    const ds = store.register({
+      name: 'Monthly Revenue',
+      source: 'rev.csv',
+      ingestionMode: 'direct',
+      rows: [
+        { month: '2026-01', revenue: 4200000 },
+        { month: '2026-02', revenue: 4800000 },
+        { month: '2026-03', revenue: 3900000 },
+        { month: '2026-04', revenue: 5100000 },
+      ],
+    })
+
+    const freeCard = formatTerminalChart(ds, {
+      type: 'line',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+    }, { showBranding: true })
+
+    assertUniformCardBorderWidth(freeCard)
+    expect(freeCard).toContain('╭─')
+    expect(freeCard).toContain('tiny-pivot.com')
+    expect(freeCard).toContain('Peak:')
+    expect(freeCard).toContain('Low:')
+    expect(freeCard).toContain('Avg:')
+    expect(freeCard).toContain('+21.4%')
+    // Contains Unicode Braille characters (U+2800..U+28FF)
+    expect(/[\u2800-\u28FF]/.test(freeCard)).toBe(true)
+
+    const proCard = formatTerminalChart(ds, {
+      type: 'line',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+    }, { showBranding: false })
+    assertUniformCardBorderWidth(proCard)
+    expect(proCard).not.toContain('tiny-pivot.com')
+  })
+
+  it('renders stacked bar cards with shade glyph legend and exact border width even on long/Unicode titles', () => {
+    const store = new DatasetStore()
+    const ds = store.register({
+      name: 'グローバル売上 🚀 Extremely Long Multi-Quarter Regional Breakdown Title That Must Truncate Cleanly',
+      source: 'global.csv',
+      ingestionMode: 'direct',
+      rows: [
+        { quarter: 'Q1', region: '東京 East', revenue: 420000 },
+        { quarter: 'Q1', region: 'North', revenue: 310000 },
+        { quarter: 'Q1', region: 'South', revenue: 180000 },
+        { quarter: 'Q1', region: 'West', revenue: 260000 },
+        { quarter: 'Q2', region: '東京 East', revenue: 480000 },
+        { quarter: 'Q2', region: 'North', revenue: 350000 },
+        { quarter: 'Q2', region: 'South', revenue: 210000 },
+        { quarter: 'Q2', region: 'West', revenue: 295000 },
+      ],
+    })
+
+    const stackedCard = formatTerminalChart(ds, {
+      type: 'stackedBar',
+      xAxis: { field: 'quarter', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      seriesField: { field: 'region', role: 'dimension' },
+    }, { showBranding: true })
+
+    assertUniformCardBorderWidth(stackedCard)
+    expect(stackedCard).toContain('█')
+    expect(stackedCard).toContain('▓')
+    expect(stackedCard).toContain('▒')
+    expect(stackedCard).toContain('░')
+    expect(stackedCard).toContain('東京 East')
+    expect(stackedCard).toContain('tiny-pivot.com')
+  })
+
+  it('renders single-series bars with sub-block precision and exact right borders', () => {
+    const store = new DatasetStore()
+    const ds = store.register({
+      name: 'Latency by Route',
+      source: 'routes.csv',
+      ingestionMode: 'direct',
+      rows: [
+        { route: '/api/query', ms: 100 },
+        { route: '/api/pivot', ms: 63 },
+        { route: '/api/export', ms: 27 },
+        { route: '/api/health', ms: 4 },
+      ],
+    })
+
+    const barCard = formatTerminalChart(ds, {
+      type: 'bar',
+      xAxis: { field: 'route', role: 'dimension' },
+      yAxis: { field: 'ms', role: 'measure', aggregation: 'sum' },
+    }, { showBranding: false })
+
+    assertUniformCardBorderWidth(barCard)
+    expect(/[█▉▊▋▌▍▎▏]/.test(barCard)).toBe(true)
+    expect(barCard).not.toContain('tiny-pivot.com')
+  })
+
+  it('renders a box-drawn pivot table with inline sparklines, Total row, exact width, and Free vs Pro branding', () => {
+    const store = new DatasetStore()
+    const ds = store.register({
+      name: 'Quarterly Sales',
+      source: 'q.csv',
+      ingestionMode: 'direct',
+      rows: [
+        { region: 'North', quarter: 'Q1', revenue: 100 },
+        { region: 'North', quarter: 'Q2', revenue: 200 },
+        { region: 'North', quarter: 'Q3', revenue: 350 },
+        { region: 'South', quarter: 'Q1', revenue: 300 },
+        { region: 'South', quarter: 'Q2', revenue: 150 },
+        { region: 'South', quarter: 'Q3', revenue: 120 },
+      ],
+    })
+
+    const freePivot = formatPivotSummary(ds, {
+      rowFields: ['region'],
+      columnFields: ['quarter'],
+      valueFields: [{ field: 'revenue', aggregation: 'sum' }],
+      showRowTotals: true,
+      showColumnTotals: true,
+    }, undefined, { showBranding: true })
+
+    assertUniformCardBorderWidth(freePivot)
+    expect(freePivot).toContain('╭─')
+    expect(freePivot).toContain('Trend')
+    expect(freePivot).toContain('Total')
+    expect(freePivot).toContain('tiny-pivot.com')
+    expect(/[▁▂▃▄▅▆▇█]/.test(freePivot)).toBe(true)
+
+    const proPivot = formatPivotSummary(ds, {
+      rowFields: ['region'],
+      columnFields: ['quarter'],
+      valueFields: [{ field: 'revenue', aggregation: 'sum' }],
+      showRowTotals: true,
+      showColumnTotals: true,
+    }, undefined, { showBranding: false })
+
+    assertUniformCardBorderWidth(proPivot)
+    expect(proPivot).not.toContain('tiny-pivot.com')
+    expect(proPivot).toContain('Trend')
+    expect(proPivot).toContain('Total')
+  })
+})
+
+describe('companion server lifecycle & lazy MCP Apps detection', () => {
+  const originalXdg = process.env.XDG_CONFIG_HOME
+
+  afterEach(() => {
+    if (originalXdg === undefined)
+      delete process.env.XDG_CONFIG_HOME
+    else
+      process.env.XDG_CONFIG_HOME = originalXdg
+  })
+
+  it('detects MCP Apps UI support via io.modelcontextprotocol/ui extension capability', () => {
+    expect(clientSupportsMcpAppsUi(undefined)).toBe(false)
+    expect(clientSupportsMcpAppsUi({})).toBe(false)
+    expect(clientSupportsMcpAppsUi({ extensions: {} })).toBe(false)
+    expect(clientSupportsMcpAppsUi({
+      extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } },
+    })).toBe(true)
+  })
+
+  it('writes companion.json on start, cleans it up on close, and ignores stale/dead PIDs', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-companion-test-'))
+    process.env.XDG_CONFIG_HOME = tmpDir
+
+    try {
+      const store = new DatasetStore()
+      const handle = await startCompanionServer({
+        store,
+        loadHtml: async () => '<html><body>ok</body></html>',
+      })
+
+      const sessionFile = getCompanionSessionFile()
+      const raw = JSON.parse(await fs.readFile(sessionFile, 'utf8')) as { url: string, pid: number }
+      expect(raw.url).toBe(handle.url)
+      expect(raw.pid).toBe(process.pid)
+      expect(isProcessAlive(process.pid)).toBe(true)
+      expect(await resolveCompanionUrl()).toBe(handle.url)
+
+      await handle.close()
+      await expect(fs.access(sessionFile)).rejects.toThrow()
+
+      // Write a stale session file pointing to an almost certainly dead PID
+      await fs.mkdir(path.dirname(sessionFile), { recursive: true })
+      await fs.writeFile(sessionFile, JSON.stringify({ url: 'http://127.0.0.1:59999', pid: 999999 }), 'utf8')
+      expect(isProcessAlive(999999)).toBe(false)
+      expect(await resolveCompanionUrl()).toBeNull()
+      // Stale file should be cleaned up automatically
+      await expect(fs.access(sessionFile)).rejects.toThrow()
+    }
+    finally {
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule injection', () => {
+  it('provides authoritative MCP server instructions steering charts & pivots to TinyPivot', () => {
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('load_data')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('load_file')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('chartConfig')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('YoY/MoM')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('INSTEAD of built-in visualization widgets')
+
+    const { server } = createTinyPivotMcpServer()
+    // Underlying MCP SDK Server stores serverOptions.instructions on _instructions
+    expect((server.server as unknown as { _instructions?: string })._instructions).toBe(TINYPIVOT_MCP_INSTRUCTIONS)
+  })
+
+  it('idempotently injects fenced <!-- tinypivot:start --> rule into CLAUDE.md and upgrades legacy markers', () => {
+    const initial = '# My Personal Rules\n\nAlways use pnpm.\n'
+    const once = upsertTinyPivotRuleBlock(initial)
+    expect(once).toContain('# My Personal Rules')
+    expect(once).toContain('Always use pnpm.')
+    expect(once).toContain('<!-- tinypivot:start -->')
+    expect(once).toContain('<!-- tinypivot:end -->')
+    expect(once).toContain('INSTEAD of built-in visualization widgets')
+
+    // Re-running must be 100% idempotent with zero duplication
+    const twice = upsertTinyPivotRuleBlock(once)
+    expect(twice).toBe(once)
+    expect(twice.match(/<!-- tinypivot:start -->/g)?.length).toBe(1)
+
+    // Upgrades legacy <!-- tinypivot-mcp:start --> block in-place without duplicating
+    const legacy = `# Notes\n\n<!-- tinypivot-mcp:start -->\nold block\n<!-- tinypivot-mcp:end -->\n\nFooter`
+    const upgraded = upsertTinyPivotRuleBlock(legacy)
+    expect(upgraded).toContain('# Notes')
+    expect(upgraded).toContain('Footer')
+    expect(upgraded).toContain(TINYPIVOT_CLAUDE_RULE_BLOCK)
+    expect(upgraded).not.toContain('old block')
+    expect(upgraded.match(/<!-- tinypivot:start -->/g)?.length).toBe(1)
   })
 })

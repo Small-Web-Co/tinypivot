@@ -1,0 +1,126 @@
+{
+  "name": "tinypivot",
+  "title": "TinyPivot — Interactive Data IDE for AI Agents",
+  "mcpName": "io.github.Small-Web-Co/tinypivot",
+  "package": "@smallwebco/tinypivot-mcp",
+  "version": "0.1.2",
+  "description": "Interactive MCP App, terminal Unicode cards, live Ghostty TUI, and native Claude plugin that turns CSV, TSV, JSON, JSONL, API/MCP outputs, and SQL results from any database into interactive charts, deterministic pivot tables, data grids, drill-through, and Excel exports.",
+  "homepage": "https://tiny-pivot.com",
+  "docsUrl": "https://tiny-pivot.com/mcp",
+  "llmsTxt": "https://tiny-pivot.com/llms.txt",
+  "llmsFullTxt": "https://tiny-pivot.com/llms-full.txt",
+  "repository": "https://github.com/Small-Web-Co/tinypivot",
+  "license": "MIT",
+  "install": {
+    "init": "npx @smallwebco/tinypivot-mcp init",
+    "stdio": {
+      "command": "npx",
+      "args": ["-y", "@smallwebco/tinypivot-mcp"]
+    },
+    "claudeMarketplace": "/plugin marketplace add Small-Web-Co/tinypivot",
+    "claudePluginInstall": "/plugin install tinypivot@tinypivot",
+    "tui": "npx @smallwebco/tinypivot-mcp tui"
+  },
+  "transports": ["stdio"],
+  "mcpAppResource": "ui://tinypivot/app.html",
+  "supportedClients": [
+    "Antigravity",
+    "Claude Code",
+    "Claude Desktop",
+    "Cursor",
+    "OpenCode",
+    "Codex CLI",
+    "pi",
+    "SEP-1865 MCP Apps hosts"
+  ],
+  "databases": {
+    "universal": [
+      "BigQuery",
+      "Snowflake",
+      "MySQL",
+      "DuckDB",
+      "Databricks",
+      "PostgreSQL",
+      "SQLite",
+      "ClickHouse"
+    ],
+    "directConnector": {
+      "database": "PostgreSQL",
+      "tool": "query_postgres",
+      "mode": "read-only AST-validated SELECT",
+      "tier": "Pro",
+      "env": ["DATABASE_URL", "TINYPIVOT_ALLOWED_TABLES"]
+    }
+  },
+  "tools": [
+    {
+      "name": "open_tinypivot",
+      "description": "Open the interactive TinyPivot data grid, pivot table, and chart explorer (works with {} using the built-in sample dataset)."
+    },
+    {
+      "name": "load_file",
+      "description": "Load a local CSV, TSV, JSON, or JSONL file (or SQL CLI export from any database) with 0 raw rows entering LLM context; pass chartConfig/pivotConfig to render in 1 call."
+    },
+    {
+      "name": "load_data",
+      "description": "Load flat JSON rows already in memory (<500 rows from APIs, MCP tools, or small SQL queries) directly into TinyPivot without writing an intermediate CSV."
+    },
+    {
+      "name": "configure_pivot",
+      "description": "Compute a deterministic pivot table via @smallwebco/tinypivot-core with zero LLM math errors."
+    },
+    {
+      "name": "configure_chart",
+      "description": "Configure interactive charts (bar, stackedBar, line, area, pie, donut, scatter, bubble, heatmap, radar) and framed Unicode terminal cards."
+    },
+    {
+      "name": "query_postgres",
+      "description": "(Optional Pro) Run AST-validated read-only SELECT queries against PostgreSQL (DATABASE_URL) with 0 raw rows entering LLM context."
+    },
+    {
+      "name": "list_datasets",
+      "description": "List currently loaded datasets, row counts, and inferred column schemas."
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "free": {
+      "price": 0,
+      "rowLimit": 2500,
+      "truncationPolicy": "Explicit UI amber banner + LLM summary warning (never silent)",
+      "includes": [
+        "Core charts (bar, stackedBar, line, area, pie, donut)",
+        "Basic pivot table (sum aggregation)",
+        "Data grid (sort, filter, search, Markdown copy, CSV export)",
+        "Framed Unicode terminal cards & live Ghostty TUI",
+        "Localhost Companion Data IDE",
+        "Code theme (Dark & Light)"
+      ]
+    },
+    "pro": {
+      "monthly": 19,
+      "annual": 149,
+      "lifetime": 399,
+      "keyPrefix": "TP-MCPP-",
+      "includes": [
+        "Unlimited rows",
+        "All 5 visual themes (Code, Phosphor, Nord, Thermal, Mono)",
+        "Double-click Drill-Through modals",
+        "All 9+ aggregations & calculated fields",
+        "Styled .xlsx Excel export",
+        "Optional direct read-only query_postgres",
+        "Watermark-free UI & terminal cards"
+      ]
+    },
+    "team": {
+      "seats": 5,
+      "monthly": 79,
+      "annual": 699,
+      "keyPrefix": "TP-MCPT-"
+    }
+  },
+  "privacy": {
+    "localDataProcessing": true,
+    "telemetry": "Anonymous zero-PII pings (event, tool, rowBucket, client, tier, version, os); never collects row data, column names, SQL, or file paths; opt out via TINYPIVOT_TELEMETRY=0 or DO_NOT_TRACK=1."
+  }
+}

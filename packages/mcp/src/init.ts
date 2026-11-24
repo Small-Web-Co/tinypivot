@@ -20,13 +20,30 @@ interface TargetResult {
   detail: string
 }
 
-const RULE_START = '<!-- tinypivot-mcp:start -->'
-const RULE_END = '<!-- tinypivot-mcp:end -->'
+const RULE_START = '<!-- tinypivot:start -->'
+const RULE_END = '<!-- tinypivot:end -->'
+const RULE_TEST_RE = /<!-- tinypivot(?:-mcp)?:start -->[\s\S]*?<!-- tinypivot(?:-mcp)?:end -->/
+const RULE_REPLACE_RE = /<!-- tinypivot(?:-mcp)?:start -->[\s\S]*?<!-- tinypivot(?:-mcp)?:end -->/g
 
-const AGENT_RULE_BLOCK = `${RULE_START}
-## Tabular Data & Charts (TinyPivot MCP)
-When the user asks to analyze, pivot, chart, filter, compare, or visualize tabular data (CSV/TSV/JSON files, SQL query outputs, or API/MCP records), prefer \`tinypivot\` (\`load_file\`, \`load_data\`, \`configure_pivot\`, \`configure_chart\`) instead of dumping raw rows into chat or writing throwaway matplotlib/HTML scripts. Pass \`chartConfig\` or \`pivotConfig\` directly on \`load_file\` / \`load_data\` so the chart renders in a single tool call.
+export const TINYPIVOT_CLAUDE_RULE_BLOCK = `${RULE_START}
+## Default Charts & Pivot Tables (TinyPivot MCP)
+Whenever the user asks for a chart (line, bar, stacked bar, area, pie, scatter), a YoY/MoM comparison, a pivot table, or interactive tabular data exploration, ALWAYS use \`tinypivot\` (\`load_data\` for in-memory rows or \`load_file\` for CSV/TSV/JSON files, passing \`chartConfig\` or \`pivotConfig\` in a single call) INSTEAD of built-in visualization widgets, HTML/SVG/Chart.js/Recharts artifacts, matplotlib scripts, or large Markdown tables. Do not create temp CSVs for <500 in-memory rows. In terminal harnesses, display the fenced \`text\` TinyPivot chart/table card verbatim in your reply.
 ${RULE_END}`
+
+export function upsertTinyPivotRuleBlock(existing: string): string {
+  if (RULE_TEST_RE.test(existing)) {
+    // Replace first occurrence and strip any accidental duplicates cleanly
+    let replaced = false
+    return existing.replace(RULE_REPLACE_RE, () => {
+      if (replaced)
+        return ''
+      replaced = true
+      return TINYPIVOT_CLAUDE_RULE_BLOCK
+    }).replace(/\n{3,}/g, '\n\n')
+  }
+  const sep = existing.trim().length > 0 ? '\n\n' : ''
+  return `${existing.trimEnd()}${sep}${TINYPIVOT_CLAUDE_RULE_BLOCK}\n`
+}
 
 function printHelp() {
   console.log(`
@@ -319,25 +336,21 @@ async function upsertCodexToml(opts: InitOptions, cliPath: string): Promise<Targ
 async function upsertClaudeRules(opts: InitOptions): Promise<TargetResult | null> {
   if (opts.noRules)
     return null
+  const targetingClaude = opts.targets ? opts.targets.has('claude') : true
+  if (!targetingClaude)
+    return null
   const claudeDir = path.join(os.homedir(), '.claude')
   const claudeMdPath = path.join(claudeDir, 'CLAUDE.md')
-  if (!opts.all && !await exists(claudeDir))
+  const explicitClaude = opts.targets?.has('claude') ?? false
+  if (!opts.all && !explicitClaude && !await exists(claudeDir))
     return null
 
   try {
     const existing = await exists(claudeMdPath) ? await fs.readFile(claudeMdPath, 'utf8') : ''
-    const blockRe = new RegExp(`${RULE_START}[\\s\\S]*?${RULE_END}`)
-    let next: string
-    if (blockRe.test(existing)) {
-      next = existing.replace(blockRe, AGENT_RULE_BLOCK)
-    }
-    else {
-      const sep = existing.trim().length > 0 ? '\n\n' : ''
-      next = `${existing.trimEnd()}${sep}${AGENT_RULE_BLOCK}\n`
-    }
+    const next = upsertTinyPivotRuleBlock(existing)
 
     if (next === existing) {
-      return { id: 'claude-rules', label: 'Claude Code Rules', configPath: claudeMdPath, status: 'unchanged', detail: 'auto-use rule already present' }
+      return { id: 'claude-rules', label: 'Claude Code Rules', configPath: claudeMdPath, status: 'unchanged', detail: 'default-chart rule already present' }
     }
     if (!opts.dryRun) {
       await fs.mkdir(claudeDir, { recursive: true })
@@ -348,7 +361,7 @@ async function upsertClaudeRules(opts: InitOptions): Promise<TargetResult | null
       label: 'Claude Code Rules',
       configPath: claudeMdPath,
       status: 'updated',
-      detail: opts.dryRun ? 'would add auto-use TinyPivot rule' : 'added auto-use TinyPivot rule',
+      detail: opts.dryRun ? 'would add default-chart TinyPivot rule' : 'added default-chart TinyPivot rule',
     }
   }
   catch (err) {
@@ -368,7 +381,7 @@ export async function runInitCommand(args: string[]): Promise<void> {
     return
 
   const home = os.homedir()
-  const cliPath = fileURLToPath(import.meta.url)
+  const cliPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'cli.js')
 
   console.log(`\nTinyPivot MCP Installer (${opts.local ? `local: ${cliPath}` : 'npx @smallwebco/tinypivot-mcp'})${opts.dryRun ? ' [DRY RUN]' : ''}\n`)
 

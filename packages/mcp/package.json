@@ -1,8 +1,9 @@
 {
   "name": "@smallwebco/tinypivot-mcp",
+  "mcpName": "io.github.Small-Web-Co/tinypivot",
   "type": "module",
-  "version": "0.1.1",
-  "description": "TinyPivot MCP Server & Interactive MCP App — turn CSV, JSON, and PostgreSQL queries into interactive pivot tables, charts, drill-through, and Excel exports directly inside AI chats.",
+  "version": "0.1.2",
+  "description": "TinyPivot MCP Server, Interactive MCP App & Claude Plugin — turn CSV, JSON, API/MCP outputs, and queries from any database into interactive charts, pivot tables, terminal cards, live TUI, drill-through, and Excel exports inside AI agents.",
   "author": "Small Web, LLC",
   "license": "MIT",
   "homepage": "https://tiny-pivot.com",
@@ -15,12 +16,20 @@
     "mcp",
     "mcp-app",
     "model-context-protocol",
+    "claude-plugin",
+    "claude-code",
     "tinypivot",
     "pivot-table",
     "data-grid",
     "analytics",
     "charts",
+    "tui",
     "csv",
+    "sql",
+    "bigquery",
+    "snowflake",
+    "duckdb",
+    "mysql",
     "postgres",
     "excel",
     "ai-workflows"
@@ -37,9 +46,13 @@
     "tinypivot-mcp": "./dist/cli.js"
   },
   "files": [
+    ".claude-plugin",
+    ".mcp.json",
     "README.md",
     "dist",
-    "rules"
+    "rules",
+    "server.json",
+    "skills"
   ],
   "scripts": {
     "build": "pnpm run build:server && pnpm run build:app",

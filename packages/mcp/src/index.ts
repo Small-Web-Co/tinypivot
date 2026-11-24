@@ -4,6 +4,11 @@ export {
   startCompanionServer,
 } from './companion.js'
 export {
+  runInitCommand,
+  TINYPIVOT_CLAUDE_RULE_BLOCK,
+  upsertTinyPivotRuleBlock,
+} from './init.js'
+export {
   executeReadOnlyPostgresQuery,
   listPostgresTables,
   type PostgresConfig,
@@ -19,10 +24,12 @@ export {
 export {
   APP_MIME_TYPE,
   APP_RESOURCE_URI,
+  clientSupportsMcpAppsUi,
   createTinyPivotMcpServer,
   type CreateTinyPivotMcpServerOptions,
   loadAppHtml,
   resolveLicenseKey,
+  TINYPIVOT_MCP_INSTRUCTIONS,
 } from './server.js'
 export {
   type ColumnSummary,
@@ -33,4 +40,15 @@ export {
   parseDelimitedText,
   type StoredDataset,
 } from './store.js'
-export { formatDatasetSummary, formatPivotSummary } from './summary.js'
+export {
+  formatDatasetSummary,
+  formatPivotSummary,
+  formatTerminalChart,
+  type TerminalFormatOptions,
+} from './summary.js'
+export {
+  getCompanionSessionFile,
+  isProcessAlive,
+  resolveCompanionUrl,
+  runTuiCommand,
+} from './tui.js'

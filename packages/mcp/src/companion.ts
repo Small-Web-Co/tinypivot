@@ -1,8 +1,11 @@
 import type { ChartThemePreset } from '@smallwebco/tinypivot-core'
 import type { AddressInfo } from 'node:net'
 import type { DatasetStore } from './store.js'
+import fs from 'node:fs/promises'
 import http from 'node:http'
+import path from 'node:path'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
+import { getCompanionSessionFile } from './tui.js'
 
 export interface CompanionServerHandle {
   url: string
@@ -195,19 +198,49 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
   const address = server.address() as AddressInfo
   const url = `http://127.0.0.1:${address.port}`
 
+  // Record active localhost session so `tinypivot-mcp tui` auto-attaches in a Ghostty/tmux split pane
+  const sessionFile = getCompanionSessionFile()
+  try {
+    await fs.mkdir(path.dirname(sessionFile), { recursive: true })
+    await fs.writeFile(sessionFile, `${JSON.stringify({ url, port: address.port, pid: process.pid, startedAt: new Date().toISOString() }, null, 2)}\n`, 'utf8')
+  }
+  catch {}
+
+  let closePromise: Promise<void> | null = null
+
   return {
     url,
     port: address.port,
     broadcastUpdate,
-    close: () => new Promise<void>((resolve) => {
-      for (const client of sseClients) {
-        try {
-          client.end()
+    close: () => {
+      if (closePromise)
+        return closePromise
+      closePromise = (async () => {
+        for (const client of sseClients) {
+          try {
+            client.end()
+          }
+          catch {}
         }
-        catch {}
-      }
-      sseClients.clear()
-      server.close(() => resolve())
-    }),
+        sseClients.clear()
+
+        await new Promise<void>((resolve) => {
+          server.close(() => resolve())
+        })
+
+        // Clean up companion.json only if this process still owns it
+        try {
+          const raw = await fs.readFile(sessionFile, 'utf8')
+          const parsed = JSON.parse(raw) as { pid?: number }
+          if (parsed.pid === process.pid) {
+            await fs.unlink(sessionFile)
+          }
+        }
+        catch {
+          // Ignore if already removed or overwritten
+        }
+      })()
+      return closePromise
+    },
   }
 }
