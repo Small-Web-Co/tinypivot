@@ -191,12 +191,19 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@modelcontextprotocol/ext-apps':
-        specifier: ^1.0.1
-        version: 1.7.5(@modelcontextprotocol/sdk@1.32.2(zod@4.6.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.6.7)
       '@modelcontextprotocol/sdk':
         specifier: ^1.26.0
         version: 1.32.2(zod@4.6.7)
+      pg:
+        specifier: ^8.0.0
+        version: 8.16.3
+      zod:
+        specifier: '>=4.6.6'
+        version: 4.6.7
+    devDependencies:
+      '@modelcontextprotocol/ext-apps':
+        specifier: ^1.0.1
+        version: 1.7.5(@modelcontextprotocol/sdk@1.32.2(zod@4.6.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(zod@4.6.7)
       '@smallwebco/tinypivot-core':
         specifier: workspace:*
         version: link:../core
@@ -206,19 +213,6 @@ importers:
       '@smallwebco/tinypivot-server':
         specifier: workspace:*
         version: link:../server
-      pg:
-        specifier: ^8.0.0
-        version: 8.16.3
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
-      zod:
-        specifier: '>=4.6.6'
-        version: 4.6.7
-    devDependencies:
       '@types/node':
         specifier: ^20.19.41
         version: 20.19.41
@@ -234,6 +228,12 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.3.4
         version: 4.7.0(vite@6.4.6(@types/node@20.19.41)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.9.0))
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
       tsup:
         specifier: ^8.0.1
         version: 8.5.1(@microsoft/api-extractor@7.43.0(@types/node@20.19.41))(jiti@1.21.7)(postcss@8.5.31)(tsx@4.21.0)(typescript@5.6.3)(yaml@2.9.0)
@@ -8878,7 +8878,7 @@ snapshots:
 
   ts-declaration-location@1.0.7(typescript@5.3.3):
     dependencies:
-      picomatch: 4.0.4
+      picomatch: 4.0.7
       typescript: 5.3.3
     optional: true
 
