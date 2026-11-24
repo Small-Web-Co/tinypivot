@@ -79,14 +79,17 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
  * Guide pages all render through MarketingGuide.vue, with their copy and
  * meta split between that component and router/routes.ts.
  */
+const PAGE_FILES = {
+  '/': ['demo/pages/Home.vue'],
+  '/ui': ['demo/pages/Ui.vue'],
+  '/docs': ['demo/pages/McpGuide.vue'],
+  '/vs-ag-grid': ['demo/pages/VsAgGrid.vue'],
+}
+
 function routeContentFiles(route, guideSlugSet) {
-  if (route.url === '/')
-    return ['demo/pages/Home.vue']
-  if (route.url === '/mcp')
-    return ['demo/pages/McpGuide.vue']
   if (guideSlugSet.has(route.url.replace(/^\//, '')))
     return ['demo/pages/MarketingGuide.vue', 'demo/router/routes.ts']
-  return ['demo/pages/VsAgGrid.vue']
+  return PAGE_FILES[route.url] ?? ['demo/router/routes.ts']
 }
 
 /**
@@ -323,7 +326,7 @@ async function main() {
 
     // Build descriptors for every route, excluding non-public paths
     const ROUTES = routeDefinitions
-      .filter(r => !EXCLUDED_PATHS.has(r.path))
+      .filter(r => !EXCLUDED_PATHS.has(r.path) && !r.redirect)
       .map(r => buildRouteDescriptor(r, guideSlugSet))
 
     console.log(`[prerender] Found ${ROUTES.length} routes to prerender`)

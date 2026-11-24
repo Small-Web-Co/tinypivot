@@ -4,6 +4,9 @@
   "outputDirectory": "dist-demo",
   "installCommand": "pnpm install",
   "devCommand": "vite --config vite.demo.config.ts --port $PORT",
+  "redirects": [
+    { "source": "/mcp", "destination": "/docs", "permanent": true }
+  ],
   "headers": [
     {
       "source": "/(.*)",

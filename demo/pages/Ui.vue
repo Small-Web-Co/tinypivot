@@ -1,0 +1,3089 @@
+<script setup lang="ts">
+import type { AIAnalystConfig, AIDataSource, AITableSchema, QueryExecutorResult } from '@smallwebco/tinypivot-core'
+import { track } from '@vercel/analytics'
+import { DataGrid } from 'tinypivot'
+import { computed, onMounted, ref } from 'vue'
+import McpHighlightReel from '../components/McpHighlightReel.vue'
+import { DATASETS, getDataset } from '../datasets'
+import { executeQuery as executeDuckDBQuery, initDuckDB, loadData } from '../utils/duckdb'
+
+// Track which datasets have been loaded into DuckDB
+const loadedDatasets = new Set<string>()
+
+// Convert datasets to AIDataSource format
+const AI_DATA_SOURCES: AIDataSource[] = DATASETS.map(d => ({
+  id: d.id,
+  table: d.tableName,
+  name: d.name,
+  description: d.description,
+}))
+
+// Framework toggle
+const selectedFramework = ref<'vue' | 'react'>('vue')
+
+// Generate large sample dataset (10,000 rows)
+function generateSampleData(count: number) {
+  const regions = ['North', 'South', 'East', 'West', 'Central', 'Northeast', 'Southeast', 'Northwest', 'Southwest']
+  const products = ['Widget A', 'Widget B', 'Widget C', 'Gadget X', 'Gadget Y', 'Device Pro', 'Device Lite', 'Tool Plus']
+  const categories = ['Electronics', 'Hardware', 'Software', 'Services', 'Accessories']
+  const years = [2022, 2023, 2024]
+  const salesReps = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack']
+  const statuses = ['Completed', 'Pending', 'Processing', 'Shipped', 'Delivered']
+
+  // Helper to get quarter from month (0-indexed)
+  function getQuarter(month: number): string {
+    if (month < 3)
+      return 'Q1'
+    if (month < 6)
+      return 'Q2'
+    if (month < 9)
+      return 'Q3'
+    return 'Q4'
+  }
+
+  const data = []
+  for (let i = 1; i <= count; i++) {
+    const basePrice = Math.floor(Math.random() * 500) + 50
+    const units = Math.floor(Math.random() * 200) + 10
+
+    // Generate a random year and month, then derive quarter from date
+    const year = years[Math.floor(Math.random() * years.length)]
+    const month = Math.floor(Math.random() * 12) // 0-11
+    const day = Math.floor(Math.random() * 28) + 1 // 1-28 to avoid month-end issues
+    const randomDate = new Date(year, month, day)
+    const dateStr = randomDate.toISOString().split('T')[0] // YYYY-MM-DD format
+    const quarter = getQuarter(month)
+
+    data.push({
+      id: i,
+      region: regions[Math.floor(Math.random() * regions.length)],
+      product: products[Math.floor(Math.random() * products.length)],
+      category: categories[Math.floor(Math.random() * categories.length)],
+      sales: basePrice * units,
+      units,
+      price: basePrice,
+      quarter,
+      year,
+      rep: salesReps[Math.floor(Math.random() * salesReps.length)],
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      margin: Math.round((Math.random() * 30 + 10) * 100) / 100,
+      date: dateStr,
+    })
+  }
+  return data
+}
+
+// isMounted gates the interactive demo from SSR — keeps prerendered HTML lean
+// while marketing copy (hero, features, pricing, testimonials) stays SSR-rendered.
+const isMounted = ref(false)
+const sampleData = ref<ReturnType<typeof generateSampleData>>([])
+
+onMounted(() => {
+  sampleData.value = generateSampleData(10000)
+  isMounted.value = true
+})
+
+// Custom data source loader - generates and loads data into DuckDB
+async function loadDataSource(dataSourceId: string): Promise<{ data: Record<string, unknown>[], schema?: AITableSchema }> {
+  console.log('[AI] Loading data source:', dataSourceId)
+
+  const dataset = getDataset(dataSourceId)
+  if (!dataset) {
+    console.error('[AI] Dataset not found:', dataSourceId, 'Available:', DATASETS.map(d => d.id))
+    throw new Error(`Dataset ${dataSourceId} not found`)
+  }
+
+  // Initialize DuckDB if needed
+  console.log('[AI] Initializing DuckDB...')
+  await initDuckDB()
+
+  // Generate and load data if not already loaded
+  if (!loadedDatasets.has(dataSourceId)) {
+    console.log('[AI] Generating dataset...')
+    const data = dataset.generate()
+    console.log('[AI] Loading', data.length, 'rows into DuckDB table:', dataset.tableName)
+    await loadData(dataset.tableName, data)
+    loadedDatasets.add(dataSourceId)
+    console.log('[AI] Dataset loaded successfully')
+  }
+
+  // Fetch first 100 rows as initial sample data for preview
+  const result = await executeDuckDBQuery(`SELECT * FROM ${dataset.tableName} LIMIT 100`)
+  console.log('[AI] Loaded', result.rows.length, 'sample rows for preview')
+
+  return { data: result.rows, schema: dataset.schema }
+}
+
+// Custom query executor - runs SQL via DuckDB WASM
+async function queryExecutor(sql: string, _table: string): Promise<QueryExecutorResult> {
+  try {
+    const result = await executeDuckDBQuery(sql)
+    return {
+      data: result.rows,
+      rowCount: result.rows.length,
+      truncated: false,
+    }
+  }
+  catch (err) {
+    return {
+      data: [],
+      rowCount: 0,
+      error: err instanceof Error ? err.message : 'Query failed',
+    }
+  }
+}
+
+// AI Analyst configuration with real AI + client-side DuckDB for queries
+// Uses /api/ai-proxy for LLM calls (Vercel serverless function)
+// Uses queryExecutor for running SQL against DuckDB WASM
+const aiAnalystConfig: AIAnalystConfig = {
+  enabled: true,
+  endpoint: '/api/ai-proxy', // Vercel serverless function for AI chat
+  dataSources: AI_DATA_SOURCES,
+  dataSourceLoader: loadDataSource,
+  queryExecutor, // Executes SQL via DuckDB WASM (client-side)
+  persistToLocalStorage: true,
+  aiModelName: __AI_MODEL__,
+}
+
+// Format toggles
+const numberFormat = ref<'us' | 'eu' | 'plain'>('us')
+const dateFormat = ref<'us' | 'eu' | 'iso'>('iso')
+
+// Theme selector
+const demoTheme = ref<
+  | 'light' | 'dark' | 'auto'
+  | 'slate' | 'slate-dark'
+  | 'zinc' | 'zinc-dark'
+  | 'indigo' | 'indigo-dark'
+  | 'violet' | 'violet-dark'
+  | 'emerald' | 'emerald-dark'
+  | 'sky' | 'sky-dark'
+  | 'rose' | 'rose-dark'
+  | 'amber' | 'amber-dark'
+  | 'solar' | 'solar-dark'
+  | 'mono' | 'mono-dark'
+>('dark')
+
+const themeOptions = [
+  { group: 'Neutral', options: [
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+    { value: 'auto', label: 'Auto (system)' },
+  ] },
+  { group: 'Slate', options: [
+    { value: 'slate', label: 'Slate' },
+    { value: 'slate-dark', label: 'Slate (dark)' },
+  ] },
+  { group: 'Zinc', options: [
+    { value: 'zinc', label: 'Zinc' },
+    { value: 'zinc-dark', label: 'Zinc (dark)' },
+  ] },
+  { group: 'Indigo', options: [
+    { value: 'indigo', label: 'Indigo' },
+    { value: 'indigo-dark', label: 'Indigo (dark)' },
+  ] },
+  { group: 'Violet', options: [
+    { value: 'violet', label: 'Violet' },
+    { value: 'violet-dark', label: 'Violet (dark)' },
+  ] },
+  { group: 'Emerald', options: [
+    { value: 'emerald', label: 'Emerald' },
+    { value: 'emerald-dark', label: 'Emerald (dark)' },
+  ] },
+  { group: 'Sky', options: [
+    { value: 'sky', label: 'Sky' },
+    { value: 'sky-dark', label: 'Sky (dark)' },
+  ] },
+  { group: 'Rose', options: [
+    { value: 'rose', label: 'Rose' },
+    { value: 'rose-dark', label: 'Rose (dark)' },
+  ] },
+  { group: 'Amber', options: [
+    { value: 'amber', label: 'Amber' },
+    { value: 'amber-dark', label: 'Amber (dark)' },
+  ] },
+  { group: 'Solar', options: [
+    { value: 'solar', label: 'Solar' },
+    { value: 'solar-dark', label: 'Solar (dark)' },
+  ] },
+  { group: 'Mono', options: [
+    { value: 'mono', label: 'Mono' },
+    { value: 'mono-dark', label: 'Mono (dark)' },
+  ] },
+] as const
+
+const isDarkDemoTheme = computed(() =>
+  demoTheme.value === 'dark' || demoTheme.value.endsWith('-dark'),
+)
+
+// Package name based on framework
+const packageName = computed(() => selectedFramework.value === 'vue' ? '@smallwebco/tinypivot-vue' : '@smallwebco/tinypivot-react')
+
+// Hero quick-install switcher (leads with MCP, 1-click toggle to Vue/React UI library)
+const heroMode = ref<'mcp' | 'ui'>('mcp')
+const heroCopied = ref(false)
+const heroCommand = computed(() =>
+  heroMode.value === 'mcp'
+    ? 'npx @smallwebco/tinypivot-mcp init'
+    : `pnpm add ${packageName.value}`,
+)
+
+// Pricing switcher (leads with MCP subscriptions/lifetime; UI Library one-time licenses in second tab)
+const pricingTab = ref<'mcp' | 'ui'>('mcp')
+const mcpProBilling = ref<'monthly' | 'yearly' | 'lifetime'>('yearly')
+const mcpTeamBilling = ref<'monthly' | 'yearly'>('yearly')
+
+const mcpProPlan = computed(() => {
+  if (mcpProBilling.value === 'monthly')
+    return { id: 'mcp_pro_monthly', price: '$19', period: '/month', sub: 'Cancel anytime. Taxes calculated at checkout.' }
+  if (mcpProBilling.value === 'lifetime')
+    return { id: 'mcp_pro_lifetime', price: '$399', period: 'one-time', sub: 'Local Pro perpetual license (all v1.x updates). Zero subscription.' }
+  return { id: 'mcp_pro_yearly', price: '$149', period: '/year', sub: '$12.42/mo billed annually — save 35%.' }
+})
+
+const mcpTeamPlan = computed(() => {
+  if (mcpTeamBilling.value === 'monthly')
+    return { id: 'mcp_team_monthly', price: '$79', period: '/month', sub: 'Up to 5 seats ($15.80/seat). Cancel anytime.' }
+  return { id: 'mcp_team_yearly', price: '$699', period: '/year', sub: 'Up to 5 seats ($11.65/seat/mo) — save 26%.' }
+})
+
+const selectedPlan = ref<'single' | 'unlimited' | 'team'>('single')
+const plans = [
+  { id: 'single', name: 'Single App', price: 49, description: 'Perpetual UI Library license for 1 developer, 1 React/Vue app (TP-PRO1 key).' },
+  { id: 'unlimited', name: 'Unlimited Apps', price: 149, description: 'Perpetual UI Library license for 1 developer, unlimited React/Vue apps (TP-PROU key).' },
+  { id: 'team', name: 'UI Team (10 Devs)', price: 399, description: 'Perpetual UI Library license for up to 10 developers, unlimited React/Vue apps (TP-PROT key).' },
+] as const
+
+const isCheckingOut = ref(false)
+const activeCheckoutPlan = ref<string | null>(null)
+
+async function startCheckoutPlan(planId: string) {
+  if (isCheckingOut.value)
+    return
+
+  isCheckingOut.value = true
+  activeCheckoutPlan.value = planId
+  track('checkout_started', { plan: planId })
+  try {
+    const response = await fetch('/api/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: planId }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      alert(`API Error (${response.status}): ${text || 'Unknown error'}`)
+      return
+    }
+
+    const data = await response.json()
+    if (data.url) {
+      track('checkout_redirected', { plan: planId })
+      window.location.href = data.url
+    }
+    else if (data.error) {
+      alert(`Error: ${data.error}`)
+    }
+    else {
+      alert('Failed to create checkout session. Please try again.')
+    }
+  }
+  catch (error) {
+    console.error('Checkout error:', error)
+    alert(`Checkout error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+  finally {
+    isCheckingOut.value = false
+    activeCheckoutPlan.value = null
+  }
+}
+
+function buyNow() {
+  return startCheckoutPlan(selectedPlan.value)
+}
+
+// Features comparison - compact version
+const freeFeatures = [
+  'Data Grid',
+  'Sorting',
+  'Filtering',
+  'Search',
+  'Export CSV',
+  'Pagination',
+  'Column Resize',
+  'Clipboard',
+  'Dark Mode',
+  'Keyboard Nav',
+  'Pivot Table (Sum)',
+  'Row/Col Totals',
+  'Calculated Fields',
+  'Formula Builder',
+  'Expand/Collapse Row Groups',
+]
+const proFeatures = [
+  'Advanced Aggregations (9+)',
+  'Pivot Drill-Through',
+  'Excel (XLSX) Export',
+  'AI Data Analyst (BYOK)',
+  'Natural Language Queries',
+  'Chart Builder (6 types)',
+  'No Watermark',
+]
+
+// Active section for navigation (kept for potential future use)
+const _activeSection = ref('hero')
+
+// Copy to clipboard
+function copyInstallCommand() {
+  navigator.clipboard.writeText(heroCommand.value)
+  heroCopied.value = true
+  setTimeout(() => {
+    heroCopied.value = false
+  }, 1800)
+  track('install_command_copied', { mode: heroMode.value, framework: selectedFramework.value })
+}
+
+function trackFreeStart() {
+  track('free_github_started', { framework: selectedFramework.value })
+}
+</script>
+
+<template>
+  <div class="landing-page">
+    <!-- Navigation -->
+    <nav class="nav">
+      <div class="nav-content">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <span>TinyPivot</span>
+        </div>
+        <div class="nav-links">
+          <router-link to="/mcp" class="nav-link-highlight">
+            MCP (In-Agent)
+          </router-link>
+          <a href="#features">Features</a>
+          <a href="#ai-analyst">AI Analyst</a>
+          <a href="#quickstart">Quick Start</a>
+          <a href="#demo">Demo</a>
+          <a href="#pricing">Pricing</a>
+          <router-link to="/vs-ag-grid" class="nav-link-highlight">
+            vs AG Grid
+          </router-link>
+        </div>
+        <div class="nav-actions">
+          <div class="nav-framework-toggle">
+            <button
+              class="nav-framework-btn" :class="[{ active: selectedFramework === 'vue' }]"
+              title="Vue 3"
+              @click="selectedFramework = 'vue'"
+            >
+              <svg viewBox="0 0 128 128" width="16" height="16">
+                <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z" />
+                <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z" />
+              </svg>
+            </button>
+            <button
+              class="nav-framework-btn" :class="[{ active: selectedFramework === 'react' }]"
+              title="React"
+              @click="selectedFramework = 'react'"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="#61dafb">
+                <circle cx="12" cy="12" r="2.5" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)" />
+                <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)" />
+              </svg>
+            </button>
+          </div>
+          <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank" class="nav-github">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero">
+      <div class="hero-bg" />
+      <div class="hero-content">
+        <div class="framework-badge">
+          <span class="mcp-pulse-dot" />
+          <span class="framework-badge-text">MCP Data IDE for AI Agents · React &amp; Vue 3 UI · BYOK AI Analyst</span>
+        </div>
+        <h1>The Interactive Data IDE for <span class="gradient-text">AI Agents &amp; Web Apps</span></h1>
+        <p class="hero-subtitle">
+          Render interactive <strong>Charts, Pivot Tables, Drill-Through, and Excel exports</strong> directly inside
+          <strong>Antigravity, Claude, Cursor, OpenCode, and pi</strong> — or embed the same battle-tested DataGrid inside your React &amp; Vue 3 apps.
+        </p>
+        <div class="hero-actions">
+          <router-link to="/mcp" class="btn btn-primary">
+            Explore TinyPivot MCP →
+          </router-link>
+          <a href="#demo" class="btn btn-secondary">
+            Try Live 10k-Row Grid Demo
+          </a>
+        </div>
+
+        <div class="hero-mode-tabs" role="tablist" aria-label="Install mode">
+          <button
+            type="button"
+            class="hero-mode-btn"
+            :class="{ active: heroMode === 'mcp' }"
+            @click="heroMode = 'mcp'"
+          >
+            AI Harness (MCP)
+          </button>
+          <button
+            type="button"
+            class="hero-mode-btn"
+            :class="{ active: heroMode === 'ui' }"
+            @click="heroMode = 'ui'"
+          >
+            {{ selectedFramework === 'vue' ? 'Vue 3 Library' : 'React Library' }}
+          </button>
+        </div>
+
+        <div class="hero-install">
+          <code>{{ heroCommand }}</code>
+          <button class="copy-btn" title="Copy to clipboard" @click="copyInstallCommand">
+            <span v-if="heroCopied" class="copied-label">Copied</span>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
+        <p class="hero-note">
+          <router-link to="/mcp#savings">
+            See honest, prompt-cache-adjusted token savings &amp; interactive ROI calculator →
+          </router-link>
+        </p>
+      </div>
+    </section>
+
+    <!-- Interactive MCP Highlight Reel -->
+    <section id="mcp-reel" class="mcp-reel-showcase">
+      <div class="section-header">
+        <div class="badge">
+          Interactive Preview · IDEs &amp; Terminals
+        </div>
+        <h2>See <span class="gradient-text">TinyPivot MCP</span> in Action</h2>
+        <p>Inline IDE charts &amp; pivots, screenshot-ready terminal cards, live SSE companion drill-through, and universal database piping.</p>
+      </div>
+      <McpHighlightReel />
+      <div class="mcp-reel-cta">
+        <router-link to="/mcp" class="mcp-reel-link">
+          Explore full MCP setup, ROI calculator &amp; pricing →
+        </router-link>
+      </div>
+    </section>
+
+    <!-- Use Cases Section: Clear Track Per User Type -->
+    <section id="use-cases" class="use-cases">
+      <div class="section-header">
+        <div class="badge">
+          One Engine · Three Ways to Use It
+        </div>
+        <h2>Built for <span class="gradient-text">How You Work With Data</span></h2>
+        <p>Start in your AI coding harness today, embed into your SaaS product tomorrow — powered by the same deterministic pivot &amp; chart core.</p>
+      </div>
+
+      <div class="use-cases-grid">
+        <div class="use-case-card use-case-featured">
+          <div class="use-case-top">
+            <span class="use-case-audience">For AI Users &amp; Data Analysts</span>
+            <span class="feature-badge free">Primary</span>
+          </div>
+          <h3>TinyPivot MCP (In-Agent Data IDE)</h3>
+          <p>
+            Stop squinting at truncated markdown tables or burning tokens re-prompting for chart tweaks. Stream CSV/JSON files, SQL exports (BigQuery, Snowflake, MySQL, DuckDB, Postgres), or MCP tool results into an interactive Chart, Pivot, and Grid inside your AI harness.
+          </p>
+          <ul class="use-case-points">
+            <li>1-command setup across Claude, Antigravity, Cursor, OpenCode &amp; pi</li>
+            <li>Core charts &amp; Sum pivot free up to 2,500 rows (transparent warning if exceeded)</li>
+            <li>Works with any database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>) in Pro</li>
+          </ul>
+          <router-link to="/mcp" class="btn btn-primary use-case-cta">
+            Set Up TinyPivot MCP →
+          </router-link>
+        </div>
+
+        <div class="use-case-card">
+          <div class="use-case-top">
+            <span class="use-case-audience">For Frontend &amp; SaaS Engineers</span>
+            <span class="feature-badge free">Vue 3 + React</span>
+          </div>
+          <h3>TinyPivot UI DataGrid &amp; Pivot</h3>
+          <p>
+            Drop a fast, batteries-included Excel-like data grid into your React or Vue 3 app in 30 seconds — with free pivot tables, sorting, filtering, search, calculated fields, and CSV export without AG Grid enterprise pricing.
+          </p>
+          <ul class="use-case-points">
+            <li>Identical API for <code>@smallwebco/tinypivot-react</code> and <code>-vue</code></li>
+            <li>Free pivot tables, calculated fields &amp; Core Charts out of the box</li>
+            <li>One-time perpetual commercial licenses starting at $49</li>
+          </ul>
+          <a href="#demo" class="btn btn-secondary use-case-cta">
+            Try Live 10k-Row Demo →
+          </a>
+        </div>
+
+        <div class="use-case-card">
+          <div class="use-case-top">
+            <span class="use-case-audience">For Product Teams</span>
+            <span class="feature-badge pro">BYOK</span>
+          </div>
+          <h3>Embedded AI Data Analyst</h3>
+          <p>
+            Give your app's end users natural-language analytics directly inside TinyPivot. Bring your own OpenAI, Anthropic, or OpenRouter key and run SQL locally via DuckDB WASM or safely against your PostgreSQL backend.
+          </p>
+          <ul class="use-case-points">
+            <li>Plain-English questions → validated SQL → instant pivot &amp; charts</li>
+            <li>Zero data passes through TinyPivot servers</li>
+            <li>Included with TinyPivot UI Library Pro licenses</li>
+          </ul>
+          <a href="#ai-analyst" class="btn btn-secondary use-case-cta">
+            See AI Analyst Setup →
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+      <div class="section-header">
+        <h2>Features</h2>
+        <p>Everything you need for data-heavy {{ selectedFramework === 'vue' ? 'Vue' : 'React' }} applications</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h3>Excel-like Grid</h3>
+          <p>Column filtering, sorting, and smart number formatting</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-violet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <h3>Global Search</h3>
+          <p>Search across all columns with Ctrl+F shortcut</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-emerald">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </div>
+          <h3>CSV Export</h3>
+          <p>One-click export to CSV with custom filename</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <h3>Pagination</h3>
+          <p>Page through large datasets with configurable size</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-pink">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h3>Clipboard</h3>
+          <p>Copy selected cells with Ctrl+C keyboard shortcut</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-cyan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          </div>
+          <h3>Dark Mode</h3>
+          <p>Light, dark, or auto theme based on system</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-indigo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+            </svg>
+          </div>
+          <h3>Pivot Table</h3>
+          <p>Drag-and-drop pivoting with Sum aggregation, totals, and expand/collapse row groups</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-rose">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h3>Calculated Fields</h3>
+          <p>Build formulas like profit margin and derived metrics</p>
+          <span class="feature-badge free">Free</span>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon feature-icon-violet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h3>Chart Builder</h3>
+          <p>Core charts free (bar, stacked, line, area, pie, donut); Pro unlocks all themes &amp; chart types</p>
+          <span class="feature-badge free">Free (Core)</span>
+        </div>
+
+        <div class="feature-card feature-card-highlight">
+          <div class="feature-icon feature-icon-gradient">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <h3>AI Data Analyst</h3>
+          <p>Natural language queries with your own API key (BYOK)</p>
+          <span class="feature-badge pro">Pro</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI Data Analyst Section -->
+    <section id="ai-analyst" class="ai-analyst-section">
+      <div class="section-header">
+        <div class="badge badge-ai">
+          Pro Feature
+        </div>
+        <h2>AI Data Analyst <span class="gradient-text">(BYOK)</span></h2>
+        <p>Let users explore data with natural language. Bring Your Own Key — use OpenAI, Anthropic, or any LLM.</p>
+      </div>
+
+      <div class="ai-demo-container">
+        <div class="ai-demo-gif">
+          <img src="/assets/tinypivot-ai.gif" alt="AI Data Analyst Demo - Ask questions in natural language" loading="lazy">
+        </div>
+        <div class="ai-demo-features">
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <div>
+              <h4>Natural Language Queries</h4>
+              <p>Users ask questions in plain English — no SQL knowledge needed</p>
+            </div>
+          </div>
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+            <div>
+              <h4>Bring Your Own Key</h4>
+              <p>Use your OpenAI, Anthropic, or OpenRouter API key — full cost control</p>
+            </div>
+          </div>
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <div>
+              <h4>Privacy-First</h4>
+              <p>Your data never passes through our servers — queries run in your environment</p>
+            </div>
+          </div>
+          <div class="ai-feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+              <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+            </svg>
+            <div>
+              <h4>Multiple Data Sources</h4>
+              <p>Connect PostgreSQL, DuckDB WASM, or any SQL backend</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-code-example">
+        <div class="example-header">
+          <span class="example-dot" />
+          <span class="example-dot" />
+          <span class="example-dot" />
+          <span class="example-title">{{ selectedFramework === 'vue' ? 'App.vue' : 'App.tsx' }} — AI Analyst Setup</span>
+        </div>
+        <div class="example-code">
+          <!-- Vue AI Example -->
+          <pre v-if="selectedFramework === 'vue'"><code><span class="code-tag">&lt;script setup lang="ts"&gt;</span>
+<span class="code-keyword">import</span> { DataGrid, setLicenseKey } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-vue'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-vue/style.css'</span>
+
+<span class="code-comment">// Activate Pro license</span>
+setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
+
+<span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
+
+<span class="code-comment">// AI Analyst configuration</span>
+<span class="code-keyword">const</span> aiConfig = {
+  enabled: <span class="code-keyword">true</span>,
+  endpoint: <span class="code-string">'/api/tinypivot'</span>,  <span class="code-comment">// Your server endpoint</span>
+  aiModelName: <span class="code-string">'Claude Sonnet'</span>,  <span class="code-comment">// Display in UI</span>
+  persistToLocalStorage: <span class="code-keyword">true</span>,
+}
+<span class="code-tag">&lt;/script&gt;</span>
+
+<span class="code-tag">&lt;template&gt;</span>
+  <span class="code-tag">&lt;DataGrid</span>
+    <span class="code-attr">:data</span>=<span class="code-string">"data"</span>
+    <span class="code-attr">:ai-analyst</span>=<span class="code-string">"aiConfig"</span>
+  <span class="code-tag">/&gt;</span>
+<span class="code-tag">&lt;/template&gt;</span></code></pre>
+          <!-- React AI Example -->
+          <pre v-else><code><span class="code-keyword">import</span> { DataGrid, setLicenseKey } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-react'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-react/style.css'</span>
+
+<span class="code-comment">// Activate Pro license</span>
+setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
+
+<span class="code-keyword">function</span> <span class="code-function">App</span>() {
+  <span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
+
+  <span class="code-comment">// AI Analyst configuration</span>
+  <span class="code-keyword">const</span> aiConfig = {
+    enabled: <span class="code-keyword">true</span>,
+    endpoint: <span class="code-string">'/api/tinypivot'</span>,  <span class="code-comment">// Your server endpoint</span>
+    aiModelName: <span class="code-string">'Claude Sonnet'</span>,  <span class="code-comment">// Display in UI</span>
+    persistToLocalStorage: <span class="code-keyword">true</span>,
+  }
+
+  <span class="code-keyword">return</span> (
+    <span class="code-tag">&lt;DataGrid</span>
+      <span class="code-attr">data</span>=<span class="code-string">{data}</span>
+      <span class="code-attr">aiAnalyst</span>=<span class="code-string">{aiConfig}</span>
+    <span class="code-tag">/&gt;</span>
+  )
+}
+
+<span class="code-keyword">export default</span> App</code></pre>
+        </div>
+      </div>
+
+      <div class="ai-cta">
+        <a href="https://github.com/Small-Web-Co/tinypivot/tree/master/examples/ai-analyst-demo" target="_blank" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+          </svg>
+          View Complete Example on GitHub
+        </a>
+        <p class="ai-cta-note">
+          Includes PostgreSQL backend, server handler setup, and DuckDB WASM for client-side queries
+        </p>
+      </div>
+    </section>
+
+    <!-- Quick Start Section -->
+    <section id="quickstart" class="quickstart">
+      <div class="section-header">
+        <div class="badge">
+          Dead Simple Integration
+        </div>
+        <h2>Up and Running in <span class="gradient-text">30 Seconds</span></h2>
+        <p>No complex configuration. No boilerplate. Just install, import, and go.</p>
+      </div>
+
+      <div class="steps-container">
+        <div class="step">
+          <div class="step-number">
+            1
+          </div>
+          <div class="step-content">
+            <h3>Install</h3>
+            <p>One package, zero peer deps (except {{ selectedFramework === 'vue' ? 'Vue' : 'React' }})</p>
+            <div class="code-block">
+              <code>pnpm add {{ packageName }}</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-connector">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </div>
+
+        <div class="step">
+          <div class="step-number">
+            2
+          </div>
+          <div class="step-content">
+            <h3>Import</h3>
+            <p>Just two lines of setup</p>
+            <div class="code-block code-block-multi">
+              <pre v-if="selectedFramework === 'vue'"><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-vue'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-vue/style.css'</span></code></pre>
+              <pre v-else><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-react'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-react/style.css'</span></code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-connector">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </div>
+
+        <div class="step">
+          <div class="step-number">
+            3
+          </div>
+          <div class="step-content">
+            <h3>Use</h3>
+            <p>Pass your data, done.</p>
+            <div class="code-block code-block-multi">
+              <pre v-if="selectedFramework === 'vue'"><code><span class="code-tag">&lt;DataGrid</span> <span class="code-attr">:data</span>=<span class="code-string">"yourData"</span> <span class="code-tag">/&gt;</span></code></pre>
+              <pre v-else><code><span class="code-tag">&lt;DataGrid</span> <span class="code-attr">data</span>=<span class="code-string">{yourData}</span> <span class="code-tag">/&gt;</span></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-showcase">
+        <div class="example-header">
+          <span class="example-dot" />
+          <span class="example-dot" />
+          <span class="example-dot" />
+          <span class="example-title">{{ selectedFramework === 'vue' ? 'App.vue' : 'App.tsx' }}</span>
+        </div>
+        <div class="example-code">
+          <!-- Vue Example -->
+          <pre v-if="selectedFramework === 'vue'"><code><span class="code-tag">&lt;script setup lang="ts"&gt;</span>
+<span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-vue'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-vue/style.css'</span>
+
+<span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
+<span class="code-tag">&lt;/script&gt;</span>
+
+<span class="code-tag">&lt;template&gt;</span>
+  <span class="code-tag">&lt;DataGrid</span>
+    <span class="code-attr">:data</span>=<span class="code-string">"data"</span>
+    <span class="code-attr">:enable-search</span>=<span class="code-string">"true"</span>
+    <span class="code-attr">:enable-export</span>=<span class="code-string">"true"</span>
+    <span class="code-attr">:show-pivot</span>=<span class="code-string">"true"</span>
+    <span class="code-attr">theme</span>=<span class="code-string">"light"</span>
+  <span class="code-tag">/&gt;</span>
+<span class="code-tag">&lt;/template&gt;</span></code></pre>
+          <!-- React Example -->
+          <pre v-else><code><span class="code-keyword">import</span> { DataGrid } <span class="code-keyword">from</span> <span class="code-string">'@smallwebco/tinypivot-react'</span>
+<span class="code-keyword">import</span> <span class="code-string">'@smallwebco/tinypivot-react/style.css'</span>
+
+<span class="code-keyword">function</span> <span class="code-function">App</span>() {
+  <span class="code-keyword">const</span> data = [...]  <span class="code-comment">// Your data array</span>
+
+  <span class="code-keyword">return</span> (
+    <span class="code-tag">&lt;DataGrid</span>
+      <span class="code-attr">data</span>=<span class="code-string">{data}</span>
+      <span class="code-attr">enableSearch</span>=<span class="code-string">{true}</span>
+      <span class="code-attr">enableExport</span>=<span class="code-string">{true}</span>
+      <span class="code-attr">showPivot</span>=<span class="code-string">{true}</span>
+      <span class="code-attr">theme</span>=<span class="code-string">"light"</span>
+    <span class="code-tag">/&gt;</span>
+  )
+}
+
+<span class="code-keyword">export default</span> App</code></pre>
+        </div>
+      </div>
+
+      <div class="stackblitz-cta">
+        <a
+          v-if="selectedFramework === 'vue'"
+          href="https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-vue"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="stackblitz-link"
+        >
+          <img
+            src="https://developer.stackblitz.com/img/open_in_stackblitz.svg"
+            alt="Open Vue example in StackBlitz"
+            height="28"
+          >
+        </a>
+        <a
+          v-else
+          href="https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="stackblitz-link"
+        >
+          <img
+            src="https://developer.stackblitz.com/img/open_in_stackblitz.svg"
+            alt="Open React example in StackBlitz"
+            height="28"
+          >
+        </a>
+      </div>
+
+      <div class="api-preview">
+        <h3>Full control when you need it</h3>
+        <p>All features are toggled via simple props:</p>
+        <div class="props-table">
+          <div class="props-row props-header">
+            <span>Prop</span>
+            <span>Default</span>
+            <span>Description</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? ':enable-search' : 'enableSearch' }}</code>
+            <span>true</span>
+            <span>Global search across all columns</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? ':enable-export' : 'enableExport' }}</code>
+            <span>true</span>
+            <span>CSV export button in toolbar</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? ':enable-pagination' : 'enablePagination' }}</code>
+            <span>false</span>
+            <span>Paginate large datasets</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? ':page-size' : 'pageSize' }}</code>
+            <span>50</span>
+            <span>Rows per page</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? ':enable-column-resize' : 'enableColumnResize' }}</code>
+            <span>true</span>
+            <span>Drag column edges to resize</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? ':enable-clipboard' : 'enableClipboard' }}</code>
+            <span>true</span>
+            <span>Ctrl+C copies selected cells</span>
+          </div>
+          <div class="props-row">
+            <code>theme</code>
+            <span>"light"</span>
+            <span>"light" | "dark" | "auto"</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? ':show-pivot' : 'showPivot' }}</code>
+            <span>true</span>
+            <span>Show pivot table toggle</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? 'number-format' : 'numberFormat' }}</code>
+            <span>"us"</span>
+            <span>"us" | "eu" | "plain"</span>
+          </div>
+          <div class="props-row">
+            <code>{{ selectedFramework === 'vue' ? 'date-format' : 'dateFormat' }}</code>
+            <span>"iso"</span>
+            <span>"us" | "eu" | "iso"</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section id="demo" class="demo">
+      <div class="section-header">
+        <h2>Live Demo</h2>
+        <p>Try the grid, pivot table, and chart builder with 10,000 rows of sample data</p>
+      </div>
+
+      <!-- Client-only: DataGrid is gated behind isMounted to keep prerendered HTML lean.
+           Marketing copy above/below this section remains SSR-rendered. -->
+      <template v-if="isMounted">
+        <div class="demo-controls">
+          <div class="demo-format-controls">
+            <div class="demo-format-group">
+              <span class="demo-format-label">Numbers:</span>
+              <div class="demo-format-toggle">
+                <button
+                  class="demo-format-btn" :class="{ active: numberFormat === 'us' }"
+                  @click="numberFormat = 'us'"
+                >
+                  US (1,000.00)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: numberFormat === 'eu' }"
+                  @click="numberFormat = 'eu'"
+                >
+                  EU (1.000,00)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: numberFormat === 'plain' }"
+                  @click="numberFormat = 'plain'"
+                >
+                  Plain (1000)
+                </button>
+              </div>
+            </div>
+            <div class="demo-format-group">
+              <span class="demo-format-label">Dates:</span>
+              <div class="demo-format-toggle">
+                <button
+                  class="demo-format-btn" :class="{ active: dateFormat === 'iso' }"
+                  @click="dateFormat = 'iso'"
+                >
+                  ISO (2024-01-15)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: dateFormat === 'us' }"
+                  @click="dateFormat = 'us'"
+                >
+                  US (01/15/2024)
+                </button>
+                <button
+                  class="demo-format-btn" :class="{ active: dateFormat === 'eu' }"
+                  @click="dateFormat = 'eu'"
+                >
+                  EU (15/01/2024)
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="demo-theme-selector">
+            <label class="demo-theme-label" for="demo-theme-select">Theme</label>
+            <select
+              id="demo-theme-select"
+              v-model="demoTheme"
+              class="demo-theme-select"
+            >
+              <optgroup
+                v-for="group in themeOptions"
+                :key="group.group"
+                :label="group.group"
+              >
+                <option
+                  v-for="opt in group.options"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <div class="demo-container" :class="{ 'demo-light': !isDarkDemoTheme }">
+          <DataGrid
+            :data="sampleData"
+            :show-pivot="true"
+            font-size="sm"
+            :enable-export="true"
+            :enable-search="true"
+            :enable-pagination="true"
+            :page-size="1000"
+            :enable-column-resize="true"
+            :enable-clipboard="true"
+            :theme="demoTheme"
+            :striped-rows="true"
+            :number-format="numberFormat"
+            :date-format="dateFormat"
+            export-filename="tinypivot-demo.csv"
+            :ai-analyst="aiAnalystConfig"
+          />
+        </div>
+
+        <div class="demo-note demo-note-success">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span><strong>Try it now!</strong> All Pro features unlocked — click "AI" to ask questions in natural language, "Pivot" for pivot tables, or "Chart" to build visualizations! Same API for Vue and React.</span>
+        </div>
+      </template>
+      <div v-else class="demo-placeholder">
+        Loading live demo…
+      </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" class="pricing">
+      <div class="section-header">
+        <h2>Simple, Transparent Pricing</h2>
+        <p>Pick your product track — dedicated licenses for AI harnesses (MCP) and React/Vue web apps (UI Library).</p>
+      </div>
+
+      <div class="pricing-track-tabs" role="tablist" aria-label="Product pricing track">
+        <button
+          type="button"
+          class="pricing-track-btn"
+          :class="{ active: pricingTab === 'mcp' }"
+          @click="pricingTab = 'mcp'"
+        >
+          TinyPivot MCP (AI Harnesses)
+        </button>
+        <button
+          type="button"
+          class="pricing-track-btn"
+          :class="{ active: pricingTab === 'ui' }"
+          @click="pricingTab = 'ui'"
+        >
+          UI Library (React &amp; Vue Apps)
+        </button>
+      </div>
+
+      <!-- MCP Pricing Track -->
+      <div v-if="pricingTab === 'mcp'" class="mcp-home-pricing-grid">
+        <div class="pricing-card pricing-free">
+          <div class="pricing-header">
+            <h3>MCP Free</h3>
+            <div class="pricing-price">
+              <span class="price">$0</span>
+              <span class="period">forever</span>
+            </div>
+          </div>
+          <p class="plan-description">
+            Zero signup or API key. Runs 100% locally in your AI harness.
+          </p>
+          <ul class="pricing-features">
+            <li>Core Charts (bar, stackedBar, line, area, pie, donut)</li>
+            <li>Pivot Table (Sum) &amp; Data Grid</li>
+            <li>Code visual theme (Dark &amp; Light)</li>
+            <li>Live Terminal Companion Data IDE</li>
+            <li>Up to 2,500 rows (explicitly bannered if truncated)</li>
+          </ul>
+          <router-link to="/mcp#setup" class="btn btn-outline">
+            Run npx @smallwebco/tinypivot-mcp init
+          </router-link>
+        </div>
+
+        <div class="pricing-card pricing-pro">
+          <div class="pricing-popular">
+            Most Popular
+          </div>
+          <div class="pricing-header">
+            <h3>MCP Pro</h3>
+            <div class="pricing-price">
+              <span class="price">{{ mcpProPlan.price }}</span>
+              <span class="period">{{ mcpProPlan.period }}</span>
+            </div>
+          </div>
+
+          <div class="plan-selector">
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpProBilling === 'monthly' }"
+              @click="mcpProBilling = 'monthly'"
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpProBilling === 'yearly' }"
+              @click="mcpProBilling = 'yearly'"
+            >
+              Yearly (-35%)
+            </button>
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpProBilling === 'lifetime' }"
+              @click="mcpProBilling = 'lifetime'"
+            >
+              Lifetime
+            </button>
+          </div>
+          <p class="plan-description">
+            {{ mcpProPlan.sub }}
+          </p>
+
+          <ul class="pricing-features">
+            <li>Unlimited rows — never truncated</li>
+            <li>All 5 themes (Code, Phosphor, Nord, Thermal, Mono)</li>
+            <li>Double-click Drill-Through &amp; AI slice selection</li>
+            <li>All 9+ aggregations (median, stdDev, % of total)</li>
+            <li>Formatted .xlsx export + no watermark</li>
+            <li>Works with any database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>)</li>
+          </ul>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :class="{ 'btn-loading': isCheckingOut && activeCheckoutPlan === mcpProPlan.id }"
+            :disabled="isCheckingOut"
+            @click="startCheckoutPlan(mcpProPlan.id)"
+          >
+            <span v-if="isCheckingOut && activeCheckoutPlan === mcpProPlan.id">Processing...</span>
+            <span v-else>Get MCP Pro — {{ mcpProPlan.price }}</span>
+          </button>
+        </div>
+
+        <div class="pricing-card pricing-free">
+          <div class="pricing-header">
+            <h3>MCP Team (5 Seats)</h3>
+            <div class="pricing-price">
+              <span class="price">{{ mcpTeamPlan.price }}</span>
+              <span class="period">{{ mcpTeamPlan.period }}</span>
+            </div>
+          </div>
+
+          <div class="plan-selector">
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpTeamBilling === 'monthly' }"
+              @click="mcpTeamBilling = 'monthly'"
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpTeamBilling === 'yearly' }"
+              @click="mcpTeamBilling = 'yearly'"
+            >
+              Yearly (-26%)
+            </button>
+          </div>
+          <p class="plan-description">
+            {{ mcpTeamPlan.sub }}
+          </p>
+
+          <ul class="pricing-features">
+            <li>Everything in MCP Pro for up to 5 seats</li>
+            <li>Shared offline-verifiable team key (TP-MCPT)</li>
+            <li>Works with any database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) + direct Postgres connector (<code>query_postgres</code>) across harnesses</li>
+            <li>Priority email support &amp; Stripe tax invoices</li>
+          </ul>
+          <button
+            type="button"
+            class="btn btn-outline"
+            :disabled="isCheckingOut"
+            @click="startCheckoutPlan(mcpTeamPlan.id)"
+          >
+            <span v-if="isCheckingOut && activeCheckoutPlan === mcpTeamPlan.id">Processing...</span>
+            <span v-else>Get MCP Team — {{ mcpTeamPlan.price }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- UI Library Pricing Track -->
+      <div v-else class="pricing-cards">
+        <div class="pricing-card pricing-free">
+          <div class="pricing-header">
+            <h3>UI Library Free</h3>
+            <div class="pricing-price">
+              <span class="price">$0</span>
+              <span class="period">forever</span>
+            </div>
+          </div>
+          <ul class="pricing-features">
+            <li v-for="f in freeFeatures" :key="f">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+              {{ f }}
+            </li>
+          </ul>
+          <a href="https://github.com/Small-Web-Co/tinypivot" class="btn btn-outline" @click="trackFreeStart">
+            Get Started
+          </a>
+        </div>
+
+        <div class="pricing-card pricing-pro">
+          <div class="pricing-popular">
+            Perpetual UI License
+          </div>
+          <div class="pricing-header">
+            <h3>UI Library Pro</h3>
+            <div class="pricing-price">
+              <span class="price">${{ plans.find(p => p.id === selectedPlan)?.price }}</span>
+              <span class="period">one-time</span>
+            </div>
+          </div>
+
+          <div class="plan-selector">
+            <button
+              v-for="plan in plans"
+              :key="plan.id"
+              class="plan-btn"
+              :class="{ active: selectedPlan === plan.id }"
+              @click="selectedPlan = plan.id"
+            >
+              {{ plan.name }}
+            </button>
+          </div>
+          <p class="plan-description">
+            {{ plans.find(p => p.id === selectedPlan)?.description }}
+          </p>
+
+          <ul class="pricing-features">
+            <li v-for="f in [...freeFeatures, ...proFeatures]" :key="f">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+              {{ f }}
+            </li>
+          </ul>
+          <button
+            class="btn btn-primary"
+            :class="{ 'btn-loading': isCheckingOut }"
+            :disabled="isCheckingOut"
+            @click="buyNow"
+          >
+            <span v-if="isCheckingOut">Processing...</span>
+            <span v-else>Buy UI License - ${{ plans.find(p => p.id === selectedPlan)?.price }}</span>
+          </button>
+        </div>
+      </div>
+
+      <p class="pricing-scope-note">
+        Existing TinyPivot UI Library keys (<code>TP-PRO*</code>) remain valid forever for React &amp; Vue apps. TinyPivot MCP Pro uses dedicated <code>TP-MCP*</code> keys.
+      </p>
+    </section>
+
+    <!-- Testimonial Section -->
+    <section class="testimonial-section">
+      <div class="section-header">
+        <div class="badge">
+          Customer Feedback
+        </div>
+        <h2>Used by teams that need self-serve analytics</h2>
+        <p>See what teams are saying about TinyPivot.</p>
+      </div>
+
+      <div class="testimonial-grid">
+        <div class="testimonial-card">
+          <div class="testimonial-mark">
+            “
+          </div>
+          <blockquote class="testimonial-quote">
+            TinyPivot has been a great addition to our analytics platform, giving our customers intuitive, interactive data grid and pivot table capabilities without the overhead of building our own solution. Small Web Co has been incredibly responsive — actively listening to our use cases and shipping improvements quickly. It’s a high-quality, well-maintained library that delivers real value at a fraction of the cost of alternatives.
+          </blockquote>
+          <div class="testimonial-attribution">
+            <div class="testimonial-author">
+              Kevin Tetz
+            </div>
+            <div class="testimonial-role">
+              CIO
+            </div>
+            <a href="https://www.vesselscale.com" target="_blank" rel="noopener" class="testimonial-link">
+              vesselscale.com
+            </a>
+          </div>
+        </div>
+
+        <div class="testimonial-card">
+          <div class="testimonial-mark">
+            “
+          </div>
+          <blockquote class="testimonial-quote">
+            Thank you so much! We found Brice to be a highly skilled, meticulous, and helpful developer. We had the opportunity to use TinyPivot, which enabled our colleagues to generate and view analytics on orders, website traffic, and performance independently, without placing a strain on the company’s IT team. We even made modifications to the plugin to suit our specific needs.
+          </blockquote>
+          <div class="testimonial-attribution">
+            <div class="testimonial-author">
+              Atlantis Headwear
+            </div>
+            <div class="testimonial-role">
+              CS
+            </div>
+            <a href="https://www.atlantisheadwear.com" target="_blank" rel="noopener" class="testimonial-link">
+              atlantisheadwear.com
+            </a>
+          </div>
+        </div>
+
+        <div class="testimonial-card">
+          <div class="testimonial-mark">
+            “
+          </div>
+          <blockquote class="testimonial-quote">
+            Amazing plugin. I found it very easy to work with — it looks sleek and fits properly with Vuetify in terms of UI. We were looking into having better reporting on our system, and this plugin landed from heaven to aid the developers’ work. The fact that you can have pivot tables, graphs, and an export tool makes our managers’ life way easier when building reports.
+          </blockquote>
+          <div class="testimonial-attribution">
+            <div class="testimonial-author">
+              Matias Nombarasco
+            </div>
+            <div class="testimonial-role">
+              Ozone Gliders LTD
+            </div>
+            <a href="https://www.flyozone.com" target="_blank" rel="noopener" class="testimonial-link">
+              flyozone.com
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+      <h2>Ready to supercharge your {{ selectedFramework === 'vue' ? 'Vue' : 'React' }} app?</h2>
+      <p>Give your team a lightweight grid with built-in pivoting, then upgrade when you need richer analytics.</p>
+      <div class="cta-actions">
+        <code>pnpm add {{ packageName }}</code>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="logo">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>TinyPivot</span>
+          </div>
+          <p>Excel-like data grid & pivot table for Vue 3 and React</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h4>Product</h4>
+            <router-link to="/mcp">
+              TinyPivot MCP
+            </router-link>
+            <a href="#use-cases">Use Cases</a>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#demo">Demo</a>
+          </div>
+          <div class="footer-col">
+            <h4>Resources</h4>
+            <router-link to="/ag-grid-alternatives">
+              AG Grid Alternatives
+            </router-link>
+            <router-link to="/best-react-pivot-table-libraries">
+              React Pivot Guide
+            </router-link>
+            <router-link to="/best-vue-pivot-table-components">
+              Vue Pivot Guide
+            </router-link>
+            <a href="https://github.com/Small-Web-Co/tinypivot#readme" target="_blank">Documentation</a>
+            <a href="https://bvallieres.com/product/development/2026/03/23/tinypivot-free-pivot-tables-lifetime-license.html" target="_blank">Latest Update</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot/releases" target="_blank">Changelog</a>
+            <a href="https://github.com/Small-Web-Co/tinypivot/blob/master/LICENSE.md" target="_blank">License</a>
+          </div>
+          <div class="footer-col">
+            <h4>Connect</h4>
+            <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank">GitHub</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 TinyPivot. All rights reserved.</p>
+      </div>
+    </footer>
+  </div>
+</template>
+
+<style scoped>
+/* Landing Page Styles */
+.landing-page {
+  min-height: 100vh;
+}
+
+.mcp-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.22);
+}
+
+.hero-mode-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.hero-mode-btn {
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hero-mode-btn.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.copied-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #34d399;
+}
+
+/* MCP Highlight Reel Showcase */
+.mcp-reel-showcase {
+  padding: 2.5rem 2rem 4rem;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.mcp-reel-cta {
+  text-align: center;
+  margin-top: 1.25rem;
+}
+
+.mcp-reel-link {
+  color: #34d399;
+  text-decoration: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: color 0.15s;
+}
+
+.mcp-reel-link:hover {
+  color: #6ee7b7;
+  text-decoration: underline;
+}
+
+/* Use Cases Track Section */
+.use-cases {
+  padding: 5rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.use-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+}
+
+.use-case-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.use-case-featured {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.09), rgba(255, 255, 255, 0.03));
+  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.12);
+}
+
+.use-case-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.use-case-audience {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #10b981;
+}
+
+.use-case-card h3 {
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+  color: #f8fafc;
+}
+
+.use-case-card p {
+  color: #94a3b8;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin: 0 0 1rem;
+}
+
+.use-case-points {
+  margin: 0 0 1.5rem;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: #cbd5e1;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.use-case-points code {
+  color: #34d399;
+  font-size: 0.8125rem;
+}
+
+.use-case-cta {
+  width: 100%;
+  justify-content: center;
+}
+
+.pricing-track-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 auto 2.25rem;
+  padding: 0.35rem;
+  width: fit-content;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pricing-track-btn {
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pricing-track-btn.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+
+.mcp-home-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.pricing-scope-note {
+  text-align: center;
+  margin: 1.75rem auto 0;
+  max-width: 720px;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.pricing-scope-note code {
+  color: #34d399;
+}
+
+/* Framework Toggle */
+.framework-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  margin-bottom: 1.5rem;
+}
+
+.framework-badge-separator {
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.framework-badge-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #42b883 30%, #61dafb 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.code-function {
+  color: #61afef;
+}
+
+.code-comment {
+  color: #5c6370;
+  font-style: italic;
+}
+
+/* Navigation */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10, 10, 15, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.logo-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #10b981;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.nav-links a {
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-links a:hover {
+  color: white;
+}
+
+.nav-link-highlight {
+  color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.nav-link-highlight:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-framework-toggle {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-framework-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-framework-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-framework-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.nav-github {
+  display: flex;
+  align-items: center;
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rem 2rem 4rem;
+  overflow: hidden;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(79, 70, 229, 0.1), transparent);
+}
+
+.hero-content {
+  position: relative;
+  max-width: 800px;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #10b981, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 1.25rem;
+  color: #94a3b8;
+  margin-bottom: 2.5rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-subtitle strong {
+  color: #e2e8f0;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 3rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(16, 185, 129, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-loading {
+  position: relative;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-outline {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hero-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+}
+
+.hero-install code {
+  font-size: 0.875rem;
+  color: #10b981;
+}
+
+.hero-note {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.hero-note a {
+  color: #94a3b8;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.hero-note a:hover {
+  color: white;
+}
+
+.copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hero-comparison {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 2rem;
+  color: #10b981;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.hero-comparison:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+.comparison-badge {
+  background: #10b981;
+  color: #0f172a;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Sections */
+.section-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.section-header h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.section-header p {
+  font-size: 1.125rem;
+  color: #94a3b8;
+}
+
+/* Features */
+.features {
+  padding: 4rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.feature-card {
+  position: relative;
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  transition: all 0.3s;
+}
+
+.feature-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.feature-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.feature-icon-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.feature-icon-violet { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+.feature-icon-emerald { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.feature-icon-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.feature-icon-pink { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
+.feature-icon-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+.feature-icon-indigo { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
+.feature-icon-rose { background: rgba(244, 63, 94, 0.15); color: #f43f5e; }
+.feature-icon-gradient {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+  color: #a78bfa;
+}
+
+.feature-card-highlight {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08));
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.feature-card-highlight:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.12));
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.feature-card h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.375rem;
+}
+
+.feature-card p {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.feature-badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.feature-badge.free {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.feature-badge.pro {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+/* AI Data Analyst Section */
+.ai-analyst-section {
+  padding: 6rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.ai-analyst-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse 60% 40% at 50% 30%, rgba(139, 92, 246, 0.1), transparent);
+  pointer-events: none;
+}
+
+.badge-ai {
+  color: #a78bfa;
+}
+
+.ai-demo-container {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 3rem;
+  margin: 3rem 0;
+  align-items: center;
+}
+
+.ai-demo-gif {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.ai-demo-gif img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ai-demo-features {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ai-feature {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.ai-feature svg {
+  flex-shrink: 0;
+  color: #a78bfa;
+}
+
+.ai-feature h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.ai-feature p {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.ai-code-example {
+  margin: 3rem 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1e1e2e;
+}
+
+.ai-code-example .example-header {
+  background: #181825;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-code-example .example-code {
+  padding: 1.5rem;
+  overflow-x: auto;
+}
+
+.ai-code-example pre {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+.ai-cta {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.ai-cta .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-cta-note {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .ai-demo-container {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .ai-demo-gif {
+    order: -1;
+  }
+}
+
+/* Quick Start */
+.quickstart {
+  padding: 6rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.quickstart::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse 60% 40% at 50% 20%, rgba(16, 185, 129, 0.08), transparent);
+  pointer-events: none;
+}
+
+.steps-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 4rem;
+  flex-wrap: wrap;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 240px;
+}
+
+.step-number {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-radius: 50%;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+.step-content {
+  text-align: center;
+}
+
+.step-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.step-content p {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+}
+
+.step-connector {
+  display: flex;
+  align-items: center;
+  padding-top: 1rem;
+  color: #334155;
+}
+
+.step-connector svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.code-block {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+}
+
+.code-block code {
+  color: #10b981;
+}
+
+.code-block-multi {
+  text-align: left;
+}
+
+.code-block-multi pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.example-showcase {
+  max-width: 700px;
+  margin: 0 auto 4rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.example-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.example-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: #374151;
+}
+
+.example-dot:nth-child(1) { background: #ef4444; }
+.example-dot:nth-child(2) { background: #f59e0b; }
+.example-dot:nth-child(3) { background: #22c55e; }
+
+.example-title {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.example-code {
+  padding: 1.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.example-code pre {
+  margin: 0;
+}
+
+.example-code code {
+  color: #e2e8f0;
+}
+
+.code-keyword { color: #c678dd; }
+.code-string { color: #98c379; }
+.code-number { color: #d19a66; }
+.code-tag { color: #61afef; }
+.code-attr { color: #d19a66; }
+
+.stackblitz-cta {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0 2rem;
+}
+
+.stackblitz-link img {
+  display: block;
+  transition: opacity 0.2s;
+}
+
+.stackblitz-link:hover img {
+  opacity: 0.85;
+}
+
+.api-preview {
+  text-align: center;
+}
+
+.api-preview h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.api-preview > p {
+  color: #64748b;
+  margin-bottom: 1.5rem;
+}
+
+.props-table {
+  max-width: 700px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.props-row {
+  display: grid;
+  grid-template-columns: 200px 80px 1fr;
+  gap: 1rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.8125rem;
+  align-items: center;
+}
+
+.props-row:last-child {
+  border-bottom: none;
+}
+
+.props-row.props-header {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.props-row code {
+  color: #10b981;
+  font-size: 0.75rem;
+}
+
+.props-row span:nth-child(2) {
+  color: #64748b;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.props-row span:nth-child(3) {
+  color: #cbd5e1;
+}
+
+/* Demo */
+.demo {
+  padding: 6rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.demo-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.demo-format-controls {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.demo-format-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.demo-format-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.demo-format-toggle {
+  display: flex;
+  gap: 0.125rem;
+  padding: 0.125rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.demo-format-btn {
+  padding: 0.3rem 0.6rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.demo-format-btn:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.demo-format-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.demo-theme-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.demo-theme-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.demo-theme-select {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23e2e8f0'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1rem;
+}
+
+.demo-theme-select:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.demo-theme-select:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.demo-theme-select option,
+.demo-theme-select optgroup {
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.demo-container {
+  background: #1e293b;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.demo-container.demo-light {
+  background: white;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.demo-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #fbbf24;
+}
+
+.demo-note-success {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.demo-note-success strong {
+  color: #10b981;
+}
+
+.demo-placeholder {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+/* Pricing */
+.pricing {
+  padding: 4rem 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.pricing .section-header {
+  margin-bottom: 2rem;
+}
+
+.pricing-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.pricing-card {
+  position: relative;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+}
+
+.pricing-card.pricing-pro {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(16, 185, 129, 0.1));
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.pricing-popular {
+  position: absolute;
+  top: -0.625rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.25rem 0.75rem;
+  background: linear-gradient(135deg, #8b5cf6, #10b981);
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+}
+
+.pricing-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.pricing-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.pricing-price {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.pricing-price .price {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.pricing-price .period {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.plan-selector {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.1875rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 0.375rem;
+}
+
+.plan-btn {
+  flex: 1;
+  padding: 0.375rem 0.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  color: #94a3b8;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.plan-btn:hover {
+  color: white;
+}
+
+.plan-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.plan-description {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #a78bfa;
+  margin-bottom: 1rem;
+  min-height: 2rem;
+}
+
+.pricing-features {
+  list-style: none;
+  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 0.5rem;
+}
+
+.pricing-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0;
+  font-size: 0.75rem;
+  color: #cbd5e1;
+}
+
+.pricing-features svg {
+  color: #10b981;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+.pricing-card .btn {
+  width: 100%;
+  justify-content: center;
+  padding: 0.625rem 1rem;
+  font-size: 0.8125rem;
+}
+
+/* Testimonial */
+.testimonial-section {
+  padding: 4rem 2rem 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.testimonial-card {
+  position: relative;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(16, 185, 129, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  border-radius: 1rem;
+  box-shadow: 0 20px 50px -30px rgba(0, 0, 0, 0.6);
+}
+
+.testimonial-mark {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  font-size: 4rem;
+  line-height: 1;
+  color: rgba(16, 185, 129, 0.25);
+  font-weight: 700;
+}
+
+.testimonial-quote {
+  position: relative;
+  margin: 0;
+  padding-left: 1.5rem;
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: #e2e8f0;
+}
+
+.testimonial-attribution {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-left: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.testimonial-author {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.testimonial-role {
+  padding: 0.25rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.testimonial-link {
+  color: #34d399;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.testimonial-link:hover {
+  color: #6ee7b7;
+}
+
+/* CTA */
+.cta {
+  padding: 6rem 2rem;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(79, 70, 229, 0.1));
+}
+
+.cta h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.cta p {
+  font-size: 1.125rem;
+  color: #94a3b8;
+  margin-bottom: 2rem;
+}
+
+.cta-actions code {
+  display: inline-block;
+  padding: 1rem 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  color: #10b981;
+}
+
+/* Footer */
+.footer {
+  padding: 4rem 2rem 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 4rem;
+  margin-bottom: 3rem;
+}
+
+.footer-brand p {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.footer-col h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #e2e8f0;
+}
+
+.footer-col a {
+  display: block;
+  color: #64748b;
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding: 0.375rem 0;
+  transition: color 0.2s;
+}
+
+.footer-col a:hover {
+  color: white;
+}
+
+.footer-bottom {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.footer-bottom p {
+  color: #475569;
+  font-size: 0.875rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .steps-container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .step {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .step-connector {
+    transform: rotate(90deg);
+    padding: 0.5rem 0;
+  }
+
+  .example-code {
+    font-size: 0.75rem;
+    padding: 1rem;
+  }
+
+  .props-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pricing-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .testimonial-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .testimonial-card {
+    padding: 1.5rem;
+  }
+
+  .testimonial-quote,
+  .testimonial-attribution {
+    padding-left: 0;
+  }
+
+  .testimonial-mark {
+    position: static;
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 3rem;
+  }
+
+  .pricing-features {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .footer-links {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .props-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+
+  .props-row.props-header {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .props-table {
+    font-size: 0.75rem;
+  }
+
+  .nav-links {
+    display: none;
+  }
+}
+</style>

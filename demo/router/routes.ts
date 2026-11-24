@@ -83,24 +83,40 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot — Interactive Data IDE for AI Agents (MCP) & React/Vue Apps',
-      description: 'In-agent analytics MCP App for Antigravity, Claude, Cursor, OpenCode, and pi — plus lightweight React & Vue 3 data grids, pivot tables, charts, and BYOK AI Data Analyst.',
+      title: 'TinyPivot — Charts & pivot tables inside your AI agent, without the token bill',
+      description: 'MCP server that renders interactive charts, pivot tables and drill-through inside Claude, Cursor, Antigravity, OpenCode and pi. The model gets a ~200-token schema; rows stay local.',
+    },
+  },
+  {
+    path: '/ui',
+    name: 'ui',
+    component: () => import('../pages/Ui.vue'),
+    meta: {
+      legacy: true,
+      title: 'TinyPivot UI — React & Vue 3 Data Grid, Pivot Tables, Charts & AI Analyst',
+      description: 'Lightweight React and Vue 3 data grid with free pivot tables, charts, calculated fields and a BYOK AI Data Analyst. One-time licenses from $49.',
+    },
+  },
+  {
+    path: '/docs',
+    name: 'docs',
+    component: () => import('../pages/McpGuide.vue'),
+    meta: {
+      legacy: true,
+      title: 'TinyPivot MCP Docs — Setup, Tools & Token Savings Calculator',
+      description: 'Set up TinyPivot MCP in Claude, Cursor, Antigravity, OpenCode and pi. Tool reference and a prompt-cache-adjusted token savings calculator.',
     },
   },
   {
     path: '/mcp',
-    name: 'mcp',
-    component: () => import('../pages/McpGuide.vue'),
-    meta: {
-      title: 'TinyPivot MCP — In-Agent Analytics & Data IDE for AI Workflows',
-      description: 'Add interactive charts, pivot tables, drill-through, and Excel export directly inside Antigravity, Claude, Cursor, OpenCode, and pi — with transparent prompt-cache-adjusted token savings.',
-    },
+    redirect: (to: { hash: string }) => ({ path: '/docs', hash: to.hash }),
   },
   {
     path: '/vs-ag-grid',
     name: 'vs-ag-grid',
     component: () => import('../pages/VsAgGrid.vue'),
     meta: {
+      legacy: true,
       title: 'TinyPivot vs AG Grid - Lightweight Pivot Table Comparison',
       description: 'Compare TinyPivot and AG Grid for React and Vue. TinyPivot is a focused data grid with free pivot tables and lifetime Pro licensing.',
     },
@@ -111,6 +127,7 @@ export const routeDefinitions = [
     component: () => import('../pages/MarketingGuide.vue'),
     props: { slug: guide.slug },
     meta: {
+      legacy: true,
       title: guide.title,
       description: guide.description,
     },
