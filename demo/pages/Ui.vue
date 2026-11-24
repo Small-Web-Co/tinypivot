@@ -3,6 +3,7 @@ import type { Framework } from '../site/ui'
 import { DataGrid } from 'tinypivot'
 import { computed, ref } from 'vue'
 import CodeBlock from '../components/site/CodeBlock.vue'
+import RetroWindow from '../components/site/RetroWindow.vue'
 import SegmentedControl from '../components/site/SegmentedControl.vue'
 import { aiAnalystCode, analystPoints, features, frameworks, quickstartCode, testimonials } from '../site/ui'
 import { aiAnalystConfig, dateFormats, numberFormats, themeChoices, useLiveDemo } from '../site/useLiveDemo'
@@ -16,30 +17,34 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
 
 <template>
   <main>
-    <section class="ui-hero">
-      <div class="wrap ui-hero-grid">
-        <div class="ui-hero-copy">
-          <p class="label">
-            TinyPivot UI · React &amp; Vue 3
-          </p>
-          <h1 class="display">
-            The grid, pivots and charts, <em>inside your app.</em>
-          </h1>
-          <p class="lede">
-            The same engine as the MCP server, as a component. Excel-like grid, free pivot tables and charts,
-            and an optional AI analyst. One-time licenses, no per-seat pricing.
-          </p>
-        </div>
-        <div class="ui-hero-actions">
-          <SegmentedControl v-model="framework" :options="frameworks" label="Framework" />
-          <CodeBlock :code="quickstart.install" filename="terminal" />
-          <div class="ui-hero-links">
-            <a href="#demo" class="btn btn-solid">Try the live demo</a>
-            <router-link to="/pricing?product=ui" class="btn btn-ghost">
-              Licenses from $49
-            </router-link>
+    <section class="ui-hero desk">
+      <div class="wrap">
+        <RetroWindow title="tinypivot-ui — React &amp; Vue 3">
+          <div class="ui-hero-grid">
+            <div class="ui-hero-copy">
+              <p class="label">
+                TinyPivot UI · React &amp; Vue 3
+              </p>
+              <h1 class="display">
+                The grid, pivots and charts, <em>inside your app.</em>
+              </h1>
+              <p class="lede">
+                The same engine as the MCP server, as a component. Excel-like grid, free pivot tables and charts,
+                and an optional AI analyst. One-time licenses, no per-seat pricing.
+              </p>
+            </div>
+            <div class="ui-hero-actions">
+              <SegmentedControl v-model="framework" :options="frameworks" label="Framework" />
+              <CodeBlock :code="quickstart.install" filename="terminal" />
+              <div class="ui-hero-links">
+                <a href="#demo" class="btn btn-solid">Try the live demo</a>
+                <router-link to="/pricing?product=ui" class="btn btn-ghost">
+                  Licenses from $49
+                </router-link>
+              </div>
+            </div>
           </div>
-        </div>
+        </RetroWindow>
       </div>
     </section>
 
@@ -75,29 +80,31 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
           </label>
         </div>
 
-        <div class="demo-frame">
-          <DataGrid
-            v-if="isMounted"
-            :data="rows"
-            :show-pivot="true"
-            font-size="sm"
-            :enable-export="true"
-            :enable-search="true"
-            :enable-pagination="true"
-            :page-size="pageSize"
-            :enable-column-resize="true"
-            :enable-clipboard="true"
-            :theme="theme"
-            :striped-rows="true"
-            :number-format="numberFormat"
-            :date-format="dateFormat"
-            export-filename="tinypivot-demo.csv"
-            :ai-analyst="aiAnalystConfig"
-          />
-          <p v-else class="demo-loading mono">
-            Loading 10,000 rows…
-          </p>
-        </div>
+        <RetroWindow title="sales.csv — 10,000 rows" flush>
+          <div class="demo-frame">
+            <DataGrid
+              v-if="isMounted"
+              :data="rows"
+              :show-pivot="true"
+              font-size="sm"
+              :enable-export="true"
+              :enable-search="true"
+              :enable-pagination="true"
+              :page-size="pageSize"
+              :enable-column-resize="true"
+              :enable-clipboard="true"
+              :theme="theme"
+              :striped-rows="true"
+              :number-format="numberFormat"
+              :date-format="dateFormat"
+              export-filename="tinypivot-demo.csv"
+              :ai-analyst="aiAnalystConfig"
+            />
+            <p v-else class="demo-loading mono">
+              Loading 10,000 rows…
+            </p>
+          </div>
+        </RetroWindow>
       </div>
     </section>
 
@@ -132,7 +139,7 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
             Most of it is <em>free.</em>
           </h2>
         </header>
-        <ul class="feature-list">
+        <ul class="feature-list ledger">
           <li v-for="f in features" :key="f.name" class="feature">
             <span class="feature-name">{{ f.name }}</span>
             <span class="feature-desc">{{ f.desc }}</span>
@@ -203,7 +210,7 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
 
 <style scoped>
 .ui-hero {
-  padding: 32px 0 48px;
+  padding: 20px 0 32px;
 }
 
 .ui-hero-grid,
@@ -242,8 +249,7 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
 }
 
 .demo {
-  border-top: 1px solid var(--rule);
-  background: var(--paper-raised);
+  border-bottom: var(--line);
 }
 
 .demo-controls {
@@ -263,8 +269,7 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
   width: 100%;
   min-height: var(--tap);
   padding: 0 10px;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-mono);
@@ -277,10 +282,7 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
   min-height: 460px;
   max-height: 760px;
   overflow: hidden;
-  border: 1px solid var(--win-rule);
-  border-radius: var(--radius);
   background: var(--win);
-  box-shadow: 0 30px 60px -40px rgb(27 26 23 / 0.6);
 }
 
 .demo-loading {
@@ -291,24 +293,23 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
   font-size: 0.85rem;
 }
 
-.features,
 .quotes,
 .closing {
-  border-top: 1px solid var(--rule);
+  border-top: var(--line);
 }
 
 .feature-list {
   display: grid;
   list-style: none;
-  border-top: 1px solid var(--ink);
+  border-top: var(--line);
 }
 
 .feature {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 2px 16px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--rule-strong);
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--rule);
 }
 
 .feature-name {
@@ -331,13 +332,13 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
 }
 
 .feature-tier.free {
-  color: var(--accent);
+  color: var(--plus);
+  font-weight: 700;
 }
 
 .feature-tier.pro {
   padding: 3px 8px;
-  border: 1px solid var(--ink);
-  border-radius: 3px;
+  border: var(--line);
 }
 
 .points {
@@ -369,15 +370,13 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
   gap: 14px;
   margin: 0;
   padding: 22px;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--paper);
 }
 
 .quote blockquote {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  line-height: 1.35;
+  font-size: 1.05rem;
+  line-height: 1.5;
 }
 
 .quote figcaption {
@@ -401,7 +400,7 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
 
 @media (min-width: 768px) {
   .ui-hero {
-    padding: 72px 0 96px;
+    padding: 48px 0 64px;
   }
 
   .feature-list {

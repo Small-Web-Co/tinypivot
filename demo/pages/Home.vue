@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import McpHighlightReel from '../components/McpHighlightReel.vue'
 import InstallBox from '../components/site/InstallBox.vue'
+import RetroWindow from '../components/site/RetroWindow.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
 
 const facts = ['free', 'runs locally', 'no signup', 'no API key']
@@ -26,28 +27,32 @@ const capabilities = [
 
 <template>
   <main>
-    <section class="hero">
-      <div class="wrap hero-grid">
-        <div class="hero-copy">
-          <p class="label">
-            MCP server for AI coding agents
-          </p>
-          <h1 class="display">
-            Your agent reads the <em>summary.</em> You read the data.
-          </h1>
-          <p class="lede">
-            TinyPivot renders charts and pivot tables inside Claude, Cursor, Antigravity, OpenCode and pi.
-            The model sees a ~200-token schema. The rows never touch its context.
-          </p>
-        </div>
-        <div id="install" class="hero-install">
-          <InstallBox source="hero" />
-          <ul class="facts" aria-label="Free tier">
-            <li v-for="fact in facts" :key="fact">
-              {{ fact }}
-            </li>
-          </ul>
-        </div>
+    <section class="hero desk">
+      <div class="wrap">
+        <RetroWindow title="README — tinypivot">
+          <div class="hero-grid">
+            <div class="hero-copy">
+              <p class="label">
+                MCP server for AI coding agents
+              </p>
+              <h1 class="display">
+                Your agent reads the <em>summary.</em> You read the data.
+              </h1>
+              <p class="lede">
+                TinyPivot renders charts and pivot tables inside Claude, Cursor, Antigravity, OpenCode and pi.
+                The model sees a ~200-token schema. The rows never touch its context.
+              </p>
+            </div>
+            <div id="install" class="hero-install">
+              <InstallBox source="hero" />
+              <ul class="facts" aria-label="Free tier">
+                <li v-for="fact in facts" :key="fact">
+                  {{ fact }}
+                </li>
+              </ul>
+            </div>
+          </div>
+        </RetroWindow>
       </div>
     </section>
 
@@ -61,7 +66,9 @@ const capabilities = [
             Charts, pivots and drill-through <em>where the conversation already is.</em>
           </h2>
         </header>
-        <McpHighlightReel />
+        <RetroWindow title="tinypivot — highlight reel" flush>
+          <McpHighlightReel />
+        </RetroWindow>
       </div>
     </section>
 
@@ -110,12 +117,16 @@ const capabilities = [
       </div>
     </section>
 
-    <section class="block closing" aria-labelledby="closing-title">
+    <section class="block closing desk" aria-labelledby="closing-title">
       <div class="wrap closing-grid">
-        <h2 id="closing-title" class="heading">
-          Install once. <em>Every harness gets it.</em>
-        </h2>
-        <InstallBox source="closing" />
+        <RetroWindow title="install.sh">
+          <div class="closing-stack">
+            <h2 id="closing-title" class="heading">
+              Install once. <em>Every harness gets it.</em>
+            </h2>
+            <InstallBox source="closing" />
+          </div>
+        </RetroWindow>
         <router-link to="/ui" class="app-link">
           <span class="label">Building an app?</span>
           <span class="app-link-title">TinyPivot UI: the same grid, pivots and charts for React &amp; Vue 3 →</span>
@@ -127,7 +138,13 @@ const capabilities = [
 
 <style scoped>
 .hero {
-  padding: 32px 0 48px;
+  padding: 20px 0 32px;
+}
+
+/* Inside a window the install box sits flat; the window carries the shadow. */
+.hero :deep(.install),
+.closing :deep(.install) {
+  box-shadow: none;
 }
 
 .hero-grid {
@@ -168,13 +185,9 @@ const capabilities = [
   margin-bottom: 32px;
 }
 
-.reel {
-  border-top: 1px solid var(--rule);
-}
-
 .savings {
-  border-top: 1px solid var(--rule);
-  background: var(--paper-raised);
+  border-top: var(--line);
+  border-bottom: var(--line);
 }
 
 .savings-grid {
@@ -199,7 +212,7 @@ const capabilities = [
 .caps {
   display: grid;
   list-style: none;
-  border-top: 1px solid var(--ink);
+  border-top: var(--line);
 }
 
 .cap {
@@ -207,7 +220,7 @@ const capabilities = [
   grid-template-columns: 2.5rem 1fr;
   gap: 4px 12px;
   padding: 22px 0;
-  border-bottom: 1px solid var(--rule-strong);
+  border-bottom: var(--line);
 }
 
 .cap-n {
@@ -219,7 +232,7 @@ const capabilities = [
 
 .cap-title {
   font-family: var(--font-display);
-  font-size: 1.7rem;
+  font-size: 2.3rem;
   font-weight: 400;
   line-height: 1.1;
 }
@@ -229,29 +242,36 @@ const capabilities = [
 }
 
 .closing {
-  border-top: 1px solid var(--rule);
+  margin-top: 8px;
+  border-top: var(--line);
+  border-bottom: 0;
 }
 
 .closing-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 28px;
-  max-width: 760px;
+  max-width: 800px;
+}
+
+.closing-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
 }
 
 .app-link {
   display: grid;
   gap: 6px;
   padding: 20px;
-  border: 1px dashed var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
-  transition: border-color 0.15s, background-color 0.15s;
 }
 
 .app-link:hover {
-  border-color: var(--ink);
-  background: var(--paper-raised);
+  background: var(--ledger);
 }
 
 .app-link-title {
@@ -260,7 +280,7 @@ const capabilities = [
 
 @media (min-width: 768px) {
   .hero {
-    padding: 72px 0 96px;
+    padding: 48px 0 64px;
   }
 
   .hero .lede {
@@ -278,7 +298,7 @@ const capabilities = [
     align-content: start;
     gap: 10px;
     padding: 24px 0 0;
-    border-top: 1px solid var(--ink);
+    border-top: var(--line);
     border-bottom: 0;
   }
 
@@ -290,7 +310,7 @@ const capabilities = [
 
 @media (min-width: 1024px) {
   .hero-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     align-items: end;
     gap: 56px;
   }

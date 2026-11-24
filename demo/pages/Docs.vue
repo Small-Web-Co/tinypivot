@@ -94,7 +94,7 @@ const { copiedKey, copy } = useCopy()
           <h2 class="heading">
             Tools
           </h2>
-          <dl class="tools">
+          <dl class="tools ledger">
             <div v-for="tool in tools" :key="tool.name" class="tool">
               <dt>
                 <code class="tool-name">{{ tool.name }}</code>
@@ -157,8 +157,8 @@ const { copiedKey, copy } = useCopy()
   padding: 10px var(--gutter);
   overflow-x: auto;
   scrollbar-width: none;
-  background: rgb(242 238 231 / 0.94);
-  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  border-bottom: var(--line);
 }
 
 .docs-toc::-webkit-scrollbar {
@@ -175,8 +175,8 @@ const { copiedKey, copy } = useCopy()
   align-items: center;
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 999px;
+  border: var(--line);
+  background: var(--paper);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   text-decoration: none;
@@ -227,11 +227,11 @@ const { copiedKey, copy } = useCopy()
 }
 
 .accordion {
-  border-top: 1px solid var(--ink);
+  border-top: var(--line);
 }
 
 .acc {
-  border-bottom: 1px solid var(--rule-strong);
+  border-bottom: var(--line);
 }
 
 .acc-sum {
@@ -282,8 +282,7 @@ const { copiedKey, copy } = useCopy()
   gap: 16px;
   width: 100%;
   padding: 14px 16px;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--paper-raised);
   color: var(--ink);
   font: inherit;
@@ -302,14 +301,14 @@ const { copiedKey, copy } = useCopy()
 
 .tools {
   display: grid;
-  border-top: 1px solid var(--ink);
+  border-top: var(--line);
 }
 
 .tool {
   display: grid;
   gap: 6px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--rule-strong);
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--rule);
 }
 
 .tool dt {
@@ -362,7 +361,6 @@ const { copiedKey, copy } = useCopy()
     min-height: 32px;
     padding: 0;
     border: 0;
-    border-radius: 0;
   }
 
   .docs-body {

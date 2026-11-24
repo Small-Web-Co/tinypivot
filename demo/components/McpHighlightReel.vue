@@ -1181,10 +1181,7 @@ function selectDb(id: DbId) {
 <style scoped>
 .reel-shell {
   width: 100%;
-  border-radius: var(--radius, 6px);
-  background: var(--win, #0f1013);
-  border: 1px solid var(--win-rule, #2a2d34);
-  box-shadow: 0 40px 80px -48px rgba(27, 26, 23, 0.75);
+  background: #0b0b0f;
   overflow: hidden;
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #e2e8f0;

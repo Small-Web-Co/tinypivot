@@ -63,9 +63,8 @@ const columns = [
 
 <style scoped>
 .footer {
-  margin-top: 48px;
-  border-top: 1px solid var(--rule-strong);
-  background: var(--paper-raised);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .footer-grid {
@@ -91,7 +90,7 @@ const columns = [
 .footer-brand p {
   max-width: 22em;
   margin-top: 10px;
-  color: var(--ink-muted);
+  color: var(--win-muted);
   font-size: 1rem;
 }
 
@@ -103,6 +102,7 @@ const columns = [
 
 .footer-col .label {
   margin-bottom: 6px;
+  color: var(--win-accent);
 }
 
 .footer-col a {
@@ -111,11 +111,11 @@ const columns = [
   min-height: 36px;
   font-size: 0.98rem;
   text-decoration: none;
-  color: var(--ink-muted);
+  color: var(--win-ink);
 }
 
 .footer-col a:hover {
-  color: var(--ink);
+  color: var(--win-accent);
 }
 
 .footer-base {
@@ -125,10 +125,10 @@ const columns = [
   gap: 8px;
   padding-top: 18px;
   padding-bottom: 28px;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--win-rule);
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--ink-faint);
+  color: var(--win-muted);
 }
 
 @media (min-width: 768px) {

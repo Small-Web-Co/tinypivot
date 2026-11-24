@@ -51,11 +51,11 @@ async function copyActive() {
 
 <style scoped>
 .install {
+  container: install / inline-size;
   min-width: 0;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--paper-raised);
-  box-shadow: 0 1px 0 var(--rule), 0 18px 40px -28px rgb(27 26 23 / 0.45);
+  border: var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow);
   text-align: left;
 }
 
@@ -63,7 +63,7 @@ async function copyActive() {
   display: flex;
   overflow-x: auto;
   scrollbar-width: none;
-  border-bottom: 1px solid var(--rule-strong);
+  border-bottom: var(--line);
   -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
   mask-image: linear-gradient(to right, #000 85%, transparent);
 }
@@ -77,9 +77,9 @@ async function copyActive() {
   min-height: var(--tap);
   padding: 0 16px;
   border: 0;
-  border-right: 1px solid var(--rule);
+  border-right: var(--line);
   background: transparent;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 500;
@@ -94,9 +94,8 @@ async function copyActive() {
 }
 
 .install-tab[aria-selected='true'] {
-  color: var(--ink);
-  background: var(--paper);
-  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--paper);
+  background: var(--ink);
 }
 
 .install-body {
@@ -133,10 +132,11 @@ async function copyActive() {
   padding: 0 16px 14px;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
-@media (min-width: 640px) {
+/* Layout follows the box's own width, not the screen's: it sits in narrow columns on desktop too. */
+@container install (min-width: 380px) {
   .install-tabs {
     -webkit-mask-image: none;
     mask-image: none;
@@ -144,7 +144,7 @@ async function copyActive() {
 
   .install-tab {
     flex: 1 1 auto;
-    padding: 0 12px;
+    padding: 0 10px;
     letter-spacing: 0.06em;
   }
 
@@ -152,14 +152,16 @@ async function copyActive() {
     border-right: 0;
   }
 
+  .install-cmd {
+    font-size: 0.88rem;
+  }
+}
+
+@container install (min-width: 540px) {
   .install-body {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     padding: 20px;
-  }
-
-  .install-cmd {
-    font-size: 0.88rem;
   }
 
   .install-copy {

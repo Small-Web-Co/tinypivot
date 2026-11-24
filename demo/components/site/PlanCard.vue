@@ -76,8 +76,7 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
   gap: 14px;
   min-width: 0;
   padding: 24px 20px;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--paper);
 }
 
@@ -95,9 +94,9 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
 
 .plan-name {
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: 2.6rem;
   font-weight: 400;
-  line-height: 1;
+  line-height: 0.9;
 }
 
 .plan-flag {
@@ -136,16 +135,20 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
   flex: 1;
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 0;
   padding-top: 14px;
-  border-top: 1px solid var(--rule);
+  border-top: var(--line);
   list-style: none;
   font-size: 1rem;
 }
 
 .plan-features li:not(.plan-lead) {
-  padding-left: 22px;
+  padding: 5px 8px 5px 30px;
   text-indent: -22px;
+}
+
+.plan-features li:not(.plan-lead):nth-child(odd) {
+  background: var(--ledger);
 }
 
 .plan-features li:not(.plan-lead)::before {
@@ -158,6 +161,7 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
 }
 
 .plan-lead {
+  padding-bottom: 8px;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.08em;

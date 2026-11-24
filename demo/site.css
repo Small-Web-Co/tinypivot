@@ -1,33 +1,42 @@
 /**
- * tiny-pivot.com site system — paper page, dark product windows.
+ * tiny-pivot.com site system — "1-bit workstation".
+ * Cream paper, black ink, one orange accent, hard shadows, dithered fills,
+ * pixel display type. Green ledger stripes mark the places where data lives.
  * Mobile-first: base rules target ~375px, min-width queries scale up.
  */
 
 :root {
-  --paper: #f2eee7;
-  --paper-raised: #e9e4da;
-  --paper-sunk: #e2dccf;
-  --rule: #d8d1c4;
-  --rule-strong: #bfb6a6;
-  --ink: #1b1a17;
-  --ink-muted: #5e5a53;
-  --ink-faint: #8a847a;
-  --accent: #1f7a55;
-  --accent-ink: #f2eee7;
-  --minus: #a23b2a;
+  --paper: #ece7dc;
+  --paper-raised: #e3ddcf;
+  --paper-sunk: #d9d3c5;
+  --ink: #111111;
+  --ink-muted: #4a463f;
+  --ink-faint: #7d776c;
+  --rule: #c9c2b3;
+  --accent: #e8502a;
+  --ledger: #dcebd9;
+  --plus: #0f7a4f;
+  --minus: #b3261e;
 
-  --win: #0f1013;
-  --win-raised: #17191e;
-  --win-rule: #2a2d34;
-  --win-ink: #e6e3dc;
-  --win-muted: #8b8f98;
-  --win-accent: #34d399;
+  --win: #111111;
+  --win-raised: #1e1e1e;
+  --win-rule: #3a3a3a;
+  --win-ink: #ece7dc;
+  --win-muted: #9a958a;
+  --win-accent: #ff7a4d;
 
-  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-display: 'Jersey 25', 'JetBrains Mono', ui-monospace, monospace;
   --font-body: 'Newsreader', 'Iowan Old Style', Georgia, serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --radius: 6px;
+  --line: 2px solid var(--ink);
+  --shadow: 6px 6px 0 var(--ink);
+  --shadow-sm: 3px 3px 0 var(--ink);
+  /* 4px checkerboard: the 1-bit "50% grey". */
+  --dither: repeating-conic-gradient(var(--paper-sunk) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+  --dither-ink: repeating-conic-gradient(var(--ink) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+
+  --radius: 0px;
   --gutter: 20px;
   --measure: 1080px;
   --tap: 44px;
@@ -49,11 +58,7 @@ body {
   font-size: 18px;
   line-height: 1.55;
   color: var(--ink);
-  background-color: var(--paper);
-  background-image:
-    linear-gradient(to right, rgb(27 26 23 / 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(27 26 23 / 0.035) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background: var(--paper);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -96,6 +101,12 @@ kbd {
   padding: 56px 0;
 }
 
+/* A dithered "desktop" band. Put content in windows on top of it, never bare text. */
+.desk {
+  background: var(--dither), var(--paper);
+  border-bottom: var(--line);
+}
+
 @media (min-width: 768px) {
   .block {
     padding: 96px 0;
@@ -104,25 +115,36 @@ kbd {
 
 /* ---------- type primitives ---------- */
 
-.display {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(2.5rem, 9vw, 4.75rem);
-  line-height: 1.02;
-  letter-spacing: -0.01em;
-}
-
-.display em,
-.heading em {
-  font-style: italic;
-  color: var(--accent);
-}
-
+.display,
 .heading {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: clamp(2rem, 6vw, 3rem);
-  line-height: 1.08;
+  letter-spacing: 0.005em;
+}
+
+.display {
+  font-size: clamp(2.9rem, 11vw, 4.5rem);
+  line-height: 0.95;
+}
+
+.heading {
+  font-size: clamp(2.3rem, 7vw, 3.4rem);
+  line-height: 1;
+}
+
+/* Emphasis is an inverted block in headlines, accent ink in section headings. */
+.display em {
+  padding: 0 0.12em;
+  background: var(--ink);
+  color: var(--paper);
+  font-style: normal;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.heading em {
+  color: var(--accent);
+  font-style: normal;
 }
 
 .lede {
@@ -137,7 +159,7 @@ kbd {
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--accent);
 }
 
 .mono {
@@ -153,39 +175,47 @@ kbd {
   gap: 8px;
   min-height: var(--tap);
   padding: 0 18px;
-  border: 1px solid var(--ink);
-  border-radius: var(--radius);
+  border: var(--line);
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s, transform 0.15s;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.08s, box-shadow 0.08s, background-color 0.12s;
 }
 
 .btn-solid {
   background: var(--ink);
   color: var(--paper);
+  box-shadow: 3px 3px 0 var(--accent);
 }
 
 .btn-solid:hover {
   background: var(--accent);
-  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-ghost {
-  background: transparent;
+  background: var(--paper);
   color: var(--ink);
 }
 
 .btn-ghost:hover {
-  background: var(--paper-raised);
+  background: var(--ledger);
 }
 
 .btn:active {
-  transform: translateY(1px);
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+
+/* ---------- ledger stripes: for rows of data ---------- */
+
+.ledger > :nth-child(odd) {
+  background: var(--ledger);
 }
 
 /* ---------- long-form pages (comparisons, guides) ---------- */
@@ -201,19 +231,22 @@ kbd {
   padding: 36px var(--gutter);
 }
 
-.article h1 {
+.article h1,
+.article h2 {
   font-family: var(--font-display);
-  font-size: clamp(2.4rem, 8vw, 4rem);
   font-weight: 400;
-  line-height: 1.04;
+  letter-spacing: 0.005em;
+}
+
+.article h1 {
+  font-size: clamp(2.8rem, 10vw, 4.6rem);
+  line-height: 0.96;
 }
 
 .article h2 {
   margin-bottom: 14px;
-  font-family: var(--font-display);
-  font-size: clamp(1.8rem, 5vw, 2.4rem);
-  font-weight: 400;
-  line-height: 1.1;
+  font-size: clamp(2.1rem, 6vw, 2.8rem);
+  line-height: 1;
 }
 
 .article h3 {
@@ -243,7 +276,6 @@ kbd {
 
 .article :not(pre) > code {
   padding: 1px 5px;
-  border-radius: 3px;
   background: var(--paper-sunk);
   font-size: 0.85em;
 }
@@ -251,7 +283,6 @@ kbd {
 .article pre {
   overflow-x: auto;
   padding: 16px;
-  border-radius: 0 0 var(--radius) var(--radius);
   background: var(--win);
   color: var(--win-ink);
   font-size: 0.8rem;
@@ -275,9 +306,9 @@ kbd {
 .article th {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink-faint);
-  border-bottom-color: var(--ink);
+  color: var(--ink);
+  border-bottom: var(--line);
 }

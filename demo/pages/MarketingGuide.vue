@@ -637,7 +637,6 @@ const guide = computed(() => guides[props.slug] ?? guides['ag-grid-alternatives'
   display: block;
   overflow-x: auto;
   padding: 12px 14px;
-  border-radius: var(--radius);
   background: var(--win);
   color: var(--win-ink);
   font-size: 0.8rem;
@@ -649,7 +648,7 @@ aside {
   align-content: start;
   gap: 2px;
   padding-top: 20px;
-  border-top: 1px solid var(--ink);
+  border-top: var(--line);
 }
 
 aside h2 {

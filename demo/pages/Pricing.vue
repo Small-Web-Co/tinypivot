@@ -84,7 +84,6 @@ const { pendingPlan, error, startCheckout } = useCheckout()
   margin-bottom: 20px;
   padding: 12px 16px;
   border: 1px solid var(--minus);
-  border-radius: var(--radius);
   color: var(--minus);
   font-family: var(--font-mono);
   font-size: 0.8rem;

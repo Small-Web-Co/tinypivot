@@ -365,20 +365,20 @@ const data = [/* your data */]
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--ink);
+  border-top: var(--line);
 }
 
 .stat-card {
   display: grid;
   gap: 2px;
   padding: 18px 12px 18px 0;
-  border-bottom: 1px solid var(--rule-strong);
+  border-bottom: var(--line);
 }
 
 .stat-value {
   font-family: var(--font-display);
-  font-size: 2rem;
-  line-height: 1.1;
+  font-size: 2.8rem;
+  line-height: 0.95;
 }
 
 .stat-card.highlight .stat-value {
@@ -400,8 +400,7 @@ const data = [/* your data */]
 
 .table-wrapper {
   overflow-x: auto;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--paper);
 }
 
@@ -435,7 +434,7 @@ const data = [/* your data */]
 }
 
 .highlight-col {
-  background: rgb(31 122 85 / 0.06);
+  background: var(--ledger);
 }
 
 th.highlight-col {
@@ -456,8 +455,7 @@ th.highlight-col {
 
 .choice-card {
   padding: 22px;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--paper);
 }
 
@@ -473,8 +471,7 @@ th.highlight-col {
 .code-block {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--win-rule);
-  border-radius: var(--radius);
+  border: var(--line);
 }
 
 .code-header {
@@ -491,8 +488,7 @@ th.highlight-col {
   gap: 14px;
   justify-items: start;
   padding: 28px;
-  border: 1px dashed var(--rule-strong);
-  border-radius: var(--radius);
+  border: 2px dashed var(--ink);
 }
 
 .cta-buttons {

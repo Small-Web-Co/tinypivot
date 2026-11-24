@@ -25,7 +25,7 @@ export const installOptions: InstallOption[] = [
   },
   {
     id: 'plugin',
-    label: 'Claude plugin',
+    label: 'Plugin',
     lines: ['/plugin marketplace add Small-Web-Co/tinypivot', '/plugin install tinypivot@tinypivot'],
     note: 'Run inside Claude Code. Bundles the MCP server and a skill.',
   },

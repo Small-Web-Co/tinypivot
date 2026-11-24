@@ -26,10 +26,8 @@ const model = defineModel<T>({ required: true })
 <style scoped>
 .seg {
   display: flex;
-  padding: 3px;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--paper-sunk);
+  border: var(--line);
+  background: var(--paper);
 }
 
 .seg-btn {
@@ -38,7 +36,6 @@ const model = defineModel<T>({ required: true })
   min-height: 38px;
   padding: 0 10px;
   border: 0;
-  border-radius: 4px;
   background: transparent;
   color: var(--ink-muted);
   font-family: var(--font-mono);
@@ -55,8 +52,7 @@ const model = defineModel<T>({ required: true })
 }
 
 .seg-btn[aria-checked='true'] {
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgb(27 26 23 / 0.15);
+  background: var(--ink);
+  color: var(--paper);
 }
 </style>

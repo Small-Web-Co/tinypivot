@@ -108,8 +108,7 @@ const proMarkerPct = computed(() => {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--paper);
 }
 
@@ -117,7 +116,7 @@ const proMarkerPct = computed(() => {
   display: grid;
   gap: 18px;
   padding: 20px;
-  border-bottom: 1px solid var(--rule-strong);
+  border-bottom: var(--line);
 }
 
 .calc-field {
@@ -218,14 +217,12 @@ input[type='range'] {
   position: relative;
   grid-column: 1 / -1;
   height: 8px;
-  border-radius: 2px;
   background: var(--win-raised);
 }
 
 .calc-bar {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 2px;
   background: var(--win-accent);
   transition: width 0.25s;
 }
@@ -244,7 +241,7 @@ input[type='range'] {
   }
 
   .calc-inputs {
-    border-right: 1px solid var(--rule-strong);
+    border-right: var(--line);
     border-bottom: 0;
   }
 

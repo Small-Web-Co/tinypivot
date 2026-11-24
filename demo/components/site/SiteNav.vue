@@ -65,10 +65,8 @@ watch(() => route.fullPath, () => {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgb(242 238 231 / 0.88);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  border-bottom: var(--line);
 }
 
 .nav-bar {
@@ -120,6 +118,7 @@ watch(() => route.fullPath, () => {
   min-height: 36px;
   padding: 0 14px;
   font-size: 0.72rem;
+  box-shadow: none;
 }
 
 .nav-toggle {
@@ -153,7 +152,7 @@ watch(() => route.fullPath, () => {
 .nav-menu {
   display: grid;
   padding: 4px var(--gutter) 12px;
-  border-top: 1px solid var(--rule);
+  border-top: var(--line);
 }
 
 .nav-menu-link {

@@ -26,8 +26,7 @@ const { copiedKey, copy } = useCopy()
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--win-rule);
-  border-radius: var(--radius);
+  border: var(--line);
   background: var(--win);
   color: var(--win-ink);
 }
