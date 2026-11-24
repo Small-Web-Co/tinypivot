@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 interface GuideSection {
@@ -508,170 +508,193 @@ const guides: Record<string, Guide> = {
 }
 
 const guide = computed(() => guides[props.slug] ?? guides['ag-grid-alternatives'])
-
-function updateMetadata() {
-  document.title = `${guide.value.title} | TinyPivot`
-
-  const description = document.querySelector('meta[name="description"]')
-  description?.setAttribute('content', guide.value.description)
-
-  let canonical = document.querySelector('link[rel="canonical"]')
-  if (!canonical) {
-    canonical = document.createElement('link')
-    canonical.setAttribute('rel', 'canonical')
-    document.head.appendChild(canonical)
-  }
-  canonical.setAttribute('href', `https://tiny-pivot.com/${props.slug}`)
-}
-
-onMounted(updateMetadata)
-watch(() => props.slug, updateMetadata)
 </script>
 
 <template>
-  <div class="guide-page">
-    <nav class="nav">
-      <div class="nav-content">
-        <RouterLink to="/" class="logo">
-          <span class="logo-mark">▦</span>
-          <span>TinyPivot</span>
-        </RouterLink>
-        <div class="nav-links">
-          <RouterLink to="/#demo">
-            Live Demo
-          </RouterLink>
-          <RouterLink to="/vs-ag-grid">
-            vs AG Grid
-          </RouterLink>
-          <RouterLink to="/#pricing">
-            Pricing
-          </RouterLink>
-        </div>
+  <main class="article guide-page">
+    <section class="hero">
+      <div class="eyebrow">
+        {{ guide.eyebrow }}
       </div>
-    </nav>
-
-    <main>
-      <section class="hero">
-        <div class="eyebrow">
-          {{ guide.eyebrow }}
-        </div>
-        <h1>{{ guide.title }}</h1>
-        <p>{{ guide.intro }}</p>
-        <div class="hero-actions">
-          <RouterLink to="/#demo" class="btn btn-primary">
-            Try the Live Demo
-          </RouterLink>
-          <RouterLink to="/#pricing" class="btn btn-secondary">
-            See Lifetime Pricing
-          </RouterLink>
-        </div>
-      </section>
-
-      <section class="guide-content">
-        <article>
-          <section v-for="section in guide.sections" :key="section.title" class="content-section">
-            <h2>{{ section.title }}</h2>
-            <p v-for="paragraph in section.paragraphs" :key="paragraph">
-              {{ paragraph }}
-            </p>
-            <ul v-if="section.bullets">
-              <li v-for="bullet in section.bullets" :key="bullet">
-                {{ bullet }}
-              </li>
-            </ul>
-          </section>
-
-          <section class="install-section">
-            <h2>Try TinyPivot in your framework</h2>
-            <p>Both packages expose the same product behavior and include TypeScript support.</p>
-            <div class="install-grid">
-              <div>
-                <h3>React</h3>
-                <code>pnpm add @smallwebco/tinypivot-react</code>
-              </div>
-              <div>
-                <h3>Vue 3</h3>
-                <code>pnpm add @smallwebco/tinypivot-vue</code>
-              </div>
-            </div>
-          </section>
-        </article>
-
-        <aside>
-          <h2>Explore TinyPivot</h2>
-          <RouterLink to="/vs-ag-grid">
-            TinyPivot vs AG Grid
-          </RouterLink>
-          <RouterLink to="/ag-grid-alternatives">
-            AG Grid alternatives
-          </RouterLink>
-          <RouterLink to="/best-react-pivot-table-libraries">
-            React pivot table guide
-          </RouterLink>
-          <RouterLink to="/best-vue-pivot-table-components">
-            Vue 3 pivot table guide
-          </RouterLink>
-          <RouterLink to="/vs-tanstack-table">
-            TinyPivot vs TanStack Table
-          </RouterLink>
-          <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank" rel="noopener">GitHub documentation</a>
-        </aside>
-      </section>
-
-      <section class="cta">
-        <h2>Start free. Upgrade when your analytics surface grows.</h2>
-        <p>Free pivot tables for React and Vue 3, with lifetime Pro licensing for advanced features.</p>
-        <RouterLink to="/#demo" class="btn btn-primary">
-          Open the Demo
+      <h1>{{ guide.title }}</h1>
+      <p>{{ guide.intro }}</p>
+      <div class="hero-actions">
+        <RouterLink to="/ui#demo" class="btn btn-solid">
+          Try the Live Demo
         </RouterLink>
-      </section>
-    </main>
+        <RouterLink to="/pricing?product=ui" class="btn btn-ghost">
+          See Lifetime Pricing
+        </RouterLink>
+      </div>
+    </section>
 
-    <footer>
-      <span>TinyPivot</span>
-      <span>React and Vue 3 data grids with free pivot tables</span>
-    </footer>
-  </div>
+    <section class="guide-content">
+      <article>
+        <section v-for="section in guide.sections" :key="section.title" class="content-section">
+          <h2>{{ section.title }}</h2>
+          <p v-for="paragraph in section.paragraphs" :key="paragraph">
+            {{ paragraph }}
+          </p>
+          <ul v-if="section.bullets">
+            <li v-for="bullet in section.bullets" :key="bullet">
+              {{ bullet }}
+            </li>
+          </ul>
+        </section>
+
+        <section class="install-section">
+          <h2>Try TinyPivot in your framework</h2>
+          <p>Both packages expose the same product behavior and include TypeScript support.</p>
+          <div class="install-grid">
+            <div>
+              <h3>React</h3>
+              <code>pnpm add @smallwebco/tinypivot-react</code>
+            </div>
+            <div>
+              <h3>Vue 3</h3>
+              <code>pnpm add @smallwebco/tinypivot-vue</code>
+            </div>
+          </div>
+        </section>
+      </article>
+
+      <aside>
+        <h2>Explore TinyPivot</h2>
+        <RouterLink to="/vs-ag-grid">
+          TinyPivot vs AG Grid
+        </RouterLink>
+        <RouterLink to="/ag-grid-alternatives">
+          AG Grid alternatives
+        </RouterLink>
+        <RouterLink to="/best-react-pivot-table-libraries">
+          React pivot table guide
+        </RouterLink>
+        <RouterLink to="/best-vue-pivot-table-components">
+          Vue 3 pivot table guide
+        </RouterLink>
+        <RouterLink to="/vs-tanstack-table">
+          TinyPivot vs TanStack Table
+        </RouterLink>
+        <a href="https://github.com/Small-Web-Co/tinypivot" target="_blank" rel="noopener">GitHub documentation</a>
+      </aside>
+    </section>
+
+    <section class="cta">
+      <h2>Start free. Upgrade when your analytics surface grows.</h2>
+      <p>Free pivot tables for React and Vue 3, with lifetime Pro licensing for advanced features.</p>
+      <RouterLink to="/ui#demo" class="btn btn-solid">
+        Open the Demo
+      </RouterLink>
+    </section>
+  </main>
 </template>
 
 <style scoped>
-.guide-page { min-height: 100vh; background: #0a0a0f; color: #e2e8f0; }
-.nav { position: sticky; top: 0; z-index: 10; background: rgba(10, 10, 15, 0.92); border-bottom: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); }
-.nav-content { max-width: 1120px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.logo, .nav-links a, aside a { color: #e2e8f0; text-decoration: none; }
-.logo { display: flex; gap: 0.5rem; align-items: center; font-weight: 700; }
-.logo-mark { color: #10b981; font-size: 1.5rem; }
-.nav-links { display: flex; gap: 1.5rem; font-size: 0.9rem; }
-.nav-links a:hover, aside a:hover { color: #10b981; }
-.hero { max-width: 900px; margin: 0 auto; padding: 7rem 2rem 5rem; text-align: center; }
-.eyebrow { display: inline-block; margin-bottom: 1.25rem; padding: 0.4rem 0.85rem; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 999px; color: #10b981; background: rgba(16, 185, 129, 0.1); font-size: 0.85rem; }
-h1 { margin: 0; font-size: clamp(2.5rem, 7vw, 4.5rem); line-height: 1.05; letter-spacing: -0.04em; }
-.hero p { max-width: 760px; margin: 1.5rem auto 0; color: #94a3b8; font-size: 1.2rem; }
-.hero-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8rem; margin-top: 2rem; }
-.btn { display: inline-flex; padding: 0.75rem 1.15rem; border-radius: 0.5rem; color: white; text-decoration: none; font-weight: 600; }
-.btn-primary { background: #059669; }
-.btn-secondary { border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.07); }
-.guide-content { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 3rem; max-width: 1120px; margin: 0 auto; padding: 0 2rem 5rem; }
-.content-section, .install-section { padding: 1.5rem 0; border-top: 1px solid rgba(255, 255, 255, 0.12); }
-h2 { margin: 0 0 0.9rem; font-size: 1.65rem; }
-h3 { margin: 0 0 0.6rem; color: #a7f3d0; }
-p, li { color: #a8b3c5; line-height: 1.75; }
-ul { padding-left: 1.2rem; }
-li { margin: 0.4rem 0; }
-aside { align-self: start; position: sticky; top: 5rem; display: grid; gap: 0.8rem; padding: 1.25rem; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 0.75rem; background: rgba(255, 255, 255, 0.03); }
-aside h2 { font-size: 1rem; }
-aside a { color: #94a3b8; font-size: 0.9rem; }
-.install-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.install-grid div { padding: 1rem; overflow-x: auto; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 0.5rem; background: rgba(255, 255, 255, 0.03); }
-code { color: #6ee7b7; font-size: 0.82rem; white-space: nowrap; }
-.cta { padding: 5rem 2rem; text-align: center; background: rgba(16, 185, 129, 0.08); }
-.cta p { margin-bottom: 1.5rem; }
-footer { display: flex; justify-content: space-between; gap: 1rem; max-width: 1120px; margin: 0 auto; padding: 2rem; color: #64748b; font-size: 0.85rem; }
-@media (max-width: 760px) {
-  .nav-links { gap: 0.8rem; font-size: 0.78rem; }
-  .guide-content { grid-template-columns: 1fr; }
-  aside { position: static; }
-  .install-grid { grid-template-columns: 1fr; }
-  footer { flex-direction: column; }
+.hero {
+  display: grid;
+  gap: 16px;
+}
+
+.hero > p {
+  max-width: 40rem;
+  font-size: 1.15rem;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.guide-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px;
+}
+
+.content-section + .content-section,
+.install-section {
+  margin-top: 40px;
+}
+
+.install-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.install-grid code {
+  display: block;
+  overflow-x: auto;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--win);
+  color: var(--win-ink);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+aside {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ink);
+}
+
+aside h2 {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+aside a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border-bottom: 1px solid var(--rule);
+  text-decoration: none;
+}
+
+aside a:hover {
+  color: var(--accent);
+}
+
+.cta {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.cta > * {
+  max-width: 40rem;
+}
+
+@media (min-width: 1024px) {
+  .guide-content {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 64px;
+  }
+
+  aside {
+    position: sticky;
+    top: 88px;
+  }
+
+  .install-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

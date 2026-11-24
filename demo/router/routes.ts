@@ -123,7 +123,6 @@ export const routeDefinitions = [
     name: 'vs-ag-grid',
     component: () => import('../pages/VsAgGrid.vue'),
     meta: {
-      legacy: true,
       title: 'TinyPivot vs AG Grid - Lightweight Pivot Table Comparison',
       description: 'Compare TinyPivot and AG Grid for React and Vue. TinyPivot is a focused data grid with free pivot tables and lifetime Pro licensing.',
     },
@@ -134,7 +133,6 @@ export const routeDefinitions = [
     component: () => import('../pages/MarketingGuide.vue'),
     props: { slug: guide.slug },
     meta: {
-      legacy: true,
       title: guide.title,
       description: guide.description,
     },
