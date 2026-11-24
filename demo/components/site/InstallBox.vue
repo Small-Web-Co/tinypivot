@@ -138,9 +138,18 @@ async function copyActive() {
 
 @media (min-width: 640px) {
   .install-tabs {
-    flex-wrap: wrap;
     -webkit-mask-image: none;
     mask-image: none;
+  }
+
+  .install-tab {
+    flex: 1 1 auto;
+    padding: 0 12px;
+    letter-spacing: 0.06em;
+  }
+
+  .install-tab:last-child {
+    border-right: 0;
   }
 
   .install-body {
