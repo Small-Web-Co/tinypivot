@@ -42,7 +42,7 @@ const slides: SlideMeta[] = [
   },
 ]
 
-// Shared realistic sample dataset: Edgeworth Revenue by Month ($k)
+// Shared realistic sample dataset: Acme Revenue by Month ($k)
 interface MonthRevenue {
   month: string
   quarter: 'Q1' | 'Q2'
@@ -53,13 +53,13 @@ interface MonthRevenue {
   deals: number
 }
 
-const edgeworthMonthly: MonthRevenue[] = [
-  { month: 'Jan', quarter: 'Q1', enterprise: 31.2, growth: 15.8, selfServe: 7.2, total: 54.2, deals: 194 },
-  { month: 'Feb', quarter: 'Q1', enterprise: 34.6, growth: 17.4, selfServe: 8.1, total: 60.1, deals: 218 },
-  { month: 'Mar', quarter: 'Q1', enterprise: 38.9, growth: 19.2, selfServe: 9.4, total: 67.5, deals: 236 },
-  { month: 'Apr', quarter: 'Q2', enterprise: 42.1, growth: 21.6, selfServe: 10.3, total: 74.0, deals: 251 },
-  { month: 'May', quarter: 'Q2', enterprise: 47.4, growth: 24.1, selfServe: 11.5, total: 83.0, deals: 259 },
-  { month: 'Jun', quarter: 'Q2', enterprise: 52.4, growth: 25.3, selfServe: 11.9, total: 89.6, deals: 262 },
+const acmeMonthly: MonthRevenue[] = [
+  { month: 'Jan', quarter: 'Q1', enterprise: 22.4, growth: 12.6, selfServe: 5.8, total: 40.8, deals: 171 },
+  { month: 'Feb', quarter: 'Q1', enterprise: 25.1, growth: 13.9, selfServe: 6.4, total: 45.4, deals: 188 },
+  { month: 'Mar', quarter: 'Q1', enterprise: 27.8, growth: 15.3, selfServe: 7.1, total: 50.2, deals: 203 },
+  { month: 'Apr', quarter: 'Q2', enterprise: 31.6, growth: 16.8, selfServe: 7.9, total: 56.3, deals: 219 },
+  { month: 'May', quarter: 'Q2', enterprise: 34.9, growth: 18.7, selfServe: 8.6, total: 62.2, deals: 231 },
+  { month: 'Jun', quarter: 'Q2', enterprise: 39.3, growth: 20.2, selfServe: 9.2, total: 68.7, deals: 240 },
 ]
 
 // Reel playback state (SSR-safe: timers only start in onMounted)
@@ -159,7 +159,7 @@ const sortLabel = computed(() => {
 })
 
 const sortedMonthly = computed(() => {
-  const copy = [...edgeworthMonthly]
+  const copy = [...acmeMonthly]
   if (sortMode.value === 'desc')
     return copy.sort((a, b) => b.total - a.total)
   if (sortMode.value === 'asc')
@@ -167,14 +167,14 @@ const sortedMonthly = computed(() => {
   return copy
 })
 
-const maxMonthTotal = 95 // clean chart ceiling ($95k)
+const maxMonthTotal = 75 // clean chart ceiling ($75k)
 
 const sampleRawRows = [
-  { id: 'INV-4091', date: '2026-06-28', account: 'Acme Cloud', tier: 'Enterprise', region: 'NA', amount: '$14,200' },
-  { id: 'INV-4094', date: '2026-06-26', account: 'Northstar Labs', tier: 'Enterprise', region: 'EU', amount: '$11,800' },
-  { id: 'INV-4098', date: '2026-06-24', account: 'Helios AI', tier: 'Growth', region: 'NA', amount: '$6,400' },
-  { id: 'INV-4102', date: '2026-06-21', account: 'Kestrel Data', tier: 'Self-Serve', region: 'APAC', amount: '$1,850' },
-  { id: 'INV-4105', date: '2026-06-19', account: 'Veridian Bio', tier: 'Enterprise', region: 'NA', amount: '$9,600' },
+  { id: 'INV-4091', date: '2026-06-28', account: 'Globex Corp', tier: 'Enterprise', region: 'NA', amount: '$12,600' },
+  { id: 'INV-4094', date: '2026-06-26', account: 'Initech', tier: 'Enterprise', region: 'EU', amount: '$9,900' },
+  { id: 'INV-4098', date: '2026-06-24', account: 'Hooli', tier: 'Growth', region: 'NA', amount: '$5,200' },
+  { id: 'INV-4102', date: '2026-06-21', account: 'Pied Piper', tier: 'Self-Serve', region: 'APAC', amount: '$1,620' },
+  { id: 'INV-4105', date: '2026-06-19', account: 'Vandelay Industries', tier: 'Enterprise', region: 'NA', amount: '$8,300' },
 ]
 
 // --- Slide 2: Deterministic Braille Line Chart + Sparkline Pivot Card ---
@@ -191,15 +191,15 @@ interface BraillePlotRow {
 }
 
 function buildBraillePlotRows(): BraillePlotRow[] {
-  const values = edgeworthMonthly.map(d => d.total)
+  const values = acmeMonthly.map(d => d.total)
   const chartCols = 36
   const chartRows = 6
   const pxW = chartCols * 2
   const pxH = chartRows * 4
 
   const grid: number[][] = Array.from({ length: chartRows }, () => Array.from<number>({ length: chartCols }).fill(0))
-  const minVal = 40
-  const maxVal = 92
+  const minVal = 38
+  const maxVal = 72
   const span = maxVal - minVal
 
   const setPx = (x: number, y: number) => {
@@ -226,7 +226,7 @@ function buildBraillePlotRows(): BraillePlotRow[] {
     }
   }
 
-  const yTicks: Record<number, string> = { 0: '$92k', 3: '$66k', 5: '$40k' }
+  const yTicks: Record<number, string> = { 0: '$72k', 3: '$52k', 5: '$38k' }
   return grid.map((rowMasks, r) => ({
     tick: yTicks[r] ?? '',
     cells: rowMasks.map(mask => (mask === 0 ? '' : String.fromCharCode(0x2800 + mask))),
@@ -236,9 +236,9 @@ function buildBraillePlotRows(): BraillePlotRow[] {
 const braillePlotRows = buildBraillePlotRows()
 
 const termPivotRows = [
-  { tier: 'Enterprise', q1: '$104.7k', q2: '$141.9k', total: '$246.6k', spark: '▁▂▄▅▇█' },
-  { tier: 'Growth', q1: '$52.4k', q2: '$71.0k', total: '$123.4k', spark: '▁▂▄▅▇█' },
-  { tier: 'Self-Serve', q1: '$24.7k', q2: '$33.7k', total: '$58.4k', spark: '▁▂▄▆██' },
+  { tier: 'Enterprise', q1: '$75.3k', q2: '$105.8k', total: '$181.1k', spark: '▁▂▄▅▇█' },
+  { tier: 'Growth', q1: '$41.8k', q2: '$55.7k', total: '$97.5k', spark: '▁▂▄▅▇█' },
+  { tier: 'Self-Serve', q1: '$19.3k', q2: '$25.7k', total: '$45.0k', spark: '▁▂▄▆██' },
 ]
 
 // --- Slide 3: Live Companion IDE Drill-Through interaction ---
@@ -254,37 +254,37 @@ const drillCells: Record<string, DrillCell> = {
   'Enterprise-Jun': {
     tier: 'Enterprise',
     month: 'Jun',
-    value: '$52.4k',
-    count: 18,
+    value: '$39.3k',
+    count: 16,
     rows: [
-      { invoice: 'INV-4091', customer: 'Acme Cloud', region: 'NA', amount: '$14,200' },
-      { invoice: 'INV-4094', customer: 'Northstar Labs', region: 'EU', amount: '$11,800' },
-      { invoice: 'INV-4105', customer: 'Veridian Bio', region: 'NA', amount: '$9,600' },
-      { invoice: 'INV-4112', customer: 'Solstice FinTech', region: 'EU', amount: '$8,900' },
+      { invoice: 'INV-4091', customer: 'Globex Corp', region: 'NA', amount: '$12,600' },
+      { invoice: 'INV-4094', customer: 'Initech', region: 'EU', amount: '$9,900' },
+      { invoice: 'INV-4105', customer: 'Vandelay Industries', region: 'NA', amount: '$8,300' },
+      { invoice: 'INV-4112', customer: 'Massive Dynamic', region: 'EU', amount: '$7,450' },
     ],
   },
   'Growth-May': {
     tier: 'Growth',
     month: 'May',
-    value: '$24.1k',
-    count: 34,
+    value: '$18.7k',
+    count: 29,
     rows: [
-      { invoice: 'INV-3912', customer: 'Helios AI', region: 'NA', amount: '$6,400' },
-      { invoice: 'INV-3925', customer: 'Quarry Ops', region: 'EU', amount: '$5,100' },
-      { invoice: 'INV-3940', customer: 'Looma Health', region: 'NA', amount: '$4,800' },
-      { invoice: 'INV-3951', customer: 'Vektor Dev', region: 'APAC', amount: '$3,900' },
+      { invoice: 'INV-3912', customer: 'Hooli', region: 'NA', amount: '$5,200' },
+      { invoice: 'INV-3925', customer: 'Dunder Mifflin', region: 'EU', amount: '$4,350' },
+      { invoice: 'INV-3940', customer: 'Wonka Labs', region: 'NA', amount: '$3,900' },
+      { invoice: 'INV-3951', customer: 'Cyberdyne', region: 'APAC', amount: '$3,150' },
     ],
   },
   'Self-Serve-Jun': {
     tier: 'Self-Serve',
     month: 'Jun',
-    value: '$11.9k',
-    count: 92,
+    value: '$9.2k',
+    count: 81,
     rows: [
-      { invoice: 'INV-4102', customer: 'Kestrel Data', region: 'APAC', amount: '$1,850' },
-      { invoice: 'INV-4108', customer: 'Marrow Studio', region: 'NA', amount: '$1,420' },
-      { invoice: 'INV-4119', customer: 'Beacon Labs', region: 'EU', amount: '$1,290' },
-      { invoice: 'INV-4124', customer: 'Pulse Metric', region: 'NA', amount: '$1,140' },
+      { invoice: 'INV-4102', customer: 'Pied Piper', region: 'APAC', amount: '$1,620' },
+      { invoice: 'INV-4108', customer: 'Tyrell Co', region: 'NA', amount: '$1,280' },
+      { invoice: 'INV-4119', customer: 'Soylent', region: 'EU', amount: '$1,090' },
+      { invoice: 'INV-4124', customer: 'Prestige Worldwide', region: 'NA', amount: '$960' },
     ],
   },
 }
@@ -311,7 +311,7 @@ const dbExamples: Record<DbId, { label: string, tag: string, mode: string, comma
     tag: 'CSV pipe · Free & Pro',
     mode: 'CLI pipe / load_file',
     command: `bq query --format=csv --nouse_legacy_sql \\
-  "SELECT month, tier, SUM(revenue) AS rev FROM edgeworth.orders GROUP BY 1,2" \\
+  "SELECT month, tier, SUM(revenue) AS rev FROM acme.orders GROUP BY 1,2" \\
   | npx @smallwebco/tinypivot-mcp --open`,
   },
   snowflake: {
@@ -319,7 +319,7 @@ const dbExamples: Record<DbId, { label: string, tag: string, mode: string, comma
     tag: 'CSV pipe · Free & Pro',
     mode: 'CLI pipe / load_file',
     command: `snow sql --format csv \\
-  -q "SELECT month, tier, revenue FROM prod.edgeworth_revenue" \\
+  -q "SELECT month, tier, revenue FROM prod.acme_revenue" \\
   | npx @smallwebco/tinypivot-mcp --open`,
   },
   mysql: {
@@ -327,7 +327,7 @@ const dbExamples: Record<DbId, { label: string, tag: string, mode: string, comma
     tag: 'TSV pipe · Free & Pro',
     mode: 'CLI pipe / load_file',
     command: `mysql -h analytics.internal --batch \\
-  -e "SELECT month, tier, revenue FROM edgeworth_revenue" \\
+  -e "SELECT month, tier, revenue FROM acme_revenue" \\
   | npx @smallwebco/tinypivot-mcp --open`,
   },
   duckdb: {
@@ -335,7 +335,7 @@ const dbExamples: Record<DbId, { label: string, tag: string, mode: string, comma
     tag: 'Parquet / S3 · Free & Pro',
     mode: 'CLI pipe / load_file',
     command: `duckdb -csv -c \\
-  "SELECT month, tier, revenue FROM 's3://edgeworth/2026/*.parquet'" \\
+  "SELECT month, tier, revenue FROM 's3://acme/2026/*.parquet'" \\
   | npx @smallwebco/tinypivot-mcp --open`,
   },
   postgres: {
@@ -343,10 +343,10 @@ const dbExamples: Record<DbId, { label: string, tag: string, mode: string, comma
     tag: 'Direct AST-safe SQL · Pro',
     mode: 'Direct query_postgres or psql pipe',
     command: `# Direct read-only MCP tool (Pro, AST-validated SELECT only):
-query_postgres({ sql: "SELECT month, tier, revenue FROM edgeworth_revenue" })
+query_postgres({ sql: "SELECT month, tier, revenue FROM acme_revenue" })
 
 # Or pipe from psql on Free/Pro:
-psql "$DATABASE_URL" --csv -c "SELECT * FROM edgeworth_revenue" | npx @smallwebco/tinypivot-mcp`,
+psql "$DATABASE_URL" --csv -c "SELECT * FROM acme_revenue" | npx @smallwebco/tinypivot-mcp`,
   },
 }
 
@@ -439,13 +439,13 @@ function selectDb(id: DbId) {
         <div class="ide-chat-bar">
           <div class="ide-user-msg">
             <span class="ide-avatar ide-avatar-user">You</span>
-            <span>Chart Edgeworth monthly revenue from <code>./exports/edgeworth_revenue.csv</code> stacked by tier.</span>
+            <span>Chart Acme monthly revenue from <code>./exports/acme_revenue.csv</code> stacked by tier.</span>
           </div>
           <div class="ide-tool-call">
             <span class="ide-tool-check">✓</span>
             <code>tinypivot.load_file</code>
-            <span class="ide-tool-args">("edgeworth_revenue.csv", chartConfig: { type: "stackedBar" })</span>
-            <span class="ide-tool-stat">1,420 rows · 0 raw rows in LLM</span>
+            <span class="ide-tool-args">("acme_revenue.csv", chartConfig: { type: "stackedBar" })</span>
+            <span class="ide-tool-stat">1,186 rows · 0 raw rows in LLM</span>
           </div>
         </div>
 
@@ -455,7 +455,7 @@ function selectDb(id: DbId) {
             <div class="widget-toolbar-left">
               <div class="widget-title-group">
                 <span class="widget-dot" />
-                <strong>Edgeworth Revenue by Month</strong>
+                <strong>Acme Revenue by Month</strong>
               </div>
               <div class="widget-mode-pills" role="tablist" aria-label="Widget view mode">
                 <button
@@ -491,7 +491,7 @@ function selectDb(id: DbId) {
               </button>
               <span class="widget-pill widget-pill-saved">
                 <span class="saved-dot" />
-                Saved 64k/$0.19
+                Saved 53k/$0.16
               </span>
             </div>
           </div>
@@ -501,24 +501,24 @@ function selectDb(id: DbId) {
             <div class="chart-legend-row">
               <span class="chart-legend-item">
                 <span class="legend-swatch" :style="{ background: activePalette.enterprise }" />
-                Enterprise ($246.6k)
+                Enterprise ($181.1k)
               </span>
               <span class="chart-legend-item">
                 <span class="legend-swatch" :style="{ background: activePalette.growth }" />
-                Growth ($123.4k)
+                Growth ($97.5k)
               </span>
               <span class="chart-legend-item">
                 <span class="legend-swatch" :style="{ background: activePalette.selfServe }" />
-                Self-Serve ($58.4k)
+                Self-Serve ($45.0k)
               </span>
-              <span class="chart-total-badge">Total: $428.4k</span>
+              <span class="chart-total-badge">Total: $323.6k</span>
             </div>
 
             <div class="stacked-chart-plot">
               <div class="chart-y-axis">
-                <span>$95k</span>
-                <span>$65k</span>
-                <span>$35k</span>
+                <span>$75k</span>
+                <span>$50k</span>
+                <span>$25k</span>
                 <span>$0</span>
               </div>
 
@@ -609,97 +609,97 @@ function selectDb(id: DbId) {
                 <tr>
                   <td><span class="tier-dot" :style="{ background: activePalette.enterprise }" />Enterprise</td>
                   <td class="num">
-                    $31.2k
+                    $22.4k
                   </td>
                   <td class="num">
-                    $34.6k
+                    $25.1k
                   </td>
                   <td class="num">
-                    $38.9k
+                    $27.8k
                   </td>
                   <td class="num">
-                    $42.1k
+                    $31.6k
                   </td>
                   <td class="num">
-                    $47.4k
+                    $34.9k
                   </td>
                   <td class="num">
-                    $52.4k
+                    $39.3k
                   </td>
                   <td class="num strong">
-                    $246.6k
+                    $181.1k
                   </td>
                 </tr>
                 <tr>
                   <td><span class="tier-dot" :style="{ background: activePalette.growth }" />Growth</td>
                   <td class="num">
-                    $15.8k
+                    $12.6k
                   </td>
                   <td class="num">
-                    $17.4k
+                    $13.9k
                   </td>
                   <td class="num">
-                    $19.2k
+                    $15.3k
                   </td>
                   <td class="num">
-                    $21.6k
+                    $16.8k
                   </td>
                   <td class="num">
-                    $24.1k
+                    $18.7k
                   </td>
                   <td class="num">
-                    $25.3k
+                    $20.2k
                   </td>
                   <td class="num strong">
-                    $123.4k
+                    $97.5k
                   </td>
                 </tr>
                 <tr>
                   <td><span class="tier-dot" :style="{ background: activePalette.selfServe }" />Self-Serve</td>
                   <td class="num">
-                    $7.2k
+                    $5.8k
                   </td>
                   <td class="num">
-                    $8.1k
+                    $6.4k
                   </td>
                   <td class="num">
-                    $9.4k
+                    $7.1k
                   </td>
                   <td class="num">
-                    $10.3k
+                    $7.9k
                   </td>
                   <td class="num">
-                    $11.5k
+                    $8.6k
                   </td>
                   <td class="num">
-                    $11.9k
+                    $9.2k
                   </td>
                   <td class="num strong">
-                    $58.4k
+                    $45.0k
                   </td>
                 </tr>
                 <tr class="total-row">
                   <td>Grand Total</td>
                   <td class="num">
-                    $54.2k
+                    $40.8k
                   </td>
                   <td class="num">
-                    $60.1k
+                    $45.4k
                   </td>
                   <td class="num">
-                    $67.5k
+                    $50.2k
                   </td>
                   <td class="num">
-                    $74.0k
+                    $56.3k
                   </td>
                   <td class="num">
-                    $83.0k
+                    $62.2k
                   </td>
                   <td class="num">
-                    $89.6k
+                    $68.7k
                   </td>
                   <td class="num strong">
-                    $428.4k
+                    $323.6k
                   </td>
                 </tr>
               </tbody>
@@ -757,7 +757,7 @@ function selectDb(id: DbId) {
               <span class="dot-green" />
             </div>
             <div class="ghostty-title">
-              ghostty — claude · ~/edgeworth-analytics
+              ghostty — claude · ~/acme-analytics
             </div>
             <div class="ghostty-tag">
               Unicode Braille + Sparklines
@@ -768,18 +768,18 @@ function selectDb(id: DbId) {
             <div class="term-prompt-line">
               <span class="term-prompt-sym">❯</span>
               <span class="term-prompt-cmd">claude</span>
-              <span class="term-prompt-arg">"Chart Edgeworth monthly revenue and pivot Q1 vs Q2 by tier"</span>
+              <span class="term-prompt-arg">"Chart Acme monthly revenue and pivot Q1 vs Q2 by tier"</span>
             </div>
             <div class="term-meta-line">
-              <span class="term-ok">●</span> tinypivot: loaded 1,420 rows locally · echoed shareable terminal cards · companion ready at <code>127.0.0.1:4319</code>
+              <span class="term-ok">●</span> tinypivot: loaded 1,186 rows locally · echoed shareable terminal cards · companion ready at <code>127.0.0.1:4319</code>
             </div>
 
             <div class="term-cards-grid">
               <!-- Framed Unicode Braille Line Chart Card -->
               <div class="tui-card tui-card-emerald">
                 <div class="tui-card-top">
-                  <span class="tui-edge-label">Edgeworth Revenue</span>
-                  <span class="tui-edge-badge">Total $428.4k</span>
+                  <span class="tui-edge-label">Acme Revenue</span>
+                  <span class="tui-edge-badge">Total $323.6k</span>
                 </div>
 
                 <div class="tui-card-body">
@@ -820,13 +820,13 @@ function selectDb(id: DbId) {
                   </div>
 
                   <div class="tui-stats-line">
-                    Peak: Jun ($89.6k) · Low: Jan ($54.2k) · Avg: $71.4k
+                    Peak: Jun ($68.7k) · Low: Jan ($40.8k) · Avg: $53.9k
                   </div>
                 </div>
 
                 <div class="tui-card-bottom">
                   <span class="tui-edge-brand">tiny-pivot.com</span>
-                  <span class="tui-edge-meta">1,420 rows · Line</span>
+                  <span class="tui-edge-meta">1,186 rows · Line</span>
                 </div>
               </div>
 
@@ -861,9 +861,9 @@ function selectDb(id: DbId) {
 
                     <div class="tui-pivot-row tui-pivot-total">
                       <span>Total</span>
-                      <span class="num">$181.8k</span>
-                      <span class="num">$246.6k</span>
-                      <span class="num">$428.4k</span>
+                      <span class="num">$136.4k</span>
+                      <span class="num">$187.2k</span>
+                      <span class="num">$323.6k</span>
                       <span class="spark-col tui-spark">▁▂▄▅▇█</span>
                     </div>
                   </div>
@@ -902,7 +902,7 @@ function selectDb(id: DbId) {
               <div class="term-log">
                 <span class="log-ts">14:22:01</span>
                 <span class="log-ev">load_file</span>
-                <span>edgeworth_revenue.csv (1,420 rows)</span>
+                <span>acme_revenue.csv (1,186 rows)</span>
               </div>
               <div class="term-log">
                 <span class="log-ts">14:22:04</span>
@@ -940,7 +940,7 @@ function selectDb(id: DbId) {
 
             <div class="browser-content">
               <div class="browser-pivot-head">
-                <strong>Edgeworth Revenue — Interactive Pivot</strong>
+                <strong>Acme Revenue — Interactive Pivot</strong>
                 <span>Double-click any cell to drill through</span>
               </div>
 
@@ -966,10 +966,10 @@ function selectDb(id: DbId) {
                   <tr>
                     <td>Enterprise</td>
                     <td class="num">
-                      $42.1k
+                      $31.6k
                     </td>
                     <td class="num">
-                      $47.4k
+                      $34.9k
                     </td>
                     <td class="num">
                       <button
@@ -978,17 +978,17 @@ function selectDb(id: DbId) {
                         :class="{ active: activeDrillKey === 'Enterprise-Jun' && showDrillModal }"
                         @click="inspectDrillCell('Enterprise-Jun')"
                       >
-                        $52.4k
+                        $39.3k
                       </button>
                     </td>
                     <td class="num strong">
-                      $246.6k
+                      $181.1k
                     </td>
                   </tr>
                   <tr>
                     <td>Growth</td>
                     <td class="num">
-                      $21.6k
+                      $16.8k
                     </td>
                     <td class="num">
                       <button
@@ -997,23 +997,23 @@ function selectDb(id: DbId) {
                         :class="{ active: activeDrillKey === 'Growth-May' && showDrillModal }"
                         @click="inspectDrillCell('Growth-May')"
                       >
-                        $24.1k
+                        $18.7k
                       </button>
                     </td>
                     <td class="num">
-                      $25.3k
+                      $20.2k
                     </td>
                     <td class="num strong">
-                      $123.4k
+                      $97.5k
                     </td>
                   </tr>
                   <tr>
                     <td>Self-Serve</td>
                     <td class="num">
-                      $10.3k
+                      $7.9k
                     </td>
                     <td class="num">
-                      $11.5k
+                      $8.6k
                     </td>
                     <td class="num">
                       <button
@@ -1022,11 +1022,11 @@ function selectDb(id: DbId) {
                         :class="{ active: activeDrillKey === 'Self-Serve-Jun' && showDrillModal }"
                         @click="inspectDrillCell('Self-Serve-Jun')"
                       >
-                        $11.9k
+                        $9.2k
                       </button>
                     </td>
                     <td class="num strong">
-                      $58.4k
+                      $45.0k
                     </td>
                   </tr>
                 </tbody>
@@ -1124,7 +1124,7 @@ function selectDb(id: DbId) {
             <div class="arch-node-kicker">
               2. Local TinyPivot MCP
             </div>
-            <strong>1,420 raw rows stay local</strong>
+            <strong>1,186 raw rows stay local</strong>
             <span>Streams rows straight to the UI over local stdio / SSE — never uploaded</span>
           </div>
 
