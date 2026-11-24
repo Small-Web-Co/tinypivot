@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { isMcpLicenseKey } from '../../packages/mcp/src/server'
 import { DatasetStore, FREE_TIER_ROW_LIMIT } from '../../packages/mcp/src/store'
 import { formatDatasetSummary, formatPivotSummary } from '../../packages/mcp/src/summary'
 import { bucketRowCount, isTelemetryEnabled } from '../../packages/mcp/src/telemetry'
@@ -93,5 +94,17 @@ describe('mCP Privacy-First Telemetry Helpers', () => {
     delete process.env.TINYPIVOT_TELEMETRY
     process.env.DO_NOT_TRACK = '1'
     expect(isTelemetryEnabled()).toBe(false)
+  })
+})
+
+describe('mcp license scoping (prevents UI Library key arbitrage)', () => {
+  it('accepts TP-MCPP and TP-MCPT keys for MCP Pro and rejects UI Library TP-PRO* keys', () => {
+    expect(isMcpLicenseKey('TP-MCPP-abc123-20991231')).toBe(true)
+    expect(isMcpLicenseKey('TP-MCPT-abc123-20991231')).toBe(true)
+    expect(isMcpLicenseKey('TP-PRO1-abc123-20991231')).toBe(false)
+    expect(isMcpLicenseKey('TP-PROU-abc123-20991231')).toBe(false)
+    expect(isMcpLicenseKey('TP-PROT-abc123-20991231')).toBe(false)
+    expect(isMcpLicenseKey('')).toBe(false)
+    expect(isMcpLicenseKey(null)).toBe(false)
   })
 })

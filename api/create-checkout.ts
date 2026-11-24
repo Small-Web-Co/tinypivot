@@ -76,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cancelPath: '/mcp#pricing',
     },
     mcp_pro_lifetime: {
-      priceId: process.env.STRIPE_PRICE_MCP_PRO_LIFETIME || 'price_1UfR6qBMwUz92tuiDxhVk2PD',
+      priceId: process.env.STRIPE_PRICE_MCP_PRO_LIFETIME || 'price_1UfRhNBMwUz92tuiDxc0F0Ht',
       mode: 'payment',
       cancelPath: '/mcp#pricing',
     },

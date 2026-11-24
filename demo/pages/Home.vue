@@ -219,46 +219,67 @@ const isDarkDemoTheme = computed(() =>
 // Package name based on framework
 const packageName = computed(() => selectedFramework.value === 'vue' ? '@smallwebco/tinypivot-vue' : '@smallwebco/tinypivot-react')
 
-// Pricing
+// Hero quick-install switcher (leads with MCP, 1-click toggle to Vue/React UI library)
+const heroMode = ref<'mcp' | 'ui'>('mcp')
+const heroCopied = ref(false)
+const heroCommand = computed(() =>
+  heroMode.value === 'mcp'
+    ? 'npx @smallwebco/tinypivot-mcp init'
+    : `pnpm add ${packageName.value}`,
+)
+
+// Pricing switcher (leads with MCP subscriptions/lifetime; UI Library one-time licenses in second tab)
+const pricingTab = ref<'mcp' | 'ui'>('mcp')
+const mcpProBilling = ref<'monthly' | 'yearly' | 'lifetime'>('yearly')
+const mcpTeamBilling = ref<'monthly' | 'yearly'>('yearly')
+
+const mcpProPlan = computed(() => {
+  if (mcpProBilling.value === 'monthly')
+    return { id: 'mcp_pro_monthly', price: '$19', period: '/month', sub: 'Cancel anytime. Taxes calculated at checkout.' }
+  if (mcpProBilling.value === 'lifetime')
+    return { id: 'mcp_pro_lifetime', price: '$399', period: 'one-time', sub: 'Local Pro perpetual license (all v1.x updates). Zero subscription.' }
+  return { id: 'mcp_pro_yearly', price: '$149', period: '/year', sub: '$12.42/mo billed annually — save 35%.' }
+})
+
+const mcpTeamPlan = computed(() => {
+  if (mcpTeamBilling.value === 'monthly')
+    return { id: 'mcp_team_monthly', price: '$79', period: '/month', sub: 'Up to 5 seats ($15.80/seat). Cancel anytime.' }
+  return { id: 'mcp_team_yearly', price: '$699', period: '/year', sub: 'Up to 5 seats ($11.65/seat/mo) — save 26%.' }
+})
+
 const selectedPlan = ref<'single' | 'unlimited' | 'team'>('single')
 const plans = [
-  { id: 'single', name: 'Single Project', price: 49, description: 'Lifetime Pro license for 1 developer, 1 project.' },
-  { id: 'unlimited', name: 'Unlimited Projects', price: 149, description: 'Lifetime Pro license for 1 developer, unlimited projects.' },
-  { id: 'team', name: 'Team License', price: 399, description: 'Lifetime Pro license for up to 10 developers, unlimited projects.' },
+  { id: 'single', name: 'Single App', price: 49, description: 'Perpetual UI Library license for 1 developer, 1 React/Vue app (TP-PRO1 key).' },
+  { id: 'unlimited', name: 'Unlimited Apps', price: 149, description: 'Perpetual UI Library license for 1 developer, unlimited React/Vue apps (TP-PROU key).' },
+  { id: 'team', name: 'UI Team (10 Devs)', price: 399, description: 'Perpetual UI Library license for up to 10 developers, unlimited React/Vue apps (TP-PROT key).' },
 ] as const
 
 const isCheckingOut = ref(false)
+const activeCheckoutPlan = ref<string | null>(null)
 
-async function buyNow() {
+async function startCheckoutPlan(planId: string) {
   if (isCheckingOut.value)
     return
 
   isCheckingOut.value = true
-  track('checkout_started', { plan: selectedPlan.value })
+  activeCheckoutPlan.value = planId
+  track('checkout_started', { plan: planId })
   try {
-    console.log('Starting checkout for plan:', selectedPlan.value)
-
     const response = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan: selectedPlan.value }),
+      body: JSON.stringify({ plan: planId }),
     })
 
-    console.log('Response status:', response.status)
-
-    // Check if response is ok
     if (!response.ok) {
       const text = await response.text()
-      console.error('API error response:', text)
       alert(`API Error (${response.status}): ${text || 'Unknown error'}`)
       return
     }
 
     const data = await response.json()
-    console.log('API response:', data)
-
     if (data.url) {
-      track('checkout_redirected', { plan: selectedPlan.value })
+      track('checkout_redirected', { plan: planId })
       window.location.href = data.url
     }
     else if (data.error) {
@@ -274,7 +295,12 @@ async function buyNow() {
   }
   finally {
     isCheckingOut.value = false
+    activeCheckoutPlan.value = null
   }
+}
+
+function buyNow() {
+  return startCheckoutPlan(selectedPlan.value)
 }
 
 // Features comparison - compact version
@@ -310,8 +336,12 @@ const _activeSection = ref('hero')
 
 // Copy to clipboard
 function copyInstallCommand() {
-  navigator.clipboard.writeText(`pnpm add ${packageName.value}`)
-  track('install_command_copied', { framework: selectedFramework.value })
+  navigator.clipboard.writeText(heroCommand.value)
+  heroCopied.value = true
+  setTimeout(() => {
+    heroCopied.value = false
+  }, 1800)
+  track('install_command_copied', { mode: heroMode.value, framework: selectedFramework.value })
 }
 
 function trackFreeStart() {
@@ -381,51 +411,127 @@ function trackFreeStart() {
     <section id="hero" class="hero">
       <div class="hero-bg" />
       <div class="hero-content">
-        <!-- Framework Badge -->
         <div class="framework-badge">
-          <svg viewBox="0 0 128 128" width="18" height="18">
-            <path fill="#42b883" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z" />
-            <path fill="#35495e" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z" />
-          </svg>
-          <span class="framework-badge-separator">+</span>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="#61dafb">
-            <circle cx="12" cy="12" r="2.5" />
-            <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" />
-            <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(60 12 12)" />
-            <ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="#61dafb" stroke-width="1" transform="rotate(120 12 12)" />
-          </svg>
-          <span class="framework-badge-text">Works with Vue 3 & React</span>
+          <span class="mcp-pulse-dot" />
+          <span class="framework-badge-text">MCP Data IDE for AI Agents · React &amp; Vue 3 UI · BYOK AI Analyst</span>
         </div>
-        <h1>Excel-like Data Grid, <span class="gradient-text">Pivot Table & Charts</span></h1>
+        <h1>The Interactive Data IDE for <span class="gradient-text">AI Agents &amp; Web Apps</span></h1>
         <p class="hero-subtitle">
-          A powerful, performant data grid with built-in filtering, sorting, and free pivot tables.
-          Same API, same features — choose your framework. Upgrade for advanced aggregations, charts, AI Analyst, and no watermark.
+          Render interactive <strong>Charts, Pivot Tables, Drill-Through, and Excel exports</strong> directly inside
+          <strong>Antigravity, Claude, Cursor, OpenCode, and pi</strong> — or embed the same battle-tested DataGrid inside your React &amp; Vue 3 apps.
         </p>
         <div class="hero-actions">
-          <a href="#demo" class="btn btn-primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-              <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Try Demo
-          </a>
-          <a href="https://www.tiny-pivot.com/#pricing" class="btn btn-secondary">
-            Get Pro License
+          <router-link to="/mcp" class="btn btn-primary">
+            Explore TinyPivot MCP →
+          </router-link>
+          <a href="#demo" class="btn btn-secondary">
+            Try Live 10k-Row Grid Demo
           </a>
         </div>
+
+        <div class="hero-mode-tabs" role="tablist" aria-label="Install mode">
+          <button
+            type="button"
+            class="hero-mode-btn"
+            :class="{ active: heroMode === 'mcp' }"
+            @click="heroMode = 'mcp'"
+          >
+            AI Harness (MCP)
+          </button>
+          <button
+            type="button"
+            class="hero-mode-btn"
+            :class="{ active: heroMode === 'ui' }"
+            @click="heroMode = 'ui'"
+          >
+            {{ selectedFramework === 'vue' ? 'Vue 3 Library' : 'React Library' }}
+          </button>
+        </div>
+
         <div class="hero-install">
-          <code>pnpm add {{ packageName }}</code>
+          <code>{{ heroCommand }}</code>
           <button class="copy-btn" title="Copy to clipboard" @click="copyInstallCommand">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <span v-if="heroCopied" class="copied-label">Copied</span>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </button>
         </div>
         <p class="hero-note">
-          <router-link to="/mcp">
-            NEW: TinyPivot MCP — In-Agent Analytics Data IDE for Antigravity, Claude & Cursor →
+          <router-link to="/mcp#savings">
+            See honest, prompt-cache-adjusted token savings &amp; interactive ROI calculator →
           </router-link>
         </p>
+      </div>
+    </section>
+
+    <!-- Use Cases Section: Clear Track Per User Type -->
+    <section id="use-cases" class="use-cases">
+      <div class="section-header">
+        <div class="badge">
+          One Engine · Three Ways to Use It
+        </div>
+        <h2>Built for <span class="gradient-text">How You Work With Data</span></h2>
+        <p>Start in your AI coding harness today, embed into your SaaS product tomorrow — powered by the same deterministic pivot &amp; chart core.</p>
+      </div>
+
+      <div class="use-cases-grid">
+        <div class="use-case-card use-case-featured">
+          <div class="use-case-top">
+            <span class="use-case-audience">For AI Users &amp; Data Analysts</span>
+            <span class="feature-badge free">Primary</span>
+          </div>
+          <h3>TinyPivot MCP (In-Agent Data IDE)</h3>
+          <p>
+            Stop squinting at truncated markdown tables or burning tokens re-prompting for chart tweaks. Stream CSV/JSON files, SQL exports (BigQuery, Snowflake, MySQL, DuckDB, Postgres), or MCP tool results into an interactive Chart, Pivot, and Grid inside your AI harness.
+          </p>
+          <ul class="use-case-points">
+            <li>1-command setup across Claude, Antigravity, Cursor, OpenCode &amp; pi</li>
+            <li>Core charts &amp; Sum pivot free up to 2,500 rows (transparent warning if exceeded)</li>
+            <li>Pro unlocks unlimited rows, 5 themes, drill-through, .xlsx &amp; Postgres</li>
+          </ul>
+          <router-link to="/mcp" class="btn btn-primary use-case-cta">
+            Set Up TinyPivot MCP →
+          </router-link>
+        </div>
+
+        <div class="use-case-card">
+          <div class="use-case-top">
+            <span class="use-case-audience">For Frontend &amp; SaaS Engineers</span>
+            <span class="feature-badge free">Vue 3 + React</span>
+          </div>
+          <h3>TinyPivot UI DataGrid &amp; Pivot</h3>
+          <p>
+            Drop a fast, batteries-included Excel-like data grid into your React or Vue 3 app in 30 seconds — with free pivot tables, sorting, filtering, search, calculated fields, and CSV export without AG Grid enterprise pricing.
+          </p>
+          <ul class="use-case-points">
+            <li>Identical API for <code>@smallwebco/tinypivot-react</code> and <code>-vue</code></li>
+            <li>Free pivot tables, calculated fields &amp; Core Charts out of the box</li>
+            <li>One-time perpetual commercial licenses starting at $49</li>
+          </ul>
+          <a href="#demo" class="btn btn-secondary use-case-cta">
+            Try Live 10k-Row Demo →
+          </a>
+        </div>
+
+        <div class="use-case-card">
+          <div class="use-case-top">
+            <span class="use-case-audience">For Product Teams</span>
+            <span class="feature-badge pro">BYOK</span>
+          </div>
+          <h3>Embedded AI Data Analyst</h3>
+          <p>
+            Give your app's end users natural-language analytics directly inside TinyPivot. Bring your own OpenAI, Anthropic, or OpenRouter key and run SQL locally via DuckDB WASM or safely against your PostgreSQL backend.
+          </p>
+          <ul class="use-case-points">
+            <li>Plain-English questions → validated SQL → instant pivot &amp; charts</li>
+            <li>Zero data passes through TinyPivot servers</li>
+            <li>Included with TinyPivot UI Library Pro licenses</li>
+          </ul>
+          <a href="#ai-analyst" class="btn btn-secondary use-case-cta">
+            See AI Analyst Setup →
+          </a>
+        </div>
       </div>
     </section>
 
@@ -532,8 +638,8 @@ function trackFreeStart() {
             </svg>
           </div>
           <h3>Chart Builder</h3>
-          <p>6 chart types with drag-and-drop configuration</p>
-          <span class="feature-badge pro">Pro</span>
+          <p>Core charts free (bar, stacked, line, area, pie, donut); Pro unlocks all themes &amp; chart types</p>
+          <span class="feature-badge free">Free (Core)</span>
         </div>
 
         <div class="feature-card feature-card-highlight">
@@ -1003,14 +1109,170 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
     <!-- Pricing Section -->
     <section id="pricing" class="pricing">
       <div class="section-header">
-        <h2>Simple Pricing</h2>
-        <p>One-time payment, lifetime Pro license. Works for both Vue and React.</p>
+        <h2>Simple, Transparent Pricing</h2>
+        <p>Pick your product track — dedicated licenses for AI harnesses (MCP) and React/Vue web apps (UI Library).</p>
       </div>
 
-      <div class="pricing-cards">
+      <div class="pricing-track-tabs" role="tablist" aria-label="Product pricing track">
+        <button
+          type="button"
+          class="pricing-track-btn"
+          :class="{ active: pricingTab === 'mcp' }"
+          @click="pricingTab = 'mcp'"
+        >
+          TinyPivot MCP (AI Harnesses)
+        </button>
+        <button
+          type="button"
+          class="pricing-track-btn"
+          :class="{ active: pricingTab === 'ui' }"
+          @click="pricingTab = 'ui'"
+        >
+          UI Library (React &amp; Vue Apps)
+        </button>
+      </div>
+
+      <!-- MCP Pricing Track -->
+      <div v-if="pricingTab === 'mcp'" class="mcp-home-pricing-grid">
         <div class="pricing-card pricing-free">
           <div class="pricing-header">
-            <h3>Free</h3>
+            <h3>MCP Free</h3>
+            <div class="pricing-price">
+              <span class="price">$0</span>
+              <span class="period">forever</span>
+            </div>
+          </div>
+          <p class="plan-description">
+            Zero signup or API key. Runs 100% locally in your AI harness.
+          </p>
+          <ul class="pricing-features">
+            <li>Core Charts (bar, stackedBar, line, area, pie, donut)</li>
+            <li>Pivot Table (Sum) &amp; Data Grid</li>
+            <li>Code visual theme (Dark &amp; Light)</li>
+            <li>Live Terminal Companion Data IDE</li>
+            <li>Up to 2,500 rows (explicitly bannered if truncated)</li>
+          </ul>
+          <router-link to="/mcp#setup" class="btn btn-outline">
+            Run npx @smallwebco/tinypivot-mcp init
+          </router-link>
+        </div>
+
+        <div class="pricing-card pricing-pro">
+          <div class="pricing-popular">
+            Most Popular
+          </div>
+          <div class="pricing-header">
+            <h3>MCP Pro</h3>
+            <div class="pricing-price">
+              <span class="price">{{ mcpProPlan.price }}</span>
+              <span class="period">{{ mcpProPlan.period }}</span>
+            </div>
+          </div>
+
+          <div class="plan-selector">
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpProBilling === 'monthly' }"
+              @click="mcpProBilling = 'monthly'"
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpProBilling === 'yearly' }"
+              @click="mcpProBilling = 'yearly'"
+            >
+              Yearly (-35%)
+            </button>
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpProBilling === 'lifetime' }"
+              @click="mcpProBilling = 'lifetime'"
+            >
+              Lifetime
+            </button>
+          </div>
+          <p class="plan-description">
+            {{ mcpProPlan.sub }}
+          </p>
+
+          <ul class="pricing-features">
+            <li>Unlimited rows — never truncated</li>
+            <li>All 5 themes (Code, Phosphor, Nord, Thermal, Mono)</li>
+            <li>Double-click Drill-Through &amp; AI slice selection</li>
+            <li>All 9+ aggregations (median, stdDev, % of total)</li>
+            <li>Formatted .xlsx export + no watermark</li>
+            <li>Read-only query_postgres (AST SQL safety)</li>
+          </ul>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :class="{ 'btn-loading': isCheckingOut && activeCheckoutPlan === mcpProPlan.id }"
+            :disabled="isCheckingOut"
+            @click="startCheckoutPlan(mcpProPlan.id)"
+          >
+            <span v-if="isCheckingOut && activeCheckoutPlan === mcpProPlan.id">Processing...</span>
+            <span v-else>Get MCP Pro — {{ mcpProPlan.price }}</span>
+          </button>
+        </div>
+
+        <div class="pricing-card pricing-free">
+          <div class="pricing-header">
+            <h3>MCP Team (5 Seats)</h3>
+            <div class="pricing-price">
+              <span class="price">{{ mcpTeamPlan.price }}</span>
+              <span class="period">{{ mcpTeamPlan.period }}</span>
+            </div>
+          </div>
+
+          <div class="plan-selector">
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpTeamBilling === 'monthly' }"
+              @click="mcpTeamBilling = 'monthly'"
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              class="plan-btn"
+              :class="{ active: mcpTeamBilling === 'yearly' }"
+              @click="mcpTeamBilling = 'yearly'"
+            >
+              Yearly (-26%)
+            </button>
+          </div>
+          <p class="plan-description">
+            {{ mcpTeamPlan.sub }}
+          </p>
+
+          <ul class="pricing-features">
+            <li>Everything in MCP Pro for up to 5 seats</li>
+            <li>Shared offline-verifiable team key (TP-MCPT)</li>
+            <li>Read-only Postgres + CSV/JSON across harnesses</li>
+            <li>Priority email support &amp; Stripe tax invoices</li>
+          </ul>
+          <button
+            type="button"
+            class="btn btn-outline"
+            :disabled="isCheckingOut"
+            @click="startCheckoutPlan(mcpTeamPlan.id)"
+          >
+            <span v-if="isCheckingOut && activeCheckoutPlan === mcpTeamPlan.id">Processing...</span>
+            <span v-else>Get MCP Team — {{ mcpTeamPlan.price }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- UI Library Pricing Track -->
+      <div v-else class="pricing-cards">
+        <div class="pricing-card pricing-free">
+          <div class="pricing-header">
+            <h3>UI Library Free</h3>
             <div class="pricing-price">
               <span class="price">$0</span>
               <span class="period">forever</span>
@@ -1031,10 +1293,10 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 
         <div class="pricing-card pricing-pro">
           <div class="pricing-popular">
-            Most Popular
+            Perpetual UI License
           </div>
           <div class="pricing-header">
-            <h3>Pro</h3>
+            <h3>UI Library Pro</h3>
             <div class="pricing-price">
               <span class="price">${{ plans.find(p => p.id === selectedPlan)?.price }}</span>
               <span class="period">one-time</span>
@@ -1071,10 +1333,14 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
             @click="buyNow"
           >
             <span v-if="isCheckingOut">Processing...</span>
-            <span v-else>Buy Now - ${{ plans.find(p => p.id === selectedPlan)?.price }}</span>
+            <span v-else>Buy UI License - ${{ plans.find(p => p.id === selectedPlan)?.price }}</span>
           </button>
         </div>
       </div>
+
+      <p class="pricing-scope-note">
+        Existing TinyPivot UI Library keys (<code>TP-PRO*</code>) remain valid forever for React &amp; Vue apps. TinyPivot MCP Pro uses dedicated <code>TP-MCP*</code> keys.
+      </p>
     </section>
 
     <!-- Testimonial Section -->
@@ -1174,6 +1440,10 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
         <div class="footer-links">
           <div class="footer-col">
             <h4>Product</h4>
+            <router-link to="/mcp">
+              TinyPivot MCP
+            </router-link>
+            <a href="#use-cases">Use Cases</a>
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
             <a href="#demo">Demo</a>
@@ -1211,6 +1481,176 @@ setLicenseKey(<span class="code-string">'YOUR_LICENSE_KEY'</span>)
 /* Landing Page Styles */
 .landing-page {
   min-height: 100vh;
+}
+
+.mcp-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.22);
+}
+
+.hero-mode-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.hero-mode-btn {
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hero-mode-btn.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.copied-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #34d399;
+}
+
+/* Use Cases Track Section */
+.use-cases {
+  padding: 5rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.use-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+}
+
+.use-case-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.use-case-featured {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.09), rgba(255, 255, 255, 0.03));
+  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.12);
+}
+
+.use-case-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.use-case-audience {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #10b981;
+}
+
+.use-case-card h3 {
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+  color: #f8fafc;
+}
+
+.use-case-card p {
+  color: #94a3b8;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin: 0 0 1rem;
+}
+
+.use-case-points {
+  margin: 0 0 1.5rem;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: #cbd5e1;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.use-case-points code {
+  color: #34d399;
+  font-size: 0.8125rem;
+}
+
+.use-case-cta {
+  width: 100%;
+  justify-content: center;
+}
+
+.pricing-track-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 auto 2.25rem;
+  padding: 0.35rem;
+  width: fit-content;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pricing-track-btn {
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pricing-track-btn.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+
+.mcp-home-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.pricing-scope-note {
+  text-align: center;
+  margin: 1.75rem auto 0;
+  max-width: 720px;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.pricing-scope-note code {
+  color: #34d399;
 }
 
 /* Framework Toggle */

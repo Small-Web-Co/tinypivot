@@ -135,7 +135,8 @@ function buildAppPayload(
 
   const turnUsdSaved = tokensToUsd(turnTokensSaved, sessionSavings.model.ratePerMillion)
 
-  const isPro = Boolean((options.licenseKey && options.licenseKey.startsWith('TP-')) || options.demoToken)
+  const validMcpKey = isMcpLicenseKey(options.licenseKey) ? options.licenseKey : null
+  const isPro = Boolean(validMcpKey || options.demoToken)
 
   return {
     datasetId: dataset.id,
@@ -153,7 +154,7 @@ function buildAppPayload(
     chartConfig: dataset.chartConfig ?? null,
     chartTheme: isPro ? store.getVisualTheme() : 'code',
     datasets: store.listMetadata(),
-    licenseKey: options.licenseKey ?? null,
+    licenseKey: validMcpKey,
     demoToken: options.demoToken ?? null,
     modelCatalog: MODEL_CATALOG,
     tokenStats: {
@@ -195,6 +196,12 @@ export async function loadAppHtml(customPath?: string): Promise<string> {
   </body></html>`
 }
 
+export function isMcpLicenseKey(key?: string | null): boolean {
+  if (!key)
+    return false
+  return key.startsWith('TP-MCPP-') || key.startsWith('TP-MCPT-')
+}
+
 export function resolveLicenseKey(explicit?: string): string | undefined {
   if (explicit?.trim())
     return explicit.trim()
@@ -220,9 +227,13 @@ export function resolveLicenseKey(explicit?: string): string | undefined {
 }
 
 export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOptions = {}) {
-  const licenseKey = resolveLicenseKey(options.licenseKey)
+  const rawLicenseKey = resolveLicenseKey(options.licenseKey)
+  const licenseKey = isMcpLicenseKey(rawLicenseKey) ? rawLicenseKey : undefined
+  if (rawLicenseKey && !licenseKey && rawLicenseKey.startsWith('TP-PRO')) {
+    console.error('[tinypivot-mcp] Notice: UI Library keys (TP-PRO*) apply to @smallwebco/tinypivot-react/-vue. TinyPivot MCP Pro requires an MCP license key (TP-MCPP* / TP-MCPT*) from https://tiny-pivot.com/mcp')
+  }
   const demoToken = options.demoToken ?? process.env.TINYPIVOT_DEMO_TOKEN
-  const isPro = Boolean((licenseKey && licenseKey.startsWith('TP-')) || demoToken)
+  const isPro = Boolean(licenseKey || demoToken)
   const tier: 'free' | 'pro' = isPro ? 'pro' : 'free'
   const store = options.store ?? new DatasetStore({
     maxRowsPerDataset: isPro ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
@@ -245,7 +256,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.1.0',
+      version: '0.1.1',
     },
     {
       capabilities: {

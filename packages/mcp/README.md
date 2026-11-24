@@ -53,8 +53,8 @@ Unlock Pro or Team at [tiny-pivot.com/mcp](https://tiny-pivot.com/mcp).
 
 ## Environment Variables (Optional)
 
-- `TINYPIVOT_LICENSE_KEY` — TinyPivot Pro/Team license key (`TP-...`)
-- `DATABASE_URL` — PostgreSQL connection string for read-only `query_postgres` (Pro)
+- `TINYPIVOT_LICENSE_KEY` — TinyPivot MCP Pro/Team license key (`TP-MCPP-...` or `TP-MCPT-...`; note that UI Library `TP-PRO*` keys apply to `@smallwebco/tinypivot-react`/`-vue` only)
+- `DATABASE_URL` — PostgreSQL connection string for read-only `query_postgres` (Pro). Works with any other database (BigQuery, Snowflake, MySQL, DuckDB, Databricks) today via CLI/CSV handoff to `load_file` or MCP piping to `load_data`
 - `TINYPIVOT_ALLOWED_TABLES` — Comma-separated table allowlist for `query_postgres`
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
 - `TINYPIVOT_NO_COMPANION=1` — Disable the localhost Companion Data IDE server

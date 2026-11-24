@@ -48,7 +48,10 @@ function buildFullCompanionPayload(
   const turnTokensSaved = ds.ingestionMode === 'direct'
     ? Math.max(0, ds.estimatedDatasetTokens - 150)
     : 0
-  const isPro = Boolean((opts.licenseKey && opts.licenseKey.startsWith('TP-')) || opts.demoToken)
+  const validMcpKey = opts.licenseKey && (opts.licenseKey.startsWith('TP-MCPP-') || opts.licenseKey.startsWith('TP-MCPT-'))
+    ? opts.licenseKey
+    : null
+  const isPro = Boolean(validMcpKey || opts.demoToken)
   return {
     datasetId: ds.id,
     name: ds.name,
@@ -65,7 +68,7 @@ function buildFullCompanionPayload(
     chartConfig: ds.chartConfig ?? null,
     chartTheme: isPro ? store.getVisualTheme() : 'code',
     datasets: store.listMetadata(),
-    licenseKey: opts.licenseKey ?? null,
+    licenseKey: validMcpKey,
     demoToken: opts.demoToken ?? null,
     modelCatalog: MODEL_CATALOG,
     tokenStats: {
@@ -156,7 +159,10 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
 
     if (req.method === 'POST' && pathname === '/api/theme') {
       const body = await readJsonBody(req)
-      const isPro = Boolean((options.licenseKey && options.licenseKey.startsWith('TP-')) || options.demoToken)
+      const isPro = Boolean(
+        (options.licenseKey && (options.licenseKey.startsWith('TP-MCPP-') || options.licenseKey.startsWith('TP-MCPT-')))
+        || options.demoToken,
+      )
       if (typeof body.theme === 'string') {
         const requested = body.theme as ChartThemePreset
         if (isPro || requested === 'code') {

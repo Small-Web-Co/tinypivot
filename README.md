@@ -1,18 +1,26 @@
 # TinyPivot
 
-A lightweight data grid with free pivot tables, Pro charts, and optional AI-powered data exploration for Vue 3 and React. Focused, batteries-included, and easy to adopt.
+**The Interactive Data IDE for AI Agents (MCP) — plus Lightweight React & Vue 3 Data Grids, Pivot Tables, Charts & Embedded AI Analyst.**
 
-**[Live Demo](https://tiny-pivot.com)** · **[In-Agent Analytics (MCP)](https://tiny-pivot.com/mcp)** · **[Buy License](https://tiny-pivot.com/#pricing)** · **[GitHub Sponsors](https://github.com/sponsors/Small-Web-Co)**
+**[TinyPivot MCP](https://tiny-pivot.com/mcp)** · **[Live Demo](https://tiny-pivot.com)** · **[Pricing](https://tiny-pivot.com/#pricing)** · **[npm (`@smallwebco/tinypivot-mcp`)](https://www.npmjs.com/package/@smallwebco/tinypivot-mcp)**
 
 ⭐ **If you find TinyPivot useful, please consider giving it a star!** It helps others discover the project.
 
 [![Star on GitHub](https://img.shields.io/github/stars/Small-Web-Co/tinypivot?style=social)](https://github.com/Small-Web-Co/tinypivot)
+[![MCP Package](https://img.shields.io/badge/npm-@smallwebco%2Ftinypivot--mcp-10b981)](https://www.npmjs.com/package/@smallwebco/tinypivot-mcp)
 [![React Package](https://img.shields.io/badge/npm-React-61dafb)](https://www.npmjs.com/package/@smallwebco/tinypivot-react)
 [![Vue Package](https://img.shields.io/badge/npm-Vue%203-42b883)](https://www.npmjs.com/package/@smallwebco/tinypivot-vue)
-[![MCP Server](https://img.shields.io/badge/MCP-In--Agent%20Analytics-6366f1)](https://tiny-pivot.com/mcp)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
-**Try it instantly:**
+### One Engine, Three Ways to Use TinyPivot
+
+| Who it's for | Package | What it does |
+|---|---|---|
+| **AI Users & Data Analysts** | `@smallwebco/tinypivot-mcp` | Interactive Charts, Pivot Tables, Drill-Through & Excel inside **Antigravity, Claude, Cursor, OpenCode, Codex CLI & pi** (`npx @smallwebco/tinypivot-mcp init`) |
+| **Frontend & SaaS Engineers** | `@smallwebco/tinypivot-react` / `-vue` | Lightweight Excel-like `<DataGrid />` with free Pivot Tables & Core Charts for React and Vue 3 apps |
+| **Product Teams** | Embedded AI Data Analyst (BYOK) | Natural-language SQL querying inside your web app using your own OpenAI/Anthropic key over DuckDB WASM or Postgres |
+
+**Try the UI library online:**
 [![React StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-react)
 [![Vue StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Small-Web-Co/tinypivot/tree/master/examples/stackblitz-vue)
 
@@ -20,13 +28,13 @@ A lightweight data grid with free pivot tables, Pro charts, and optional AI-powe
 
 ## In-Agent Analytics (TinyPivot MCP App)
 
-**Turn any AI agent into a real Data IDE.** Instead of reading truncated markdown tables, burning 30k+ tokens pasting raw CSV/JSON rows into chat, or trusting LLM arithmetic, **`@smallwebco/tinypivot-mcp`** renders an interactive Chart, Pivot Table, Drill-Through, and Data Grid **directly inside your AI harness** (Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, pi, or any SEP-1865 MCP Apps client).
+**Turn any AI agent into a real Data IDE.** Instead of reading truncated markdown tables, burning tokens re-prompting for chart tweaks, or trusting LLM arithmetic, **`@smallwebco/tinypivot-mcp`** renders an interactive Chart, Pivot Table, Drill-Through, and Data Grid **directly inside your AI harness** (Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, pi, or any SEP-1865 MCP Apps client).
 
 - **1-Command Multi-Harness Setup:** Run `npx @smallwebco/tinypivot-mcp init` to auto-detect and configure all installed AI harnesses on your machine.
 - **Generous Free Tier (Core Charts Included):** Free includes Core Charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), Basic Pivot (`sum`), `Code` theme, Live Companion IDE, and up to **2,500 rows** (with unmistakable UI + LLM warnings whenever a larger dataset is truncated — never silent truncation).
-- **Save 90%+ LLM Tokens:** Large datasets stream directly from the local MCP server into the interactive UI via app-only tools instead of stuffing thousands of rows into the LLM context window.
-- **Deterministic Math (Zero Hallucinations):** Aggregations, totals, and pivot summaries are computed locally by `@smallwebco/tinypivot-core`, not estimated by an LLM.
-- **Pro / Team (`$19/mo`, `$149/yr`, `$249 Lifetime`, or `$79/mo` Team):** Unlocks unlimited rows, all 5 visual themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`), double-click Drill-Through, all 9+ aggregations, styled `.xlsx` exports, and AST-validated read-only `query_postgres`.
+- **Real, Cache-Aware Token Savings:** `load_file` and `query_postgres` send only a ~200-token schema & summary to the LLM and stream full rows locally to the UI at 0 tokens — and every local click (Chart ↔ Pivot ↔ Data, sort, filter, drill-through) costs `$0`.
+- **Works With Any Database Today:** Export any BigQuery, Snowflake, MySQL, DuckDB, or Databricks query to CSV/JSON and pass it to `load_file` (or pipe from another MCP server), plus built-in AST-validated read-only `query_postgres`. Native multi-DB & Parquet adapters coming in v0.2.
+- **Pro / Team (`$19/mo`, `$149/yr`, `$399` Local Lifetime, or `$79/mo` Team 5-Seat):** Unlocks unlimited rows, all 5 visual themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`), double-click Drill-Through, all 9+ aggregations, styled `.xlsx` exports, and read-only `query_postgres` (uses dedicated `TP-MCP*` keys).
 
 ### Quick Setup for AI Harnesses
 

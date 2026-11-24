@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { startCompanionServer } from './companion.js'
 import { runInitCommand } from './init.js'
-import { createTinyPivotMcpServer, loadAppHtml, resolveLicenseKey } from './server.js'
+import { createTinyPivotMcpServer, isMcpLicenseKey, loadAppHtml, resolveLicenseKey } from './server.js'
 import { DatasetStore, FREE_TIER_ROW_LIMIT } from './store.js'
 
 function openInBrowser(url: string) {
@@ -30,9 +30,10 @@ async function main() {
     return
   }
 
-  const licenseKey = resolveLicenseKey()
+  const rawLicenseKey = resolveLicenseKey()
+  const licenseKey = isMcpLicenseKey(rawLicenseKey) ? rawLicenseKey : undefined
   const demoToken = process.env.TINYPIVOT_DEMO_TOKEN
-  const isPro = Boolean((licenseKey && licenseKey.startsWith('TP-')) || demoToken)
+  const isPro = Boolean(licenseKey || demoToken)
   const store = new DatasetStore({
     maxRowsPerDataset: isPro ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
   })

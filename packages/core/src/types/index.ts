@@ -260,7 +260,7 @@ export interface PivotTableProps {
 }
 
 // License Types
-export type LicenseType = 'free' | 'pro-single' | 'pro-unlimited' | 'pro-team'
+export type LicenseType = 'free' | 'pro-single' | 'pro-unlimited' | 'pro-team' | 'mcp-pro' | 'mcp-team'
 
 export interface LicenseFeatures {
   pivot: boolean

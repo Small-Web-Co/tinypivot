@@ -83,8 +83,8 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot - Lightweight React & Vue Data Grid with Free Pivot Tables',
-      description: 'Lightweight data grid for React and Vue with free pivot tables, Sum aggregation, totals, and calculated fields. Upgrade for charts, AI Analyst, advanced aggregations, and no watermark.',
+      title: 'TinyPivot — Interactive Data IDE for AI Agents (MCP) & React/Vue Apps',
+      description: 'In-agent analytics MCP App for Antigravity, Claude, Cursor, OpenCode, and pi — plus lightweight React & Vue 3 data grids, pivot tables, charts, and BYOK AI Data Analyst.',
     },
   },
   {
@@ -93,7 +93,7 @@ export const routeDefinitions = [
     component: () => import('../pages/McpGuide.vue'),
     meta: {
       title: 'TinyPivot MCP — In-Agent Analytics & Data IDE for AI Workflows',
-      description: 'Add interactive charts, pivot tables, drill-through, and Excel export directly inside Antigravity, Claude Desktop, Cursor, and any MCP Apps host — while saving 90%+ LLM tokens.',
+      description: 'Add interactive charts, pivot tables, drill-through, and Excel export directly inside Antigravity, Claude, Cursor, OpenCode, and pi — with transparent prompt-cache-adjusted token savings.',
     },
   },
   {

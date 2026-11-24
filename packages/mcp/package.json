@@ -1,7 +1,7 @@
 {
   "name": "@smallwebco/tinypivot-mcp",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TinyPivot MCP Server & Interactive MCP App — turn CSV, JSON, and PostgreSQL queries into interactive pivot tables, charts, drill-through, and Excel exports directly inside AI chats.",
   "author": "Small Web, LLC",
   "license": "MIT",

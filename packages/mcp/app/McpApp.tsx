@@ -215,7 +215,7 @@ export function McpApp() {
 
   const applyLicense = useCallback(async (payload: ToolPayload) => {
     if (!licenseAppliedRef.current) {
-      if (payload.licenseKey) {
+      if (payload.licenseKey && (payload.licenseKey.startsWith('TP-MCPP-') || payload.licenseKey.startsWith('TP-MCPT-'))) {
         await setLicenseKey(payload.licenseKey)
         licenseAppliedRef.current = true
       }

@@ -83,7 +83,7 @@ const proPlanDetails = computed(() => {
     return { plan: 'mcp_pro_monthly', price: '$19', period: '/month', sub: 'Cancel anytime. Taxes calculated at checkout.' }
   }
   if (proBilling.value === 'lifetime') {
-    return { plan: 'mcp_pro_lifetime', price: '$249', period: 'one-time', sub: 'Local Pro perpetual license (all v1.x updates). Zero subscription.' }
+    return { plan: 'mcp_pro_lifetime', price: '$399', period: 'one-time', sub: 'Local Pro perpetual license (all v1.x updates). Zero subscription.' }
   }
   return { plan: 'mcp_pro_yearly', price: '$149', period: '/year', sub: '$12.42/mo billed annually — save 35%.' }
 })
@@ -687,25 +687,26 @@ function copyText(key: string, text: string) {
 <style scoped>
 .mcp-page {
   min-height: 100vh;
-  background: #0b1020;
-  color: #e5e7eb;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0a0a0f;
+  color: #e2e8f0;
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   padding-bottom: 80px;
+  position: relative;
 }
 
 .mcp-nav {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(11, 16, 32, 0.88);
+  background: rgba(10, 10, 15, 0.85);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .mcp-nav-inner {
-  max-width: 1080px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 14px 24px;
+  padding: 1rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -714,24 +715,29 @@ function copyText(key: string, text: string) {
 .mcp-logo {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 18px;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1.125rem;
   color: #f8fafc;
   text-decoration: none;
+}
+
+.mcp-logo svg {
+  color: #10b981;
 }
 
 .mcp-nav-links {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 1.5rem;
 }
 
 .mcp-nav-links a {
-  color: #cbd5e1;
+  color: #94a3b8;
   text-decoration: none;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
+  transition: color 0.2s;
 }
 
 .mcp-nav-links a:hover {
@@ -739,17 +745,20 @@ function copyText(key: string, text: string) {
 }
 
 .mcp-nav-cta {
-  background: #4f46e5;
+  background: linear-gradient(135deg, #10b981, #059669);
   color: #ffffff !important;
-  padding: 7px 14px;
-  border-radius: 8px;
+  padding: 0.45rem 0.95rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
 }
 
 .mcp-hero {
-  max-width: 860px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: 64px 24px 44px;
+  padding: 72px 24px 48px;
   text-align: center;
+  position: relative;
+  background: radial-gradient(ellipse 80% 55% at 50% -10%, rgba(16, 185, 129, 0.14), transparent);
 }
 
 .mcp-badge {
@@ -758,9 +767,9 @@ function copyText(key: string, text: string) {
   border-radius: 999px;
   font-size: 12.5px;
   font-weight: 600;
-  background: rgba(99, 102, 241, 0.16);
-  color: #a5b4fc;
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.32);
   margin-bottom: 20px;
 }
 
@@ -773,7 +782,7 @@ function copyText(key: string, text: string) {
 }
 
 .mcp-gradient {
-  background: linear-gradient(135deg, #818cf8, #38bdf8, #34d399);
+  background: linear-gradient(135deg, #10b981, #3b82f6, #8b5cf6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -793,15 +802,15 @@ function copyText(key: string, text: string) {
   padding: 8px 10px 8px 18px;
   margin-bottom: 24px;
   border-radius: 10px;
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  background: rgba(15, 23, 42, 0.9);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(16, 185, 129, 0.38);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .hero-cmd-box code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 14px;
-  color: #7dd3fc;
+  color: #34d399;
 }
 
 .mcp-hero-actions {
@@ -823,15 +832,18 @@ function copyText(key: string, text: string) {
   text-decoration: none;
   cursor: pointer;
   border: none;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .btn-primary {
-  background: #4f46e5;
+  background: linear-gradient(135deg, #10b981, #059669);
   color: #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.28);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
 }
 
 .btn-primary:disabled,
@@ -1207,9 +1219,9 @@ function copyText(key: string, text: string) {
 }
 
 .pricing-featured {
-  border-color: rgba(99, 102, 241, 0.6);
-  background: linear-gradient(180deg, rgba(79, 70, 229, 0.14), rgba(15, 23, 42, 0.92));
-  box-shadow: 0 12px 36px rgba(79, 70, 229, 0.18);
+  border-color: rgba(16, 185, 129, 0.55);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.92));
+  box-shadow: 0 12px 36px rgba(16, 185, 129, 0.15);
 }
 
 .pricing-top-row {
@@ -1261,14 +1273,18 @@ function copyText(key: string, text: string) {
 }
 
 .billing-toggle button.active {
-  background: #4f46e5;
-  color: #ffffff;
+  background: #10b981;
+  color: #06281e;
 }
 
 .save-tag {
   font-size: 10px;
-  color: #6ee7b7;
+  color: #34d399;
   margin-left: 2px;
+}
+
+.billing-toggle button.active .save-tag {
+  color: #06281e;
 }
 
 .pricing-price {
@@ -1358,8 +1374,8 @@ function copyText(key: string, text: string) {
 }
 
 .harness-tab.active {
-  background: #4f46e5;
-  border-color: #6366f1;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #10b981;
   color: #ffffff;
 }
 

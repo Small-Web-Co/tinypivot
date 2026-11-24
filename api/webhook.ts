@@ -27,16 +27,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
 })
 
-// License type codes
+// License type codes (UI Library keys stay TP-PRO*, MCP keys use TP-MCP*)
 const PLAN_CODES: Record<string, string> = {
   single: 'PRO1',
   unlimited: 'PROU',
   team: 'PROT',
-  mcp_pro_monthly: 'PROU',
-  mcp_pro_yearly: 'PROU',
-  mcp_pro_lifetime: 'PROU',
-  mcp_team_monthly: 'PROT',
-  mcp_team_yearly: 'PROT',
+  mcp_pro_monthly: 'MCPP',
+  mcp_pro_yearly: 'MCPP',
+  mcp_pro_lifetime: 'MCPP',
+  mcp_team_monthly: 'MCPT',
+  mcp_team_yearly: 'MCPT',
 }
 
 const VALID_PLANS = new Set(Object.keys(PLAN_CODES))
@@ -48,7 +48,7 @@ const PLAN_PRICES: Record<string, string | undefined> = {
   team: process.env.STRIPE_PRICE_TEAM || 'price_1SZZMWBMwUz92tuibrSiGNhb',
   mcp_pro_monthly: process.env.STRIPE_PRICE_MCP_PRO_MONTHLY || 'price_1UfR6hBMwUz92tui4vtPTgzb',
   mcp_pro_yearly: process.env.STRIPE_PRICE_MCP_PRO_YEARLY || 'price_1UfR6nBMwUz92tuiR83KcMYF',
-  mcp_pro_lifetime: process.env.STRIPE_PRICE_MCP_PRO_LIFETIME || 'price_1UfR6qBMwUz92tuiDxhVk2PD',
+  mcp_pro_lifetime: process.env.STRIPE_PRICE_MCP_PRO_LIFETIME || 'price_1UfRhNBMwUz92tuiDxc0F0Ht',
   mcp_team_monthly: process.env.STRIPE_PRICE_MCP_TEAM_MONTHLY || 'price_1UfR6wBMwUz92tuic7EMgc3p',
   mcp_team_yearly: process.env.STRIPE_PRICE_MCP_TEAM_YEARLY || 'price_1UfR73BMwUz92tuiNd8bx6A7',
 }

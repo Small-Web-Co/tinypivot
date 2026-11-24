@@ -375,6 +375,10 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
     type = 'pro-unlimited'
   else if (typeCode === 'PROT')
     type = 'pro-team'
+  else if (typeCode === 'MCPP')
+    type = 'mcp-pro'
+  else if (typeCode === 'MCPT')
+    type = 'mcp-team'
 
   // Features remain active forever. The parsed date is retained for compatibility.
   return {
@@ -387,7 +391,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
       percentageMode: type !== 'free',
       sessionPersistence: type !== 'free',
       noWatermark: type !== 'free',
-      charts: type !== 'free',
+      charts: true,
       aiAnalyst: type !== 'free',
       drillThrough: type !== 'free',
       xlsxExport: type !== 'free',
