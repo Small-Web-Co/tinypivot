@@ -14,12 +14,12 @@ function parseVisualTheme(raw?: string): ChartThemePreset {
   return lower && VALID_VISUAL_THEMES.has(lower) ? lower : 'code'
 }
 
-function getPreferencesPath(): string {
+export function getPreferencesPath(): string {
   const base = process.env.XDG_CONFIG_HOME?.trim() || path.join(os.homedir(), '.config')
   return path.join(base, 'tinypivot', 'preferences.json')
 }
 
-function loadSavedVisualTheme(): ChartThemePreset | undefined {
+export function loadSavedVisualTheme(): ChartThemePreset | undefined {
   try {
     const raw = fsSync.readFileSync(getPreferencesPath(), 'utf8')
     const parsed = JSON.parse(raw) as { visualTheme?: string }
@@ -31,7 +31,7 @@ function loadSavedVisualTheme(): ChartThemePreset | undefined {
   }
 }
 
-function saveVisualThemePreference(theme: ChartThemePreset): void {
+export function saveVisualThemePreference(theme: ChartThemePreset): void {
   try {
     const prefPath = getPreferencesPath()
     fsSync.mkdirSync(path.dirname(prefPath), { recursive: true })

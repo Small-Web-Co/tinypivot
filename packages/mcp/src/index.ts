@@ -6,8 +6,10 @@ export {
 export {
   runInitCommand,
   TINYPIVOT_CLAUDE_RULE_BLOCK,
+  TINYPIVOT_PI_RULE_BLOCK,
   upsertTinyPivotRuleBlock,
 } from './init.js'
+export { buildPiExtensionSource } from './pi-extension.js'
 export {
   executeReadOnlyPostgresQuery,
   listPostgresTables,

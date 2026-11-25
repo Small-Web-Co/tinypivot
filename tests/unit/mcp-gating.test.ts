@@ -388,5 +388,85 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(upgraded).toContain(TINYPIVOT_CLAUDE_RULE_BLOCK)
     expect(upgraded).not.toContain('old block')
     expect(upgraded.match(/<!-- tinypivot:start -->/g)?.length).toBe(1)
+    expect(upgraded).toContain('pi')
+    expect(upgraded).toContain('VERY FIRST reply')
+  })
+
+  it('plots multi-series YoY Braille line charts independently without summing series or dropping missing months to zero', () => {
+    const store = new DatasetStore()
+    const ds = store.register({
+      name: 'Edgeworth YoY',
+      source: 'test',
+      rows: [
+        { month: 'Jan', year: '2025', revenue: 6_540_000 },
+        { month: 'Feb', year: '2025', revenue: 4_660_000 },
+        { month: 'Mar', year: '2025', revenue: 5_080_000 },
+        { month: 'Jul', year: '2025', revenue: 4_235_000 },
+        { month: 'Dec', year: '2025', revenue: 4_048_000 },
+        { month: 'Jan', year: '2026', revenue: 4_500_000 },
+        { month: 'Feb', year: '2026', revenue: 3_960_000 },
+        { month: 'Mar', year: '2026', revenue: 2_985_000 },
+      ],
+    })
+
+    const card = formatTerminalChart(ds, {
+      type: 'line',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      seriesField: { field: 'year', role: 'dimension' },
+      options: { title: 'Edgeworth Revenue YoY (2025 vs 2026)' },
+    })
+
+    assertUniformCardBorderWidth(card)
+    expect(card).toContain('━━ 2025')
+    expect(card).toContain('┄┄ 2026')
+    // Top Y-axis tick must reflect individual series peak (~6.54M), NOT summed 11.04M
+    expect(card).toContain('6.54M')
+    expect(card).not.toContain('11.04M')
+
+    const summary = formatDatasetSummary(
+      { ...ds, chartConfig: { type: 'line', xAxis: { field: 'month', role: 'dimension' }, yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' }, seriesField: { field: 'year', role: 'dimension' } } },
+      'http://127.0.0.1:51234',
+    )
+    expect(summary).toContain('ACTION REQUIRED (Terminal Host — No Inline GUI)')
+    expect(summary).toContain('↗ Live: http://127.0.0.1:51234')
+
+    // Direct TTY truecolor ANSI mode keeps uniform visual widths and embeds theme palette RGB
+    const coloredStacked = formatTerminalChart(ds, {
+      type: 'stackedBar',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
+      seriesField: { field: 'year', role: 'dimension' },
+      options: { title: 'Acme revenue by month' },
+    }, { colorTheme: 'paper', raw: true, companionUrl: 'http://127.0.0.1:51234' })
+    expect(coloredStacked).toContain('\x1B[38;2;255;122;77m')
+    expect(coloredStacked).toContain('↗ Live: http://127.0.0.1:51234')
+    expect(coloredStacked).not.toContain('```text')
+    const coloredWidths = coloredStacked.split('\n').map(l => visualWidth(l))
+    expect(new Set(coloredWidths).size).toBe(1)
+
+    // Pivot card embeds live link directly inside the framed box
+    const livePivot = formatPivotSummary(ds, {
+      rowFields: ['month'],
+      columnFields: ['year'],
+      valueFields: [{ field: 'revenue', aggregation: 'sum' }],
+      showRowTotals: true,
+      showColumnTotals: true,
+    }, 'http://127.0.0.1:51234', { showBranding: false })
+    assertUniformCardBorderWidth(livePivot)
+    expect(livePivot).toContain('↗ Live: http://127.0.0.1:51234')
+  })
+
+  it('generates a self-contained pi truecolor extension with all 10 unified palettes and /tinypivot-theme command', async () => {
+    const { buildPiExtensionSource } = await import('../../packages/mcp/src/index.js')
+    const src = buildPiExtensionSource()
+    expect(src).toContain('registerEntryRenderer("tinypivot-card"')
+    expect(src).toContain('registerCommand("tinypivot-theme"')
+    expect(src).toContain('tool_execution_end')
+    expect(src).toContain('"crt-amber"')
+    expect(src).toContain('"paper"')
+    expect(src).toContain('"greenbar"')
+    expect(src).toContain('"crt-green"')
+    expect(src).toContain('255,')
   })
 })

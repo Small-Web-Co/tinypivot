@@ -1,6 +1,6 @@
-import type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
+import type { ChartConfig, ChartThemePreset, PivotConfig, TerminalPalette } from '@smallwebco/tinypivot-core'
 import type { StoredDataset } from './store.js'
-import { computePivotResult, processChartData } from '@smallwebco/tinypivot-core'
+import { computePivotResult, processChartData, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 
 const SUB_BLOCKS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
 const SERIES_GLYPHS = ['█', '▓', '▒', '░']
@@ -18,9 +18,26 @@ const BRAILLE_BITS: readonly (readonly number[])[] = [
 // eslint-disable-next-line no-control-regex
 const ANSI_ESCAPE_RE = /\x1B\[[0-9;]*m/g
 
+const ANSI_RESET = '\x1B[0m'
+const ANSI_BOLD = '\x1B[1m'
+
+function ansiFg(rgb: [number, number, number], text: string): string {
+  return `\x1B[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m${text}${ANSI_RESET}`
+}
+
+function ansiFgBold(rgb: [number, number, number], text: string): string {
+  return `${ANSI_BOLD}\x1B[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m${text}${ANSI_RESET}`
+}
+
 export interface TerminalFormatOptions {
   /** Show subtle tiny-pivot.com card signature (true on Free tier, false on Pro) */
   showBranding?: boolean
+  /** Live local Companion Data IDE URL to embed inside the card footer */
+  companionUrl?: string
+  /** Optional 24-bit ANSI truecolor palette for direct TTY CLI output (omit for LLM Markdown) */
+  colorTheme?: ChartThemePreset
+  /** Omit Markdown ```text fences (for direct TTY CLI output) */
+  raw?: boolean
 }
 
 function codePointDisplayWidth(cp: number): number {
@@ -191,6 +208,12 @@ function buildBottomBorder(footerLeft: string, footerRight: string, innerWidth: 
   return `╰${'─'.repeat(innerWidth + 2)}╯`
 }
 
+function resolveTerminalPalette(theme?: ChartThemePreset): TerminalPalette | undefined {
+  if (!theme)
+    return undefined
+  return TERMINAL_PALETTES[theme] ?? TERMINAL_PALETTES.code
+}
+
 function wrapInCard(
   title: string,
   rightBadge: string,
@@ -198,24 +221,35 @@ function wrapInCard(
   footerLeft: string,
   footerRight: string,
   minWidth = 66,
+  options: { palette?: TerminalPalette, raw?: boolean } = {},
 ): string {
+  const pal = options.palette
   const contentLines = bodyLines.filter(l => l !== CARD_DIVIDER)
   const longestBody = Math.max(...contentLines.map(l => visualWidth(l)), 0)
   const desiredHeader = visualWidth(title) + visualWidth(rightBadge) + (rightBadge ? 6 : 4)
   const desiredFooter = visualWidth(footerLeft) + visualWidth(footerRight) + (footerLeft && footerRight ? 6 : 4)
   const innerWidth = Math.min(82, Math.max(minWidth, longestBody, Math.min(desiredHeader, 82), Math.min(desiredFooter, 82)))
 
-  const topBorder = buildTopBorder(title, rightBadge, innerWidth)
-  const dividerLine = `├${'─'.repeat(innerWidth + 2)}┤`
+  const topPlain = buildTopBorder(title, rightBadge, innerWidth)
+  const topBorder = pal
+    ? topPlain.replace(/^(╭─ )(.+?)( ─+ )(.+?)( ─╮)$/, (_, a, b, c, d, e) =>
+        `${ansiFg(pal.border, a)}${ansiFgBold(pal.text, b)}${ansiFg(pal.border, c)}${ansiFg(pal.accent, d)}${ansiFg(pal.border, e)}`)
+    : topPlain
+  const dividerPlain = `├${'─'.repeat(innerWidth + 2)}┤`
+  const dividerLine = pal ? ansiFg(pal.border, dividerPlain) : dividerPlain
+  const edge = pal ? ansiFg(pal.border, '│') : '│'
 
   const paddedBody = bodyLines.map((line) => {
     if (line === CARD_DIVIDER)
       return dividerLine
     const clipped = visualWidth(line) > innerWidth ? truncateVisual(line, innerWidth) : line
-    return `│ ${padEndVisual(clipped, innerWidth)} │`
+    return `${edge} ${padEndVisual(clipped, innerWidth)} ${edge}`
   })
 
-  const bottomBorder = buildBottomBorder(footerLeft, footerRight, innerWidth)
+  const botPlain = buildBottomBorder(footerLeft, footerRight, innerWidth)
+  const bottomBorder = pal ? ansiFg(pal.border, botPlain) : botPlain
+  if (options.raw)
+    return [topBorder, ...paddedBody, bottomBorder].join('\n')
   return ['```text', topBorder, ...paddedBody, bottomBorder, '```'].join('\n')
 }
 
@@ -235,9 +269,16 @@ function computeBrailleYBounds(values: number[]): { minVal: number, maxVal: numb
   return { minVal, maxVal, span: Math.max(maxVal - minVal, 1e-9) }
 }
 
+const LINE_SERIES_STYLES = ['━━', '┄┄', '··', '──'] as const
+
+interface BrailleSeries {
+  name: string
+  values: Array<number | null>
+}
+
 function renderBrailleLineBody(
   categories: string[],
-  values: number[],
+  seriesList: BrailleSeries[],
   filledArea = false,
 ): string[] {
   const chartCols = 58
@@ -246,7 +287,10 @@ function renderBrailleLineBody(
   const pxH = chartRows * 4
 
   const grid: number[][] = Array.from({ length: chartRows }, () => Array.from<number>({ length: chartCols }).fill(0))
-  const { minVal, maxVal, span } = computeBrailleYBounds(values)
+  const allFinite = seriesList.flatMap(s => s.values.filter((v): v is number => v !== null && Number.isFinite(v)))
+  if (allFinite.length === 0)
+    return []
+  const { minVal, maxVal, span } = computeBrailleYBounds(allFinite)
 
   const setPixel = (x: number, y: number) => {
     const cx = Math.max(0, Math.min(pxW - 1, Math.round(x)))
@@ -256,36 +300,57 @@ function renderBrailleLineBody(
     grid[cellRow][cellCol] |= BRAILLE_BITS[cy % 4][cx % 2]
   }
 
-  const pts = values.map((v, i) => ({
-    x: values.length === 1 ? pxW / 2 : (i / (values.length - 1)) * (pxW - 1),
-    y: (pxH - 1) - ((v - minVal) / span) * (pxH - 1),
-  }))
-
-  // Track topmost y per x column for optional subtle area stipple fill
+  // Track topmost y per x column for optional subtle area stipple fill (single-series area)
   const curveY = Array.from<number>({ length: pxW }).fill(pxH)
-  const plotPoint = (x: number, y: number) => {
+  const plotPoint = (x: number, y: number, trackCurve: boolean) => {
     const cx = Math.max(0, Math.min(pxW - 1, Math.round(x)))
     const cy = Math.max(0, Math.min(pxH - 1, Math.round(y)))
     setPixel(cx, cy)
-    if (cy < curveY[cx])
+    if (trackCurve && cy < curveY[cx])
       curveY[cx] = cy
   }
 
-  // Connect consecutive points smoothly using fine linear interpolation
-  for (let i = 0; i < pts.length; i++) {
-    plotPoint(pts[i].x, pts[i].y)
-    if (i > 0) {
-      const a = pts[i - 1]
-      const b = pts[i]
-      const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) * 1.5))
-      for (let s = 1; s < steps; s++) {
-        const t = s / steps
-        plotPoint(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+  const shouldPlotStep = (seriesIdx: number, stepIdx: number): boolean => {
+    if (seriesIdx === 0)
+      return true
+    if (seriesIdx === 1)
+      return (stepIdx % 7) < 4
+    return (stepIdx % 6) < 2
+  }
+
+  const count = categories.length
+  for (let sIdx = 0; sIdx < seriesList.length; sIdx++) {
+    const series = seriesList[sIdx]
+    const trackCurve = filledArea && sIdx === 0 && seriesList.length === 1
+    let prev: { x: number, y: number } | null = null
+    let dashCounter = 0
+
+    for (let i = 0; i < count; i++) {
+      const val = series.values[i]
+      if (val === null || !Number.isFinite(val)) {
+        prev = null
+        continue
       }
+      const pt = {
+        x: count === 1 ? pxW / 2 : (i / (count - 1)) * (pxW - 1),
+        y: (pxH - 1) - ((val - minVal) / span) * (pxH - 1),
+      }
+      plotPoint(pt.x, pt.y, trackCurve)
+      if (prev) {
+        const steps = Math.max(1, Math.ceil(Math.hypot(pt.x - prev.x, pt.y - prev.y) * 1.5))
+        for (let s = 1; s < steps; s++) {
+          dashCounter++
+          if (shouldPlotStep(sIdx, dashCounter)) {
+            const t = s / steps
+            plotPoint(prev.x + (pt.x - prev.x) * t, prev.y + (pt.y - prev.y) * t, trackCurve)
+          }
+        }
+      }
+      prev = pt
     }
   }
 
-  if (filledArea) {
+  if (filledArea && seriesList.length === 1) {
     for (let cx = 0; cx < pxW; cx += 2) {
       const topY = curveY[cx]
       if (topY < pxH) {
@@ -303,6 +368,17 @@ function renderBrailleLineBody(
   const midRow = Math.floor(chartRows / 2)
 
   const lines: string[] = []
+  if (seriesList.length > 1) {
+    const legendItems = seriesList.slice(0, LINE_SERIES_STYLES.length).map((s, idx) => {
+      const seriesSum = s.values.reduce<number>((acc, v) => acc + (v ?? 0), 0)
+      return `${LINE_SERIES_STYLES[idx]} ${truncateVisual(s.name, 14)} (${formatCompactNumber(seriesSum)})`
+    })
+    if (seriesList.length > LINE_SERIES_STYLES.length)
+      legendItems.push(`+${seriesList.length - LINE_SERIES_STYLES.length} more`)
+    lines.push(legendItems.join('   '))
+    lines.push('')
+  }
+
   for (let r = 0; r < chartRows; r++) {
     let yTick = ''
     let axisChar = '│'
@@ -348,6 +424,24 @@ function renderBrailleLineBody(
   }
 
   return lines
+}
+
+function buildPresentSeriesPairs(
+  rows: Record<string, unknown>[],
+  xField: string,
+  seriesField?: string,
+): Set<string> | null {
+  if (!seriesField)
+    return null
+  const present = new Set<string>()
+  for (const row of rows) {
+    const xRaw = row[xField]
+    const sRaw = row[seriesField]
+    const xKey = xRaw === null || xRaw === undefined ? '(blank)' : String(xRaw)
+    const sKey = sRaw === null || sRaw === undefined ? '(blank)' : String(sRaw)
+    present.add(`${xKey}\u0000${sKey}`)
+  }
+  return present
 }
 
 function formatTrendDelta(values: number[]): string {
@@ -403,6 +497,10 @@ export function formatTerminalChart(
   }
 
   const showBranding = options.showBranding !== false
+  const pal = resolveTerminalPalette(options.colorTheme)
+  const liveRow = options.companionUrl
+    ? (pal ? ansiFg(pal.accent, `↗ Live: ${options.companionUrl}`) : `↗ Live: ${options.companionUrl}`)
+    : null
   const peakCat = truncateVisual(String(processed.categories[peakIdx]), 14)
   const lowCat = truncateVisual(String(processed.categories[lowIdx]), 14)
   const statsLine = `▲ Peak: ${peakCat} (${formatCompactNumber(totalsPerCat[peakIdx])})`
@@ -411,14 +509,61 @@ export function formatTerminalChart(
 
   // High-res 2x4 Braille line / area chart for time-series with >= 3 points
   if ((fullConfig.type === 'line' || fullConfig.type === 'area') && processed.categories.length >= 3) {
-    const body = renderBrailleLineBody(processed.categories.map(String), totalsPerCat, fullConfig.type === 'area')
-    body.push(CARD_DIVIDER, statsLine)
-    const delta = formatTrendDelta(totalsPerCat)
-    const badge = delta ? `Total ${formatCompactNumber(grandTotal)} · ${delta}` : `Total ${formatCompactNumber(grandTotal)}`
+    const categoriesStr = processed.categories.map(String)
+    const presentPairs = processed.series.length > 1
+      ? buildPresentSeriesPairs(dataset.rows, chartConfig.xAxis.field, chartConfig.seriesField?.field)
+      : null
+    const brailleSeries: BrailleSeries[] = processed.series.map(s => ({
+      name: s.name,
+      values: categoriesStr.map((cat, idx) => {
+        if (presentPairs && !presentPairs.has(`${cat}\u0000${s.name}`))
+          return null
+        const val = Number(s.data[idx])
+        return Number.isFinite(val) ? val : null
+      }),
+    }))
+    const body = renderBrailleLineBody(categoriesStr, brailleSeries, fullConfig.type === 'area').map((row, rIdx) => {
+      if (!pal)
+        return row
+      if (brailleSeries.length > 1 && rIdx === 0)
+        return ansiFg(pal.accent, row)
+      if (row.includes('┤') || row.includes('│')) {
+        const splitIdx = Math.max(row.indexOf('┤'), row.indexOf('│'))
+        return `${ansiFg(pal.muted, row.slice(0, splitIdx))}${ansiFg(pal.border, row[splitIdx])}${ansiFg(pal.accent, row.slice(splitIdx + 1))}`
+      }
+      if (row.includes('└'))
+        return ansiFg(pal.border, row)
+      return ansiFg(pal.muted, row)
+    })
+
+    let lineStats = statsLine
+    let badge = `Total ${formatCompactNumber(grandTotal)}`
+    if (brailleSeries.length === 1) {
+      const delta = formatTrendDelta(totalsPerCat)
+      badge = delta ? `Total ${formatCompactNumber(grandTotal)} · ${delta}` : badge
+    }
+    else {
+      const perSeriesPeaks = brailleSeries.slice(0, 3).map((s) => {
+        let bestIdx = -1
+        for (let i = 0; i < s.values.length; i++) {
+          const v = s.values[i]
+          if (v !== null && (bestIdx === -1 || v > (s.values[bestIdx] ?? Number.NEGATIVE_INFINITY)))
+            bestIdx = i
+        }
+        return bestIdx >= 0
+          ? `${truncateVisual(s.name, 10)} peak: ${truncateVisual(categoriesStr[bestIdx], 8)} (${formatCompactNumber(s.values[bestIdx]!)})`
+          : `${truncateVisual(s.name, 10)}: —`
+      })
+      lineStats = `▲ ${perSeriesPeaks.join('  ·  ')}`
+    }
+
+    body.push(CARD_DIVIDER, pal ? ansiFg(pal.muted, lineStats) : lineStats)
+    if (liveRow)
+      body.push(liveRow)
     const chartKind = fullConfig.type === 'area' ? 'Area' : 'Line'
     const footerLeft = showBranding ? 'tiny-pivot.com' : ''
     const footerRight = `${dataset.rows.length.toLocaleString()} rows · ${chartKind}`
-    return wrapInCard(title, badge, body, footerLeft, footerRight)
+    return wrapInCard(title, badge, body, footerLeft, footerRight, 66, { palette: pal, raw: options.raw })
   }
 
   // Horizontal precision bar / multi-series stacked bar card
@@ -439,47 +584,65 @@ export function formatTerminalChart(
   if (isMultiSeries) {
     const visibleLegend = processed.series
       .slice(0, SERIES_GLYPHS.length)
-      .map((s, i) => `${SERIES_GLYPHS[i]} ${truncateVisual(s.name, 14)}`)
+      .map((s, i) => {
+        const glyph = pal ? ansiFg(pal.series[i % pal.series.length], SERIES_GLYPHS[i]) : SERIES_GLYPHS[i]
+        const name = pal ? ansiFg(pal.text, truncateVisual(s.name, 14)) : truncateVisual(s.name, 14)
+        return `${glyph} ${name}`
+      })
     if (processed.series.length > SERIES_GLYPHS.length)
-      visibleLegend.push(`+${processed.series.length - SERIES_GLYPHS.length} more`)
+      visibleLegend.push(pal ? ansiFg(pal.muted, `+${processed.series.length - SERIES_GLYPHS.length} more`) : `+${processed.series.length - SERIES_GLYPHS.length} more`)
     body.push(visibleLegend.join('  '))
     body.push('')
   }
 
   for (const entry of entries) {
-    const label = padEndVisual(truncateVisual(entry.label, labelWidth), labelWidth)
+    const labelPlain = padEndVisual(truncateVisual(entry.label, labelWidth), labelWidth)
+    const label = pal ? ansiFg(pal.text, labelPlain) : labelPlain
     let bar: string
     if (isMultiSeries) {
       const totalWidth = entry.total === 0 ? 0 : Math.max(1, Math.round((Math.abs(entry.total) / maxVal) * barWidth))
       const segSum = entry.segments.reduce((a, b) => a + b, 0) || 1
+      let builtPlainLen = 0
       let built = ''
-      for (let i = 0; i < entry.segments.length && built.length < totalWidth; i++) {
+      for (let i = 0; i < entry.segments.length && builtPlainLen < totalWidth; i++) {
         const segLen = i === entry.segments.length - 1
-          ? Math.max(0, totalWidth - built.length)
+          ? Math.max(0, totalWidth - builtPlainLen)
           : Math.round((entry.segments[i] / segSum) * totalWidth)
-        built += SERIES_GLYPHS[i % SERIES_GLYPHS.length].repeat(segLen)
+        if (segLen <= 0)
+          continue
+        const segStr = SERIES_GLYPHS[i % SERIES_GLYPHS.length].repeat(segLen)
+        built += pal ? ansiFg(pal.series[i % pal.series.length], segStr) : segStr
+        builtPlainLen += segLen
       }
-      bar = padEndVisual(built, barWidth)
+      bar = `${built}${' '.repeat(Math.max(0, barWidth - builtPlainLen))}`
     }
     else {
-      bar = padEndVisual(renderPreciseBar(Math.abs(entry.total) / maxVal, barWidth), barWidth)
+      const rawBar = renderPreciseBar(Math.abs(entry.total) / maxVal, barWidth)
+      const coloredBar = pal ? ansiFg(pal.accent, rawBar) : rawBar
+      bar = `${coloredBar}${' '.repeat(Math.max(0, barWidth - visualWidth(rawBar)))}`
     }
     const valStr = padStartVisual(formatCompactNumber(entry.total), valWidth)
     const pctStr = grandTotal > 0 ? `${((entry.total / grandTotal) * 100).toFixed(1).padStart(5)}%` : ''
-    body.push(`${label} │ ${bar} ${valStr}${pctStr ? `  ${pctStr}` : ''}`)
+    const sep = pal ? ansiFg(pal.border, '│') : '│'
+    const valOut = pal ? ansiFgBold(pal.text, valStr) : valStr
+    const pctOut = pctStr ? (pal ? ansiFg(pal.muted, pctStr) : pctStr) : ''
+    body.push(`${label} ${sep} ${bar} ${valOut}${pctOut ? `  ${pctOut}` : ''}`)
   }
 
   if (processed.categories.length > entries.length) {
-    body.push(`… +${processed.categories.length - entries.length} more categories (all interactive in TinyPivot)`)
+    const more = `… +${processed.categories.length - entries.length} more categories (all interactive in TinyPivot)`
+    body.push(pal ? ansiFg(pal.muted, more) : more)
   }
 
-  body.push(CARD_DIVIDER, statsLine)
+  body.push(CARD_DIVIDER, pal ? ansiFg(pal.muted, statsLine) : statsLine)
+  if (liveRow)
+    body.push(liveRow)
 
   const footerLeft = showBranding ? 'tiny-pivot.com' : ''
   const chartKind = isMultiSeries ? 'Stacked Bar' : 'Bar'
   const footerRight = `${dataset.rows.length.toLocaleString()} rows · ${chartKind}`
 
-  return wrapInCard(title, `Total ${formatCompactNumber(grandTotal)}`, body, footerLeft, footerRight)
+  return wrapInCard(title, `Total ${formatCompactNumber(grandTotal)}`, body, footerLeft, footerRight, 66, { palette: pal, raw: options.raw })
 }
 
 export function formatDatasetSummary(
@@ -491,7 +654,10 @@ export function formatDatasetSummary(
     .map(c => `- \`${c.name}\` (${c.type}, ${c.distinctCount} distinct; e.g. ${c.sampleValues.slice(0, 3).join(', ')})`)
     .join('\n')
 
-  const chartBlock = formatTerminalChart(dataset, dataset.chartConfig, options)
+  const chartBlock = formatTerminalChart(dataset, dataset.chartConfig, {
+    ...options,
+    companionUrl: options.companionUrl ?? companionUrl,
+  })
   const rowHeadline = dataset.truncatedForFreeTier
     ? `**${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows (Free tier limit)**`
     : `**${dataset.rows.length.toLocaleString()} rows**`
@@ -508,11 +674,14 @@ export function formatDatasetSummary(
   }
 
   if (chartBlock) {
+    const echoNote = companionUrl
+      ? '> **ACTION REQUIRED (Terminal Host — No Inline GUI):** The user cannot see this chart unless you include the fenced `text` TinyPivot card above **verbatim** in your reply along with the Interactive Data IDE link below. Do not say "it is open in TinyPivot" without printing the card.'
+      : '_Display the fenced TinyPivot card above verbatim when replying in a terminal harness._'
     parts.push(
       '',
       chartBlock,
       '',
-      '_Display the fenced TinyPivot card above verbatim when replying in a terminal harness._',
+      echoNote,
     )
   }
 
@@ -595,7 +764,9 @@ export function formatPivotSummary(
   const computeInnerWidth = () =>
     widths.reduce((sum, w) => sum + w, 0) + (widths.length - 1) * 3
 
-  const minInner = 48
+  const effectiveLiveUrl = options.companionUrl ?? companionUrl
+  const liveLabel = effectiveLiveUrl ? `↗ Live: ${effectiveLiveUrl}` : ''
+  const minInner = Math.max(48, liveLabel ? visualWidth(liveLabel) + 2 : 0)
   const deficit = minInner - computeInnerWidth()
   if (deficit > 0) {
     widths[0] += deficit
@@ -633,22 +804,21 @@ export function formatPivotSummary(
     tableLines.push(midRule, formatRow(totalRow))
   }
   tableLines.push(botColsRule)
-  // Put subtle compact status line only if clipped, otherwise close directly with footer border!
-  if (result.rowHeaders.length > maxRows || totalCols > maxCols) {
-    const clipNotes: string[] = []
-    if (result.rowHeaders.length > maxRows)
-      clipNotes.push(`+${result.rowHeaders.length - maxRows} more rows`)
-    if (totalCols > maxCols)
-      clipNotes.push(`+${totalCols - maxCols} more cols`)
-    const clipMsg = truncateVisual(`… ${clipNotes.join(', ')} (all interactive in TinyPivot)`, innerWidth)
-    tableLines.push(`│ ${padEndVisual(clipMsg, innerWidth)} │`)
-    tableLines.push(footerLine)
-  }
-  else {
-    // Replace botColsRule with clean direct bottom border when no clip line, or render integrated footer bar
-    tableLines.pop()
+  const hasFooterContent = result.rowHeaders.length > maxRows || totalCols > maxCols || showBranding || Boolean(liveLabel)
+  if (hasFooterContent) {
+    if (result.rowHeaders.length > maxRows || totalCols > maxCols) {
+      const clipNotes: string[] = []
+      if (result.rowHeaders.length > maxRows)
+        clipNotes.push(`+${result.rowHeaders.length - maxRows} more rows`)
+      if (totalCols > maxCols)
+        clipNotes.push(`+${totalCols - maxCols} more cols`)
+      const clipMsg = truncateVisual(`… ${clipNotes.join(', ')} (all interactive in TinyPivot)`, innerWidth)
+      tableLines.push(`│ ${padEndVisual(clipMsg, innerWidth)} │`)
+    }
+    if (liveLabel) {
+      tableLines.push(`│ ${padEndVisual(truncateVisual(liveLabel, innerWidth), innerWidth)} │`)
+    }
     if (showBranding) {
-      tableLines.push(botColsRule)
       const leftTxt = 'tiny-pivot.com'
       const rightTxt = truncateVisual(metaRight, Math.max(4, innerWidth - visualWidth(leftTxt) - 2))
       const gap = Math.max(1, innerWidth - visualWidth(leftTxt) - visualWidth(rightTxt))
@@ -656,21 +826,34 @@ export function formatPivotSummary(
       tableLines.push(`╰${'─'.repeat(innerWidth + 2)}╯`)
     }
     else {
-      tableLines.push(`╰─${widths.map(w => '─'.repeat(w)).join('─┴─')}─╯`)
+      tableLines.push(footerLine)
     }
   }
-  tableLines.push('```')
+  else {
+    tableLines.pop()
+    tableLines.push(`╰─${widths.map(w => '─'.repeat(w)).join('─┴─')}─╯`)
+  }
+  if (options.raw) {
+    tableLines.shift()
+  }
+  else {
+    tableLines.push('```')
+  }
 
   const headline = dataset.truncatedForFreeTier
     ? `Pivot on **${dataset.name}** (**first ${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows — Free tier subset**):`
     : `Pivot on **${dataset.name}** (${dataset.rows.length.toLocaleString()} source rows):`
+
+  const echoNote = companionUrl
+    ? '> **ACTION REQUIRED (Terminal Host — No Inline GUI):** The user cannot see this pivot table unless you include the fenced `text` TinyPivot card above **verbatim** in your reply along with the Interactive Data IDE link below. Do not say "it is open in TinyPivot" without printing the card.'
+    : '_Display the fenced TinyPivot table above verbatim when replying in a terminal harness._'
 
   const out = [
     headline,
     '',
     tableLines.join('\n'),
     '',
-    '_Display the fenced TinyPivot table above verbatim when replying in a terminal harness._',
+    echoNote,
   ]
 
   if (result.rowHeaders.length > maxRows) {

@@ -1,12 +1,14 @@
 #!/usr/bin/env node
+import type { ChartThemePreset } from '@smallwebco/tinypivot-core'
 import type { CompanionServerHandle } from './companion.js'
 import { spawn } from 'node:child_process'
 import { PassThrough } from 'node:stream'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { startCompanionServer } from './companion.js'
 import { runInitCommand } from './init.js'
 import { createTinyPivotMcpServer, isMcpLicenseKey, loadAppHtml, resolveLicenseKey } from './server.js'
-import { DatasetStore, FREE_TIER_ROW_LIMIT, parseDelimitedText } from './store.js'
+import { DatasetStore, FREE_TIER_ROW_LIMIT, getPreferencesPath, loadSavedVisualTheme, parseDelimitedText, saveVisualThemePreference } from './store.js'
 import { formatDatasetSummary, formatPivotSummary, formatTerminalChart } from './summary.js'
 import { runTuiCommand } from './tui.js'
 
@@ -157,14 +159,166 @@ async function readRemainingStdin(initial: Buffer, alreadyEnded: boolean): Promi
   })
 }
 
+function swatchBlock(rgb: [number, number, number]): string {
+  return `\x1B[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m██\x1B[0m`
+}
+
+function formatThemeRow(id: ChartThemePreset, active: ChartThemePreset, selected: boolean, useColor: boolean): string {
+  const pal = TERMINAL_PALETTES[id]
+  const pointer = selected ? '›' : ' '
+  const dot = id === active ? '●' : ' '
+  const swatches = useColor
+    ? `${swatchBlock(pal.series[0])} ${swatchBlock(pal.series[1])} ${swatchBlock(pal.series[2])}`
+    : '■■■'
+  const idCol = id.padEnd(11)
+  const labelCol = pal.label.padEnd(11)
+  const suffix = id === active ? ' (active)' : ''
+  const line = `  ${pointer} ${dot} ${swatches}  ${idCol} ${labelCol}${suffix}`
+  return useColor && selected ? `\x1B[1m${line}\x1B[0m` : line
+}
+
+async function runInteractiveThemePicker(active: ChartThemePreset): Promise<ChartThemePreset | null> {
+  const themes = CHART_THEME_IDS
+  let cursor = Math.max(0, themes.indexOf(active))
+  const useColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR)
+  const totalLines = themes.length + 4
+  let rendered = false
+
+  const draw = () => {
+    if (rendered) {
+      process.stdout.write(`\x1B[${totalLines}A`)
+    }
+    rendered = true
+    const out = [
+      '\x1B[2K\x1B[1mTinyPivot MCP — Choose Visual Theme\x1B[0m  (↑/↓ move, Enter select, q cancel)',
+      '\x1B[2K',
+      ...themes.map((id, idx) => `\x1B[2K${formatThemeRow(id, active, idx === cursor, useColor)}`),
+      '\x1B[2K',
+      `\x1B[2K  Saves to ${getPreferencesPath()} (applies across all MCP sessions, Companion IDE & TUI)`,
+    ]
+    process.stdout.write(`${out.join('\n')}\n`)
+  }
+
+  return new Promise((resolve) => {
+    process.stdout.write('\x1B[?25l')
+    draw()
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    process.stdin.setEncoding('utf8')
+
+    const finish = (choice: ChartThemePreset | null) => {
+      process.stdin.off('data', onKey)
+      process.stdin.setRawMode(false)
+      process.stdin.pause()
+      process.stdout.write('\x1B[?25h')
+      resolve(choice)
+    }
+
+    const onKey = (key: string) => {
+      if (key === 'q' || key === '\u0003' || key === '\x1B') {
+        finish(null)
+        return
+      }
+      if (key === '\r' || key === '\n') {
+        finish(themes[cursor])
+        return
+      }
+      if (key === '\x1B[A' || key === 'k') {
+        cursor = (cursor - 1 + themes.length) % themes.length
+        draw()
+      }
+      else if (key === '\x1B[B' || key === 'j') {
+        cursor = (cursor + 1) % themes.length
+        draw()
+      }
+    }
+
+    process.stdin.on('data', onKey)
+  })
+}
+
+async function runThemeCommand(args: string[]): Promise<void> {
+  const validSet = new Set<string>(CHART_THEME_IDS)
+  const requested = args[0]?.trim().toLowerCase()
+  const active = (process.env.TINYPIVOT_THEME?.trim().toLowerCase() && validSet.has(process.env.TINYPIVOT_THEME.trim().toLowerCase()))
+    ? process.env.TINYPIVOT_THEME.trim().toLowerCase() as ChartThemePreset
+    : (loadSavedVisualTheme() ?? 'code')
+  const useColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR)
+
+  if (!requested && process.stdin.isTTY && process.stdout.isTTY) {
+    console.log('')
+    const picked = await runInteractiveThemePicker(active)
+    console.log('')
+    if (!picked) {
+      console.log('Theme unchanged.')
+      return
+    }
+    saveVisualThemePreference(picked)
+    console.log(`✓ Default TinyPivot theme set to "${picked}" (${TERMINAL_PALETTES[picked].label})`)
+    if (process.env.TINYPIVOT_THEME) {
+      console.log(`  Note: TINYPIVOT_THEME=${process.env.TINYPIVOT_THEME} in your shell/harness env overrides preferences.json.`)
+    }
+    return
+  }
+
+  if (!requested || requested === '-h' || requested === '--help' || requested === 'list') {
+    console.log('\nTinyPivot MCP — Visual Themes\n')
+    for (const id of CHART_THEME_IDS) {
+      console.log(formatThemeRow(id, active, false, useColor))
+    }
+    console.log(`\nPreferences file: ${getPreferencesPath()}`)
+    if (process.env.TINYPIVOT_THEME) {
+      console.log(`Note: TINYPIVOT_THEME=${process.env.TINYPIVOT_THEME} is set in env and overrides preferences.json.`)
+    }
+    console.log('\nUsage: npx @smallwebco/tinypivot-mcp theme [theme-id]\n')
+    return
+  }
+
+  if (!validSet.has(requested)) {
+    console.error(`Unknown theme "${requested}". Available themes: ${CHART_THEME_IDS.join(', ')}`)
+    process.exit(1)
+  }
+
+  saveVisualThemePreference(requested as ChartThemePreset)
+  console.log(`✓ Default TinyPivot theme set to "${requested}" (${TERMINAL_PALETTES[requested as ChartThemePreset].label}) — saved to ${getPreferencesPath()}`)
+  console.log('  Applies immediately on next TinyPivot MCP turn, Companion IDE load, or TUI launch.')
+}
+
+function printRootHelp(): void {
+  console.log(`
+TinyPivot MCP — Interactive Data IDE & Terminal Charts for AI Agents
+
+Commands:
+  tinypivot-mcp init [options]       Configure Claude Code, Claude Desktop, pi, Cursor, OpenCode, Codex & Antigravity
+  tinypivot-mcp theme [id]           Interactive arrow-key theme picker (or set theme directly)
+  tinypivot-mcp tui                  Attach a live truecolor split-pane TUI (Ghostty/tmux)
+  <cmd> | tinypivot-mcp [options]    Pipe CSV/TSV/JSON/JSONL directly from psql, duckdb, bq, etc.
+
+Options:
+  --theme=<id>                       Visual theme (${CHART_THEME_IDS.join(', ')})
+  --pivot                            Also print a framed sparkline pivot table on stdin pipe
+  --open                             Open the live Companion Data IDE in your browser
+  --port=<n>                         Bind Companion Data IDE on a specific localhost port
+  --name=<title>                     Dataset title for piped stdin / loaded files
+`.trim())
+}
+
 async function main() {
   const args = process.argv.slice(2)
+  if (args[0] === '-h' || args[0] === '--help') {
+    printRootHelp()
+    return
+  }
   if (args[0] === 'init') {
     await runInitCommand(args.slice(1))
     return
   }
   if (args[0] === 'tui' || args[0] === 'attach') {
     await runTuiCommand(args.slice(1))
+    return
+  }
+  if (args[0] === 'theme' || args[0] === 'themes') {
+    await runThemeCommand(args.slice(1))
     return
   }
 
@@ -292,12 +446,25 @@ async function main() {
       : ''
     console.error(`[tinypivot-mcp] Loaded ${ds.name} (${ds.rows.length.toLocaleString()} rows)${truncSuffix}`)
 
-    const chartCard = formatTerminalChart(ds, ds.chartConfig, { showBranding: !isPro })
+    const useTtyColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR)
+    let liveCompanionUrl: string | undefined
+    if ((autoOpen || explicitPort) && !disableCompanion) {
+      const handle = await ensureCompanionStarted()
+      liveCompanionUrl = handle?.url
+    }
+
+    const fmtOpts = {
+      showBranding: !isPro,
+      companionUrl: liveCompanionUrl,
+      colorTheme: useTtyColor ? store.getVisualTheme() : undefined,
+      raw: useTtyColor,
+    }
+    const chartCard = formatTerminalChart(ds, ds.chartConfig, fmtOpts)
     if (chartCard) {
       console.log(chartCard)
     }
     else {
-      console.log(formatDatasetSummary(ds, undefined, { showBranding: !isPro }))
+      console.log(formatDatasetSummary(ds, liveCompanionUrl, fmtOpts))
     }
 
     if (showPivotOutput && ds.pivotConfig?.valueFields?.length) {
@@ -307,16 +474,13 @@ async function main() {
         valueFields: ds.pivotConfig.valueFields,
         showRowTotals: ds.pivotConfig.showRowTotals ?? true,
         showColumnTotals: ds.pivotConfig.showColumnTotals ?? true,
-      }, undefined, { showBranding: !isPro })
+      }, liveCompanionUrl, fmtOpts)
       console.log(`\n${pivotCard}`)
     }
 
-    if ((autoOpen || explicitPort) && !disableCompanion) {
-      const handle = await ensureCompanionStarted()
-      if (handle) {
-        console.error(`[tinypivot-mcp] Serving live Companion IDE at ${handle.url} (press Ctrl+C to stop)`)
-        await new Promise<void>(() => {})
-      }
+    if (liveCompanionUrl) {
+      console.error(`[tinypivot-mcp] Serving live Companion IDE at ${liveCompanionUrl} (press Ctrl+C to stop)`)
+      await new Promise<void>(() => {})
     }
     return
   }
