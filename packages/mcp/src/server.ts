@@ -12,6 +12,7 @@ import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { completable } from '@modelcontextprotocol/sdk/server/completable.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
@@ -91,6 +92,14 @@ const VIEW_MODE_VALUES = ['grid', 'pivot', 'chart'] as const
 type ViewMode = typeof VIEW_MODE_VALUES[number]
 // z.enum needs a non-empty tuple; the ids come from the shared theme list in core.
 const VISUAL_THEME_VALUES = CHART_THEME_IDS as [ChartThemePreset, ...ChartThemePreset[]]
+
+/**
+ * An optional prompt argument with suggestions. The MCP SDK enables completions when the schema
+ * inside `.optional()` is completable, but answers them from the outer schema, so both carry it.
+ */
+function optionalCompletable(complete: (value: string | undefined) => string[]) {
+  return completable(completable(z.string(), complete).optional(), complete)
+}
 
 const pivotValueSchema = z.object({
   field: z.string(),
@@ -1195,6 +1204,16 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   ))
 
   // 11. Set the visual theme preset (callable by both the model in chat and the UI app)
+
+  /** Saves the theme, or explains that it needs Pro. Shared by the tool and the slash command. */
+  const applyVisualTheme = (theme: ChartThemePreset): { theme: ChartThemePreset, text: string, proRequired?: boolean } => {
+    if (!isPro && theme !== 'code')
+      return { theme: 'code', proRequired: true, text: 'Additional chart themes require TinyPivot Pro (https://tiny-pivot.com/pricing).' }
+    const active = store.setVisualTheme(theme)
+    notifyCompanion()
+    return { theme: active, text: `TinyPivot theme set to **${active}** (saved to ~/.config/tinypivot/preferences.json).` }
+  }
+
   server.registerTool(
     'set_visual_theme',
     {
@@ -1208,18 +1227,30 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
     },
     async ({ theme }) => {
-      if (!isPro && theme !== 'code') {
-        return {
-          content: [{ type: 'text', text: 'Additional chart themes require TinyPivot Pro (https://tiny-pivot.com/pricing).' }],
-          structuredContent: { chartTheme: 'code', proRequired: true },
-        }
-      }
-      const activeTheme = store.setVisualTheme(theme)
-      notifyCompanion()
+      const result = applyVisualTheme(theme)
       return {
-        content: [{ type: 'text', text: `TinyPivot theme set to **${activeTheme}** (saved to ~/.config/tinypivot/preferences.json).` }],
-        structuredContent: { chartTheme: activeTheme },
+        content: [{ type: 'text', text: result.text }],
+        structuredContent: result.proRequired ? { chartTheme: 'code', proRequired: true } : { chartTheme: result.theme },
       }
+    },
+  )
+
+  // A slash command in hosts that list MCP prompts (Claude Code: /mcp__tinypivot__theme paper).
+  server.registerPrompt(
+    'theme',
+    {
+      title: 'TinyPivot theme',
+      description: `Switch TinyPivot's theme for terminal cards, charts and the Studio: ${CHART_THEME_IDS.join(', ')}.`,
+      argsSchema: {
+        name: optionalCompletable(value => CHART_THEME_IDS.filter(id => id.startsWith(value ?? ''))),
+      },
+    },
+    ({ name }) => {
+      const theme = CHART_THEME_IDS.find(id => id === name?.trim().toLowerCase())
+      const text = theme
+        ? `${applyVisualTheme(theme).text} Confirm it to the user in one short line; no tool call is needed.`
+        : `TinyPivot's theme is **${store.getVisualTheme()}**. Tell the user, in one short line, that they can pick one of: ${CHART_THEME_IDS.join(', ')} (for example /mcp__tinypivot__theme paper).`
+      return { messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }] }
     },
   )
 

@@ -219,3 +219,33 @@ describe('small tables in replies', () => {
     expect(text).toContain('Studio: http://127.0.0.1:47317')
   })
 })
+
+describe('the theme slash command', () => {
+  beforeEach(() => {
+    vi.stubEnv('TINYPIVOT_TELEMETRY', '0')
+    vi.stubEnv('TINYPIVOT_LICENSE_KEY', '')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('is listed as a prompt and completes theme names', async () => {
+    const client = await connectClient({})
+    expect((await client.listPrompts()).prompts.map(prompt => prompt.name)).toContain('theme')
+
+    const completion = await client.complete({ ref: { type: 'ref/prompt', name: 'theme' }, argument: { name: 'name', value: 'crt' } })
+    expect(completion.completion.values).toEqual(['crt-amber', 'crt-green'])
+  })
+
+  it('lists the themes when none is named, and needs Pro for the extra ones', async () => {
+    const client = await connectClient({})
+    const textOf = async (args: Record<string, string>) => {
+      const { messages } = await client.getPrompt({ name: 'theme', arguments: args })
+      return (messages[0].content as { text: string }).text
+    }
+
+    expect(await textOf({})).toContain('paper, greenbar, onebit')
+    expect(await textOf({ name: 'Paper' })).toContain('require TinyPivot Pro')
+  })
+})
