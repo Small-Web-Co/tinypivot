@@ -40,7 +40,8 @@
   "network": {
     "hosts": [
       "registry.npmjs.org",
-      "tiny-pivot.com"
+      "tiny-pivot.com",
+      "www.tiny-pivot.com"
     ]
   }
 }
