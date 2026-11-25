@@ -5,7 +5,9 @@ import type { Claim } from './studio-protocol.js'
  * `found` when a cell of a summary table, a total, a group total (what a pivot shows) or a share
  * of one rounds to it at the precision the agent wrote (1.20M covers 1,195,000 to 1,205,000).
  * Raw tables offer only their totals, so a number does not count as backed just because some
- * row among thousands happens to hold it. Percentages that are not shares, small counts, and
+ * row among thousands happens to hold it. Failing that, a number may be the arithmetic an answer
+ * does on a small summary table: the gap between two of its cells, or the change from one period's
+ * column (or row) to the next. Percentages that are not shares, small counts, and
  * numbers that match nothing are reported as they are rather than guessed at: this marks what
  * the data backs, it does not prove the rest wrong. Links and inline code are not read.
  */
@@ -21,8 +23,8 @@ export interface ClaimSource {
   measures?: string[]
 }
 
-/** `$1.20M`, `48,189,470`, `28.6%`, `-3.5K`. Dates, quarters and ids are skipped by the checks below. */
-const NUMBER_RE = /(?<![\w.-])([$€£]?)(-?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s?([KMB])?(%)?(?![\w-])/g
+/** `$1.20M`, `48,189,470`, `28.6%`, `-3.5K`, `-$9.9M`. Dates, quarters and ids are skipped by the checks below. */
+const NUMBER_RE = /(?<![\w.-])(-?)([$€£]?)(-?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s?([KMB])?(%)?(?![\w-])/g
 const SCALE: Record<string, number> = { K: 1e3, M: 1e6, B: 1e9 }
 /** Years and tiny counts ("4 regions") are not worth checking. */
 const MIN_PLAIN_VALUE = 10
@@ -48,7 +50,8 @@ interface ParsedNumber {
 }
 
 function parseNumber(match: RegExpMatchArray): ParsedNumber | null {
-  const [text, currency, minus, whole, fraction = '', suffix, percent] = match
+  const [text, leadingMinus, currency, innerMinus, whole, fraction = '', suffix, percent] = match
+  const minus = leadingMinus || innerMinus
   const isYear = !currency && !suffix && !percent && !fraction && /^(?:19|20)\d{2}$/.test(whole)
   if (isYear)
     return null
@@ -89,6 +92,10 @@ interface Pool {
   values: Candidate[]
   /** Percentages: shares of a total, and cells of columns that hold percentages. */
   percents: Candidate[]
+  /** Gaps between cells of a summary table, compared without sign; checked after the above. */
+  gaps: Candidate[]
+  /** Changes in percent between periods of a summary table, without sign; checked last. */
+  changes: Candidate[]
 }
 
 /** Beyond this many rows a table is raw data: its cells are not what an answer quotes, only its totals. */
@@ -154,6 +161,47 @@ function cells(rows: Record<string, unknown>[], measure: string, total: number, 
   }
 }
 
+/** A summary table this small is one an answer does arithmetic on; larger ones offer too many pairs. */
+const DERIVED_MAX_ROWS = 50
+
+/** `mrr_2025` and `mrr_2026` are one measure in two periods: the same name once digits are gone. */
+function periodStem(column: string): string {
+  return column.replace(/\d+/g, '#')
+}
+
+/** Gaps and changes between period columns of each row, e.g. mrr_2025 → mrr_2026 for APAC. */
+function rowChanges(rows: Record<string, unknown>[], measures: string[], pool: Pool): void {
+  for (const [i, from] of measures.entries()) {
+    for (const to of measures.slice(i + 1)) {
+      if (periodStem(from) !== periodStem(to) || from === to)
+        continue
+      for (const row of rows)
+        addChange(row[from], row[to], `${from} → ${to} · ${rowLabel(row)}`, pool)
+    }
+  }
+}
+
+/** Gaps between the rows of one column, and changes between rows that share a label (long periods). */
+function columnGaps(rows: Record<string, unknown>[], measure: string, pool: Pool): void {
+  for (const [i, a] of rows.entries()) {
+    for (const b of rows.slice(i + 1)) {
+      const [labelA, labelB] = [rowLabel(a), rowLabel(b)]
+      if (labelA === labelB)
+        addChange(a[measure], b[measure], `${measure} · ${labelA}, one row to the next`, pool)
+      else if (typeof a[measure] === 'number' && typeof b[measure] === 'number')
+        pool.gaps.push({ value: Math.abs((a[measure] as number) - (b[measure] as number)), where: `${measure} · ${labelA} − ${labelB}` })
+    }
+  }
+}
+
+function addChange(from: unknown, to: unknown, where: string, pool: Pool): void {
+  if (typeof from !== 'number' || typeof to !== 'number')
+    return
+  pool.gaps.push({ value: Math.abs(to - from), where: `change in ${where}` })
+  if (from !== 0)
+    pool.changes.push({ value: Math.abs((to / from - 1) * 100), where: `change in ${where}` })
+}
+
 /** The view's measures first, then the table's other number columns. */
 function measuresFirst(columns: string[], measures: string[] = []): string[] {
   const shown = measures.filter(measure => columns.includes(measure))
@@ -162,14 +210,15 @@ function measuresFirst(columns: string[], measures: string[] = []): string[] {
 
 /** The numbers an answer could quote from one table. */
 function candidatesFor(source: ClaimSource): Pool {
-  const pool: Pool = { values: [], percents: [] }
+  const pool: Pool = { values: [], percents: [], gaps: [], changes: [] }
   const rows = source.rows.slice(0, MAX_ROWS_PER_SOURCE)
   const summary = source.rows.length <= SUMMARY_MAX_ROWS
   // A raw table groups only the way its chart or pivot does; every grouping of thousands of rows
   // would offer a share close to almost any round percentage.
   const dimensions = summary ? columnsOf(rows, 'string') : (source.dimensions ?? [])
   pool.values.push({ value: source.rows.length, where: `rows in ${source.name}` })
-  for (const measure of measuresFirst(columnsOf(rows, 'number'), source.measures)) {
+  const measures = measuresFirst(columnsOf(rows, 'number'), source.measures)
+  for (const measure of measures) {
     const total = sumOf(rows, measure)
     // Cells first: when a cell and a group total agree, the cell is the plainer reference.
     if (summary)
@@ -177,11 +226,23 @@ function candidatesFor(source: ClaimSource): Pool {
     pool.values.push({ value: total, where: `${measure} · total of ${source.name}` })
     groupTotals(rows, dimensions, measure, total, pool)
   }
+  if (rows.length <= DERIVED_MAX_ROWS) {
+    rowChanges(rows, measures, pool)
+    for (const measure of measures.filter(measure => !PERCENT_COLUMN_RE.test(measure)))
+      columnGaps(rows, measure, pool)
+  }
   return pool
 }
 
-function closest(claim: ParsedNumber, candidates: Candidate[]): Candidate | undefined {
-  return candidates.find(candidate => Math.abs(candidate.value - claim.value) <= claim.tolerance + 1e-9)
+function closest(value: number, tolerance: number, candidates: Candidate[]): Candidate | undefined {
+  return candidates.find(candidate => Math.abs(candidate.value - value) <= tolerance + 1e-9)
+}
+
+/** Where the data backs a number: a direct value first, then a gap or change worked out from it. */
+function backing(claim: ParsedNumber, pools: Pool[]): Candidate | undefined {
+  const [direct, derived] = claim.percent ? ['percents', 'changes'] as const : ['values', 'gaps'] as const
+  return closest(claim.value, claim.tolerance, pools.flatMap(pool => pool[direct]))
+    ?? closest(Math.abs(claim.value), claim.tolerance, pools.flatMap(pool => pool[derived]))
 }
 
 /** The numbers in `text`, each marked with whether the data backs it and where. */
@@ -190,10 +251,8 @@ export function checkClaims(text: string, sources: ClaimSource[]): Claim[] {
   if (claims.length === 0 || sources.length === 0)
     return []
   const pools = sources.map(candidatesFor)
-  const values = pools.flatMap(pool => pool.values)
-  const percents = pools.flatMap(pool => pool.percents)
   return claims.map((claim) => {
-    const match = closest(claim, claim.percent ? percents : values)
+    const match = backing(claim, pools)
     if (match)
       return { text: claim.text, status: 'found', where: match.where }
     return { text: claim.text, status: claim.percent || claim.small ? 'unchecked' : 'not-found' }

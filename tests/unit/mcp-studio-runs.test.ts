@@ -66,6 +66,25 @@ describe('reading the numbers in an answer', () => {
     ])
   })
 
+  it('backs the gaps and period changes an answer works out from a small summary', () => {
+    const wide = [
+      { region: 'North America', mrr_2025: 14_750_000, mrr_2026: 17_120_000, seats: 900 },
+      { region: 'EMEA', mrr_2025: 11_110_000, mrr_2026: 14_960_000, seats: 700 },
+    ]
+    const answer = 'EMEA grew +$3.85M (+34.7%) and is now within $2.2M of North America, a gap that was $3.6M. Seats moved 30%. Revenue fell -$9.9M.'
+    expect(checkClaims(answer, [{ name: 'By region', rows: wide }])).toEqual([
+      { text: '$3.85M', status: 'found', where: 'change in mrr_2025 → mrr_2026 · EMEA' },
+      { text: '34.7%', status: 'found', where: 'change in mrr_2025 → mrr_2026 · EMEA' },
+      { text: '$2.2M', status: 'found', where: 'mrr_2026 · North America − EMEA' },
+      { text: '$3.6M', status: 'found', where: 'mrr_2025 · North America − EMEA' },
+      { text: '30%', status: 'unchecked' },
+      { text: '-$9.9M', status: 'not-found' },
+    ])
+    // Long periods: rows that share a label are one item in two periods.
+    const long = [{ plan: 'Team', year: '2025', mrr: 2_080_000 }, { plan: 'Team', year: '2026', mrr: 2_699_000 }]
+    expect(checkClaims('Team rose 29.8%, +$619K.', [{ name: 'Slope', rows: long }]).map(claim => claim.status)).toEqual(['found', 'found'])
+  })
+
   it('checks nothing when there is no data to check against', () => {
     expect(checkClaims('Revenue was 1.2M', [])).toEqual([])
   })
