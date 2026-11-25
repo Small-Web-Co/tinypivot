@@ -444,7 +444,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.7.0',
+      version: '0.7.1',
     },
     {
       capabilities: {
