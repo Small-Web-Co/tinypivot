@@ -20,23 +20,7 @@ const facts = ['free', 'runs locally', 'no signup', 'no API key']
 // The hero's fine print comes from the measured benchmark shown in the savings section.
 const headline = benchmarkHeadline()
 
-const studioPoints = [
-  {
-    n: '01',
-    title: 'A trace you can check',
-    body: 'Every load, query, chart and pivot, with the agent\'s reason, what it shows and the SQL or filter behind it. Open any step to see the data as it was then.',
-  },
-  {
-    n: '02',
-    title: 'Edit and rerun',
-    body: 'Change a step\'s SQL and run it yourself with DuckDB, read-only, on your machine. The result keeps the chart and joins the trace as your step.',
-  },
-  {
-    n: '03',
-    title: 'Talk back, with the data',
-    body: 'Send a row, a pivot cell or the whole view with a comment. Your own agent answers in the trace: pi and Claude Code start on it at once, others with their next TinyPivot reply.',
-  },
-] as const
+const heroPoints = ['A trace you can check', 'Edit and rerun', 'Talk back, with the data'] as const
 
 const capabilities = [
   {
@@ -76,8 +60,8 @@ const capabilities = [
                 so you can check it, rerun it, or tell the agent what to change.
               </p>
               <ul class="hero-points">
-                <li v-for="point in studioPoints" :key="point.n">
-                  {{ point.title }}
+                <li v-for="point in heroPoints" :key="point">
+                  {{ point }}
                 </li>
               </ul>
               <a href="#savings" class="hero-fine">
@@ -99,53 +83,18 @@ const capabilities = [
       </div>
     </section>
 
-    <section id="studio" class="block studio" aria-labelledby="studio-title">
+    <section id="studio" class="block reel" aria-labelledby="reel-title">
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            TinyPivot Studio · on localhost
-          </p>
-          <h2 id="studio-title" class="heading">
-            Every step the agent takes, <em>with the SQL behind it.</em>
-          </h2>
-          <p class="lede">
-            The first time your agent uses TinyPivot, the Studio opens in your browser and follows along.
-            The chat keeps a compact chart or table so you can see progress; the Studio is where you check the work.
-          </p>
-        </header>
-        <RetroWindow title="TinyPivot Studio — 127.0.0.1:47317" flush>
-          <img
-            class="studio-shot"
-            src="/reel/studio/trace.jpg"
-            width="2560"
-            height="1600"
-            loading="lazy"
-            alt="TinyPivot Studio: the agent's steps with their reasons and SQL beside a line chart of monthly revenue."
-          >
-        </RetroWindow>
-        <ol class="caps studio-points">
-          <li v-for="point in studioPoints" :key="point.n" class="cap">
-            <span class="cap-n mono">{{ point.n }}</span>
-            <h3 class="cap-title">
-              {{ point.title }}
-            </h3>
-            <p class="cap-body">
-              {{ point.body }}
-            </p>
-          </li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="block reel" aria-labelledby="reel-title">
-      <div class="wrap">
-        <header class="section-head">
-          <p class="label">
-            In the harness
+            In the harness · TinyPivot Studio
           </p>
           <h2 id="reel-title" class="heading">
             Progress in the chat, <em>the full view a click away.</em>
           </h2>
+          <p class="lede">
+            Recorded sessions in each agent. The Studio opens beside the terminal with every step and the SQL behind it, and sends the data back with your comment.
+          </p>
         </header>
         <RetroWindow title="tinypivot — recorded sessions" flush>
           <HarnessReel />
@@ -293,20 +242,6 @@ const capabilities = [
   font-size: 0.72rem;
   line-height: 1.5;
   color: var(--ink-muted);
-}
-
-.studio {
-  border-top: var(--line);
-}
-
-.studio-shot {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.studio-points {
-  margin-top: 32px;
 }
 
 .facts {
