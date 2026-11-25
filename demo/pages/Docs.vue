@@ -112,6 +112,7 @@ const { copiedKey, copy } = useCopy()
             Token savings, <em>with the caveats.</em>
           </h2>
           <p class="docs-text">
+            This calculator compares TinyPivot with pasting rows into chat. Against an agent that writes Python, our measured cost in Claude Code was about the same, so expect savings only where rows would otherwise go into the conversation.
             Move the sliders to match your own work. The model counts what you avoid sending: the raw rows, their re-reads on follow-ups, and the tables the model would otherwise rewrite.
           </p>
           <SavingsCalculator />

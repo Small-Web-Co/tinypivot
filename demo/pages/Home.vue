@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { defineAsyncComponent, onMounted, ref } from 'vue'
 import HarnessReel from '../components/HarnessReel.vue'
-import ContextMeter from '../components/site/ContextMeter.vue'
+import BenchmarkTable from '../components/site/BenchmarkTable.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
-import { EXAMPLE_RATE, EXAMPLE_WORKLOAD, exampleSavings, formatUsd } from '../site/savings'
+import { benchmarkHeadline } from '../site/benchmark'
 
 // The showcase loads the real grid and chart library, so it is fetched in the
 // browser only and kept out of the prerendered HTML and the first bundle.
@@ -17,16 +17,8 @@ onMounted(() => {
 
 const facts = ['free', 'runs locally', 'no signup', 'no API key']
 
-// Hero figures: the same worked example as the receipt further down the page.
-const savings = exampleSavings()
-const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
-const heroProof = {
-  percent: savings.percent,
-  usd: formatUsd(savings.usd),
-  rows: fmt(EXAMPLE_WORKLOAD.rows),
-  followUps: EXAMPLE_WORKLOAD.followUps,
-  model: EXAMPLE_RATE.name,
-}
+// Hero figures come from the measured benchmark shown in the savings section.
+const headline = benchmarkHeadline()
 
 const capabilities = [
   {
@@ -55,30 +47,29 @@ const capabilities = [
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
-                MCP server for AI coding agents
+                MCP server for AI agents
               </p>
               <h1 class="display">
-                Stop spending tokens on <em>reading data.</em>
+                Stop pasting rows into chat. <em>Chart them instead.</em>
               </h1>
               <p class="lede">
-                Paste query results into chat and you pay for every row, again on every follow-up.
-                TinyPivot keeps the rows on your machine, draws the chart and pivot inside Claude, Cursor,
-                Antigravity, OpenCode and pi, and sends the model a short summary instead.
+                Pasted rows are billed one by one and added up by eye. TinyPivot keeps them on your machine,
+                computes totals exactly, and charts them in Claude, Cursor, Antigravity, OpenCode and pi.
               </p>
               <a href="#savings" class="hero-proof">
                 <span class="hero-stats">
                   <span class="hero-stat">
-                    <strong>{{ heroProof.percent }}<span class="hero-unit">%</span></strong>
-                    fewer tokens
+                    <strong>{{ headline.cheaperThanPastingPct }}<span class="hero-unit">%</span></strong>
+                    cheaper than pasting
                   </span>
                   <span class="hero-stat">
-                    <strong>{{ heroProof.usd }}</strong>
-                    saved per analysis
+                    <strong>{{ headline.correct }}<span class="hero-unit">/{{ headline.questions }}</span></strong>
+                    exact answers (pasting: {{ headline.pastedCorrect }}/{{ headline.questions }})
                   </span>
                 </span>
                 <span class="hero-fine">
-                  Example: {{ heroProof.rows }} rows, {{ heroProof.followUps }} follow-ups, {{ heroProof.model }} prices.
-                  See the math ↓
+                  Measured in Claude Code.<template v-if="headline.aboutSameAsPython"> Same cost as an agent writing Python, minus the code.</template>
+                  Benchmark ↓
                 </span>
               </a>
             </div>
@@ -136,23 +127,27 @@ const capabilities = [
       <div class="wrap savings-grid">
         <div>
           <p class="label">
-            The receipt
+            Measured, not modelled
           </p>
           <h2 id="savings-title" class="heading">
-            The model needs the shape of your data, <em>not every row.</em>
+            What three questions <em>actually cost.</em>
           </h2>
           <p class="lede">
-            Pasting a query result into chat bills you for every cell, then again on each follow-up.
-            With TinyPivot the rows stay on your machine. Each question costs a short reply, and re-slicing in the Data IDE costs nothing.
+            The same three questions about the same data, asked in each setup. Against reading the rows,
+            TinyPivot costs about half and gets every figure right. Against an agent that writes Python the cost
+            is about even: you skip the code, not the tokens.
           </p>
           <router-link to="/docs#savings" class="text-link">
             Run the numbers for your own workload →
           </router-link>
         </div>
-        <TokenReceipt />
+        <BenchmarkTable />
       </div>
       <div class="wrap savings-meter">
-        <ContextMeter />
+        <p class="label">
+          Where the tokens go when you paste rows
+        </p>
+        <TokenReceipt />
       </div>
     </section>
 
@@ -322,6 +317,9 @@ const capabilities = [
 }
 
 .savings-meter {
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
   margin-top: 40px;
 }
 

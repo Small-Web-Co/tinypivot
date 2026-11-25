@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { benchmarkHeadline, benchmarkSetups } from '../../demo/site/benchmark'
 import {
   estimateTokens,
-  EXAMPLE_RATE,
-  exampleSavings,
   formatTokens,
   formatUsd,
   TOOL_REPLY_TOKENS,
@@ -63,18 +62,19 @@ describe('formatters', () => {
   })
 })
 
-describe('homepage headline figures', () => {
-  it('come from the worked example at a named model price', () => {
-    const savings = exampleSavings()
-    expect(EXAMPLE_RATE.name).toBe('Claude Opus 5.5')
-    expect(savings.tokensWithout).toBe(93_000)
-    expect(savings.tokensWith).toBe(6_525)
-    // 85,875 input tokens at $4/M plus 600 output tokens at $20/M.
-    expect(savings.usd).toBeCloseTo(0.3555)
+describe('measured benchmark headline', () => {
+  it('rounds the comparison with pasting down, and reports right answers as measured', () => {
+    const headline = benchmarkHeadline()
+    // 0.162 against 0.320 is 49.4% cheaper.
+    expect(headline.cheaperThanPastingPct).toBe(49)
+    expect(headline.correct).toBe(3)
+    expect(headline.pastedCorrect).toBe(1)
   })
 
-  it('round the percentage down so the claim never overstates', () => {
-    expect(exampleSavings().percent).toBe(92.9)
-    expect(exampleSavings().percent).toBeLessThanOrEqual((86_475 / 93_000) * 100)
+  it('only claims parity with an agent writing Python when the costs really are close', () => {
+    expect(benchmarkHeadline().aboutSameAsPython).toBe(true)
+    const tinypivot = benchmarkSetups.find(s => s.id === 'tinypivot')!
+    const python = benchmarkSetups.find(s => s.id === 'python')!
+    expect(Math.abs(tinypivot.smallCost / python.smallCost - 1)).toBeLessThan(0.15)
   })
 })
