@@ -19,7 +19,7 @@ The Claude plugin asks for the license key through a sensitive `license_key` opt
 | Official MCP Registry | Already published | `packages/mcp/server.json`, published by CI | Nothing |
 | Claude Desktop extensions (.mcpb) | Closed to new local servers | Nothing needed: the plugin bundle replaces it | Nothing |
 | OpenCode ecosystem / awesome-opencode | Anyone, by pull request | Studio plugin installed by `init`; listing text below | Open the pull requests once the repo meets awesome-opencode's 25-star rule |
-| pi package gallery | Automatic for npm packages with the `pi-package` keyword | pi extension installed by `init` | Optional follow-up: publish the extension as a pi package |
+| pi package gallery | Automatic for npm packages with the `pi-package` keyword | `@smallwebco/tinypivot-mcp` is a pi package | Nothing: listed after the next release |
 | Gemini CLI extension gallery | Automatic for public repos with the `gemini-cli-extension` topic | `gemini-extension.json`, passes `gemini extensions validate` | Add the GitHub topic |
 | Antigravity plugin marketplace | Partners only, by interest form | `plugin.json` + `mcp_config.json` in `packages/mcp`, passes `agy plugin validate` | Send the interest form |
 | Cursor marketplace | Anyone, manual review | `.cursor-plugin/plugin.json`, `mcp.json`, root `.cursor-plugin/marketplace.json` | Submit at cursor.com/marketplace/publish |
@@ -135,9 +135,9 @@ Listings (**You**, once the repository qualifies):
 
 ## pi
 
-- `init` installs the pi extension (`~/.pi/agent/extensions/tinypivot.ts`), which already delivers Studio messages live.
-- The gallery at https://pi.dev/packages lists npm packages with the `pi-package` keyword automatically; there is no submission. A pi package declares its files in a `pi` key in `package.json` (`extensions`, `skills`, …) and installs with `pi install npm:<name>`.
-- **Follow-up, not done here:** ship the generated extension as a pi package (for example a build step that writes it into the package and a `pi.extensions` entry), then add the `pi-package` keyword. Until then, `init` is the install path.
+- The npm package is also a pi package: `pi install npm:@smallwebco/tinypivot-mcp`. Its `pi` key in `packages/mcp/package.json` loads `dist/pi/tinypivot.ts` (generated at build from `buildPiExtensionSource({ packaged: true })`) and the skill. The extension registers the TinyPivot server with `pi.registerMcpServer`, starting `dist/cli.js` from the installed package, so no `init` or `mcp.json` entry is needed. When `init` has installed its own copy in `~/.pi/agent/extensions`, the packaged one does nothing.
+- `init` keeps installing the extension and the `mcp.json` entry, as before.
+- The gallery at https://pi.dev/packages lists npm packages with the `pi-package` keyword automatically, so the listing appears with the first release that carries it.
 
 ## Gemini CLI
 

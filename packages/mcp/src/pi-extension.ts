@@ -2,6 +2,46 @@ import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { EXTENSION_HEADER } from './agent-bridge.js'
 
 /**
+ * pi hides MCP tools behind codemode unless told otherwise, so its model only sees a one-line
+ * summary of each server. TinyPivot's data tools are declared directly, with a summary that says
+ * when to use them, so tables of figures go through TinyPivot without the user asking.
+ */
+export const PI_ENTRY_EXTRAS = {
+  description: 'Show any table of figures, ranking, breakdown, trend, chart or pivot to the user. Use it instead of Markdown tables.',
+  toolExposure: {
+    load_file: 'direct',
+    load_data: 'direct',
+    query: 'direct',
+    configure_chart: 'direct',
+    configure_pivot: 'direct',
+  },
+} as const
+
+export interface PiExtensionOptions {
+  /**
+   * Built into the npm package as a pi package (`pi install npm:@smallwebco/tinypivot-mcp`), at
+   * dist/pi/tinypivot.ts. It then starts the server from the package itself, and does nothing when
+   * `init` has installed its own copy in ~/.pi/agent/extensions, which also configures the server.
+   */
+  packaged?: boolean
+}
+
+/** Lines that run first in the packaged extension's entry function. */
+function packagedPreamble(): string {
+  return `
+  // Installed as a pi package. A copy written by \`tinypivot-mcp init\` takes over when present.
+  if (fs.existsSync(path.join(os.homedir(), ".pi", "agent", "extensions", "tinypivot.ts"))) return;
+  if (typeof pi.registerMcpServer === "function") {
+    pi.registerMcpServer("tinypivot", {
+      command: "node",
+      args: [fileURLToPath(new URL("../cli.js", import.meta.url))],
+      ...${JSON.stringify(PI_ENTRY_EXTRAS)},
+    });
+  }
+`
+}
+
+/**
  * Generates a self-contained pi coding-agent extension (`~/.pi/agent/extensions/tinypivot.ts`)
  * installed automatically by `tinypivot-mcp init`.
  *
@@ -14,7 +54,7 @@ import { EXTENSION_HEADER } from './agent-bridge.js'
  * - Registers `/tinypivot-theme [theme-id]` inside pi for instant interactive theme switching
  *   persisted to `~/.config/tinypivot/preferences.json` and synced to the live Studio.
  */
-export function buildPiExtensionSource(): string {
+export function buildPiExtensionSource({ packaged = false }: PiExtensionOptions = {}): string {
   const palettesJson = JSON.stringify(TERMINAL_PALETTES, null, 2)
   const themeOrderJson = JSON.stringify(CHART_THEME_IDS)
 
@@ -24,7 +64,7 @@ export function buildPiExtensionSource(): string {
 
 import fs from "node:fs";
 import os from "node:os";
-import path from "node:path";
+import path from "node:path";${packaged ? '\nimport { fileURLToPath } from "node:url";' : ''}
 
 type RGB = [number, number, number];
 interface Palette {
@@ -334,7 +374,7 @@ function createStudioBridge(pi: any) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function (pi: any) {
+export default function (pi: any) {${packaged ? packagedPreamble() : ''}
   const studio = createStudioBridge(pi);
   pi.on("agent_start", () => studio.status(true));
   pi.on("agent_end", (event: { messages?: unknown }) => studio.onAgentEnd(event?.messages));
