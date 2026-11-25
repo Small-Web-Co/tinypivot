@@ -63,6 +63,8 @@ interface ToolPayload {
   chartConfig?: Partial<ChartConfig> | null
   /** Columns offered as dashboard filters above every view */
   filterFields?: string[]
+  /** The local Studio's address, in a host that draws this view in its chat */
+  studioUrl?: string | null
   chartTheme?: ChartThemePreset
   datasets?: DatasetMeta[]
   licenseKey?: string | null
@@ -213,6 +215,9 @@ export function McpApp() {
   const [licenseReady, setLicenseReady] = useState(false)
 
   const [canMessageHost, setCanMessageHost] = useState(false)
+  /** The local Studio, when this view is drawn in a desktop app's chat; the app opens it on request. */
+  const [studioUrl, setStudioUrl] = useState<string | null>(null)
+  const canOpenLinksRef = useRef(false)
   const [canUpdateContext, setCanUpdateContext] = useState(false)
   const [selectedContext, setSelectedContext] = useState<NoteAttachment | null>(null)
   const [askComment, setAskComment] = useState<string | null>(null)
@@ -299,6 +304,33 @@ export function McpApp() {
     setLicenseReady(true)
   }, [])
 
+  /** Asks the host to open the Studio: a desktop app may show it in its own browser. */
+  const openStudioInHost = useCallback((url: string) => {
+    const app = appRef.current
+    if (!app) {
+      window.open(url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    void app.openLink({ url }).catch(() => window.open(url, '_blank', 'noopener,noreferrer'))
+  }, [])
+
+  /**
+   * Opens a Studio the first time its address arrives (each conversation has its own), so it
+   * comes up beside the chat as it does beside a terminal; later replies leave it as the user left it.
+   */
+  const openStudioOnce = useCallback((url: string) => {
+    if (!canOpenLinksRef.current)
+      return
+    const key = `tinypivot-studio-opened:${url}`
+    try {
+      if (window.localStorage.getItem(key))
+        return
+      window.localStorage.setItem(key, '1')
+    }
+    catch {}
+    openStudioInHost(url)
+  }, [openStudioInHost])
+
   const applyPayload = useCallback(async (payload: ToolPayload, fetchMore?: (id: string) => void) => {
     await applyLicense(payload)
 
@@ -325,6 +357,10 @@ export function McpApp() {
     setPivotConfig(payload.pivotConfig ?? undefined)
     setChartConfig(payload.chartConfig ?? undefined)
     setFilterFields(payload.filterFields ?? [])
+    if (payload.studioUrl) {
+      setStudioUrl(payload.studioUrl)
+      openStudioOnce(payload.studioUrl)
+    }
     livePivotConfig.current = undefined
     liveChartConfig.current = undefined
     if (payload.modelCatalog)
@@ -340,7 +376,7 @@ export function McpApp() {
     if (payload.hasMoreRows && payload.datasetId && fetchMore) {
       fetchMore(payload.datasetId)
     }
-  }, [applyLicense])
+  }, [applyLicense, openStudioOnce])
 
   /** Pages in the rest of a dataset after its first page, up to the interactive limit. */
   const fetchRemainingRows = useCallback(async (app: App, id: string, loaded: number, total: number) => {
@@ -638,6 +674,7 @@ export function McpApp() {
 
         const caps = app.getHostCapabilities() as Record<string, unknown> | undefined
         setCanMessageHost(Boolean(caps?.message))
+        canOpenLinksRef.current = Boolean(caps?.openLinks)
         setCanUpdateContext(Boolean(caps?.updateModelContext))
 
         fallbackTimer = setTimeout(() => {
@@ -867,6 +904,16 @@ export function McpApp() {
               onClick={() => void stopStudio()}
             >
               Stop
+            </button>
+          )}
+          {!studio && studioUrl && (
+            <button
+              type="button"
+              className="tp-mcp-pill"
+              title="Open TinyPivot Studio: every step with its SQL, and the answer's numbers checked"
+              onClick={() => openStudioInHost(studioUrl)}
+            >
+              Open Studio ↗
             </button>
           )}
           {studio && (

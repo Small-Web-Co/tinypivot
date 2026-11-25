@@ -281,5 +281,22 @@ describe('the Studio link in each reply', () => {
     expect(await textOf()).toContain('http://127.0.0.1:47317/s/one')
     expect(await textOf()).toContain('http://127.0.0.1:51000/s/one')
     expect(ensureCompanion).toHaveBeenCalledTimes(2)
+    // A terminal has no view of its own: the CLI opens the Studio itself.
+    expect(ensureCompanion).toHaveBeenCalledWith({ open: true })
+  })
+
+  it('reaches desktop apps too, where TinyPivot\'s view asks the app to open the Studio', async () => {
+    const ensureCompanion = vi.fn(async () => 'http://127.0.0.1:47317/s/one')
+    const { server } = createTinyPivotMcpServer({ ensureCompanion })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const client = new Client({ name: 'claude-ai', version: '1.0.0' }, { capabilities: { extensions: { 'io.modelcontextprotocol/ui': {} } } })
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+    const result = await client.callTool({ name: 'load_data', arguments: LOAD_ARGS })
+
+    expect((result.content as Array<{ text: string }>)[0].text).toContain('http://127.0.0.1:47317/s/one')
+    expect((result.structuredContent as { studioUrl: string }).studioUrl).toBe('http://127.0.0.1:47317/s/one')
+    // The view opens it through the app, so the CLI does not also open the system browser.
+    expect(ensureCompanion).toHaveBeenCalledWith({ open: false })
   })
 })

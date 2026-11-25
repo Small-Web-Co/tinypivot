@@ -160,8 +160,11 @@ export interface CreateTinyPivotMcpServerOptions {
   licenseKey?: string
   demoToken?: string
   companionUrl?: string
-  /** Lazily start and return the localhost Studio URL on demand when a data tool runs in a non-MCP-Apps host */
-  ensureCompanion?: () => Promise<string | undefined>
+  /**
+   * Start the localhost Studio if it is not running and return its URL. `open: false` leaves
+   * opening it to the caller: where the host draws TinyPivot's view, the view asks the host.
+   */
+  ensureCompanion?: (options?: { open?: boolean }) => Promise<string | undefined>
   onStateChanged?: () => void
   /**
    * Whether the model should reprint each chart card in a terminal. On by default, because
@@ -438,7 +441,6 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     maxRowsPerDataset: isPro ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
   })
   /** A widget host that asked for the Studio once (open_tinypivot) keeps getting its link. */
-  let studioRequested = false
   const notifyCompanion = () => {
     options.onStateChanged?.()
   }
@@ -483,13 +485,12 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
    * Studio the user stopped, or that stopped with no tab open, starts again here, instead of the
    * reply handing out a dead address that another session's Studio may since have taken.
    */
-  const resolveCompanionUrlForTool = async (forceCompanion = false): Promise<string | undefined> => {
+  const resolveCompanionUrlForTool = async (): Promise<string | undefined> => {
     if (!options.ensureCompanion)
       return options.companionUrl
-    studioRequested ||= forceCompanion
-    if (!studioRequested && clientRendersWidget())
-      return undefined
-    return options.ensureCompanion()
+    // Where TinyPivot's view is drawn in the chat, the view asks the host to open the Studio, so
+    // the host can show it in its own browser rather than the system one.
+    return options.ensureCompanion({ open: !clientRendersWidget() })
   }
 
   /**
@@ -497,9 +498,9 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
    * Hosts without MCP Apps give structuredContent to the model in place of the text, which costs
    * thousands of tokens and hides the terminal card, so they get the text summary on its own.
    */
-  const dataToolResult = (summaryText: string, payload: ReturnType<typeof buildAppPayload>) => {
+  const dataToolResult = (summaryText: string, payload: ReturnType<typeof buildAppPayload>, studioUrl: string | undefined) => {
     const content = [{ type: 'text' as const, text: summaryText }]
-    return clientRendersWidget() ? { content, structuredContent: payload } : { content }
+    return clientRendersWidget() ? { content, structuredContent: { ...payload, studioUrl: studioUrl ?? null } } : { content }
   }
 
   /** The shared ending of every tool that loads a dataset: the card for the model, the payload for the widget. */
@@ -516,7 +517,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       truncated: ds.truncatedForFreeTier,
     })
     notifyCompanion()
-    return dataToolResult(summaryText, payload)
+    return dataToolResult(summaryText, payload, liveCompanionUrl)
   }
 
   const studio = options.studio ?? new Studio(store)
@@ -679,11 +680,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       inputSchema: {
         datasetId: z.string().optional(),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
-        openBrowser: z.boolean().optional().describe('Also start the localhost Studio in hosts with an inline widget'),
       },
       _meta: PANE_UI_META,
     },
-    async ({ datasetId, viewMode, openBrowser }, extra) => {
+    async ({ datasetId, viewMode }, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const ds = store.get(datasetId, sessionKey)
       if (!ds) {
@@ -699,7 +699,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         store.setActive(ds.id, sessionKey)
       }
 
-      const liveCompanionUrl = await resolveCompanionUrlForTool(Boolean(openBrowser))
+      const liveCompanionUrl = await resolveCompanionUrlForTool()
       const summaryText = formatDatasetSummary(ds, liveCompanionUrl, cardFormat())
       const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
       recordTelemetry({
@@ -711,7 +711,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         truncated: ds.truncatedForFreeTier,
       })
       notifyCompanion()
-      return dataToolResult(summaryText, payload)
+      return dataToolResult(summaryText, payload, liveCompanionUrl)
     },
   )
 
@@ -871,7 +871,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       })
       notifyCompanion()
 
-      return dataToolResult(summary, payload)
+      return dataToolResult(summary, payload, liveCompanionUrl)
     },
   )
 
@@ -956,7 +956,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         truncated: ds.truncatedForFreeTier,
       })
       notifyCompanion()
-      return dataToolResult(summaryText, payload)
+      return dataToolResult(summaryText, payload, liveCompanionUrl)
     },
   )
 

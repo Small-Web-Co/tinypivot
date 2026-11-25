@@ -570,8 +570,9 @@ async function main() {
     companionUrl: companion?.link,
     ensureCompanion: disableCompanion
       ? undefined
-      // A terminal agent's first data step opens the Studio, unless TINYPIVOT_OPEN_STUDIO=0.
-      : async () => (await ensureCompanionStarted(process.env.TINYPIVOT_OPEN_STUDIO !== '0'))?.link,
+      // A terminal agent's first data step opens the Studio, unless TINYPIVOT_OPEN_STUDIO=0. Where
+      // the host draws TinyPivot's view, the view asks the host to open it instead.
+      : async ({ open = true } = {}) => (await ensureCompanionStarted(open && process.env.TINYPIVOT_OPEN_STUDIO !== '0'))?.link,
     onStateChanged: () => companion?.broadcastUpdate(),
   })
 
