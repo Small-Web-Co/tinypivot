@@ -69,6 +69,19 @@ const capabilities = [
                   {{ point }}
                 </li>
               </ul>
+              <div id="install" class="hero-install">
+                <InstallBox
+                  source="hero"
+                  prominent
+                  action-label="Get started · run once"
+                  action-meta="10s setup"
+                />
+                <ul class="facts" aria-label="Free tier">
+                  <li v-for="fact in facts" :key="fact">
+                    {{ fact }}
+                  </li>
+                </ul>
+              </div>
               <div class="hero-meta-links">
                 <a href="#savings" class="hero-fine">
                   Measured in Claude Code: {{ headline.cheaperThanPythonPct }}% cheaper than Python
@@ -82,14 +95,6 @@ const capabilities = [
             </div>
             <div class="hero-side">
               <HeroCharts class="hero-charts" />
-              <div id="install" class="hero-install">
-                <InstallBox source="hero" />
-                <ul class="facts" aria-label="Free tier">
-                  <li v-for="fact in facts" :key="fact">
-                    {{ fact }}
-                  </li>
-                </ul>
-              </div>
             </div>
           </div>
         </RetroWindow>
@@ -214,8 +219,7 @@ const capabilities = [
   padding: 20px 0 32px;
 }
 
-/* Inside a window the install box sits flat; the window carries the shadow. */
-.hero :deep(.install),
+/* Inside the closing window the install box sits flat; the hero install box keeps its hard shadow as the primary CTA. */
 .closing :deep(.install) {
   box-shadow: none;
 }
@@ -228,22 +232,21 @@ const capabilities = [
 
 .hero-copy {
   display: grid;
-  gap: 16px;
-}
-
-/* Install first on a phone; beside the copy, the Studio card leads and install sits under it. */
-.hero-side {
-  display: grid;
-  gap: 20px;
+  gap: 14px;
   align-content: start;
 }
 
-.hero-charts {
-  order: 2;
+.hero-install {
+  margin-top: 4px;
+}
+
+.hero-side {
+  display: grid;
+  align-content: start;
 }
 
 .hero .lede {
-  font-size: 1.08rem;
+  font-size: 1.06rem;
 }
 
 .hero-points {
@@ -417,11 +420,11 @@ const capabilities = [
 
 @media (min-width: 768px) {
   .hero {
-    padding: 48px 0 64px;
+    padding: 32px 0 48px;
   }
 
   .hero .lede {
-    font-size: 1.2rem;
+    font-size: 1.12rem;
   }
 
   .caps {
@@ -447,13 +450,9 @@ const capabilities = [
 
 @media (min-width: 1024px) {
   .hero-grid {
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     align-items: start;
-    gap: 56px;
-  }
-
-  .hero-charts {
-    order: 0;
+    gap: 44px;
   }
 
   .savings-grid {
