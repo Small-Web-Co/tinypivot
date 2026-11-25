@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent, onMounted, ref } from 'vue'
-import McpHighlightReel from '../components/McpHighlightReel.vue'
+import HarnessReel from '../components/HarnessReel.vue'
 import ContextMeter from '../components/site/ContextMeter.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
@@ -92,8 +92,8 @@ const capabilities = [
             Charts, pivots and drill-through <em>where the conversation already is.</em>
           </h2>
         </header>
-        <RetroWindow title="tinypivot — highlight reel" flush>
-          <McpHighlightReel />
+        <RetroWindow title="tinypivot — recorded sessions" flush>
+          <HarnessReel />
         </RetroWindow>
       </div>
     </section>

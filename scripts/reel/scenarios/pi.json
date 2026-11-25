@@ -1,0 +1,46 @@
+{
+  "command": "pi --approve --no-skills --no-prompt-templates",
+  "cols": 96,
+  "rows": 44,
+  "steps": [
+    {
+      "idle": 2500,
+      "timeout": 40000
+    },
+    {
+      "sleep": 1000
+    },
+    {
+      "type": "area chart of MRR by period from acme-orders.csv"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 5000
+    },
+    {
+      "idle": 6000,
+      "timeout": 240000
+    },
+    {
+      "type": "now a stacked bar of MRR by region and plan"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 5000
+    },
+    {
+      "idle": 6000,
+      "timeout": 240000
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "command": "opencode",
+  "cols": 96,
+  "rows": 44,
+  "steps": [
+    {
+      "wait": "Ask anything",
+      "timeout": 40000
+    },
+    {
+      "sleep": 9000
+    },
+    {
+      "type": "chart MRR by channel from acme-orders.csv"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 5000
+    },
+    {
+      "idle": 6000,
+      "timeout": 240000
+    },
+    {
+      "type": "show a pivot table of MRR by region and plan"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 5000
+    },
+    {
+      "idle": 6000,
+      "timeout": 240000
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "recordings": [
+    {
+      "id": "claude-code",
+      "take": "claude-7.jsonl",
+      "startWhen": "❯",
+      "busyWhen": "esc to interrupt",
+      "busySpeed": 4,
+      "maxHold": 4500,
+      "captions": [
+        {
+          "when": "❯",
+          "title": "Ask in plain words",
+          "body": "One sentence about a 44,714-row file on disk. No schema, no SQL, nothing pasted into the chat."
+        },
+        {
+          "when": "rows · Line",
+          "title": "The chart prints in the reply",
+          "body": "TinyPivot read every row on your machine. Claude received a summary of about 540 tokens."
+        },
+        {
+          "when": "❯ show a pivot",
+          "title": "Follow up for a few hundred tokens",
+          "body": "The file is already loaded, so the next question sends only the new instruction."
+        },
+        {
+          "when": "Trend",
+          "title": "A pivot table with sparklines",
+          "body": "Exact totals computed outside the model, with a trend column for every row."
+        },
+        {
+          "when": "❯ chart Partner",
+          "title": "Narrow it to one segment",
+          "body": "Filters run on disk as well. Only Partner orders from 2026 are loaded."
+        },
+        {
+          "when": "Low: 2026-03",
+          "title": "It finds the bad month",
+          "body": "Partner orders fell to 90 in March. Claude calls it out from the chart summary alone."
+        }
+      ]
+    },
+    {
+      "id": "pi",
+      "take": "pi-8.jsonl",
+      "busyWhen": "Working",
+      "busySpeed": 7,
+      "maxHold": 4500,
+      "captions": [
+        {
+          "when": ".",
+          "title": "A local model, on your own machine",
+          "body": "pi driving an open-weights model. TinyPivot does the arithmetic, so the model only has to ask for the chart."
+        },
+        {
+          "when": "rows · Area",
+          "title": "An area chart in the amber theme",
+          "body": "Twenty-two months of revenue, drawn in braille dots and coloured by the theme you pick."
+        },
+        {
+          "when": "now a stacked bar",
+          "title": "Change the cut in one line",
+          "body": "Same file, new question. Nothing is reloaded and the model re-reads no rows."
+        },
+        {
+          "when": "rows · Stacked Bar",
+          "title": "Stacked by plan",
+          "body": "Enterprise carries the business. The totals come from all 44,714 rows, not a sample."
+        }
+      ]
+    },
+    {
+      "id": "opencode",
+      "take": "opencode-2.jsonl",
+      "startAfter": "Authentication Required",
+      "busyWhen": "esc interrupt",
+      "busySpeed": 7,
+      "maxHold": 4500,
+      "captions": [
+        {
+          "when": ".",
+          "title": "Same server, another harness",
+          "body": "One install command wires TinyPivot into every agent on the machine. Here it is in OpenCode."
+        },
+        {
+          "when": "rows · Bar",
+          "title": "A ranked bar chart",
+          "body": "Channels sorted by revenue with shares, peak, low and average in the footer."
+        },
+        {
+          "when": "show a pivot table",
+          "title": "Ask for the table instead",
+          "body": "The same data as a region by plan grid."
+        },
+        {
+          "when": "rows · 4 groups",
+          "title": "Pivot table with a trend column",
+          "body": "Every cell is an exact sum. The sparkline shows the shape of each row at a glance."
+        }
+      ]
+    },
+    {
+      "id": "antigravity",
+      "take": "agy-2.jsonl",
+      "startWhen": "for shortcuts",
+      "busyWhen": "esc to cancel|Thinking|Generating|Working",
+      "busySpeed": 5,
+      "maxHold": 4500,
+      "captions": [
+        {
+          "when": ".",
+          "title": "Antigravity, from the command line",
+          "body": "Google's agent reads the same MCP server. One sentence, one file."
+        },
+        {
+          "when": "Allow calling this tool",
+          "title": "You approve each tool call",
+          "body": "The agent asks before it runs TinyPivot. The file never leaves your machine either way."
+        },
+        {
+          "when": "rows · Stacked Bar",
+          "title": "Stacked bars by region and plan",
+          "body": "Four regions, four plans, 44,714 orders, drawn in the reply."
+        },
+        {
+          "when": "now a pivot table",
+          "title": "Then the numbers behind it",
+          "body": "Ask for a pivot table and the exact figures come back as a grid."
+        },
+        {
+          "when": "rows · 4 groups",
+          "title": "Pivot table with a trend column",
+          "body": "Channel by customer type, summed outside the model."
+        }
+      ]
+    }
+  ]
+}

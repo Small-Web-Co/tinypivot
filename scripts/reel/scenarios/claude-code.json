@@ -1,0 +1,62 @@
+{
+  "command": "claude --model sonnet --setting-sources project --mcp-config \"$REEL_MCP_CONFIG\" --strict-mcp-config --allowedTools mcp__tinypivot --disallowedTools Bash Write Edit NotebookEdit WebFetch WebSearch",
+  "cols": 96,
+  "rows": 44,
+  "steps": [
+    {
+      "wait": "❯",
+      "timeout": 40000
+    },
+    {
+      "sleep": 1500
+    },
+    {
+      "type": "chart 2026 vs 2025 MRR by month from acme-orders.csv"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 5000
+    },
+    {
+      "idle": 4000,
+      "timeout": 240000
+    },
+    {
+      "type": "show a pivot table of MRR by plan and channel"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 5000
+    },
+    {
+      "idle": 4000,
+      "timeout": 240000
+    },
+    {
+      "type": "chart Partner orders per month for 2026"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 5000
+    },
+    {
+      "idle": 4000,
+      "timeout": 240000
+    }
+  ]
+}

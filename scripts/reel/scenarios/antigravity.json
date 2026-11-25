@@ -1,0 +1,66 @@
+{
+  "command": "agy",
+  "cols": 96,
+  "rows": 44,
+  "steps": [
+    {
+      "wait": "for shortcuts",
+      "timeout": 40000
+    },
+    {
+      "sleep": 1500
+    },
+    {
+      "type": "chart MRR by region from acme-orders.csv, split by plan"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "wait": "Allow calling this tool",
+      "timeout": 120000
+    },
+    {
+      "sleep": 1200
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 4000
+    },
+    {
+      "idle": 5000,
+      "timeout": 240000
+    },
+    {
+      "type": "now a pivot table of MRR by channel and customer type"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "wait": "Allow calling this tool",
+      "timeout": 120000
+    },
+    {
+      "sleep": 1200
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 4000
+    },
+    {
+      "idle": 5000,
+      "timeout": 240000
+    }
+  ]
+}

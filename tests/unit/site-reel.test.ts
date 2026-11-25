@@ -1,0 +1,178 @@
+import type { RecordingFrame, Run } from '../../demo/site/reel/player'
+import { describe, expect, it } from 'vitest'
+import { cameraFor, findCard, lastContentRow, wideShot } from '../../demo/site/reel/director'
+import { glyphRects, sparklineCells, sparklineRect } from '../../demo/site/reel/glyphs'
+import { applyFrames, captionAt, createScreen, frameIndexAt } from '../../demo/site/reel/player'
+import { applySgr, indexedColor, parseScreen, phosphor, rowText, TERMINAL_THEME, themed } from '../../scripts/reel/ansi.mjs'
+
+const ESC = '\u001B'
+
+describe('reel: reading captured terminal colours', () => {
+  it('splits a line into styled runs and strips hyperlinks', () => {
+    const [row] = parseScreen(`plain ${ESC}[1;38;5;196mbold red${ESC}[0m ${ESC}]8;id=1;https://x.test${ESC}\\link${ESC}]8;;${ESC}\\`)
+
+    expect(rowText(row)).toBe('plain bold red link')
+    expect(row[1]).toEqual(['bold red', { bold: true, fg: '#ff0000' }])
+    expect(row[0][1]).toEqual({})
+  })
+
+  it('carries a style across line breaks until it is reset', () => {
+    const rows = parseScreen(`${ESC}[38;2;10;200;30mfirst\nsecond${ESC}[39m third`)
+
+    expect(rows[1][0]).toEqual(['second', { fg: '#0ac81e' }])
+    expect(rows[1][1]).toEqual([' third', {}])
+  })
+
+  it('expands tabs to the next stop, counting from the start of the line', () => {
+    const [row] = parseScreen(`ab\t${ESC}[1mc\t\td`)
+    expect(rowText(row)).toBe(`ab      c${' '.repeat(15)}d`)
+  })
+
+  it('understands resets for single attributes', () => {
+    const style = applySgr({ bold: true, dim: true, fg: '#fff', bg: '#000', inverse: true }, '22;39;27')
+    expect(style).toEqual({ bg: '#000' })
+  })
+
+  it('shows greys as amber phosphor and keeps real colours', () => {
+    expect(indexedColor(16)).toBe(TERMINAL_THEME.bg)
+    expect(indexedColor(231)).toBe(TERMINAL_THEME.bright)
+    expect(indexedColor(244)).toBe(phosphor(128 / 255))
+    expect(themed(128, 128, 128)).not.toBe('#808080')
+    expect(indexedColor(196)).toBe('#ff0000')
+    expect(themed(151, 118, 229)).toBe('#9776e5')
+  })
+})
+
+describe('reel: stepping through a recording', () => {
+  const frames: RecordingFrame[] = [
+    { t: 0, rows: [[0, [['$ ', 0]]]] },
+    { t: 100, rows: [[0, [['$ ls', 0]]]] },
+    { t: 400, rows: [[1, [['a.csv', 1]]]] },
+  ]
+
+  it('finds the frame showing at a given time', () => {
+    expect(frameIndexAt(frames, -1)).toBe(-1)
+    expect(frameIndexAt(frames, 0)).toBe(0)
+    expect(frameIndexAt(frames, 399)).toBe(1)
+    expect(frameIndexAt(frames, 9000)).toBe(2)
+  })
+
+  it('applies only the rows that changed and reports them', () => {
+    const screen = createScreen(2)
+    expect([...applyFrames(screen, frames, -1, 1)]).toEqual([0])
+    expect(screen).toEqual([[['$ ls', 0]], []])
+
+    expect([...applyFrames(screen, frames, 1, 2)]).toEqual([1])
+    expect(screen[1]).toEqual([['a.csv', 1]])
+  })
+
+  it('shows the latest caption that has started', () => {
+    const captions = [{ t: 0, title: 'Ask', body: '' }, { t: 500, title: 'Chart', body: '' }]
+    expect(captionAt(captions, 499)?.title).toBe('Ask')
+    expect(captionAt(captions, 500)?.title).toBe('Chart')
+    expect(captionAt([], 10)).toBeNull()
+  })
+})
+
+describe('reel: drawing chart characters on the cell grid', () => {
+  const CW = 8
+  const CH = 16
+  const area = (char: string) => (glyphRects(char, CW, CH) ?? []).reduce((sum, rect) => sum + rect.w * rect.h, 0)
+
+  it('leaves ordinary text to the font', () => {
+    expect(glyphRects('a', CW, CH)).toBeNull()
+    expect(glyphRects(' ', CW, CH)).toBeNull()
+  })
+
+  it('fills block elements by eighths', () => {
+    expect(area('█')).toBe(CW * CH)
+    expect(area('▄')).toBe(CW * CH / 2)
+    expect(area('▌')).toBe(CW * CH / 2)
+    expect(area('▏')).toBe(CW * CH / 8)
+    expect(area('▇')).toBe(CW * CH * 7 / 8)
+    expect(glyphRects('▒', CW, CH)?.[0].alpha).toBe(0.5)
+  })
+
+  it('draws one dot per braille bit, and none for the blank pattern', () => {
+    expect(glyphRects('⠀', CW, CH)).toEqual([])
+    expect(glyphRects('⣿', CW, CH)).toHaveLength(8)
+    const [dot] = glyphRects('⠁', CW, CH) ?? []
+    expect(dot.x).toBeLessThan(CW / 2)
+    expect(dot.y).toBeLessThan(CH / 4)
+  })
+
+  it('spots sparklines but not solid bars', () => {
+    expect([...sparklineCells([...'│ ▁▃█▂ │'])]).toEqual([2, 3, 4, 5])
+    expect(sparklineCells([...'│ ████▌ 64.9M'])).toEqual(new Set())
+    expect(sparklineCells([...'▁ alone'])).toEqual(new Set())
+  })
+
+  it('draws sparkline bars apart from their neighbours and from the row below', () => {
+    const tall = sparklineRect('█', CW, CH)
+    const short = sparklineRect('▁', CW, CH)
+
+    expect(tall.h).toBeGreaterThan(short.h)
+    for (const bar of [tall, short]) {
+      expect(bar.x).toBeGreaterThan(0)
+      expect(bar.x + bar.w).toBeLessThan(CW)
+      expect(bar.y).toBeGreaterThan(0)
+      expect(bar.y + bar.h).toBeLessThan(CH)
+    }
+  })
+
+  it('joins box-drawing lines at the cell edges', () => {
+    const horizontal = glyphRects('─', CW, CH) ?? []
+    const left = Math.min(...horizontal.map(rect => rect.x))
+    const right = Math.max(...horizontal.map(rect => rect.x + rect.w))
+    expect([left, right]).toEqual([0, CW])
+
+    const corner = glyphRects('╭', CW, CH) ?? []
+    expect(Math.max(...corner.map(rect => rect.y + rect.h))).toBe(CH)
+    expect(Math.max(...corner.map(rect => rect.x + rect.w))).toBe(CW)
+    expect(Math.min(...corner.map(rect => rect.y))).toBeGreaterThan(0)
+  })
+})
+
+describe('reel: camera', () => {
+  const screen = (lines: string[]): Run[][] => lines.map(line => [[line, 0]])
+  const CARD = ['  ╭─ MRR by month ─╮', '  │ ⣀⠤⠒⠉           │', '  ╰──── 44,714 rows ╯']
+
+  it('finds the newest complete card and ignores one cut off at the top', () => {
+    const card = findCard(screen(['❯ chart it', ...CARD, 'done']))
+    expect(card).toMatchObject({ col: 2, row: 1, rows: 3, cols: 18, title: '╭─ MRR by month ─╮' })
+
+    expect(findCard(screen(CARD.slice(1)))).toBeNull()
+    expect(findCard(screen(['just text']))).toBeNull()
+  })
+
+  const grid = { cols: 96, rows: 44, viewRows: 28 }
+
+  it('follows the newest output: top of the screen first, scrolling once it fills the stage', () => {
+    expect(wideShot(grid, 5)).toEqual({ scale: 1, x: 0, y: 0 })
+    // Content down to row 35 puts rows 9 to 36 in view.
+    expect(wideShot(grid, 35).y).toBeCloseTo((-9 / 44) * 100)
+    // Never scrolls past the last row.
+    expect(wideShot(grid, 43).y).toBeCloseTo((-16 / 44) * 100)
+    expect(lastContentRow(screen(['a', '', 'b', '  ', '']))).toBe(2)
+  })
+
+  it('pushes in on a card and keeps it inside the stage', () => {
+    const card = { col: 2, row: 12, cols: 70, rows: 17 }
+    const camera = cameraFor(card, grid, 2)
+
+    expect(camera.scale).toBeCloseTo(96 / 76)
+    // A card near the left edge pins the view to that edge instead of showing empty space.
+    expect(camera.x).toBe(0)
+
+    // The stage shows `viewRows` rows of an unscaled canvas; work out which rows are visible.
+    const firstVisibleRow = (-camera.y / 100) * grid.rows / camera.scale
+    const visibleRows = grid.viewRows / camera.scale
+    expect(firstVisibleRow).toBeLessThanOrEqual(card.row)
+    expect(firstVisibleRow + visibleRows).toBeGreaterThanOrEqual(card.row + card.rows)
+  })
+
+  it('respects the zoom cap and never zooms out below full width', () => {
+    expect(cameraFor({ col: 40, row: 10, cols: 10, rows: 4 }, grid, 1.5).scale).toBe(1.5)
+    expect(cameraFor({ col: 0, row: 0, cols: 96, rows: 40 }, grid, 2).scale).toBe(1)
+  })
+})
