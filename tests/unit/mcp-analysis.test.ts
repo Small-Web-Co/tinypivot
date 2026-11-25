@@ -6,7 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DuckDbRunner, quoteLiteral, toPlainValue, withinBudget } from '../../packages/mcp/src/duckdb'
-import { formatHistoryList, HistoryStore } from '../../packages/mcp/src/history'
+import { formatHistoryList, HistoryStore, SESSIONS_DIR } from '../../packages/mcp/src/history'
 import { createTinyPivotMcpServer, DatasetStore } from '../../packages/mcp/src/index'
 import { formatProfile } from '../../packages/mcp/src/profile'
 import { describeView, fileStepSql, Studio } from '../../packages/mcp/src/studio'
@@ -75,6 +75,23 @@ describe('history', () => {
     expect(history.prune(new Date('2026-11-25T00:00:00Z'))).toBe(1)
     expect(history.list()).toHaveLength(1)
     expect(fs.existsSync(history.rowsPath(old)!)).toBe(false)
+  })
+
+  it('deletes conversation traces older than the retention window, and the old shared trace', () => {
+    const history = new HistoryStore({ dir: path.join(dir, 'history'), retentionDays: 30 })
+    const sessions = path.join(history.dir, SESSIONS_DIR)
+    fs.mkdirSync(sessions, { recursive: true })
+    const oldTrace = path.join(sessions, 'old.jsonl')
+    const recentTrace = path.join(sessions, 'recent.jsonl')
+    fs.writeFileSync(oldTrace, '{}\n')
+    fs.writeFileSync(recentTrace, '{}\n')
+    fs.writeFileSync(path.join(history.dir, 'trace.jsonl'), '{}\n')
+    fs.utimesSync(oldTrace, new Date('2026-09-01T00:00:00Z'), new Date('2026-09-01T00:00:00Z'))
+    fs.utimesSync(recentTrace, new Date('2026-11-20T00:00:00Z'), new Date('2026-11-20T00:00:00Z'))
+
+    history.prune(new Date('2026-11-25T00:00:00Z'))
+    expect(fs.readdirSync(sessions)).toEqual(['recent.jsonl'])
+    expect(fs.existsSync(path.join(history.dir, 'trace.jsonl'))).toBe(false)
   })
 
   it('records nothing when switched off', () => {
@@ -171,8 +188,11 @@ describe('query, profile and history tools', () => {
     expect(dataset.name).toBe('Your query')
     expect(store.get()?.id).toBe(dataset.id)
 
-    const restarted = new Studio(new DatasetStore(), { history })
+    const restarted = new Studio(new DatasetStore(), { history, sessionId: studio.sessionId })
     expect(restarted.recentSteps().map(s => [s.actor, s.tool])).toEqual([['user', 'query']])
+
+    // Another conversation on the same machine starts with its own, empty trace.
+    expect(new Studio(new DatasetStore(), { history }).recentSteps()).toEqual([])
   }, 30_000)
 
   it('keeps a step\'s chart when the user edits its SQL, if the result still has its fields', async () => {

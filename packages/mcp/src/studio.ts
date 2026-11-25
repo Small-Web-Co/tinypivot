@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { AgentBridge } from './agent-bridge.js'
 import { DuckDbRunner, quoteIdentifier, quoteLiteral } from './duckdb.js'
-import { HistoryStore } from './history.js'
+import { HistoryStore, SESSIONS_DIR } from './history.js'
 import { DEFAULT_SESSION_KEY } from './store.js'
 
 /**
@@ -114,6 +114,13 @@ export function withoutCards(text: string): string {
 }
 
 let sequence = 0
+
+/** `20261125-101403-4f2a`: sortable by start time, unique per process. */
+function newSessionId(): string {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)
+  return `${stamp}-${process.pid.toString(36)}${Math.random().toString(36).slice(2, 6)}`
+}
+
 function nextId(prefix: string): string {
   sequence += 1
   return `${prefix}-${Date.now().toString(36)}-${sequence.toString(36)}`
@@ -133,9 +140,16 @@ export class Studio {
   private agentBusy = false
   private agentHint?: string
 
-  constructor(readonly store: DatasetStore, options: { history?: HistoryStore, duck?: DuckDbRunner } = {}) {
+  /**
+   * Which conversation this Studio belongs to. Each server process is one conversation, so its
+   * trace is its own: other sessions, harnesses and tools running on the machine never show up here.
+   */
+  readonly sessionId: string
+
+  constructor(readonly store: DatasetStore, options: { history?: HistoryStore, duck?: DuckDbRunner, sessionId?: string } = {}) {
     this.history = options.history ?? new HistoryStore()
     this.duck = options.duck ?? new DuckDbRunner()
+    this.sessionId = options.sessionId ?? newSessionId()
     this.steps = this.readTraceFile()
   }
 
@@ -191,7 +205,7 @@ export class Studio {
   }
 
   private get traceFile(): string {
-    return path.join(this.history.dir, 'trace.jsonl')
+    return path.join(this.history.dir, SESSIONS_DIR, `${this.sessionId}.jsonl`)
   }
 
   private readTraceFile(): TraceStep[] {
@@ -215,7 +229,7 @@ export class Studio {
     if (!this.history.enabled)
       return
     try {
-      fs.mkdirSync(this.history.dir, { recursive: true })
+      fs.mkdirSync(path.dirname(this.traceFile), { recursive: true })
       fs.appendFileSync(this.traceFile, `${JSON.stringify(step)}\n`)
       if (fs.statSync(this.traceFile).size > TRACE_FILE_MAX_BYTES)
         fs.writeFileSync(this.traceFile, `${this.steps.map(s => JSON.stringify(s)).join('\n')}\n`)

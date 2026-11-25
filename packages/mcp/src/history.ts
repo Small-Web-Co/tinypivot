@@ -40,6 +40,8 @@ export interface RecordInput {
 /** Larger ephemeral pulls keep only their description, so history stays small. */
 export const HISTORY_MAX_SAVED_ROWS = 200_000
 const DEFAULT_RETENTION_DAYS = 30
+/** Where each conversation's Studio trace is kept, under the history folder. */
+export const SESSIONS_DIR = 'sessions'
 
 export function defaultHistoryDir(): string {
   const base = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share')
@@ -139,11 +141,25 @@ export class HistoryStore {
     return zlib.gunzipSync(fs.readFileSync(file)).toString('utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as Record<string, unknown>)
   }
 
-  /** Deletes entries older than the retention window. Returns how many were removed. */
+  /** Removes conversation traces last written before `cutoff`, and the old trace every session shared. */
+  private pruneTraces(cutoff: number): void {
+    fs.rmSync(path.join(this.dir, 'trace.jsonl'), { force: true })
+    const sessions = path.join(this.dir, SESSIONS_DIR)
+    if (!fs.existsSync(sessions))
+      return
+    for (const file of fs.readdirSync(sessions)) {
+      const full = path.join(sessions, file)
+      if (fs.statSync(full).mtimeMs < cutoff)
+        fs.rmSync(full, { force: true })
+    }
+  }
+
+  /** Deletes entries and conversation traces older than the retention window. Returns how many entries were removed. */
   prune(now = new Date()): number {
     if (!fs.existsSync(this.dir))
       return 0
     const cutoff = now.getTime() - this.retentionDays * 24 * 60 * 60 * 1000
+    this.pruneTraces(cutoff)
     let removed = 0
     for (const entry of this.list()) {
       if (new Date(entry.createdAt).getTime() >= cutoff)
