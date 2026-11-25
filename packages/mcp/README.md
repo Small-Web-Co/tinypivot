@@ -171,3 +171,7 @@ TinyPivot MCP sends minimal, **zero-PII** anonymous usage pings (`event`, `tool`
 
 - **Never collected:** row data, column names, SQL queries, file paths, hostnames, or user identities.
 - **Opt out anytime:** set `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` in your environment or MCP server `env` block.
+
+## License
+
+TinyPivot is **source-available (dual-licensed)**: Free Tier features are licensed under MIT, and Pro / Team features require a commercial license from Small Web, LLC. See [LICENSE.md](./LICENSE.md) for full terms.
