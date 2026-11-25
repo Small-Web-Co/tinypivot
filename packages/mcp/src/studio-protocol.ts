@@ -52,6 +52,12 @@ export interface StudioNote {
 }
 
 /** What the browser Studio shows: the trace, notes not yet delivered, and saved pulls. */
+/** How the user can make their agent take Studio messages live: a sentence, and a command to copy if there is one. */
+export interface AgentHint {
+  text: string
+  command?: string
+}
+
 export interface StudioSnapshot {
   /** Each step, with the SQL that reproduces it when there is one (file loads included). */
   steps: Array<TraceStep & { editableSql?: string }>
@@ -61,5 +67,5 @@ export interface StudioSnapshot {
   /** Ids of the datasets loaded right now, so a step can open its dataset directly. */
   loadedIds: string[]
   /** The agent the Studio talks to, and the ways it reaches it live right now (empty when only queued). */
-  agent: { name?: string, live: string[], busy: boolean, hint?: string }
+  agent: { name?: string, live: string[], busy: boolean, hint?: AgentHint }
 }

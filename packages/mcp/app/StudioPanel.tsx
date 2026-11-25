@@ -292,7 +292,31 @@ function SqlEditor({ initialSql, fromStepId, tables, onClose, notify }: SqlEdito
 }
 
 /** Who the Studio talks to, and whether messages reach it now or with its next TinyPivot reply. */
-function AgentStatus({ agent }: { agent: StudioSnapshot['agent'] }) {
+/** How to make the agent take messages live, with the command to copy when there is one. */
+function AgentHintLine({ hint, notify }: { hint: NonNullable<StudioSnapshot['agent']['hint']>, notify: (message: string) => void }) {
+  const copy = async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command)
+      notify('Copied. Run it in your terminal.')
+    }
+    catch {
+      notify('Could not copy to the clipboard.')
+    }
+  }
+  return (
+    <span className="tp-studio-agent-tip">
+      {hint.text}
+      {hint.command && (
+        <span className="tp-studio-agent-command">
+          <code>{hint.command}</code>
+          <button type="button" className="tp-studio-btn tp-studio-btn-ghost" onClick={() => void copy(hint.command!)}>Copy</button>
+        </span>
+      )}
+    </span>
+  )
+}
+
+function AgentStatus({ agent, notify }: { agent: StudioSnapshot['agent'], notify: (message: string) => void }) {
   const name = agent.name ?? 'Your agent'
   const live = agent.live.length > 0
   return (
@@ -302,7 +326,7 @@ function AgentStatus({ agent }: { agent: StudioSnapshot['agent'] }) {
         <strong>{name}</strong>
         {agent.busy ? ' is working…' : live ? ' · live: messages start a turn now' : ' · messages go with its next TinyPivot reply'}
       </span>
-      {!live && agent.hint && <span className="tp-studio-agent-tip">{agent.hint}</span>}
+      {!live && agent.hint && <AgentHintLine hint={agent.hint} notify={notify} />}
     </div>
   )
 }
@@ -379,7 +403,7 @@ function NoteComposer({ notes, agent, aboutStep, attachment, onAttachView, onCle
 
   return (
     <div className="tp-studio-composer">
-      <AgentStatus agent={agent} />
+      <AgentStatus agent={agent} notify={notify} />
       <QueuedNotes notes={notes} />
       {aboutStep && (
         <div className="tp-studio-about">

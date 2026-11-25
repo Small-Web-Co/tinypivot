@@ -44,6 +44,7 @@ export {
   type StoredDataset,
 } from './store.js'
 export {
+  type AgentHint,
   type StepActor,
   STUDIO_HEADER,
   type StudioNote,

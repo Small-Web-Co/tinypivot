@@ -1607,6 +1607,20 @@ body,
   overflow-wrap: anywhere;
 }
 
+.tp-studio-agent-command {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.tp-studio-agent-command code {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-primary, inherit);
+  user-select: all;
+}
+
 .tp-studio-attachment .tp-studio-label {
   color: var(--tp-accent-2);
 }

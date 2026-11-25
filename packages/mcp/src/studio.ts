@@ -1,7 +1,7 @@
 import type { ChartConfig, DataGridViewMode, PivotConfig } from '@smallwebco/tinypivot-core'
 import type { HistoryEntry, RecordInput } from './history.js'
 import type { DatasetStore, RowFilter, StoredDataset } from './store.js'
-import type { NoteAttachment, StepActor, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
+import type { AgentHint, NoteAttachment, StepActor, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { AgentBridge } from './agent-bridge.js'
@@ -138,7 +138,7 @@ export class Studio {
   readonly agent = new AgentBridge(() => this.changed())
   private agentName?: string
   private agentBusy = false
-  private agentHint?: string
+  private agentHint?: AgentHint
 
   /**
    * Which conversation this Studio belongs to. Each server process is one conversation, so its
@@ -185,7 +185,7 @@ export class Studio {
   }
 
   /** What would let this agent receive Studio messages live, shown while it cannot. */
-  setAgentHint(hint: string | undefined): void {
+  setAgentHint(hint: AgentHint | undefined): void {
     this.agentHint = hint
     this.changed()
   }

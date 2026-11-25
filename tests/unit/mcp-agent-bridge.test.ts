@@ -138,6 +138,8 @@ describe('claude Code channel server', () => {
     const { tools } = await client.listTools()
     expect(tools.map(tool => tool.name)).not.toContain('studio_reply')
     expect(client.getServerCapabilities()?.experimental).toBeUndefined()
+    // The Studio offers the command that restarts into the same conversation with the channel on.
+    expect(studio.snapshot().agent.hint?.command).toBe('claude --continue --dangerously-load-development-channels server:tinypivot')
   })
 })
 

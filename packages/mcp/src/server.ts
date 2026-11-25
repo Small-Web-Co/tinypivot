@@ -8,6 +8,7 @@ import type {
 } from '@smallwebco/tinypivot-core'
 import type { PostgresConfig } from './postgres.js'
 import type { StoredDataset } from './store.js'
+import type { AgentHint } from './studio-protocol.js'
 import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -203,13 +204,21 @@ function normalizePivot(pivotConfig: z.infer<typeof pivotConfigSchema>): Partial
   }
 }
 
-/** Every data tool takes a short reason, shown to the user in the Studio trace. */
 /** What the Studio tells a pi user, by the state of TinyPivot's pi extension. */
-const PI_HINTS: Record<Awaited<ReturnType<typeof refreshPiExtension>>, string | undefined> = {
+const PI_HINTS: Record<Awaited<ReturnType<typeof refreshPiExtension>>, AgentHint | undefined> = {
   current: undefined,
   custom: undefined,
-  updated: 'TinyPivot\'s pi extension was just updated. Restart pi to send messages live.',
-  absent: 'Run npx @smallwebco/tinypivot-mcp@latest init --targets=pi, then restart pi, to send messages live.',
+  updated: { text: 'TinyPivot\'s pi extension was just updated. Restart pi to send messages live.' },
+  absent: { text: 'Install TinyPivot\'s pi extension, then restart pi, to send messages live:', command: 'npx @smallwebco/tinypivot-mcp@latest init --targets=pi' },
+}
+
+/**
+ * Claude Code only takes live messages through a channel, which it loads at start. `--continue`
+ * brings the user back into the same conversation, so the restart costs nothing.
+ */
+const CLAUDE_CHANNEL_HINT: AgentHint = {
+  text: 'To send messages live, restart Claude Code into this same conversation with TinyPivot\'s channel:',
+  command: 'claude --continue --dangerously-load-development-channels server:tinypivot',
 }
 
 /** Explained once in the server instructions, so the schema stays bare. */
@@ -461,7 +470,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     if (clientName === 'pi')
       void refreshPiExtension().then(status => studio.setAgentHint(PI_HINTS[status])).catch(() => {})
     if (clientName === 'claude-code' && !claudeChannel)
-      studio.setAgentHint('Start Claude Code with --dangerously-load-development-channels server:tinypivot to send messages live.')
+      studio.setAgentHint(CLAUDE_CHANNEL_HINT)
     if (claudeChannel) {
       studio.agent.connect({
         name: 'Claude Code channel',
