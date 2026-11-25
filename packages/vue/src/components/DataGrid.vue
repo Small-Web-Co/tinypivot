@@ -16,7 +16,7 @@ import type {
   PivotLayout,
   Theme,
 } from '@smallwebco/tinypivot-core'
-import { selectionBounds as boundsBetween, canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues, heightToFill, loadCalculatedFields, measureFill, saveCalculatedFields, selectionCellClass, snapToFill } from '@smallwebco/tinypivot-core'
+import { selectionBounds as boundsBetween, canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, describeFilter, getDrillThroughRows, getFieldUniqueValues, heightToFill, loadCalculatedFields, measureFill, saveCalculatedFields, selectionCellClass, snapToFill } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
@@ -38,6 +38,7 @@ import ChartBuilder from './ChartBuilder.vue'
 import ColumnFilter from './ColumnFilter.vue'
 import DrillThroughModal from './DrillThroughModal.vue'
 import ExportMenu from './ExportMenu.vue'
+import FilterBar from './FilterBar.vue'
 import PivotConfig from './PivotConfig.vue'
 import PivotSkeleton from './PivotSkeleton.vue'
 
@@ -89,6 +90,8 @@ const props = withDefaults(defineProps<{
   chartConfig?: Partial<ChartConfig>
   /** Optional visual palette preset for charts ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
   chartTheme?: ChartThemePreset
+  /** Dashboard filters: a control per field above every view, narrowing the grid, pivot and chart together */
+  filterFields?: string[]
 }>(), {
   loading: false,
   rowHeight: 36,
@@ -252,6 +255,18 @@ const {
   setDateRangeFilter,
   getDateRangeFilter,
 } = useExcelGrid({ data: dataRef })
+
+// Dashboard filters, each with what it is set to now
+const filterBarFields = computed(() => {
+  // Read so the bar follows every filter change.
+  void columnFilters.value
+  return (props.filterFields ?? [])
+    .filter(field => columnKeys.value.includes(field))
+    .map(field => ({
+      field,
+      summary: describeFilter({ values: getColumnFilterValues(field), numericRange: getNumericRangeFilter(field), dateRange: getDateRangeFilter(field) }, props.numberFormat),
+    }))
+})
 
 // Filtered data for pivot table (respects column filters)
 const filteredDataForPivot = computed(() => {
@@ -1429,6 +1444,15 @@ function handleContainerClick(event: MouseEvent) {
       </div>
     </div>
 
+    <FilterBar
+      v-if="filterBarFields.length > 0 && viewMode !== 'ai'"
+      :fields="filterBarFields"
+      :filtered-row-count="filteredRowCount"
+      :total-row-count="totalRowCount"
+      @open="openFilterDropdown"
+      @clear="clearAllFilters"
+    />
+
     <!-- AI Analyst View - use v-show to preserve state when switching tabs -->
     <div v-if="showAIAnalyst && aiAnalyst" v-show="viewMode === 'ai'" class="vpg-ai-view">
       <AIAnalyst
@@ -1633,7 +1657,7 @@ function handleContainerClick(event: MouseEvent) {
     <template v-else-if="viewMode === 'chart'">
       <div class="vpg-chart-view">
         <!-- Filter indicator for chart -->
-        <div v-if="activeFilterInfo && activeFilterInfo.length > 0" class="vpg-chart-filter-bar">
+        <div v-if="activeFilterInfo && activeFilterInfo.length > 0 && filterBarFields.length === 0" class="vpg-chart-filter-bar">
           <svg class="vpg-icon" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
           </svg>

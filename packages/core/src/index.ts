@@ -342,6 +342,7 @@ export { isDateRange, isNumericRange } from './types'
 export {
   clamp,
   debounce,
+  describeFilter,
   detectColumnType,
   detectFieldType,
   formatCellValue,

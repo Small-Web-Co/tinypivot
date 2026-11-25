@@ -2,7 +2,7 @@
  * TinyPivot Core - Utility Functions
  * Pure utility functions with no framework dependencies
  */
-import type { ColumnStats, DateFormat, FieldStats, NumberFormat } from '../types'
+import type { ColumnStats, DateFormat, DateRange, FieldStats, NumberFormat, NumericRange } from '../types'
 
 /** Three numeric parts split by -, / or . (2024-03-05, 3/5/2024, 05.03.2024), with an optional time. */
 const NUMERIC_DATE_RE = /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}(?:[T ,]|$)/
@@ -353,4 +353,28 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
  */
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
+}
+
+/** What a dashboard filter is set to, in a few words, or null when it lets every row through. */
+export function describeFilter(
+  filter: { values?: string[], numericRange?: NumericRange | null, dateRange?: DateRange | null },
+  format: NumberFormat = 'us',
+): string | null {
+  const range = (min: string | null, max: string | null) => {
+    if (min !== null && max !== null)
+      return `${min} – ${max}`
+    if (min !== null)
+      return `≥ ${min}`
+    return max !== null ? `≤ ${max}` : null
+  }
+  if (filter.numericRange) {
+    const { min, max } = filter.numericRange
+    return range(min === null ? null : formatNumber(min, format), max === null ? null : formatNumber(max, format))
+  }
+  if (filter.dateRange)
+    return range(filter.dateRange.min, filter.dateRange.max)
+  const values = filter.values ?? []
+  if (values.length === 0)
+    return null
+  return values.length <= 2 ? values.join(', ') : `${values[0]} +${values.length - 1}`
 }

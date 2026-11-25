@@ -2602,6 +2602,91 @@
   color: #1e293b !important;
 }
 
+/* Dashboard filters: a control per field above every view */
+.vpg-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--vpg-border-default);
+  background: var(--vpg-surface-panel);
+}
+
+.vpg-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 18rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--vpg-border-default);
+  border-radius: 0.375rem;
+  background: var(--vpg-surface-bg);
+  color: var(--vpg-text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.vpg-filter-chip:hover {
+  border-color: var(--vpg-border-strong);
+  background: var(--vpg-surface-hover);
+}
+
+.vpg-filter-chip:focus-visible {
+  outline: 2px solid var(--vpg-focus-ring);
+  outline-offset: 1px;
+}
+
+.vpg-filter-chip-field {
+  color: var(--vpg-text-muted);
+}
+
+.vpg-filter-chip-value {
+  overflow: hidden;
+  color: var(--vpg-text-primary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vpg-filter-chip-active {
+  border-color: var(--vpg-accent);
+  background: var(--vpg-accent-soft-bg);
+}
+
+.vpg-filter-chip-active .vpg-filter-chip-value {
+  color: var(--vpg-accent-soft-text);
+}
+
+.vpg-filter-chip-caret {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  color: var(--vpg-text-muted);
+}
+
+.vpg-filter-bar-count {
+  margin-left: 0.25rem;
+  color: var(--vpg-text-muted);
+  font-size: 0.75rem;
+}
+
+.vpg-filter-bar-clear {
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--vpg-accent);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.vpg-filter-bar-clear:hover {
+  text-decoration: underline;
+}
+
 /* @design-layer:start */
 /**
  * TinyPivot - Design layer

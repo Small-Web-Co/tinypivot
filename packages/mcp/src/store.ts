@@ -84,6 +84,18 @@ export interface StoredDataset {
   viewMode: DataGridViewMode
   pivotConfig?: Partial<PivotConfig>
   chartConfig?: Partial<ChartConfig>
+  /** Columns offered as dashboard filters above every view, when the user asked for them. */
+  filterFields?: string[]
+}
+
+/** How a dataset is shown: its view and dashboard filters, as every Studio and widget payload sends them. */
+export function datasetView(ds: StoredDataset) {
+  return {
+    viewMode: ds.viewMode,
+    pivotConfig: ds.pivotConfig ?? null,
+    chartConfig: ds.chartConfig ?? null,
+    filterFields: ds.filterFields ?? [],
+  }
 }
 
 export interface DatasetMetadata {
@@ -710,6 +722,7 @@ export class DatasetStore {
       viewMode?: DataGridViewMode
       pivotConfig?: Partial<PivotConfig>
       chartConfig?: Partial<ChartConfig>
+      filterFields?: string[]
     },
     sessionKey?: string,
   ): StoredDataset | undefined {
@@ -722,6 +735,8 @@ export class DatasetStore {
       ds.pivotConfig = { ...ds.pivotConfig, ...patch.pivotConfig }
     if (patch.chartConfig !== undefined)
       ds.chartConfig = { ...ds.chartConfig, ...patch.chartConfig }
+    if (patch.filterFields !== undefined)
+      ds.filterFields = patch.filterFields
     this.activeId = ds.id
     if (ds.id !== SAMPLE_DATASET_ID) {
       const key = this.normalizeSessionKey(sessionKey)

@@ -61,6 +61,8 @@ interface ToolPayload {
   viewMode?: DataGridViewMode
   pivotConfig?: Partial<PivotConfig> | null
   chartConfig?: Partial<ChartConfig> | null
+  /** Columns offered as dashboard filters above every view */
+  filterFields?: string[]
   chartTheme?: ChartThemePreset
   datasets?: DatasetMeta[]
   licenseKey?: string | null
@@ -207,6 +209,7 @@ export function McpApp() {
   const [modelCatalog, setModelCatalog] = useState<ModelPricing[]>(FALLBACK_MODELS)
   const [pivotConfig, setPivotConfig] = useState<Partial<PivotConfig> | undefined>(undefined)
   const [chartConfig, setChartConfig] = useState<Partial<ChartConfig> | undefined>(undefined)
+  const [filterFields, setFilterFields] = useState<string[]>([])
   const [licenseReady, setLicenseReady] = useState(false)
 
   const [canMessageHost, setCanMessageHost] = useState(false)
@@ -321,6 +324,7 @@ export function McpApp() {
     }
     setPivotConfig(payload.pivotConfig ?? undefined)
     setChartConfig(payload.chartConfig ?? undefined)
+    setFilterFields(payload.filterFields ?? [])
     livePivotConfig.current = undefined
     liveChartConfig.current = undefined
     if (payload.modelCatalog)
@@ -1217,6 +1221,7 @@ export function McpApp() {
                   viewMode={viewMode}
                   pivotConfig={pivotConfig}
                   chartConfig={chartConfig}
+                  filterFields={filterFields}
                   showPivot={true}
                   enableExport={true}
                   enableSearch={true}

@@ -9,7 +9,7 @@ import http from 'node:http'
 import path from 'node:path'
 import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
-import { getPreferencesPath } from './store.js'
+import { datasetView, getPreferencesPath } from './store.js'
 import { STUDIO_HEADER } from './studio-protocol.js'
 import { cardTitle, datasetCard } from './summary.js'
 import { getCompanionSessionFile, isProcessAlive } from './tui.js'
@@ -231,9 +231,7 @@ function buildFullCompanionPayload(
     rows: ds.rows.slice(0, INTERACTIVE_ROW_LIMIT),
     hasMoreRows: false,
     columns: ds.columns,
-    viewMode: ds.viewMode,
-    pivotConfig: ds.pivotConfig ?? null,
-    chartConfig: ds.chartConfig ?? null,
+    ...datasetView(ds),
     chartTheme: isPro ? store.getVisualTheme() : 'code',
     datasets: store.listMetadata(),
     licenseKey: validMcpKey(opts.licenseKey),

@@ -20,7 +20,7 @@ import type {
   Theme,
 } from '@smallwebco/tinypivot-core'
 import type { AIAnalystHandle } from './AIAnalyst'
-import { selectionBounds as boundsBetween, canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues, heightToFill, measureFill, selectionCellClass, snapToFill } from '@smallwebco/tinypivot-core'
+import { selectionBounds as boundsBetween, canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, describeFilter, getDrillThroughRows, getFieldUniqueValues, heightToFill, measureFill, selectionCellClass, snapToFill } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useExcelGrid } from '../hooks/useExcelGrid'
@@ -39,6 +39,7 @@ import { ChartBuilder } from './ChartBuilder'
 import { ColumnFilter } from './ColumnFilter'
 import { DrillThroughModal } from './DrillThroughModal'
 import { ExportMenu } from './ExportMenu'
+import { FilterBar } from './FilterBar'
 import { PivotConfig } from './PivotConfig'
 import { PivotSkeleton } from './PivotSkeleton'
 
@@ -92,6 +93,8 @@ interface DataGridProps {
   chartConfig?: Partial<ChartConfig>
   /** Optional visual palette preset for charts ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
   chartTheme?: ChartThemePreset
+  /** Dashboard filters: a control per field above every view, narrowing the grid, pivot and chart together */
+  filterFields?: string[]
   onCellClick?: (payload: {
     row: number
     col: number
@@ -149,6 +152,7 @@ export function DataGrid({
   pivotConfig: controlledPivotConfig,
   chartConfig: controlledChartConfig,
   chartTheme,
+  filterFields,
   onCellClick,
   onExport,
   onCopy,
@@ -300,6 +304,14 @@ export function DataGrid({
   } = useExcelGrid({ data: displayData, enableSorting: true, enableFiltering: true })
 
   const sortingState = table.getState().sorting
+
+  // Dashboard filters, each with what it is set to now
+  const filterBarFields = useMemo(() => (filterFields ?? [])
+    .filter(field => columnKeys.includes(field))
+    .map(field => ({
+      field,
+      summary: describeFilter({ values: getColumnFilterValues(field), numericRange: getNumericRangeFilter(field), dateRange: getDateRangeFilter(field) }, numberFormat),
+    })), [filterFields, columnKeys, columnFilters, getColumnFilterValues, getNumericRangeFilter, getDateRangeFilter, numberFormat])
 
   // Filtered data for pivot table
   const filteredDataForPivot = useMemo(() => {
@@ -1429,6 +1441,16 @@ export function DataGrid({
         </div>
       </div>
 
+      {filterBarFields.length > 0 && viewMode !== 'ai' && (
+        <FilterBar
+          fields={filterBarFields}
+          filteredRowCount={filteredRowCount}
+          totalRowCount={totalRowCount}
+          onOpen={openFilterDropdown}
+          onClear={clearAllFilters}
+        />
+      )}
+
       {/* AI Analyst View - always render if enabled, use CSS to hide for state preservation */}
       {showAIAnalyst && aiAnalyst && (
         <div className="vpg-ai-view" style={{ display: viewMode === 'ai' ? undefined : 'none' }}>
@@ -1698,8 +1720,8 @@ export function DataGrid({
       {/* Chart View */}
       {viewMode === 'chart' && (
         <div className="vpg-chart-view">
-          {/* Filter indicator for chart */}
-          {activeFilterInfo && activeFilterInfo.length > 0 && (
+          {/* Filter indicator for chart (the filter bar says the same when it is shown) */}
+          {activeFilterInfo && activeFilterInfo.length > 0 && filterBarFields.length === 0 && (
             <div className="vpg-chart-filter-bar">
               <svg className="vpg-icon" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />

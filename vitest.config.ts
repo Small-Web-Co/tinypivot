@@ -26,6 +26,8 @@ export default defineConfig({
         find: /^@modelcontextprotocol\/sdk\/(.*)$/,
         replacement: resolve(__dirname, './packages/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/$1'),
       },
+      // Likewise React: tests that render the React components use the React package's copy.
+      { find: /^(react|react-dom)(\/.*)?$/, replacement: resolve(__dirname, './packages/react/node_modules/$1$2') },
     ],
   },
 })

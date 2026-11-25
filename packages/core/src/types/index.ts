@@ -251,6 +251,8 @@ export interface DataGridProps {
   chartConfig?: Partial<ChartConfig>
   /** Optional chart preset. Defaults to the grid theme's matching preset for unified themes, else `'code'`. */
   chartTheme?: ChartThemePreset
+  /** Dashboard filters: a control per field above every view, narrowing the grid, pivot and chart together */
+  filterFields?: string[]
 }
 
 export interface PivotTableProps {

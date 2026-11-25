@@ -26,7 +26,7 @@ import { ROW_PAGE_SIZE } from './limits.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile } from './profile.js'
-import { chartConfigFromPivot, DatasetStore, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
+import { chartConfigFromPivot, DatasetStore, datasetView, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { agentLabel, Studio } from './studio.js'
 import { describeChartForText, formatDatasetSummary, formatPivotSummary } from './summary.js'
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
@@ -123,7 +123,7 @@ const pivotConfigSchema = z.object({
  */
 const chartFieldShape = {
   type: chartTypeSchema,
-  xAxisField: z.string().describe('Category or date column'),
+  xAxisField: z.string(),
   yAxisField: z.string(),
   aggregation: z.enum(CHART_AGG_VALUES).default('sum'),
   seriesField: z.string().optional(),
@@ -131,12 +131,16 @@ const chartFieldShape = {
   title: z.string().optional(),
 }
 
-/** Finishing touches only `configure_chart` takes: map geography, callouts, and the deck layout. */
+/**
+ * Finishing touches only `configure_chart` takes: map geography, callouts, the deck layout, and
+ * dashboard filters (a filter control per listed column above every view, when the user asks).
+ */
 const chartStyleShape = {
   geography: z.enum(GEOGRAPHY_VALUES).optional(),
   annotations: z.boolean().optional(),
   variant: z.enum(['editorial', 'deck']).optional(),
   footnote: z.string().optional(),
+  filters: z.array(z.string()).optional().describe('Columns to offer as filter controls'),
 }
 
 const loadChartSchema = z.object(chartFieldShape)
@@ -252,6 +256,17 @@ const askParam = z.string().optional()
 const DUCKDB_WAIT_MS = 45_000
 
 /** `source` names the dataset in the footnote under D3 charts, so a pasted chart says where it came from. */
+/** What configure_chart says about the dashboard filters it was asked for. */
+function filterNote(asked: string[] | undefined, shown: string[] | undefined): string[] {
+  if (!asked)
+    return []
+  const missing = asked.filter(field => !shown?.includes(field))
+  return [
+    shown?.length ? `Filters above every view: ${shown.join(', ')}.` : 'Filters removed.',
+    ...(missing.length ? [`Not columns, so left out: ${missing.join(', ')}.`] : []),
+  ]
+}
+
 function toCoreChartConfig(input: ChartInput, source?: string): Partial<ChartConfig> {
   // The schema already rejected unknown names, so this always resolves.
   const type = resolveChartType(input.type ?? 'bar') ?? 'bar'
@@ -317,9 +332,7 @@ function buildAppPayload(
     previewRows,
     hasMoreRows: dataset.rows.length > previewRows.length,
     columns: dataset.columns,
-    viewMode: dataset.viewMode,
-    pivotConfig: dataset.pivotConfig ?? null,
-    chartConfig: dataset.chartConfig ?? null,
+    ...datasetView(dataset),
     chartTheme: isPro ? store.getVisualTheme() : 'code',
     datasets: store.listMetadata(options.sessionKey),
     licenseKey: validMcpKey,
@@ -877,7 +890,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
       _meta: INLINE_UI_META,
     },
-    async ({ datasetId, chartTheme, why, ...chartInput }, extra) => {
+    async ({ datasetId, chartTheme, why, filters, ...chartInput }, extra) => {
       const { xAxisField, yAxisField, aggregation, seriesField } = chartInput
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const ds = store.get(datasetId, sessionKey)
@@ -893,9 +906,12 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       }
       const chartConfig = toCoreChartConfig(chartInput, ds.name)
       const type = chartConfig.type!
+      const columnNames = new Set(ds.columns.map(column => column.name))
+      const filterFields = filters?.filter(field => columnNames.has(field))
       store.updateView(ds.id, {
         viewMode: 'chart',
         chartConfig,
+        ...(filterFields ? { filterFields } : {}),
       }, sessionKey)
 
       const asciiChart = formatTerminalChart(ds, chartConfig, { showBranding: !isPro })
@@ -913,6 +929,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       summaryParts.push(
         `Configured **${type}** chart on **${ds.name}**: X = \`${xAxisField}\`, Y = \`${aggregation}(${yAxisField})\`${seriesField ? `, series = \`${seriesField}\`` : ''}${chartInput.targetField ? `, target = \`${chartInput.targetField}\`` : ''}.`,
         ...describeChartForText(ds.rows, chartConfig),
+        ...filterNote(filters, filterFields),
       )
       const liveCompanionUrl = await resolveCompanionUrlForTool()
       if (asciiChart)
@@ -1199,9 +1216,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           tier,
           hasMore: offset + rows.length < ds.rows.length,
           columns: ds.columns,
-          viewMode: ds.viewMode,
-          pivotConfig: ds.pivotConfig ?? null,
-          chartConfig: ds.chartConfig ?? null,
+          ...datasetView(ds),
           chartTheme: isPro ? store.getVisualTheme() : 'code',
           datasets: store.listMetadata(sessionKey),
           licenseKey: licenseKey ?? null,
