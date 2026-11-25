@@ -1,6 +1,6 @@
 {
   "name": "tinypivot",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Interactive Data IDE inside Claude — turn CSV, TSV, JSON, JSONL, API/MCP outputs, and SQL results from any database into interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, and Excel exports.",
   "author": {
     "name": "Small Web, LLC",
