@@ -75,19 +75,31 @@ describe('studio routes', () => {
     expect((await post('/api/studio/query', { sql: 'DROP TABLE x' })).status).toBe(400)
   }, 30_000)
 
-  it('queues notes for the agent and lets the user take one back', async () => {
-    const { body } = await post('/api/studio/note', { text: 'Use net revenue, not gross' })
-    expect((await snapshot()).notes.map(n => n.text)).toEqual(['Use net revenue, not gross'])
+  it('sends notes only to an agent that can take them live', async () => {
+    const refused = await post('/api/studio/note', { text: 'Use net revenue, not gross' })
+    expect(refused.status).toBe(409)
+    expect(refused.body.error).toContain('cannot receive messages from the Studio')
 
-    await post('/api/studio/note/delete', { id: (body.note as { id: string }).id })
-    expect((await snapshot()).notes).toEqual([])
+    const pushed: string[] = []
+    studio.agent.connect({ name: 'pi', push: (_note, text) => pushed.push(text) > 0 })
+    expect((await post('/api/studio/note', { text: 'Use net revenue, not gross' })).status).toBe(200)
+    expect(pushed).toEqual(['Message from the user in TinyPivot Studio: Use net revenue, not gross'])
     expect((await post('/api/studio/note', { text: '   ' })).status).toBe(400)
   })
 
   it('refuses writes without the Studio header', async () => {
+    studio.agent.connect({ name: 'pi', push: () => true })
     expect((await post('/api/studio/note', { text: 'hi' }, {})).status).toBe(403)
-    expect((await snapshot()).notes).toEqual([])
+    expect((await snapshot()).steps).toEqual([])
   })
+
+  it('re-checks a step on request', async () => {
+    await post('/api/studio/query', { sql: `SELECT region, sum(mrr) AS mrr FROM ${quoteLiteral(csvPath)} GROUP BY 1` })
+    const step = (await snapshot()).steps.at(-1)!
+    const result = await post('/api/studio/verify', { stepId: step.id })
+    expect(result).toMatchObject({ status: 200, body: { checks: [{ kind: 'rerun', ok: true }] } })
+    expect((await post('/api/studio/verify', { stepId: 'nope' })).status).toBe(400)
+  }, 30_000)
 
   it('refuses requests addressed to another host name', async () => {
     const status = await new Promise<number>((resolve, reject) => {
@@ -116,6 +128,7 @@ describe('studio routes', () => {
     await readUntil('event: studio')
     expect(handle.clientCount()).toBe(1)
 
+    studio.agent.connect({ name: 'pi', push: () => true })
     studio.addNote('Check March')
     await readUntil('Check March')
     expect(text).toContain('"tool":"note"')

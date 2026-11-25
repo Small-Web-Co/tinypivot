@@ -50,7 +50,7 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false }
     `For files use load_file, so the rows stay out of your context; to filter, join or aggregate files first, use query with SQL. Use load_data only for rows you already have, up to about ${LOAD_DATA_ROW_GUIDE}; write larger sets to a file first. history lists and reopens earlier pulls.`,
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
-    'Pass why on every data call: one short sentence the user sees in the TinyPivot Studio trace. Replies may end with notes the user wrote in the Studio; act on them.',
+    'On every data call pass why (one short sentence for TinyPivot Studio); when loading or querying, also ask (the user\'s request, verbatim).',
     ...(claudeChannel ? ['Messages from TinyPivot Studio arrive as <channel source="tinypivot"> events: do what they ask, then answer with studio_reply.'] : []),
     cards,
   ].join(' ')
@@ -223,6 +223,8 @@ const CLAUDE_CHANNEL_HINT: AgentHint = {
 
 /** Explained once in the server instructions, so the schema stays bare. */
 const whyParam = z.string().max(240).optional()
+/** The user's request in their words, so the Studio can show each answer from the question down (the Studio keeps 500 characters). */
+const askParam = z.string().optional()
 
 /** How long a query waits for DuckDB on first use before asking the model to try again. */
 const DUCKDB_WAIT_MS = 45_000
@@ -436,7 +438,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   /** The shared ending of every tool that loads a dataset: the card for the model, the payload for the widget. */
   const replyWithDataset = async (ds: StoredDataset, sessionKey: string, tool: string, note = '') => {
     const liveCompanionUrl = await resolveCompanionUrlForTool()
-    const summaryText = withNotes(`${formatDatasetSummary(ds, liveCompanionUrl, cardFormat())}${note}`)
+    const summaryText = `${formatDatasetSummary(ds, liveCompanionUrl, cardFormat())}${note}`
     const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
     recordTelemetry({
       event: 'tool_call',
@@ -457,8 +459,6 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   catch (error) {
     console.error(`[tinypivot-mcp] Could not prune history: ${error instanceof Error ? error.message : String(error)}`)
   }
-  /** A tool's text plus any notes the user left in the Studio since the last reply. */
-  const withNotes = (text: string) => `${text}${studio.takeNotes()}`
 
   /**
    * Lets the Studio reach this agent: into the Claude Code session through a channel when it was
@@ -658,6 +658,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         filePath: z.string(),
         name: z.string().optional(),
         why: whyParam,
+        ask: askParam,
         where: z.array(rowFilterSchema).optional().describe('Keep only matching rows, e.g. [{"field":"year","equals":[2026]}]'),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
@@ -666,7 +667,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
       _meta: INLINE_UI_META,
     },
-    async ({ filePath, name, why, where, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
+    async ({ filePath, name, why, ask, where, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
       try {
         const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
         const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep, where })
@@ -687,7 +688,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           }, sessionKey)
         }
 
-        studio.recordDatasetStep(ds, { actor: 'agent', tool: 'load_file', why, file: ds.source, where })
+        studio.recordDatasetStep(ds, { actor: 'agent', tool: 'load_file', why, ask, file: ds.source, where })
         return replyWithDataset(ds, sessionKey, 'load_file')
       }
       catch (err) {
@@ -708,6 +709,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       inputSchema: {
         name: z.string(),
         why: whyParam,
+        ask: askParam,
         rows: z.array(z.record(z.string(), z.unknown())),
         source: z.string().optional(),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
@@ -717,7 +719,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
       _meta: INLINE_UI_META,
     },
-    async ({ name, why, rows, source, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
+    async ({ name, why, ask, rows, source, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
       const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
       const ds = store.register({
         name,
@@ -731,7 +733,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         keepExisting: shouldKeep,
       })
       studio.remember(ds, { kind: 'data', source: source ?? 'inline JSON' })
-      studio.recordDatasetStep(ds, { actor: 'agent', tool: 'load_data', why })
+      studio.recordDatasetStep(ds, { actor: 'agent', tool: 'load_data', why, ask })
       return replyWithDataset(ds, sessionKey, 'load_data')
     },
   )
@@ -781,7 +783,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       }, sessionKey)
 
       const liveCompanionUrl = await resolveCompanionUrlForTool()
-      const summary = withNotes(formatPivotSummary(ds, fullPivotConfig, liveCompanionUrl, cardFormat()))
+      const summary = formatPivotSummary(ds, fullPivotConfig, liveCompanionUrl, cardFormat())
       studio.recordDatasetStep(ds, { actor: 'agent', tool: 'configure_pivot', why })
       // Computing the pivot deterministically on the server avoids feeding raw rows back to the LLM
       const pivotTokensSaved = Math.max(0, ds.estimatedDatasetTokens - Math.round(Buffer.byteLength(summary, 'utf8') / 4))
@@ -864,7 +866,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         summaryParts.push('', asciiChart)
       if (liveCompanionUrl)
         summaryParts.push(`Studio: ${liveCompanionUrl}`)
-      const summaryText = withNotes(summaryParts.join('\n'))
+      const summaryText = summaryParts.join('\n')
       studio.recordDatasetStep(ds, { actor: 'agent', tool: 'configure_chart', why })
 
       const chartTokensSaved = Math.max(0, ds.estimatedDatasetTokens - Math.round(Buffer.byteLength(summaryText, 'utf8') / 4))
@@ -898,6 +900,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         inputSchema: {
           sql: z.string(),
           why: whyParam,
+          ask: askParam,
           name: z.string().optional(),
           viewMode: z.enum(VIEW_MODE_VALUES).optional(),
           pivotConfig: pivotConfigSchema.optional(),
@@ -905,7 +908,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         },
         _meta: INLINE_UI_META,
       },
-      async ({ sql, why, name, viewMode, pivotConfig, keepExisting }, extra) => {
+      async ({ sql, why, ask, name, viewMode, pivotConfig, keepExisting }, extra) => {
         if (!isPro) {
           return {
             isError: true,
@@ -929,7 +932,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             keepExisting: shouldKeep,
           })
           studio.remember(ds, { kind: 'postgres', source: sql })
-          studio.recordDatasetStep(ds, { actor: 'agent', tool: 'query_postgres', why, sql })
+          studio.recordDatasetStep(ds, { actor: 'agent', tool: 'query_postgres', why, ask, sql })
           return replyWithDataset(ds, sessionKey, 'query_postgres', res.truncated ? ' (capped at max rows)' : '')
         }
         catch (err) {
@@ -952,6 +955,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       inputSchema: {
         sql: z.string(),
         why: whyParam,
+        ask: askParam,
         name: z.string().optional(),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
@@ -960,7 +964,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
       _meta: INLINE_UI_META,
     },
-    async ({ sql, why, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
+    async ({ sql, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
       const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
       try {
         if (await withinBudget(studio.duck.prepare(), DUCKDB_WAIT_MS) === 'pending') {
@@ -970,6 +974,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           sql,
           name,
           why,
+          ask,
           actor: 'agent',
           sessionKey,
           keepExisting: shouldKeep,
@@ -1003,7 +1008,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       if (!ds)
         return { isError: true, content: [{ type: 'text' as const, text: `Dataset "${datasetId ?? '(active)'}" not found.` }] }
       studio.recordDatasetStep(ds, { actor: 'agent', tool: 'profile', why })
-      return { content: [{ type: 'text' as const, text: withNotes(formatProfile(ds)) }] }
+      return { content: [{ type: 'text' as const, text: formatProfile(ds) }] }
     },
   )
 
@@ -1025,7 +1030,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       if (!history.enabled)
         return { content: [{ type: 'text' as const, text: 'History is off (TINYPIVOT_HISTORY=0).' }] }
       if (!open)
-        return { content: [{ type: 'text' as const, text: withNotes(formatHistoryList(history.list(limit ?? 15))) }] }
+        return { content: [{ type: 'text' as const, text: formatHistoryList(history.list(limit ?? 15)) }] }
       const { sessionKey } = resolveSessionContext(extra, true)
       try {
         const ds = await studio.reopen(open, { actor: 'agent', why, sessionKey })

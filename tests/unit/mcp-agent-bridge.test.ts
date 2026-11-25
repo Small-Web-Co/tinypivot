@@ -27,17 +27,16 @@ afterEach(() => {
 })
 
 describe('sending to the agent', () => {
-  it('goes straight into the conversation when a live connector takes it, and is queued otherwise', () => {
-    const queued = studio.addNote('Use net revenue')
-    expect(queued.delivery).toBe('queued')
+  it('goes straight into the conversation when a live connector takes it, and is refused otherwise', () => {
+    expect(() => studio.addNote('Use net revenue')).toThrow('cannot receive messages from the Studio')
+    expect(studio.recentSteps()).toEqual([])
 
     const pushed: string[] = []
     const disconnect = studio.agent.connect({ name: 'pi', push: (_note, text) => pushed.push(text) > 0 })
-    const live = studio.addNote('Split by plan', { attachment: { label: 'Row #3', text: 'region=EMEA, mrr=1800' } })
-    expect(live.delivery).toBe('live')
-    expect(pushed[0]).toContain('Split by plan\nAttached (Row #3):\nregion=EMEA, mrr=1800')
+    studio.addNote('Split by plan', { attachment: { label: 'Row #3', text: 'region=EMEA, mrr=1800' } })
+    expect(pushed[0]).toBe('Message from the user in TinyPivot Studio: Split by plan\nAttached (Row #3):\nregion=EMEA, mrr=1800')
+    expect(studio.recentSteps().map(step => [step.actor, step.tool, step.why])).toEqual([['user', 'note', 'Split by plan']])
     expect(studio.snapshot().agent.live).toEqual(['pi'])
-    expect(studio.pendingNotes().map(n => n.text)).toEqual(['Use net revenue'])
 
     disconnect()
     expect(studio.snapshot().agent.live).toEqual([])
@@ -83,7 +82,7 @@ describe('pi extension bridge', () => {
     await handlers.get('agent_settled')!({})
     expect(studio.snapshot().agent.busy).toBe(false)
 
-    expect(studio.addNote('Which region is biggest?').delivery).toBe('live')
+    studio.addNote('Which region is biggest?')
     await vi.waitFor(() => expect(sent).toHaveLength(1), { timeout: 3000 })
     expect(sent[0].content).toBe('Message from the user in TinyPivot Studio: Which region is biggest?')
     expect(sent[0].options).toEqual({ triggerTurn: true, deliverAs: 'steer' })

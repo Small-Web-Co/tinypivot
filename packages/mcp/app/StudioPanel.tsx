@@ -1,16 +1,17 @@
 import type { HistoryEntry } from '../src/history'
-import type { NoteAttachment, StudioNote, StudioSnapshot, TraceStep } from '../src/studio-protocol'
+import type { Claim, NoteAttachment, StepCheck, StudioSnapshot } from '../src/studio-protocol'
+import type { Run, StudioStep } from './runs'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { postToStudio } from './companionApi'
+import { claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from './runs'
 
 /**
- * The Studio side panel: every data step the agent and the user took, with the reason and the
- * SQL behind it; an editor to change and rerun that SQL; and messages to the agent, with data
- * attached, that reach it live where the harness allows and with its next TinyPivot reply
- * otherwise. The agent's answers come back into the trace.
+ * The Studio side panel reads the trace as questions. Each one shows what was asked, then how the
+ * answer was made, step by step: the source and its rows, the SQL, the chart or pivot, and the
+ * agent's answer with each number it quotes marked by whether the data backs it. A question can be
+ * re-checked: the source file unchanged, the SQL giving the same rows again. Messages go back to
+ * the agent only where it can take them live; elsewhere the user asks in their terminal.
  */
-
-type StudioStep = StudioSnapshot['steps'][number]
 
 interface StudioPanelProps {
   snapshot: StudioSnapshot
@@ -24,18 +25,12 @@ interface StudioPanelProps {
   notify: (message: string) => void
 }
 
-const TOOL_LABELS: Record<string, string> = {
-  load_file: 'file',
-  load_data: 'rows',
-  query: 'sql',
-  query_postgres: 'postgres',
-  configure_pivot: 'pivot',
-  configure_chart: 'chart',
-  profile: 'profile',
-  history: 'reopen',
-  note: 'note',
-  ask: 'ask',
-  reply: 'reply',
+const STAGE_LABELS: Record<ReturnType<typeof stageOf>, string> = {
+  source: 'source',
+  transform: 'sql',
+  view: 'view',
+  answer: 'answer',
+  message: 'message',
 }
 
 const SQL_TOKEN = /('(?:[^']|'')*'|"(?:[^"]|"")*"|--[^\n]*|\b\d+(?:\.\d+)?\b|\b[a-z_]+\b)/gi
@@ -134,78 +129,207 @@ function shortDate(iso: string): string {
   return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function stepTitle(step: TraceStep): string {
-  return step.why || step.datasetName || step.view || TOOL_LABELS[step.tool] || step.tool
+function fileName(file: string): string {
+  return file.split(/[\\/]/).pop() || file
 }
 
-/** A prompt the user can paste into any agent: the step, its SQL, any attached data, and what they want. */
-export function buildPrompt(note: string, step?: StudioStep, attachment?: NoteAttachment | null): string {
+function sourceText(step: StudioStep): string {
+  if (step.file)
+    return fileName(step.file)
+  if (step.tool === 'load_data')
+    return 'Rows passed in by the agent'
+  if (step.tool === 'query_postgres')
+    return 'Postgres'
+  if (step.tool === 'history')
+    return 'A saved pull, reopened'
+  return step.datasetName ?? 'Data'
+}
+
+function resultText(step: StudioStep): string | undefined {
+  if (typeof step.rows !== 'number')
+    return undefined
+  const columns = step.columns?.length ? ` × ${step.columns.length} columns` : ''
+  return `${step.rows.toLocaleString()} rows${columns}`
+}
+
+/** A prompt the user can paste into any agent: the question, how it was answered so far, and what they want now. */
+export function buildPrompt(note: string, run?: Run, attachment?: NoteAttachment | null): string {
   const lines: string[] = []
-  if (step) {
-    lines.push(`About this TinyPivot step: "${stepTitle(step)}"${step.datasetName ? ` (${step.datasetName}, ${step.view ?? 'table'})` : ''}.`)
-    if (step.editableSql)
-      lines.push('', '```sql', step.editableSql, '```')
+  if (run) {
+    lines.push(`About this TinyPivot question: "${runTitle(run)}".`)
+    const sql = lastStep(run, step => Boolean(step.editableSql))?.editableSql
+    if (sql)
+      lines.push('', '```sql', sql, '```')
   }
   if (attachment)
     lines.push(...(lines.length ? [''] : []), `Attached from TinyPivot (${attachment.label}):`, attachment.text)
-  lines.push(...(lines.length ? [''] : []), note)
+  if (note)
+    lines.push(...(lines.length ? [''] : []), note)
   return lines.join('\n')
 }
 
-interface StepRowProps {
-  step: StudioStep
-  selected: boolean
-  active: boolean
-  onSelect: () => void
-  children?: React.ReactNode
+async function copyText(text: string, notify: (message: string) => void, done = 'Copied.') {
+  try {
+    await navigator.clipboard.writeText(text)
+    notify(done)
+  }
+  catch {
+    notify('Could not copy to the clipboard.')
+  }
 }
 
-function StepRow({ step, selected, active, onSelect, children }: StepRowProps) {
-  const classes = ['tp-studio-step', `tp-studio-step-${step.actor}`, selected ? 'is-selected' : '', active ? 'is-active' : ''].filter(Boolean).join(' ')
+function ClaimMark({ claim }: { claim: Claim }) {
+  const title = claim.status === 'found'
+    ? `In the data: ${claim.where}`
+    : claim.status === 'unchecked' ? 'A rate or change: not checked against the data' : 'Not found in the data this question used'
+  return <mark className={`tp-claim tp-claim-${claim.status}`} title={title}>{claim.text}</mark>
+}
+
+/** The agent's answer, each quoted number marked by whether the data backs it. */
+function AnswerText({ step }: { step: StudioStep }) {
+  const claims = step.claims ?? []
+  const summary = claims.length ? claimSummary(claims) : undefined
   return (
-    <li className={classes}>
-      <button type="button" className="tp-studio-step-btn" onClick={onSelect} aria-expanded={selected}>
-        <span className="tp-studio-dot" aria-hidden="true" />
-        <span className="tp-studio-step-meta">
-          <span className="tp-studio-tag">{TOOL_LABELS[step.tool] ?? step.tool}</span>
-          <span>{step.actor === 'user' ? 'you' : 'agent'}</span>
-          <span>{clockTime(step.at)}</span>
-          {typeof step.rows === 'number' && <span>{`${step.rows.toLocaleString()} rows`}</span>}
-        </span>
-        <span className="tp-studio-step-why">{renderInline(stepTitle(step))}</span>
-        {step.view && step.tool !== 'note' && <span className="tp-studio-step-view">{step.view}</span>}
-      </button>
-      {selected && children}
+    <div className="tp-run-answer">
+      <p>
+        {markClaims(step.why ?? '', claims).map((part, index) =>
+          typeof part === 'string' ? <React.Fragment key={index}>{renderInline(part)}</React.Fragment> : <ClaimMark key={index} claim={part} />,
+        )}
+      </p>
+      {summary && summary.checked > 0 && (
+        <span className={`tp-run-badge ${summary.found === summary.checked ? 'is-ok' : 'is-warn'}`}>{summary.text}</span>
+      )}
+    </div>
+  )
+}
+
+function CheckList({ checks }: { checks?: StepCheck[] }) {
+  if (!checks?.length)
+    return null
+  return (
+    <ul className="tp-run-checks">
+      {checks.map(check => (
+        <li key={check.kind} className={check.ok ? 'is-ok' : 'is-warn'}>
+          <span aria-hidden="true">{check.ok ? '✓' : '!'}</span>
+          {check.detail}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+interface StageProps {
+  step: StudioStep
+  index: number
+  active: boolean
+  canOpen: boolean
+  checks?: StepCheck[]
+  onOpen: (viewMode?: 'grid') => void
+  onEdit: () => void
+}
+
+/** One step on the way to the answer: what it read or did, why, and what came out. */
+function Stage({ step, index, active, canOpen, checks, onOpen, onEdit }: StageProps) {
+  const stage = stageOf(step)
+  const [showSql, setShowSql] = useState(false)
+  const result = resultText(step)
+  const sql = step.editableSql
+  return (
+    <li className={`tp-run-stage tp-run-stage-${stage} ${active ? 'is-active' : ''}`}>
+      <span className="tp-run-num" aria-hidden="true">{index}</span>
+      <div className="tp-run-stage-body">
+        <div className="tp-run-stage-head">
+          <span className="tp-studio-tag">{STAGE_LABELS[stage]}</span>
+          {stage === 'source' && <span className="tp-run-source" title={step.file ?? step.sql}>{sourceText(step)}</span>}
+          {stage === 'view' && <span className="tp-run-source">{step.view}</span>}
+          {step.actor === 'user' && <span className="tp-run-by">you</span>}
+        </div>
+        {stage === 'answer' ? <AnswerText step={step} /> : step.why && <p className="tp-run-why">{renderInline(step.why)}</p>}
+        {sql && stage !== 'view' && (
+          showSql
+            ? <pre className="tp-studio-sql"><code>{highlightSql(sql)}</code></pre>
+            : <button type="button" className="tp-run-sql-line" onClick={() => setShowSql(true)} title="Show the SQL">{sql.replace(/\s+/g, ' ')}</button>
+        )}
+        {(result || canOpen) && stage !== 'answer' && (
+          <div className="tp-run-result">
+            {result && <span>{result}</span>}
+            {canOpen && <button type="button" className="tp-run-link" onClick={() => onOpen('grid')}>Rows</button>}
+            {canOpen && step.view && step.view !== 'table' && <button type="button" className="tp-run-link" onClick={() => onOpen()}>{step.viewMode === 'pivot' ? 'Pivot' : 'Chart'}</button>}
+            {sql && <button type="button" className="tp-run-link" onClick={onEdit}>Edit SQL</button>}
+          </div>
+        )}
+        <CheckList checks={checks} />
+      </div>
     </li>
   )
 }
 
-interface StepDetailProps {
-  step: StudioStep
-  canOpen: boolean
-  onOpen: () => void
-  onEdit: () => void
-  onAsk: () => void
+interface RunCardProps {
+  run: Run
+  open: boolean
+  activeDatasetId: string
+  loaded: Set<string>
+  checks: Record<string, StepCheck[]>
+  checking: boolean
+  onToggle: () => void
+  onOpenStep: (step: StudioStep, viewMode?: 'grid') => void
+  onEdit: (step: StudioStep) => void
+  onCheck: () => void
+  onCopy: () => void
 }
 
-function StepDetail({ step, canOpen, onOpen, onEdit, onAsk }: StepDetailProps) {
+function runBadges(run: Run, checks: Record<string, StepCheck[]>) {
+  const answer = lastStep(run, step => step.tool === 'reply')
+  const claims = answer?.claims ?? []
+  const summary = claims.length ? claimSummary(claims) : undefined
+  const results = run.steps.flatMap(step => checks[step.id] ?? [])
+  return { summary, checked: results.length > 0, allOk: results.every(check => check.ok) }
+}
+
+/** A question and, when open, every step that answered it. */
+function RunCard({ run, open, activeDatasetId, loaded, checks, checking, onToggle, onOpenStep, onEdit, onCheck, onCopy }: RunCardProps) {
+  const stages = run.steps.filter(step => step.tool !== 'note')
+  const { summary, checked, allOk } = runBadges(run, checks)
+  const verifiable = run.steps.some(step => step.fingerprint || step.source)
   return (
-    <div className="tp-studio-detail">
-      {step.file && (
-        <div className="tp-studio-file" title={step.file}>
-          <span className="tp-studio-label">file</span>
-          {step.file}
+    <li className={`tp-run ${open ? 'is-open' : ''}`}>
+      <button type="button" className="tp-run-head" aria-expanded={open} onClick={onToggle}>
+        <span className={`tp-run-prompt ${run.prompt ? '' : 'is-missing'}`}>{renderInline(runTitle(run))}</span>
+        <span className="tp-studio-step-meta">
+          <span>{clockTime(run.at)}</span>
+          <span>{run.askedIn === 'studio' ? 'asked here' : run.askedIn === 'terminal' ? 'asked in the terminal' : 'question not recorded'}</span>
+          <span>{`${stages.length} step${stages.length === 1 ? '' : 's'}`}</span>
+          {summary && summary.checked > 0 && <span className={summary.found === summary.checked ? 'tp-run-ok' : 'tp-run-warn'}>{`${summary.found}/${summary.checked} numbers`}</span>}
+          {checked && <span className={allOk ? 'tp-run-ok' : 'tp-run-warn'}>{allOk ? 'reproduced' : 'check failed'}</span>}
+        </span>
+      </button>
+      {open && (
+        <div className="tp-run-body">
+          <ol className="tp-run-stages">
+            {stages.map((step, index) => (
+              <Stage
+                key={step.id}
+                step={step}
+                index={index + 1}
+                active={Boolean(step.datasetId) && step.datasetId === activeDatasetId}
+                canOpen={Boolean(step.datasetId && (loaded.has(step.datasetId) || step.historyId))}
+                checks={checks[step.id]}
+                onOpen={viewMode => onOpenStep(step, viewMode)}
+                onEdit={() => onEdit(step)}
+              />
+            ))}
+          </ol>
+          <div className="tp-studio-actions">
+            {verifiable && (
+              <button type="button" className="tp-studio-btn" disabled={checking} onClick={onCheck} title="Check the sources are unchanged and the SQL gives the same rows again">
+                {checking ? 'Checking…' : 'Check this answer'}
+              </button>
+            )}
+            <button type="button" className="tp-studio-btn tp-studio-btn-ghost" onClick={onCopy}>Copy for terminal</button>
+          </div>
         </div>
       )}
-      {step.editableSql && (
-        <pre className="tp-studio-sql"><code>{highlightSql(step.editableSql)}</code></pre>
-      )}
-      <div className="tp-studio-actions">
-        {canOpen && <button type="button" className="tp-studio-btn" onClick={onOpen}>Open</button>}
-        {step.editableSql && <button type="button" className="tp-studio-btn" onClick={onEdit}>Edit &amp; run SQL</button>}
-        {step.tool !== 'note' && <button type="button" className="tp-studio-btn tp-studio-btn-ghost" onClick={onAsk}>Ask agent about this</button>}
-      </div>
-    </div>
+    </li>
   )
 }
 
@@ -291,32 +415,22 @@ function SqlEditor({ initialSql, fromStepId, tables, onClose, notify }: SqlEdito
   )
 }
 
-/** Who the Studio talks to, and whether messages reach it now or with its next TinyPivot reply. */
 /** How to make the agent take messages live, with the command to copy when there is one. */
 function AgentHintLine({ hint, notify }: { hint: NonNullable<StudioSnapshot['agent']['hint']>, notify: (message: string) => void }) {
-  const copy = async (command: string) => {
-    try {
-      await navigator.clipboard.writeText(command)
-      notify('Copied. Run it in your terminal.')
-    }
-    catch {
-      notify('Could not copy to the clipboard.')
-    }
-  }
   return (
     <span className="tp-studio-agent-tip">
       {hint.text}
       {hint.command && (
         <span className="tp-studio-agent-command">
           <code>{hint.command}</code>
-          <button type="button" className="tp-studio-btn tp-studio-btn-ghost" onClick={() => void copy(hint.command!)}>Copy</button>
+          <button type="button" className="tp-studio-btn tp-studio-btn-ghost" onClick={() => void copyText(hint.command!, notify, 'Copied. Run it in your terminal.')}>Copy</button>
         </span>
       )}
     </span>
   )
 }
 
-function AgentStatus({ agent, notify }: { agent: StudioSnapshot['agent'], notify: (message: string) => void }) {
+function AgentStatus({ agent }: { agent: StudioSnapshot['agent'] }) {
   const name = agent.name ?? 'Your agent'
   const live = agent.live.length > 0
   return (
@@ -324,17 +438,15 @@ function AgentStatus({ agent, notify }: { agent: StudioSnapshot['agent'], notify
       <span className="tp-studio-agent-dot" aria-hidden="true" />
       <span>
         <strong>{name}</strong>
-        {agent.busy ? ' is working…' : live ? ' · live: messages start a turn now' : ' · messages go with its next TinyPivot reply'}
+        {agent.busy ? ' is working…' : live ? ' · live: messages start a turn now' : ' · cannot take messages from the Studio'}
       </span>
-      {!live && agent.hint && <AgentHintLine hint={agent.hint} notify={notify} />}
     </div>
   )
 }
 
 interface NoteComposerProps {
-  notes: StudioNote[]
   agent: StudioSnapshot['agent']
-  aboutStep?: StudioStep
+  aboutRun?: Run
   attachment: NoteAttachment | null
   onAttachView?: () => void
   onClearAttachment: () => void
@@ -343,39 +455,27 @@ interface NoteComposerProps {
   focusKey: number
 }
 
-function QueuedNotes({ notes }: { notes: StudioNote[] }) {
-  if (notes.length === 0)
-    return null
+/** Shown when the agent cannot take messages: ask in the terminal, and how to make it live where possible. */
+function OfflineAgent({ agent, notify }: { agent: StudioSnapshot['agent'], notify: (message: string) => void }) {
   return (
-    <ul className="tp-studio-queue" aria-label="Messages waiting for the agent">
-      {notes.map(note => (
-        <li key={note.id}>
-          <span>{note.attachment ? `${note.text} · ${note.attachment.label}` : note.text}</span>
-          <button
-            type="button"
-            className="tp-studio-icon-btn"
-            aria-label="Remove message"
-            onClick={() => void postToStudio('/api/studio/note/delete', { id: note.id }).catch(() => {})}
-          >
-            ×
-          </button>
-        </li>
-      ))}
-      <li className="tp-studio-queue-hint">Sent with the agent&apos;s next TinyPivot reply. To send now, copy it as a prompt.</li>
-    </ul>
+    <div className="tp-studio-composer">
+      <AgentStatus agent={agent} />
+      <p className="tp-studio-offline">Ask follow-ups in your terminal. Copy for terminal on any question gives your agent its steps and SQL.</p>
+      {agent.hint && <AgentHintLine hint={agent.hint} notify={notify} />}
+    </div>
   )
 }
 
-function NoteComposer({ notes, agent, aboutStep, attachment, onAttachView, onClearAttachment, onDetach, notify, focusKey }: NoteComposerProps) {
+function NoteComposer({ agent, aboutRun, attachment, onAttachView, onClearAttachment, onDetach, notify, focusKey }: NoteComposerProps) {
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
-  const live = agent.live.length > 0
 
   useEffect(() => {
     if (focusKey > 0)
       inputRef.current?.focus()
   }, [focusKey])
 
+  const aboutStep = aboutRun && lastStep(aboutRun, step => Boolean(step.datasetId))
   const send = async () => {
     if (!text.trim())
       return
@@ -384,32 +484,21 @@ function NoteComposer({ notes, agent, aboutStep, attachment, onAttachView, onCle
       setText('')
       onDetach()
       onClearAttachment()
-      notify(live ? `Sent to ${agent.name ?? 'your agent'}` : 'Queued for the agent\'s next TinyPivot reply')
+      notify(`Sent to ${agent.name ?? 'your agent'}`)
     }
     catch (err) {
       notify(err instanceof Error ? err.message : String(err))
     }
   }
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildPrompt(text.trim(), aboutStep, attachment))
-      notify('Copied. Paste it into your agent.')
-    }
-    catch {
-      notify('Could not copy to the clipboard.')
-    }
-  }
-
   return (
     <div className="tp-studio-composer">
-      <AgentStatus agent={agent} notify={notify} />
-      <QueuedNotes notes={notes} />
-      {aboutStep && (
+      <AgentStatus agent={agent} />
+      {aboutRun && (
         <div className="tp-studio-about">
           <span className="tp-studio-label">about</span>
-          <span className="tp-studio-about-text">{stepTitle(aboutStep)}</span>
-          <button type="button" className="tp-studio-icon-btn" aria-label="Detach from step" onClick={onDetach}>×</button>
+          <span className="tp-studio-about-text">{runTitle(aboutRun)}</span>
+          <button type="button" className="tp-studio-icon-btn" aria-label="Detach from question" onClick={onDetach}>×</button>
         </div>
       )}
       {attachment
@@ -442,9 +531,8 @@ function NoteComposer({ notes, agent, aboutStep, attachment, onAttachView, onCle
         }}
       />
       <div className="tp-studio-actions">
-        <button type="button" className="tp-studio-btn tp-studio-btn-ghost" disabled={!text.trim()} onClick={() => void copy()}>Copy as prompt</button>
         <button type="button" className="tp-studio-btn tp-studio-btn-primary" disabled={!text.trim()} onClick={() => void send()}>
-          {live ? `Send to ${agent.name ?? 'agent'}` : 'Queue for agent'}
+          {`Send to ${agent.name ?? 'agent'}`}
         </button>
       </div>
     </div>
@@ -490,16 +578,43 @@ function useFollowLatest(count: number) {
   return { listRef, onScroll }
 }
 
+/** Verifies every step of a question that can be checked, one after another. */
+function useChecks(notify: (message: string) => void) {
+  const [checks, setChecks] = useState<Record<string, StepCheck[]>>({})
+  const [checking, setChecking] = useState<string | null>(null)
+  const check = useCallback(async (run: Run) => {
+    setChecking(run.id)
+    try {
+      for (const step of run.steps.filter(s => s.fingerprint || s.source)) {
+        const result = await postToStudio<{ checks: StepCheck[] }>('/api/studio/verify', { stepId: step.id })
+        setChecks(prev => ({ ...prev, [step.id]: result.checks }))
+      }
+    }
+    catch (err) {
+      notify(err instanceof Error ? err.message : String(err))
+    }
+    finally {
+      setChecking(null)
+    }
+  }, [notify])
+  return { checks, checking, check }
+}
+
 export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onAttachView, onClearAttachment, notify }: StudioPanelProps) {
-  const [tab, setTab] = useState<'trace' | 'history'>('trace')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [tab, setTab] = useState<'questions' | 'history'>('questions')
+  const runs = useMemo(() => groupRuns(snapshot.steps), [snapshot.steps])
+  const [openId, setOpenId] = useState<string | null>(null)
   const [editor, setEditor] = useState<{ sql: string, fromStepId?: string } | null>(null)
   const [aboutId, setAboutId] = useState<string | null>(null)
   const [focusKey, setFocusKey] = useState(0)
   const { listRef, onScroll } = useFollowLatest(snapshot.steps.length)
+  const { checks, checking, check } = useChecks(notify)
 
   const loaded = useMemo(() => new Set(snapshot.loadedIds), [snapshot.loadedIds])
-  const aboutStep = snapshot.steps.find(step => step.id === aboutId)
+  const live = snapshot.agent.live.length > 0
+  // The newest question stays open until the user picks another.
+  const shownId = openId ?? runs.at(-1)?.id
+  const aboutRun = runs.find(run => run.id === aboutId)
 
   const post = useCallback(async (route: string, body: unknown) => {
     try {
@@ -510,15 +625,13 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
     }
   }, [notify])
 
-  const canOpen = (step: StudioStep) => Boolean(step.datasetId && (loaded.has(step.datasetId) || step.historyId))
-
   return (
     <aside className="tp-studio" aria-label="TinyPivot Studio">
       <div className="tp-studio-head">
         <div className="tp-studio-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'trace'} className={tab === 'trace' ? 'active' : ''} onClick={() => setTab('trace')}>
-            Trace
-            <span className="tp-studio-count">{snapshot.steps.length}</span>
+          <button type="button" role="tab" aria-selected={tab === 'questions'} className={tab === 'questions' ? 'active' : ''} onClick={() => setTab('questions')}>
+            Questions
+            <span className="tp-studio-count">{runs.length}</span>
           </button>
           <button type="button" role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>
             History
@@ -542,45 +655,50 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
       <div className="tp-studio-body" ref={listRef} onScroll={onScroll}>
         {tab === 'history'
           ? <HistoryList entries={snapshot.history} enabled={snapshot.historyEnabled} onOpen={id => void post('/api/studio/open', { id })} />
-          : snapshot.steps.length === 0
-            ? <p className="tp-studio-empty">Each step the agent takes shows up here, with why it took it and the SQL behind it.</p>
+          : runs.length === 0
+            ? <p className="tp-studio-empty">Each question you ask your agent shows up here: where the data came from, the SQL, the rows, the chart, and the answer, with its numbers checked against the data.</p>
             : (
-                <ol className="tp-studio-trace">
-                  {snapshot.steps.map(step => (
-                    <StepRow
-                      key={step.id}
-                      step={step}
-                      selected={selectedId === step.id}
-                      active={Boolean(step.datasetId) && step.datasetId === activeDatasetId}
-                      onSelect={() => setSelectedId(prev => (prev === step.id ? null : step.id))}
-                    >
-                      <StepDetail
-                        step={step}
-                        canOpen={canOpen(step)}
-                        onOpen={() => void post('/api/studio/show', { stepId: step.id })}
-                        onEdit={() => setEditor({ sql: step.editableSql ?? '', fromStepId: step.id })}
-                        onAsk={() => {
-                          setAboutId(step.id)
+                <ol className="tp-runs">
+                  {runs.map(run => (
+                    <RunCard
+                      key={run.id}
+                      run={run}
+                      open={run.id === shownId}
+                      activeDatasetId={activeDatasetId}
+                      loaded={loaded}
+                      checks={checks}
+                      checking={checking === run.id}
+                      onToggle={() => setOpenId(run.id === shownId ? '' : run.id)}
+                      onOpenStep={(step, viewMode) => void post('/api/studio/show', { stepId: step.id, viewMode })}
+                      onEdit={step => setEditor({ sql: step.editableSql ?? '', fromStepId: step.id })}
+                      onCheck={() => void check(run)}
+                      onCopy={() => {
+                        if (live) {
+                          setAboutId(run.id)
                           setFocusKey(k => k + 1)
-                        }}
-                      />
-                    </StepRow>
+                        }
+                        void copyText(buildPrompt('', run), notify, 'Copied. Paste it into your agent.')
+                      }}
+                    />
                   ))}
                 </ol>
               )}
       </div>
 
-      <NoteComposer
-        notes={snapshot.notes}
-        agent={snapshot.agent}
-        aboutStep={aboutStep}
-        attachment={attachment}
-        onAttachView={onAttachView}
-        onClearAttachment={onClearAttachment}
-        onDetach={() => setAboutId(null)}
-        notify={notify}
-        focusKey={focusKey}
-      />
+      {live
+        ? (
+            <NoteComposer
+              agent={snapshot.agent}
+              aboutRun={aboutRun}
+              attachment={attachment}
+              onAttachView={onAttachView}
+              onClearAttachment={onClearAttachment}
+              onDetach={() => setAboutId(null)}
+              notify={notify}
+              focusKey={focusKey}
+            />
+          )
+        : <OfflineAgent agent={snapshot.agent} notify={notify} />}
     </aside>
   )
 }

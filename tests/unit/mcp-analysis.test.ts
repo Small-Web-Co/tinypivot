@@ -166,20 +166,51 @@ describe('query, profile and history tools', () => {
     return { call, history, studio, store }
   }
 
-  it('records each step with its reason and SQL, and hands the user\'s notes to the agent once', async () => {
+  it('records each step with the user\'s request, its reason, SQL, columns and a fingerprint', async () => {
     const { call, studio } = await connect()
     const sql = `SELECT region, sum(mrr) AS mrr FROM ${quoteLiteral(csvPath)} GROUP BY 1`
-    await call('query', { sql, name: 'MRR by region', why: 'Compare regions before splitting by channel' })
+    await call('query', { sql, name: 'MRR by region', why: 'Compare regions before splitting by channel', ask: 'Which region brings the most MRR?' })
 
     const step = studio.recentSteps().at(-1)!
-    expect(step).toMatchObject({ actor: 'agent', tool: 'query', why: 'Compare regions before splitting by channel', sql, rows: 2 })
+    expect(step).toMatchObject({ actor: 'agent', tool: 'query', why: 'Compare regions before splitting by channel', ask: 'Which region brings the most MRR?', sql, rows: 2, columns: ['region', 'mrr'] })
+    expect(step.fingerprint).toMatchObject({ rows: 2, hash: expect.stringMatching(/^[0-9a-f]{16}$/) })
     expect(step.historyId).toBeDefined()
 
+    const pushed: string[] = []
+    studio.agent.connect({ name: 'pi', push: (_note, text) => pushed.push(text) > 0 })
     studio.addNote('Exclude the Partner channel', { stepId: step.id })
-    const reply = await call('profile', {})
-    expect(reply.text).toContain('Notes from the user in TinyPivot Studio')
-    expect(reply.text).toContain('- Exclude the Partner channel\n  About the step "Compare regions before splitting by channel" on dataset `mrr_by_region`, SQL: SELECT region')
-    expect((await call('profile', {})).text).not.toContain('Notes from the user')
+    expect(pushed[0]).toContain('Message from the user in TinyPivot Studio: Exclude the Partner channel\nAbout the step "Compare regions before splitting by channel" on dataset `mrr_by_region`, SQL: SELECT region')
+  }, 30_000)
+
+  it('checks a step again: the same rows from its SQL, and its file unchanged', async () => {
+    const { call, studio } = await connect()
+    await call('query', { sql: `SELECT region, sum(mrr) AS mrr FROM ${quoteLiteral(csvPath)} GROUP BY 1` })
+    const queryStep = studio.recentSteps().at(-1)!
+    expect(await studio.verifyStep(queryStep.id)).toEqual([{ kind: 'rerun', ok: true, detail: 'Same 2 rows, same values.' }])
+
+    await call('load_file', { filePath: csvPath, chartConfig: { type: 'bar', xAxisField: 'region', yAxisField: 'mrr' } })
+    const loadStep = studio.recentSteps().at(-1)!
+    expect((await studio.verifyStep(loadStep.id)).map(check => [check.kind, check.ok])).toEqual([['source', true], ['rerun', true]])
+
+    fs.appendFileSync(csvPath, '2026-03,LATAM,Sales,4,400\n')
+    fs.utimesSync(csvPath, new Date(), new Date(Date.now() + 5000))
+    const after = await studio.verifyStep(loadStep.id)
+    expect(after.map(check => [check.kind, check.ok])).toEqual([['source', false], ['rerun', false]])
+    expect(after[1].detail).toBe('The SQL gives 6 rows again; the load had 5.')
+    expect((await studio.verifyStep(queryStep.id))[0]).toMatchObject({ ok: false, detail: 'Different result: 3 rows now, 2 then.' })
+  }, 30_000)
+
+  it('marks the numbers in an answer that the data backs', async () => {
+    const { call, studio } = await connect()
+    await call('query', { sql: `SELECT region, sum(mrr) AS mrr FROM ${quoteLiteral(csvPath)} GROUP BY 1 ORDER BY 2 DESC` })
+    const reply = studio.reply('APAC leads with 3,200 MRR, 52.0% of the 6.15K total. Growth was 12.5%, and EMEA has 9,999.')
+    expect(reply.claims).toEqual([
+      { text: '3,200', status: 'found', where: 'mrr · APAC' },
+      { text: '52.0%', status: 'found', where: 'share of mrr · APAC' },
+      { text: '6.15K', status: 'found', where: 'mrr · total of SQL query' },
+      { text: '12.5%', status: 'unchecked' },
+      { text: '9,999', status: 'not-found' },
+    ])
   }, 30_000)
 
   it('records the user\'s own queries as theirs and reloads the trace after a restart', async () => {

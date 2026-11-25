@@ -162,7 +162,7 @@ await page.locator('.tp-studio-note-input').fill('Split 2026 by plan too, and fl
 await shoot(page, 'note')
 
 await page.getByRole('tab', { name: /History/ }).click()
-await page.getByRole('tab', { name: 'Data' }).click()
+await page.getByRole('tab', { name: 'Rows' }).click()
 await page.waitForTimeout(SETTLE_MS)
 await shoot(page, 'history')
 

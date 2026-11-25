@@ -831,7 +831,7 @@ export function McpApp() {
               className={`tp-mcp-seg-btn ${viewMode === 'grid' ? 'active' : ''}`}
               onClick={() => { if (viewMode !== 'grid') { setViewMode('grid'); trackLocalAction() } }}
             >
-              Data
+              Rows
             </button>
           </div>
 

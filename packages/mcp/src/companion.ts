@@ -241,14 +241,24 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       const text = typeof body.text === 'string' ? body.text.trim() : ''
       if (!text || text.length > MAX_NOTE_CHARS)
         return sendJson(res, 400, { error: `Write a note of up to ${MAX_NOTE_CHARS.toLocaleString('en-US')} characters.` })
-      const note = studio.addNote(text, {
-        stepId: typeof body.stepId === 'string' ? body.stepId : undefined,
-        attachment: parseAttachment(body.attachment),
-      })
-      return sendJson(res, 200, { note })
+      try {
+        const note = studio.addNote(text, {
+          stepId: typeof body.stepId === 'string' ? body.stepId : undefined,
+          attachment: parseAttachment(body.attachment),
+        })
+        return sendJson(res, 200, { note })
+      }
+      catch (error) {
+        return sendJson(res, 409, { error: errorMessage(error) })
+      }
     }
-    if (pathname === '/api/studio/note/delete') {
-      return sendJson(res, 200, { removed: typeof body.id === 'string' && studio.removeNote(body.id) })
+    if (pathname === '/api/studio/verify') {
+      try {
+        return sendJson(res, 200, { checks: await studio.verifyStep(String(body.stepId ?? '')) })
+      }
+      catch (error) {
+        return sendJson(res, 400, { error: errorMessage(error) })
+      }
     }
     if (pathname === '/api/studio/reply') {
       const text = typeof body.text === 'string' ? body.text.trim() : ''
@@ -263,7 +273,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     }
     if (pathname === '/api/studio/show') {
       try {
-        const dataset = await studio.showStep(String(body.stepId ?? ''))
+        const viewMode = body.viewMode === 'grid' || body.viewMode === 'chart' || body.viewMode === 'pivot' ? body.viewMode : undefined
+        const dataset = await studio.showStep(String(body.stepId ?? ''), { viewMode })
         broadcastUpdate()
         return sendJson(res, 200, { datasetId: dataset.id })
       }

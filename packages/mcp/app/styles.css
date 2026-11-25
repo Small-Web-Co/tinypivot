@@ -1152,42 +1152,11 @@ body,
   line-height: 1.5;
 }
 
-/* Timeline: a hairline rail with one node per step. Agent steps are solid, yours are hollow. */
-.tp-studio-trace {
-  position: relative;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tp-studio-trace::before {
-  content: '';
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: 7px;
-  width: 1px;
-  background: linear-gradient(180deg, transparent, var(--tp-accent-border) 24px, var(--tp-accent-border) calc(100% - 24px), transparent);
-}
-
-.tp-studio-step {
-  position: relative;
-  animation: tp-studio-in 260ms ease-out both;
-}
-
-@keyframes tp-studio-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-}
-
-.tp-studio-step-btn,
 .tp-studio-history-btn {
   display: grid;
   gap: 3px;
   width: 100%;
-  padding: 7px 8px 7px 26px;
+  padding: 7px 8px;
   border: 1px solid transparent;
   border-radius: var(--tp-radius);
   background: transparent;
@@ -1197,48 +1166,8 @@ body,
   cursor: pointer;
 }
 
-.tp-studio-history-btn {
-  padding-left: 8px;
-}
-
-.tp-studio-step-btn:hover,
 .tp-studio-history-btn:hover {
   background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
-}
-
-.tp-studio-step.is-selected > .tp-studio-step-btn {
-  border-color: var(--color-border-primary, rgba(148, 163, 184, 0.2));
-  background: var(--color-background-primary, #0b101b);
-}
-
-.tp-studio-dot {
-  position: absolute;
-  top: 12px;
-  left: 3px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--tp-accent);
-  box-shadow: 0 0 0 3px var(--color-background-secondary, #111827);
-}
-
-.tp-studio-step-user .tp-studio-dot {
-  background: var(--color-background-secondary, #111827);
-  border: 2px solid var(--tp-accent-2);
-}
-
-.tp-studio-step.is-active .tp-studio-dot {
-  box-shadow: 0 0 0 3px var(--color-background-secondary, #111827), 0 0 10px 2px var(--tp-accent);
-}
-
-.tp-studio-step:last-child .tp-studio-dot {
-  animation: tp-studio-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes tp-studio-pulse {
-  50% {
-    box-shadow: 0 0 0 3px var(--color-background-secondary, #111827), 0 0 0 6px var(--tp-accent-soft);
-  }
 }
 
 .tp-studio-step-meta {
@@ -1260,26 +1189,10 @@ body,
   font-size: 9.5px;
 }
 
-.tp-studio-step-user .tp-studio-tag {
-  border-color: var(--tp-accent-2);
-  color: var(--tp-accent-2);
-}
-
 .tp-studio-step-why {
   color: var(--color-text-primary, #e2e8f0);
   font-size: 13px;
   line-height: 1.4;
-}
-
-.tp-studio-step-view {
-  font: 11px/1.35 var(--tp-mono);
-  color: var(--color-text-secondary, #94a3b8);
-}
-
-.tp-studio-detail {
-  display: grid;
-  gap: 8px;
-  margin: 4px 0 10px 26px;
 }
 
 .tp-studio-label {
@@ -1290,15 +1203,6 @@ body,
   color: var(--color-text-tertiary, #64748b);
 }
 
-.tp-studio-file {
-  overflow: hidden;
-  font: 11px/1.4 var(--tp-mono);
-  color: var(--color-text-secondary, #94a3b8);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tp-studio-sql,
 .tp-studio-sql-input {
   margin: 0;
   padding: 9px 10px;
@@ -1500,33 +1404,6 @@ body,
   white-space: nowrap;
 }
 
-.tp-studio-queue {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tp-studio-queue li {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 5px 8px;
-  border-left: 2px solid var(--tp-accent-2);
-  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
-  line-height: 1.4;
-}
-
-.tp-studio-queue li.tp-studio-queue-hint {
-  padding: 0 2px;
-  border: 0;
-  background: none;
-  color: var(--color-text-tertiary, #64748b);
-  font-size: 11px;
-}
-
 .tp-studio-history {
   display: grid;
   gap: 2px;
@@ -1553,13 +1430,6 @@ body,
   .tp-studio {
     border-right: 0;
     border-bottom: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.2));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tp-studio-step,
-  .tp-studio-step:last-child .tp-studio-dot {
-    animation: none;
   }
 }
 
@@ -1639,7 +1509,7 @@ body,
   color: var(--tp-accent);
 }
 
-/* The agent's answers read as prose; long ones open fully when selected. */
+/* Saved pulls and answers read as prose. */
 .tp-studio-step-why {
   white-space: pre-wrap;
 }
@@ -1653,13 +1523,6 @@ body,
   border-radius: var(--tp-radius);
   background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
   font: 0.9em var(--tp-mono);
-}
-
-.tp-studio-step:not(.is-selected) .tp-studio-step-why {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
 }
 
 /* Desktop and IDE hosts: a comment to go with the row or slice sent into the chat. */
@@ -1730,4 +1593,338 @@ body,
 .tp-mcp-stopped p {
   margin: 0;
   color: var(--color-text-secondary, inherit);
+}
+
+/* ==========================================================================
+   Questions: each one reads from what was asked down to the answer.
+   ========================================================================== */
+.tp-studio {
+  --tp-ok: var(--color-text-success, var(--tp-accent-2));
+  --tp-warn: var(--color-text-warning, #f59e0b);
+}
+
+.tp-runs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tp-run {
+  border: 1px solid transparent;
+  border-radius: var(--tp-radius);
+  animation: tp-studio-in 260ms ease-out both;
+}
+
+@keyframes tp-studio-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.tp-run.is-open {
+  border-color: var(--color-border-primary, rgba(148, 163, 184, 0.2));
+  background: var(--color-background-primary, #0b101b);
+}
+
+.tp-run-head {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tp-run:not(.is-open) .tp-run-head:hover {
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
+}
+
+/* The question, set as a quote: the user's words come first. */
+.tp-run-prompt {
+  padding-left: 8px;
+  border-left: 2px solid var(--tp-accent-2);
+  color: var(--color-text-primary, #e2e8f0);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.tp-run-prompt.is-missing {
+  border-left-style: dashed;
+  border-left-color: var(--color-text-tertiary, #64748b);
+  font-weight: 400;
+}
+
+.tp-run:not(.is-open) .tp-run-prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tp-run-ok {
+  color: var(--tp-ok);
+}
+
+.tp-run-warn {
+  color: var(--tp-warn);
+}
+
+.tp-run-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 10px;
+}
+
+/* The steps, numbered on a rail: how the answer was made, in order. */
+.tp-run-stages {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tp-run-stages::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 9px;
+  width: 1px;
+  background: var(--tp-accent-border);
+}
+
+.tp-run-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.tp-run-num {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--tp-accent-border);
+  border-radius: var(--tp-radius);
+  background: var(--color-background-primary, #0b101b);
+  color: var(--color-text-secondary, #94a3b8);
+  font: 600 10px/1 var(--tp-mono);
+}
+
+.tp-run-stage.is-active .tp-run-num {
+  border-color: var(--tp-accent);
+  background: var(--tp-accent);
+  color: var(--color-background-primary, #0b101b);
+}
+
+.tp-run-stage-answer .tp-run-num {
+  border-color: var(--tp-accent-2);
+  color: var(--tp-accent-2);
+}
+
+.tp-run-stage-body {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tp-run-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  font: 11px/1.3 var(--tp-mono);
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.tp-run-source {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tp-run-by {
+  color: var(--tp-accent-2);
+}
+
+.tp-run-why {
+  margin: 0;
+  color: var(--color-text-secondary, #94a3b8);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* The SQL, one line until asked for in full. */
+.tp-run-sql-line {
+  overflow: hidden;
+  padding: 3px 6px;
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.2));
+  border-radius: var(--tp-radius);
+  background: var(--color-background-secondary, #111827);
+  color: var(--color-text-secondary, #94a3b8);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 11px/1.4 var(--tp-mono);
+  cursor: pointer;
+}
+
+.tp-run-sql-line:hover {
+  border-color: var(--tp-accent-border);
+  color: var(--color-text-primary, #e2e8f0);
+}
+
+.tp-run-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font: 11px/1.3 var(--tp-mono);
+  color: var(--color-text-primary, #e2e8f0);
+}
+
+.tp-run-result {
+  column-gap: 12px;
+}
+
+/* Small text actions beside a result: open its rows, its chart, or its SQL. */
+.tp-run-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tp-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tp-run-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tp-run-stage .tp-studio-sql {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tp-run-checks {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 11px/1.4 var(--tp-mono);
+}
+
+.tp-run-checks li {
+  display: flex;
+  gap: 6px;
+}
+
+.tp-run-checks .is-ok {
+  color: var(--tp-ok);
+}
+
+.tp-run-checks .is-warn {
+  color: var(--tp-warn);
+}
+
+/* The answer: prose, with each quoted number marked by what the data says about it. */
+.tp-run-answer {
+  display: grid;
+  gap: 6px;
+}
+
+.tp-run-answer p {
+  margin: 0;
+  color: var(--color-text-primary, #e2e8f0);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.tp-run-answer strong {
+  color: var(--tp-accent);
+}
+
+.tp-run-answer code {
+  padding: 0 3px;
+  border-radius: var(--tp-radius);
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
+  font: 0.9em var(--tp-mono);
+}
+
+.tp-claim {
+  padding: 0 1px;
+  background: none;
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+.tp-claim-found {
+  text-decoration-color: var(--tp-ok);
+}
+
+.tp-claim-not-found {
+  text-decoration-color: var(--tp-warn);
+  text-decoration-style: wavy;
+}
+
+.tp-claim-unchecked {
+  text-decoration-color: var(--color-text-tertiary, #64748b);
+  text-decoration-style: dotted;
+}
+
+.tp-run-badge {
+  justify-self: start;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--tp-radius);
+  font: 500 10.5px/1.3 var(--tp-mono);
+}
+
+.tp-run-badge.is-ok {
+  color: var(--tp-ok);
+}
+
+.tp-run-badge.is-warn {
+  color: var(--tp-warn);
+}
+
+.tp-studio-offline {
+  margin: 0;
+  color: var(--color-text-secondary, #94a3b8);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@keyframes tp-studio-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-run,
+  .tp-studio-agent.is-busy .tp-studio-agent-dot {
+    animation: none;
+  }
 }

@@ -1,10 +1,13 @@
 import type { ChartConfig, DataGridViewMode, PivotConfig } from '@smallwebco/tinypivot-core'
+import type { ClaimSource } from './claims.js'
 import type { HistoryEntry, RecordInput } from './history.js'
 import type { DatasetStore, RowFilter, StoredDataset } from './store.js'
-import type { AgentHint, NoteAttachment, StepActor, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
+import type { AgentHint, Fingerprint, NoteAttachment, SourceFile, StepActor, StepCheck, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { AgentBridge } from './agent-bridge.js'
+import { checkClaims } from './claims.js'
 import { DuckDbRunner, quoteIdentifier, quoteLiteral } from './duckdb.js'
 import { HistoryStore, SESSIONS_DIR } from './history.js'
 import { DEFAULT_SESSION_KEY } from './store.js'
@@ -20,6 +23,7 @@ export interface StudioQueryInput {
   name?: string
   actor: StepActor
   why?: string
+  ask?: string
   sessionKey?: string
   keepExisting?: boolean
   viewMode?: DataGridViewMode
@@ -33,6 +37,8 @@ export interface StudioQueryInput {
 const STEPS_IN_MEMORY = 300
 const HISTORY_IN_SNAPSHOT = 50
 const ATTACHMENT_MAX_CHARS = 6000
+/** The user's request as the agent passed it, kept to a readable length. */
+const ASK_MAX_CHARS = 500
 
 /** Friendly names for MCP client names. */
 const AGENT_NAMES: Record<string, string> = {
@@ -67,6 +73,14 @@ export function describeView(dataset: StoredDataset): string {
     return `${chart.type ?? 'bar'} chart: ${chart.yAxis.aggregation ?? 'sum'}(${chart.yAxis.field}) by ${chart.xAxis.field}${series}`
   }
   return 'table'
+}
+
+/** The fields a dataset's chart or pivot groups by. */
+function viewDimensions(dataset: StoredDataset): string[] {
+  const chart = dataset.chartConfig
+  const pivot = dataset.pivotConfig
+  return [chart?.xAxis?.field, chart?.seriesField?.field, ...(pivot?.rowFields ?? []), ...(pivot?.columnFields ?? [])]
+    .filter((field): field is string => Boolean(field))
 }
 
 /** SQL for a load_file filter, comparing as text the way the in-memory filter does. */
@@ -113,6 +127,32 @@ export function withoutCards(text: string): string {
   return stripped.replace(/\n{3,}/g, '\n\n').trim() || text.trim()
 }
 
+/** Rows reduce to a count and a hash of every row, sorted, so the same result in any order matches. */
+export function fingerprintRows(rows: Record<string, unknown>[]): Fingerprint {
+  const rowHashes = rows.map(row => crypto.createHash('sha1').update(JSON.stringify(row, (_, value) => (typeof value === 'bigint' ? value.toString() : value))).digest('hex'))
+  rowHashes.sort()
+  return { rows: rows.length, hash: crypto.createHash('sha256').update(rowHashes.join('')).digest('hex').slice(0, 16) }
+}
+
+/** The file's size and modification time now, or undefined when it cannot be read. */
+function sourceFile(file: string): SourceFile | undefined {
+  try {
+    const stat = fs.statSync(file)
+    return { file, bytes: stat.size, modifiedAt: stat.mtime.toISOString() }
+  }
+  catch {
+    return undefined
+  }
+}
+
+function checkSource(then: SourceFile): StepCheck {
+  const now = sourceFile(then.file)
+  if (!now)
+    return { kind: 'source', ok: false, detail: 'The file is gone or cannot be read.' }
+  const ok = now.bytes === then.bytes && now.modifiedAt === then.modifiedAt
+  return { kind: 'source', ok, detail: ok ? 'The file is unchanged since this step.' : `The file changed: ${now.bytes.toLocaleString('en-US')} bytes, saved ${now.modifiedAt}.` }
+}
+
 let sequence = 0
 
 /** `20261125-101403-4f2a`: sortable by start time, unique per process. */
@@ -130,7 +170,6 @@ export class Studio {
   readonly history: HistoryStore
   readonly duck: DuckDbRunner
   private steps: TraceStep[] = []
-  private notes: StudioNote[] = []
   private readonly pullsByDataset = new Map<string, HistoryEntry>()
   private readonly listeners = new Set<() => void>()
   private changeQueued = false
@@ -176,7 +215,6 @@ export class Studio {
         ...step,
         editableSql: step.sql ?? (step.file ? fileStepSql(step.file, step.where) : undefined),
       })),
-      notes: this.pendingNotes(),
       history: this.history.enabled ? this.history.list(HISTORY_IN_SNAPSHOT) : [],
       historyEnabled: this.history.enabled,
       loadedIds: this.store.listMetadata(sessionKey).map(meta => meta.id),
@@ -250,13 +288,18 @@ export class Studio {
     return full
   }
 
-  /** Records a step about a dataset, filling in its name, size, view and saved pull. */
-  recordDatasetStep(dataset: StoredDataset, step: Pick<TraceStep, 'actor' | 'tool' | 'why' | 'sql' | 'file' | 'where'>): TraceStep {
+  /** Records a step about a dataset, filling in its name, size, columns, fingerprint, view and saved pull. */
+  recordDatasetStep(dataset: StoredDataset, step: Pick<TraceStep, 'actor' | 'tool' | 'why' | 'ask' | 'sql' | 'file' | 'where'>): TraceStep {
+    const source = step.file ? sourceFile(step.file) : undefined
     return this.record({
       ...step,
+      ...(step.ask?.trim() ? { ask: step.ask.trim().slice(0, ASK_MAX_CHARS) } : { ask: undefined }),
       datasetId: dataset.id,
       datasetName: dataset.name,
       rows: dataset.rows.length,
+      columns: dataset.columns.map(column => column.name),
+      fingerprint: fingerprintRows(dataset.rows),
+      ...(source ? { source } : {}),
       view: describeView(dataset),
       viewMode: dataset.viewMode,
       ...(dataset.chartConfig ? { chartConfig: structuredClone(dataset.chartConfig) } : {}),
@@ -267,9 +310,11 @@ export class Studio {
 
   /**
    * Shows a step's dataset as it was right after the step, reopening it from history when it is
-   * no longer loaded. Looking is not a step, so nothing is recorded.
+   * no longer loaded; `viewMode` shows it another way, e.g. its rows. Looking is not a step, so
+   * nothing is recorded.
    */
-  async showStep(stepId: string, sessionKey = DEFAULT_SESSION_KEY): Promise<StoredDataset> {
+  async showStep(stepId: string, options: { viewMode?: DataGridViewMode, sessionKey?: string } = {}): Promise<StoredDataset> {
+    const sessionKey = options.sessionKey ?? DEFAULT_SESSION_KEY
     const step = this.steps.find(s => s.id === stepId)
     if (!step?.datasetId)
       throw new Error('That step has no data to show.')
@@ -279,8 +324,9 @@ export class Studio {
         throw new Error('That data is no longer loaded and was not saved to history.')
       dataset = await this.reopen(step.historyId, { actor: 'user', sessionKey, record: false })
     }
+    const viewMode = options.viewMode ?? step.viewMode
     return this.store.updateView(dataset.id, {
-      ...(step.viewMode ? { viewMode: step.viewMode } : {}),
+      ...(viewMode ? { viewMode } : {}),
       ...(step.chartConfig ? { chartConfig: { ...step.chartConfig, seriesField: step.chartConfig.seriesField } } : {}),
       ...(step.pivotConfig ? { pivotConfig: step.pivotConfig } : {}),
     }, sessionKey) ?? dataset
@@ -324,7 +370,7 @@ export class Studio {
     })
     const shown = this.keepViewOf(input.viewFromStepId, dataset, sessionKey) ?? dataset
     this.remember(shown, { kind: 'query', source: input.sql })
-    this.recordDatasetStep(shown, { actor: input.actor, tool: 'query', why: input.why, sql: input.sql })
+    this.recordDatasetStep(shown, { actor: input.actor, tool: 'query', why: input.why, ask: input.ask, sql: input.sql })
     return { dataset: shown, truncated: result.truncated }
   }
 
@@ -372,8 +418,8 @@ export class Studio {
   }
 
   /**
-   * Sends the user's message to the agent: straight into its conversation when a live connector
-   * takes it, otherwise queued for its next TinyPivot reply.
+   * Sends the user's message straight into the agent's conversation. Throws when no live
+   * connector takes it: the Studio only offers to send when the agent can receive.
    */
   addNote(text: string, options: { stepId?: string, attachment?: NoteAttachment } = {}): StudioNote {
     const attachment = options.attachment && { label: options.attachment.label.slice(0, 120), text: options.attachment.text.slice(0, ATTACHMENT_MAX_CHARS) }
@@ -381,26 +427,19 @@ export class Studio {
       id: nextId('note'),
       at: new Date().toISOString(),
       text: text.trim(),
-      delivery: 'queued',
       ...(options.stepId ? { stepId: options.stepId } : {}),
       ...(attachment ? { attachment } : {}),
     }
-    if (this.agent.push(note, this.describeNote(note, { withSource: true })))
-      note.delivery = 'live'
-    else
-      this.notes.push(note)
+    if (!this.agent.push(note, this.describeNote(note)))
+      throw new Error(`${this.agentName ? agentLabel(this.agentName) : 'Your agent'} cannot receive messages from the Studio. Ask in your terminal instead.`)
     this.record({ actor: 'user', tool: 'note', why: note.text, ...(attachment ? { view: `with ${attachment.label}` } : {}) })
     return note
   }
 
-  /**
-   * How a message reads to the agent: the text, the step it is about, and any attached data.
-   * `withSource` says where it came from, for messages that arrive on their own in the conversation.
-   */
-  describeNote(note: StudioNote, { withSource = false } = {}): string {
+  /** How a message reads to the agent: where it came from, the text, the step it is about, and any attached data. */
+  describeNote(note: StudioNote): string {
     const step = note.stepId ? this.steps.find(s => s.id === note.stepId) : undefined
-    const source = withSource ? 'Message from the user in TinyPivot Studio: ' : ''
-    const lines = [`${source}${note.text}`]
+    const lines = [`Message from the user in TinyPivot Studio: ${note.text}`]
     if (step)
       lines.push(`About the step "${step.why ?? step.view ?? step.tool}"${step.datasetId ? ` on dataset \`${step.datasetId}\`` : ''}${step.sql ? `, SQL: ${step.sql.replace(/\s+/g, ' ')}` : ''}`)
     if (note.attachment)
@@ -408,31 +447,58 @@ export class Studio {
     return lines.join('\n')
   }
 
-  /** The agent's answer to a Studio message, recorded in the trace where the user reads it. */
-  reply(text: string): TraceStep {
-    return this.record({ actor: 'agent', tool: 'reply', why: withoutCards(text) })
+  /**
+   * The agent's answer to a Studio message, recorded where the user reads it, with each number it
+   * quotes checked against the data loaded since the user last asked something.
+   */
+  reply(text: string, sessionKey = DEFAULT_SESSION_KEY): TraceStep {
+    const answer = withoutCards(text)
+    const claims = checkClaims(answer, this.datasetsSinceLastAsk(sessionKey))
+    return this.record({ actor: 'agent', tool: 'reply', why: answer, ...(claims.length ? { claims } : {}) })
   }
 
-  /** Drops a queued note the user no longer wants sent. */
-  removeNote(id: string): boolean {
-    const before = this.notes.length
-    this.notes = this.notes.filter(note => note.id !== id)
-    if (this.notes.length !== before)
-      this.changed()
-    return this.notes.length !== before
+  /** The datasets the current question has used and that are still loaded, newest first. */
+  private datasetsSinceLastAsk(sessionKey: string): ClaimSource[] {
+    let lastAsk = this.steps.length - 1
+    while (lastAsk > 0 && !(this.steps[lastAsk].actor === 'user' && (this.steps[lastAsk].tool === 'note' || this.steps[lastAsk].tool === 'query')))
+      lastAsk--
+    const ids = new Set(this.steps.slice(Math.max(0, lastAsk)).flatMap(step => (step.datasetId ? [step.datasetId] : [])))
+    return [...ids].reverse().flatMap((id) => {
+      const dataset = this.store.get(id, sessionKey)
+      return dataset ? [{ name: dataset.name, rows: dataset.rows, dimensions: viewDimensions(dataset) }] : []
+    })
   }
 
-  pendingNotes(): StudioNote[] {
-    return [...this.notes]
+  /**
+   * Re-checks a step: whether its source file is unchanged, and whether running its SQL again gives
+   * the same rows. Results of queries are compared value by value (row order ignored); a file load
+   * is compared by row count, since the file reader and SQL may type the same column differently.
+   */
+  async verifyStep(stepId: string, sessionKey = DEFAULT_SESSION_KEY): Promise<StepCheck[]> {
+    const step = this.steps.find(s => s.id === stepId)
+    if (!step)
+      throw new Error('That step is no longer in the trace.')
+    const checks: StepCheck[] = []
+    if (step.source)
+      checks.push(checkSource(step.source))
+    const sql = step.sql ?? (step.file ? fileStepSql(step.file, step.where) : undefined)
+    if (sql && step.fingerprint)
+      checks.push(await this.checkRerun(sql, step, sessionKey))
+    return checks
   }
 
-  /** The queued notes as text for the agent, emptying the queue. Empty when there are none. */
-  takeNotes(): string {
-    if (this.notes.length === 0)
-      return ''
-    const lines = this.notes.map(note => `- ${this.describeNote(note).replace(/\n/g, '\n  ')}`)
-    this.notes = []
-    this.changed()
-    return `\n\n**Notes from the user in TinyPivot Studio** (act on these):\n${lines.join('\n')}`
+  private async checkRerun(sql: string, step: TraceStep, sessionKey: string): Promise<StepCheck> {
+    const expected = step.fingerprint!
+    try {
+      const result = await this.duck.run(sql, this.queryViews(sessionKey))
+      const again = fingerprintRows(result.rows)
+      if (step.tool !== 'query' && step.tool !== 'query_postgres')
+        return { kind: 'rerun', ok: again.rows === expected.rows, detail: `The SQL gives ${again.rows.toLocaleString('en-US')} rows again; the load had ${expected.rows.toLocaleString('en-US')}.` }
+      const ok = again.rows === expected.rows && again.hash === expected.hash
+      return { kind: 'rerun', ok, detail: ok ? `Same ${again.rows.toLocaleString('en-US')} rows, same values.` : `Different result: ${again.rows.toLocaleString('en-US')} rows now, ${expected.rows.toLocaleString('en-US')} then${again.rows === expected.rows ? ', with changed values' : ''}.` }
+    }
+    catch (error) {
+      return { kind: 'rerun', ok: false, detail: `Could not run it again: ${error instanceof Error ? error.message : String(error)}` }
+    }
   }
 }
