@@ -1,9 +1,11 @@
 import type { ChartConfig, DataGridViewMode, PivotConfig } from '@smallwebco/tinypivot-core'
+import type { ChatTurn } from './agent-bridge.js'
 import type { HistoryEntry, RecordInput } from './history.js'
 import type { DatasetStore, RowFilter, StoredDataset } from './store.js'
-import type { StepActor, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
+import type { NoteAttachment, StepActor, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
 import fs from 'node:fs'
 import path from 'node:path'
+import { AgentBridge } from './agent-bridge.js'
 import { DuckDbRunner, quoteIdentifier, quoteLiteral } from './duckdb.js'
 import { HistoryStore } from './history.js'
 import { DEFAULT_SESSION_KEY } from './store.js'
@@ -31,6 +33,25 @@ export interface StudioQueryInput {
 /** Steps kept in memory and shown in the Studio; the file keeps more. */
 const STEPS_IN_MEMORY = 300
 const HISTORY_IN_SNAPSHOT = 50
+/** How long an AI Analyst question waits for the agent's answer. */
+export const ANSWER_WAIT_MS = 4 * 60 * 1000
+const ATTACHMENT_MAX_CHARS = 6000
+
+/** Friendly names for MCP client names. */
+const AGENT_NAMES: Record<string, string> = {
+  'claude-code': 'Claude Code',
+  'claude-ai': 'Claude Desktop',
+  'pi': 'pi',
+  'opencode': 'OpenCode',
+  'cursor-vscode': 'Cursor',
+  'codex-mcp-client': 'Codex',
+  'antigravity': 'Antigravity',
+  'Visual Studio Code': 'VS Code',
+}
+
+export function agentLabel(clientName?: string): string {
+  return (clientName && (AGENT_NAMES[clientName] ?? clientName)) || 'your agent'
+}
 /** When the trace file passes this size it is cut back to the newest STEPS_IN_MEMORY steps. */
 const TRACE_FILE_MAX_BYTES = 5 * 1024 * 1024
 
@@ -86,6 +107,15 @@ function historyTableExpression(entry: HistoryEntry, rowsPath: string | undefine
   return rowsPath ? `read_json_auto(${quoteLiteral(rowsPath)})` : undefined
 }
 
+/**
+ * An answer without the terminal cards the agent echoed into it: the Studio already shows those
+ * views, and box drawing does not read outside a terminal.
+ */
+export function withoutCards(text: string): string {
+  const stripped = text.replace(/```text\n[\s\S]*?```\n?/g, block => (/[╭╰│┤├]/.test(block) ? '' : block))
+  return stripped.replace(/\n{3,}/g, '\n\n').trim() || text.trim()
+}
+
 let sequence = 0
 function nextId(prefix: string): string {
   sequence += 1
@@ -100,6 +130,10 @@ export class Studio {
   private readonly pullsByDataset = new Map<string, HistoryEntry>()
   private readonly listeners = new Set<() => void>()
   private changeQueued = false
+  /** Ways to reach the user's agent: live channels, sampling, or nothing (queued notes). */
+  readonly agent = new AgentBridge(() => this.changed())
+  private agentName?: string
+  private agentBusy = false
 
   constructor(readonly store: DatasetStore, options: { history?: HistoryStore, duck?: DuckDbRunner } = {}) {
     this.history = options.history ?? new HistoryStore()
@@ -134,7 +168,22 @@ export class Studio {
       history: this.history.enabled ? this.history.list(HISTORY_IN_SNAPSHOT) : [],
       historyEnabled: this.history.enabled,
       loadedIds: this.store.listMetadata(sessionKey).map(meta => meta.id),
+      agent: { name: this.agentName ? agentLabel(this.agentName) : undefined, live: this.agent.live(), busy: this.agentBusy },
     }
+  }
+
+  /** Whether the agent is in the middle of a turn, as its extension reports it. */
+  setAgentBusy(busy: boolean): void {
+    if (busy === this.agentBusy)
+      return
+    this.agentBusy = busy
+    this.changed()
+  }
+
+  /** The MCP client's name, e.g. `claude-code`, shown in the Studio. */
+  setAgentName(name: string | undefined): void {
+    this.agentName = name
+    this.changed()
   }
 
   private get traceFile(): string {
@@ -304,12 +353,70 @@ export class Studio {
     return dataset
   }
 
-  /** Queues a note for the agent; it is delivered with the next TinyPivot reply. */
-  addNote(text: string, stepId?: string): StudioNote {
-    const note: StudioNote = { id: nextId('note'), at: new Date().toISOString(), text: text.trim(), ...(stepId ? { stepId } : {}) }
-    this.notes.push(note)
-    this.record({ actor: 'user', tool: 'note', why: note.text })
+  /**
+   * Sends the user's message to the agent: straight into its conversation when a live connector
+   * takes it, otherwise queued for its next TinyPivot reply.
+   */
+  addNote(text: string, options: { stepId?: string, attachment?: NoteAttachment, kind?: StudioNote['kind'] } = {}): StudioNote {
+    const attachment = options.attachment && { label: options.attachment.label.slice(0, 120), text: options.attachment.text.slice(0, ATTACHMENT_MAX_CHARS) }
+    const note: StudioNote = {
+      id: nextId(options.kind === 'question' ? 'ask' : 'note'),
+      at: new Date().toISOString(),
+      text: text.trim(),
+      kind: options.kind ?? 'note',
+      delivery: 'queued',
+      ...(options.stepId ? { stepId: options.stepId } : {}),
+      ...(attachment ? { attachment } : {}),
+    }
+    if (this.agent.push(note, this.describeNote(note, { withSource: true })))
+      note.delivery = 'live'
+    else
+      this.notes.push(note)
+    this.record({ actor: 'user', tool: note.kind === 'question' ? 'ask' : 'note', why: note.text, ...(attachment ? { view: `with ${attachment.label}` } : {}) })
     return note
+  }
+
+  /**
+   * How a message reads to the agent: the text, the step it is about, and any attached data.
+   * `withSource` says where it came from, for messages that arrive on their own in the conversation.
+   */
+  describeNote(note: StudioNote, { withSource = false } = {}): string {
+    const step = note.stepId ? this.steps.find(s => s.id === note.stepId) : undefined
+    const source = withSource || note.kind === 'question' ? `${note.kind === 'question' ? 'Question' : 'Message'} from the user in TinyPivot Studio: ` : ''
+    const lines = [`${source}${note.text}`]
+    if (step)
+      lines.push(`About the step "${step.why ?? step.view ?? step.tool}"${step.datasetId ? ` on dataset \`${step.datasetId}\`` : ''}${step.sql ? `, SQL: ${step.sql.replace(/\s+/g, ' ')}` : ''}`)
+    if (note.attachment)
+      lines.push(`Attached (${note.attachment.label}):`, note.attachment.text)
+    return lines.join('\n')
+  }
+
+  /**
+   * Answers an AI Analyst question with the user's own agent: its model directly when the host
+   * offers sampling, otherwise through its conversation, waiting for the reply.
+   */
+  async ask(question: string, options: { turns?: ChatTurn[], attachment?: NoteAttachment, waitMs?: number } = {}): Promise<string> {
+    const complete = this.agent.completer()
+    if (complete) {
+      this.record({ actor: 'user', tool: 'ask', why: question })
+      const answer = await complete(options.turns?.length ? options.turns : [{ role: 'user', content: question }])
+      this.reply(answer)
+      return answer
+    }
+    const note = this.addNote(question, { kind: 'question', attachment: options.attachment })
+    const name = agentLabel(this.agentName)
+    if (note.delivery === 'queued')
+      return `${name} is not connected to the Studio live, so this question goes to it with its next TinyPivot reply. To ask now, use Copy as prompt in the Studio and paste it into ${name}.`
+    const answer = await this.agent.waitForReply(note.id, options.waitMs ?? ANSWER_WAIT_MS)
+    return answer ?? `${name} is still working on this. Its answer will appear in the Studio trace.`
+  }
+
+  /** The agent's answer to a Studio message: recorded in the trace and handed to whoever waits for it. */
+  reply(text: string, re?: string): TraceStep {
+    const answer = withoutCards(text)
+    const step = this.record({ actor: 'agent', tool: 'reply', why: answer })
+    this.agent.answer(answer, re)
+    return step
   }
 
   /** Drops a queued note the user no longer wants sent. */
@@ -329,11 +436,7 @@ export class Studio {
   takeNotes(): string {
     if (this.notes.length === 0)
       return ''
-    const lines = this.notes.map((note) => {
-      const step = note.stepId ? this.steps.find(s => s.id === note.stepId) : undefined
-      const about = step ? ` (about "${step.why ?? step.view ?? step.tool}"${step.sql ? `, SQL: ${step.sql.replace(/\s+/g, ' ')}` : ''})` : ''
-      return `- ${note.text}${about}`
-    })
+    const lines = this.notes.map(note => `- ${this.describeNote(note).replace(/\n/g, '\n  ')}`)
     this.notes = []
     this.changed()
     return `\n\n**Notes from the user in TinyPivot Studio** (act on these):\n${lines.join('\n')}`

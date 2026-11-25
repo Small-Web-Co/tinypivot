@@ -158,10 +158,10 @@ describe('query, profile and history tools', () => {
     expect(step).toMatchObject({ actor: 'agent', tool: 'query', why: 'Compare regions before splitting by channel', sql, rows: 2 })
     expect(step.historyId).toBeDefined()
 
-    studio.addNote('Exclude the Partner channel', step.id)
+    studio.addNote('Exclude the Partner channel', { stepId: step.id })
     const reply = await call('profile', {})
     expect(reply.text).toContain('Notes from the user in TinyPivot Studio')
-    expect(reply.text).toContain('Exclude the Partner channel (about "Compare regions before splitting by channel", SQL: SELECT region')
+    expect(reply.text).toContain('- Exclude the Partner channel\n  About the step "Compare regions before splitting by channel" on dataset `mrr_by_region`, SQL: SELECT region')
     expect((await call('profile', {})).text).not.toContain('Notes from the user')
   }, 30_000)
 

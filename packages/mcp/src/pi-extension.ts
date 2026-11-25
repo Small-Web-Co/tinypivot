@@ -8,6 +8,8 @@ import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
  * - Intercepts TinyPivot MCP tool outputs (including nested codemode calls) on `tool_execution_end`
  *   and renders framed charts & pivot tables directly in pi's TUI in full 24-bit ANSI truecolor
  *   using TinyPivot's unified theme palettes (zero extra LLM context tokens).
+ * - Connects pi to TinyPivot Studio: Studio messages start a turn here, and the agent's answer
+ *   goes back to the Studio.
  * - Registers `/tinypivot-theme [theme-id]` inside pi for instant interactive theme switching
  *   persisted to `~/.config/tinypivot/preferences.json` and synced to the live Studio.
  */
@@ -85,7 +87,7 @@ async function syncCompanionTheme(themeId: string): Promise<void> {
     if (!parsed.url) return;
     await fetch(\`\${parsed.url}/api/theme\`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-tinypivot": "1" },
       body: JSON.stringify({ theme: themeId }),
     });
   } catch {
@@ -202,8 +204,113 @@ interface TinyPivotCardEntryData {
   themeId: string;
 }
 
+// TinyPivot Studio bridge: messages the user sends from the Studio arrive here, go into this
+// session as a turn, and the agent's final answer goes back to the Studio.
+// The Studio link TinyPivot puts in its replies ("Studio: …" or a card's "Live: …").
+const STUDIO_LINK = /(?:Studio|Live): (http:[/][/]127[.]0[.]0[.]1:[0-9]+)/;
+const STUDIO_HEADERS = { "Content-Type": "application/json", "x-tinypivot": "1" };
+
+function lastAssistantText(messages: unknown): string {
+  if (!Array.isArray(messages)) return "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i] as { role?: string; content?: unknown };
+    if (message?.role !== "assistant") continue;
+    if (typeof message.content === "string") return message.content.trim();
+    if (!Array.isArray(message.content)) return "";
+    return message.content
+      .map(part => (part && typeof part === "object" && (part as { type?: string }).type === "text" ? String((part as { text?: unknown }).text ?? "") : ""))
+      .join("\\n")
+      .trim();
+  }
+  return "";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createStudioBridge(pi: any) {
+  let studioUrl: string | undefined;
+  let stream: AbortController | undefined;
+  let awaiting: string | undefined;
+
+  function handleFrame(frame: string): void {
+    if (!frame.startsWith("event: message")) return;
+    const data = frame.split("\\n").find(line => line.startsWith("data: "));
+    if (!data) return;
+    const message = JSON.parse(data.slice(6)) as { id: string; text: string };
+    awaiting = message.id;
+    pi.sendMessage(
+      { customType: "tinypivot-studio", content: message.text, display: true },
+      { triggerTurn: true, deliverAs: "steer" },
+    );
+  }
+
+  async function listen(url: string, signal: AbortSignal): Promise<void> {
+    let delay = 1000;
+    while (!signal.aborted) {
+      try {
+        const res = await fetch(url + "/api/studio/agent-stream?agent=pi", { headers: STUDIO_HEADERS, signal });
+        if (!res.ok || !res.body) throw new Error("Studio stream " + res.status);
+        delay = 1000;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let end = buffer.indexOf("\\n\\n");
+          while (end >= 0) {
+            handleFrame(buffer.slice(0, end));
+            buffer = buffer.slice(end + 2);
+            end = buffer.indexOf("\\n\\n");
+          }
+        }
+      } catch {
+        // The Studio restarted or closed; try again after a pause.
+      }
+      if (signal.aborted) return;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay = Math.min(delay * 2, 30000);
+    }
+  }
+
+  return {
+    /** Starts listening to the Studio named in a TinyPivot tool reply. */
+    noticeToolText(text: string): void {
+      const url = STUDIO_LINK.exec(text)?.[1];
+      if (!url || url === studioUrl) return;
+      stream?.abort();
+      studioUrl = url;
+      stream = new AbortController();
+      void listen(url, stream.signal);
+      void this.status(true);
+    },
+    /** Tells the Studio whether pi is working, so it can show progress. */
+    async status(busy: boolean): Promise<void> {
+      if (!studioUrl) return;
+      await fetch(studioUrl + "/api/studio/agent-status", { method: "POST", headers: STUDIO_HEADERS, body: JSON.stringify({ busy }) }).catch(() => {});
+    },
+    async onAgentEnd(messages: unknown): Promise<void> {
+      if (!awaiting || !studioUrl) return;
+      const re = awaiting;
+      awaiting = undefined;
+      const text = lastAssistantText(messages);
+      if (!text) return;
+      await fetch(studioUrl + "/api/studio/reply", { method: "POST", headers: STUDIO_HEADERS, body: JSON.stringify({ re, text }) }).catch(() => {});
+    },
+    stop(): void {
+      stream?.abort();
+      stream = undefined;
+    },
+  };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function (pi: any) {
+  const studio = createStudioBridge(pi);
+  pi.on("agent_start", () => studio.status(true));
+  pi.on("agent_end", (event: { messages?: unknown }) => studio.onAgentEnd(event?.messages));
+  pi.on("agent_settled", () => studio.status(false));
+  pi.on("session_shutdown", () => studio.stop());
   if (typeof pi.registerEntryRenderer === "function") {
     pi.registerEntryRenderer("tinypivot-card", (entry: { data?: TinyPivotCardEntryData }) => {
       const data = entry?.data;
@@ -224,11 +331,12 @@ export default function (pi: any) {
   }
 
   pi.on("tool_execution_end", (event: { toolName?: string; result?: unknown; isError?: boolean }, ctx: { hasUI?: boolean }) => {
-    if (ctx?.hasUI === false || event?.isError) return;
-    if (!event?.toolName || !isTinyPivotTool(event.toolName)) return;
-
+    if (event?.isError) return;
     const text = extractResultText(event.result);
     if (!text) return;
+    // TinyPivot calls made through codemode arrive under another tool's name, so look at the text.
+    studio.noticeToolText(text);
+    if (!event?.toolName || !isTinyPivotTool(event.toolName) || ctx?.hasUI === false) return;
     const cards = extractTinyPivotCards(text);
     if (cards.length === 0) return;
 

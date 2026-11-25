@@ -10,7 +10,19 @@ In a terminal agent, the first TinyPivot step opens the Studio at `http://127.0.
 
 - **Trace:** every step, newest last, marked as the agent's or yours, with its reason (the `why` the agent passes), what it shows (for example `line chart: sum(mrr) by month`), the row count, and the SQL or file filter behind it. File loads are shown as the SQL that reproduces them.
 - **SQL editor:** edit a step's SQL, or write new SQL over local files and loaded tables, and run it with DuckDB, read-only. The result replaces the view, keeps the step's chart when its fields still exist, and joins the trace as your step.
-- **Notes to the agent:** write what to check or change, optionally about one step. The agent receives your notes at the end of its next TinyPivot reply. To send one at once, **Copy as prompt** puts the note, the step and its SQL on your clipboard.
+- **Messages to the agent, with data:** write what to check or change, optionally about one step, and attach data: click a row, drill into a pivot cell, or attach the current view. It goes to the agent with the dataset id, so the agent can query the rest itself.
+- **AI Analyst (Pro):** the Analyst tab answers questions about the loaded data. Your own agent answers, not a separate model or API key, and the SQL it suggests runs locally, read-only.
+
+How a message reaches your agent depends on the harness. The Studio shows which one applies:
+
+| Agent | How Studio messages arrive |
+|---|---|
+| pi | Live: TinyPivot's pi extension starts a turn, and the answer comes back to the Studio. Run `npx @smallwebco/tinypivot-mcp@latest init` once to install or update the extension. |
+| Claude Code | Live when started with `claude --dangerously-load-development-channels server:tinypivot` (Claude Code channels, a research preview). The agent answers with `studio_reply`. Otherwise, with its next TinyPivot reply. |
+| Hosts with MCP sampling | The Analyst answers with the host's own model, outside the conversation. |
+| Others | With the agent's next TinyPivot reply. **Copy as prompt** puts the message, the step, its SQL and the data on your clipboard to paste now. |
+
+In desktop and IDE hosts that show TinyPivot inline (Claude Desktop, VS Code, Cursor), click a row or drill into a pivot cell, then **Send to chat** to post it to the conversation with your comment.
 
 History holds every table the agent pulled (30 days, on your machine), and the Studio can reopen any of them without re-running the query. The Studio only answers this machine, on its own address, and accepts changes only from its own page.
 
@@ -149,7 +161,8 @@ Data tools take an optional `why`: one sentence the agent writes about each step
 - `TINYPIVOT_ALLOWED_TABLES` — Comma-separated table allowlist for `query_postgres`
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
 - `TINYPIVOT_NO_COMPANION=1` — Disable the localhost Studio server
-- `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; another free port is used when it is taken, unless this is set)
+- `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; when it is taken, the Studio uses a free port and the tool replies link to it)
+- `TINYPIVOT_CLAUDE_CHANNEL` — `1` or `0` overrides whether TinyPivot offers Claude Code a channel. By default it does when Claude Code was started with this server in `--channels` or `--dangerously-load-development-channels`.
 - `TINYPIVOT_OPEN_STUDIO` — Set to `0` so the first TinyPivot step in a terminal agent does not open the Studio in your browser
 - `TINYPIVOT_REPRINT_CARDS` — Set to `0` so the model does not reprint each chart card in a terminal. Saves about 400 output tokens per question; the card stays visible in the Studio, the `tui` pane and pi.
 - `TINYPIVOT_HISTORY` — Set to `0` to stop saving pulls to history. `TINYPIVOT_HISTORY_DAYS` sets how long they are kept (default 30).

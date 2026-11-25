@@ -38,6 +38,13 @@ export interface Recording {
   captions: RecordingCaption[]
   /** Plain text of the final screen, for search engines and screen readers. */
   transcript: string
+  /** TinyPivot Studio screenshots taken during the session, shown beside the terminal. */
+  studio?: StudioFrame[]
+}
+
+export interface StudioFrame {
+  t: number
+  src: string
 }
 
 export function createScreen(rows: number): Run[][] {
@@ -45,7 +52,7 @@ export function createScreen(rows: number): Run[][] {
 }
 
 /** Index of the last frame that starts at or before `time`, or -1 before the first one. */
-export function frameIndexAt(frames: RecordingFrame[], time: number): number {
+export function frameIndexAt(frames: ReadonlyArray<{ t: number }>, time: number): number {
   let low = 0
   let high = frames.length - 1
   let found = -1

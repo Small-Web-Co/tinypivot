@@ -211,6 +211,11 @@ export function DataGrid({
   // Loading state for full data reset
   const [isLoadingFullData, setIsLoadingFullData] = useState(false)
 
+  // New data from the parent replaces whatever the AI Analyst loaded over the old data.
+  useEffect(() => {
+    setAiLoadedData(null)
+  }, [data])
+
   // Data to display - AI loaded data takes precedence
   const displayData = useMemo(() => aiLoadedData || data, [aiLoadedData, data])
   const [_chartConfig, setChartConfig] = useState<ChartConfig | null>(null)

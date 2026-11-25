@@ -1,5 +1,6 @@
 import type { ChartConfig, ChartSortOrder, ChartThemePreset, DataGridViewMode, DrillThroughResult, PivotConfig, Theme } from '@smallwebco/tinypivot-core'
-import type { StudioSnapshot } from '../src/studio-protocol'
+import type { AIAnalystConfig } from '@smallwebco/tinypivot-react'
+import type { NoteAttachment, StudioSnapshot } from '../src/studio-protocol'
 import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps'
 import {
   CHART_THEME_PRESETS,
@@ -9,6 +10,7 @@ import {
 import { DataGrid, enableDemoMode, setLicenseKey } from '@smallwebco/tinypivot-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { INTERACTIVE_ROW_LIMIT, ROW_PAGE_SIZE } from '../src/limits'
+import { rowAttachment, sliceAttachment, viewAttachment } from './attachments'
 import { postToStudio } from './companionApi'
 import { StudioPanel } from './StudioPanel'
 
@@ -65,11 +67,6 @@ interface ToolPayload {
   demoToken?: string | null
   modelCatalog?: ModelPricing[]
   tokenStats?: TokenStats
-}
-
-interface SelectedContext {
-  label: string
-  summary: string
 }
 
 interface ActionToast {
@@ -213,7 +210,8 @@ export function McpApp() {
 
   const [canMessageHost, setCanMessageHost] = useState(false)
   const [canUpdateContext, setCanUpdateContext] = useState(false)
-  const [selectedContext, setSelectedContext] = useState<SelectedContext | null>(null)
+  const [selectedContext, setSelectedContext] = useState<NoteAttachment | null>(null)
+  const [askComment, setAskComment] = useState<string | null>(null)
   const [actionToast, setActionToast] = useState<ActionToast | null>(null)
   const [userSurfaceOverride, setUserSurfaceOverride] = useState(false)
   const [studio, setStudio] = useState<StudioSnapshot | null>(null)
@@ -312,8 +310,9 @@ export function McpApp() {
     setTier(nextTier)
     if (payload.datasets)
       setDatasets(payload.datasets)
+    // Someone talking to the AI Analyst stays there; the new view waits behind the other tabs.
     if (payload.viewMode)
-      setViewMode(payload.viewMode)
+      setViewMode(current => (current === 'ai' ? current : payload.viewMode!))
     if (nextTier === 'free') {
       setVisualTheme('code')
     }
@@ -698,31 +697,23 @@ export function McpApp() {
   }, [applyPayload, transportMode, fetchRemainingRows])
 
   const handleCellClick = useCallback((payload: { row: number, col: number, value: unknown, rowData: Record<string, unknown> }) => {
-    const preview = Object.entries(payload.rowData)
-      .slice(0, 8)
-      .map(([k, v]) => `${k}=${String(v)}`)
-      .join(', ')
-    setSelectedContext({
-      label: `Row #${payload.row + 1}`,
-      summary: `Selected cell in "${datasetName}" (row ${payload.row + 1}, value=${String(payload.value)}): ${preview}`,
-    })
-  }, [datasetName])
+    setSelectedContext(rowAttachment(datasetName, datasetId, payload.row, payload.rowData))
+  }, [datasetId, datasetName])
 
   const handleDrillThrough = useCallback((result: DrillThroughResult) => {
-    const slicePath = [
-      ...result.descriptor.rowPath,
-      ...result.descriptor.columnPath,
-    ].filter(Boolean).join(' / ')
-    const sampleRows = result.rows.slice(0, 10)
-    setSelectedContext({
-      label: `Drill-through (${result.descriptor.rowCount} rows)`,
-      summary: [
-        `Drilled into "${datasetName}" slice [${slicePath}] (${result.descriptor.aggregation}(${result.descriptor.valueField}) = ${result.descriptor.formattedValue}, ${result.descriptor.rowCount} rows).`,
-        `Sample underlying rows:\n${JSON.stringify(sampleRows, null, 2)}`,
-      ].join('\n'),
-    })
+    setSelectedContext(sliceAttachment(datasetName, datasetId, result))
     trackLocalAction()
-  }, [datasetName, trackLocalAction])
+  }, [datasetId, datasetName, trackLocalAction])
+
+  const handleAttachView = useCallback(() => {
+    const view = viewMode === 'chart' ? `${chartConfig?.type ?? 'bar'} chart` : viewMode === 'pivot' ? 'pivot table' : 'table'
+    setSelectedContext(viewAttachment(datasetName, datasetId, view, rows))
+  }, [chartConfig?.type, datasetId, datasetName, rows, viewMode])
+
+  // The AI Analyst panel, answered by the user's own agent through the Studio.
+  const analystConfig = useMemo<AIAnalystConfig | undefined>(() => (studio
+    ? { enabled: true, endpoint: '/api/studio/analyst', aiModelName: studio.agent.name ?? 'Your agent', maxRows: 10_000 }
+    : undefined), [studio])
 
   const handleCopyMarkdown = useCallback(async () => {
     const container = mainRef.current
@@ -754,29 +745,27 @@ export function McpApp() {
     }
   }, [showToast])
 
+  /** Sends the selected row or slice, with the user's comment, into the host's chat (desktop and IDE hosts). */
   const handleSendToChat = useCallback(async () => {
     const app = appRef.current
     if (!app || !selectedContext)
       return
+    const text = `${askComment?.trim() || 'Look at this from TinyPivot:'}\n\n${selectedContext.text}`
     try {
       if (canMessageHost) {
-        await app.sendMessage({
-          role: 'user',
-          content: [{ type: 'text', text: `Analyze this slice from TinyPivot:\n\n${selectedContext.summary}` }],
-        })
+        await app.sendMessage({ role: 'user', content: [{ type: 'text', text }] })
         showToast('Sent to chat')
       }
       else if (canUpdateContext) {
-        await app.updateModelContext({
-          content: [{ type: 'text', text: selectedContext.summary }],
-        })
-        showToast('Attached to next message')
+        await app.updateModelContext({ content: [{ type: 'text', text }] })
+        showToast('Attached to your next message')
       }
+      setAskComment(null)
     }
     catch (err) {
       showToast(`Could not send: ${err instanceof Error ? err.message : String(err)}`)
     }
-  }, [canMessageHost, canUpdateContext, selectedContext, showToast])
+  }, [askComment, canMessageHost, canUpdateContext, selectedContext, showToast])
 
   const shellClass = [
     'tp-mcp-shell',
@@ -821,6 +810,18 @@ export function McpApp() {
             >
               Data
             </button>
+            {analystConfig && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'ai'}
+                className={`tp-mcp-seg-btn ${viewMode === 'ai' ? 'active' : ''}`}
+                title={`Ask questions about this data; ${analystConfig.aiModelName} answers`}
+                onClick={() => setViewMode('ai')}
+              >
+                Analyst
+              </button>
+            )}
           </div>
 
           {datasets.length > 1
@@ -1090,19 +1091,40 @@ export function McpApp() {
             </button>
           )}
 
-          {selectedContext && transportMode === 'mcp' && (canMessageHost || canUpdateContext) && (
+          {selectedContext && transportMode === 'mcp' && (canMessageHost || canUpdateContext) && askComment === null && (
             <button
               type="button"
               className="tp-mcp-btn tp-mcp-btn-primary"
-              onClick={() => void handleSendToChat()}
+              onClick={() => setAskComment('')}
             >
-              Ask AI:
+              Send to chat:
               {' '}
               {selectedContext.label}
             </button>
           )}
         </div>
       </header>
+
+      {selectedContext && askComment !== null && (
+        <form
+          className="tp-mcp-ask"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void handleSendToChat()
+          }}
+        >
+          <span className="tp-mcp-ask-label">{selectedContext.label}</span>
+          <input
+            className="tp-mcp-ask-input"
+            placeholder="Add a comment for the agent (optional)"
+            value={askComment}
+            aria-label="Comment for the agent"
+            onChange={e => setAskComment(e.target.value)}
+          />
+          <button type="submit" className="tp-mcp-btn tp-mcp-btn-primary">Send</button>
+          <button type="button" className="tp-mcp-btn" onClick={() => setAskComment(null)}>Cancel</button>
+        </form>
+      )}
 
       {truncatedForFreeTier && sourceTotalRows > totalRows && (
         <div className="tp-mcp-truncation-banner" role="alert">
@@ -1155,6 +1177,9 @@ export function McpApp() {
             snapshot={studio}
             tables={datasets.map(ds => ({ id: ds.id, name: ds.name }))}
             activeDatasetId={datasetId}
+            attachment={selectedContext}
+            onAttachView={rows.length > 0 ? handleAttachView : undefined}
+            onClearAttachment={() => setSelectedContext(null)}
             notify={message => showToast(message)}
           />
         )}
@@ -1172,6 +1197,7 @@ export function McpApp() {
                   viewMode={viewMode}
                   pivotConfig={pivotConfig}
                   chartConfig={chartConfig}
+                  aiAnalyst={analystConfig}
                   showPivot={true}
                   enableExport={true}
                   enableSearch={true}

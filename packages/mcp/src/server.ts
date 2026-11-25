@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
+import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList } from './history.js'
 import { ROW_PAGE_SIZE } from './limits.js'
@@ -36,7 +37,7 @@ const LOAD_DATA_ROW_GUIDE = 50
  * What the model is told once per session. Hosts send it with every request, so every word
  * here costs every user on every turn: keep it to what changes the model's behaviour.
  */
-export function buildInstructions({ reprintCards = true }: { reprintCards?: boolean } = {}): string {
+export function buildInstructions({ reprintCards = true, claudeChannel = false }: { reprintCards?: boolean, claudeChannel?: boolean } = {}): string {
   const cards = reprintCards
     ? 'In a terminal, show the returned ```text card verbatim with the Studio link in your reply, except in pi, whose TinyPivot extension already displays it.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
@@ -46,6 +47,7 @@ export function buildInstructions({ reprintCards = true }: { reprintCards?: bool
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     'Pass why on every data call: one short sentence the user sees in the TinyPivot Studio trace. Replies may end with notes the user wrote in the Studio; act on them.',
+    ...(claudeChannel ? ['Messages from TinyPivot Studio arrive as <channel source="tinypivot"> events: do what they ask, then answer with studio_reply, passing the message id as re.'] : []),
     cards,
   ].join(' ')
 }
@@ -133,6 +135,8 @@ export interface CreateTinyPivotMcpServerOptions {
   reprintCards?: boolean
   /** The shared trace, history and SQL engine; the CLI passes the same one to the Studio page. */
   studio?: Studio
+  /** Offer Claude Code channels; defaults to whether Claude Code was started with this server's channel flag. */
+  claudeChannel?: boolean
 }
 
 export interface McpToolRequestExtra {
@@ -349,6 +353,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     options.onStateChanged?.()
   }
   const reprintCards = options.reprintCards ?? process.env.TINYPIVOT_REPRINT_CARDS !== '0'
+  const claudeChannel = options.claudeChannel ?? claudeChannelEnabled()
   const cardFormat = { showBranding: !isPro, reprintNote: reprintCards }
   const postgresConfig: PostgresConfig | undefined = options.postgres ?? (
     process.env.DATABASE_URL
@@ -364,14 +369,15 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.4.0',
+      version: '0.5.0',
     },
     {
       capabilities: {
         resources: {},
         tools: {},
+        ...(claudeChannel ? { experimental: { 'claude/channel': {} } } : {}),
       },
-      instructions: buildInstructions({ reprintCards }),
+      instructions: buildInstructions({ reprintCards, claudeChannel }),
     },
   )
 
@@ -425,6 +431,53 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   /** A tool's text plus any notes the user left in the Studio since the last reply. */
   const withNotes = (text: string) => `${text}${studio.takeNotes()}`
 
+  /**
+   * Lets the Studio reach this agent: into the Claude Code session through a channel when it was
+   * started with one, and with the host's own model when it offers MCP sampling.
+   */
+  const connectAgent = () => {
+    studio.setAgentName(server.server.getClientVersion()?.name)
+    if (claudeChannel) {
+      studio.agent.connect({
+        name: 'Claude Code channel',
+        push: (note, text) => {
+          const content = `${text}\n\nAnswer with studio_reply (re: "${note.id}") so the user sees it in TinyPivot Studio.`
+          server.server.notification({ method: CHANNEL_NOTIFICATION, params: { content, meta: { message_id: note.id, kind: note.kind } } })
+            .catch(error => console.error('[tinypivot-mcp] Could not reach the Claude Code channel:', error))
+          return true
+        },
+      })
+    }
+    if (server.server.getClientCapabilities()?.sampling) {
+      studio.agent.connect({
+        name: 'sampling',
+        complete: async (turns) => {
+          const result = await server.server.createMessage({
+            messages: turns.map(turn => ({ role: turn.role, content: { type: 'text' as const, text: turn.content } })),
+            maxTokens: 2000,
+          })
+          return result.content.type === 'text' ? result.content.text : ''
+        },
+      })
+    }
+  }
+
+  if (claudeChannel) {
+    // The channel's reply tool: how the agent answers a Studio message where the user is looking.
+    server.registerTool(
+      'studio_reply',
+      {
+        title: 'Reply in TinyPivot Studio',
+        description: 'Answer a message from TinyPivot Studio. The user reads it there.',
+        inputSchema: { text: z.string().min(1).max(8000), re: z.string().max(80).optional() },
+      },
+      async ({ text, re }) => {
+        studio.reply(text, re)
+        return { content: [{ type: 'text' as const, text: 'Shown in TinyPivot Studio.' }] }
+      },
+    )
+  }
+
   /** Tools only the widget calls. A host with no widget would just list them for the model. */
   const widgetOnlyTools: Array<{ disable: () => void }> = []
   const widgetOnly = (tool: { disable: () => void }) => {
@@ -459,6 +512,12 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     if (!clientRendersWidget())
       widgetOnlyTools.forEach(tool => tool.disable())
     detectedClientName = server.server.getClientVersion()?.name
+    try {
+      connectAgent()
+    }
+    catch (error) {
+      console.error('[tinypivot-mcp] Could not connect the Studio to the agent:', error)
+    }
     recordTelemetry({
       event: 'server_start',
       client: detectedClientName,

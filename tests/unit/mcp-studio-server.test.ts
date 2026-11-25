@@ -24,12 +24,13 @@ describe('isAllowedRequest', () => {
     expect(isAllowedRequest({ method: 'GET' }, port)).toBe(false)
   })
 
-  it('takes writes only with the Studio header and from the Studio\'s own origin', () => {
+  it('takes browser writes only from the Studio\'s own page, and local tools\' writes only with the Studio header', () => {
     const host = `127.0.0.1:${port}`
-    expect(isAllowedRequest({ method: 'POST', host, studioHeader: '1', origin: `http://${host}` }, port)).toBe(true)
+    expect(isAllowedRequest({ method: 'POST', host, origin: `http://${host}` }, port)).toBe(true)
+    expect(isAllowedRequest({ method: 'POST', host, origin: 'https://evil.example' }, port)).toBe(false)
+    expect(isAllowedRequest({ method: 'POST', host, origin: 'https://evil.example', studioHeader: '1' }, port)).toBe(false)
     expect(isAllowedRequest({ method: 'POST', host, studioHeader: '1' }, port)).toBe(true)
-    expect(isAllowedRequest({ method: 'POST', host, origin: `http://${host}` }, port)).toBe(false)
-    expect(isAllowedRequest({ method: 'POST', host, studioHeader: '1', origin: 'https://evil.example' }, port)).toBe(false)
+    expect(isAllowedRequest({ method: 'POST', host }, port)).toBe(false)
   })
 })
 

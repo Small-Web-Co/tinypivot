@@ -1,6 +1,6 @@
 # TinyPivot — Developer & In-Agent Analytics Reference
 
-> Updated for TinyPivot MCP v0.4.0 & TinyPivot React/Vue v1.4.5.
+> Updated for TinyPivot MCP v0.5.0 & TinyPivot React/Vue v1.4.6.
 
 TinyPivot is **one deterministic analytics engine** shipped in two complementary forms:
 1. **TinyPivot MCP (`@smallwebco/tinypivot-mcp`)** — Data analysis studio for AI agents: TinyPivot Studio on localhost, an MCP App, a native Claude plugin, framed terminal cards and a live Ghostty TUI.

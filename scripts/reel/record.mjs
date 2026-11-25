@@ -14,10 +14,11 @@
  *       { "type": "text" },                       type like a person
  *       { "key": "Enter" },                       press a named tmux key
  *       { "idle": 2500, "timeout": 120000 },      wait until the screen stops changing
- *       { "sleep": 800 } ] }
+ *       { "sleep": 800 },
+ *       { "untilFile": "$ENV_VAR", "timeout": 600000 } ] }  record until another script creates that file
  */
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -105,6 +106,21 @@ async function waitForIdle(quietMs, timeout) {
   throw new Error(`Screen never went quiet for ${quietMs}ms within ${timeout}ms`)
 }
 
+/** Keeps recording until a file appears: how a script driving the other side of a session says it is done. */
+async function waitForFile(path, timeout) {
+  const file = path.replace(/^\$(\w+)$/, (_, name) => process.env[name] ?? '')
+  if (!file)
+    throw new Error(`untilFile names ${path}, which is not set`)
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    sample()
+    if (existsSync(file))
+      return
+    await sleep(POLL_MS)
+  }
+  throw new Error(`Timed out after ${timeout}ms waiting for ${file}`)
+}
+
 /** Types with uneven gaps and a longer pause after spaces, so it reads as a person typing. */
 async function typeText(text) {
   for (const char of text) {
@@ -126,6 +142,8 @@ async function runStep(step) {
     return waitForIdle(step.idle, step.timeout ?? 120000)
   if (step.sleep)
     return watchFor(step.sleep)
+  if (step.untilFile)
+    return waitForFile(step.untilFile, step.timeout ?? 600000)
   throw new Error(`Unknown step: ${JSON.stringify(step)}`)
 }
 

@@ -36,6 +36,16 @@ const ROWS_ON_DISK = 44714
 
 export const reelScenes: ReelScene[] = [
   {
+    id: 'studio-pi',
+    harness: 'pi + Studio',
+    headline: 'The terminal and the Studio, talking to each other.',
+    detail: 'pi works the data in the terminal. Every step shows up in the Studio, where you send the data back with a comment or ask the AI Analyst, and pi answers.',
+    stats: [
+      { value: 2, label: 'questions sent from the Studio, both answered by pi' },
+      { value: ROWS_ON_DISK, label: 'rows queried on your machine' },
+    ],
+  },
+  {
     id: 'claude-code',
     harness: 'Claude Code',
     headline: 'Ask in the terminal. The chart prints in the reply.',

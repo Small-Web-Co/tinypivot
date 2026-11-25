@@ -35,11 +35,22 @@ export interface TraceStep {
   historyId?: string
 }
 
+/** Data the user sends along with a message: a selected row, a drilled-into slice, a view. */
+export interface NoteAttachment {
+  label: string
+  text: string
+}
+
 export interface StudioNote {
   id: string
   at: string
   text: string
+  /** A note asks the agent to do something; a question is from the AI Analyst and expects an answer. */
+  kind: 'note' | 'question'
   stepId?: string
+  attachment?: NoteAttachment
+  /** `live` when it went straight into the agent's conversation, `queued` when it waits for the next reply. */
+  delivery: 'live' | 'queued'
 }
 
 /** What the browser Studio shows: the trace, notes not yet delivered, and saved pulls. */
@@ -51,4 +62,6 @@ export interface StudioSnapshot {
   historyEnabled: boolean
   /** Ids of the datasets loaded right now, so a step can open its dataset directly. */
   loadedIds: string[]
+  /** The agent the Studio talks to, and the ways it reaches it live right now (empty when only queued). */
+  agent: { name?: string, live: string[], busy: boolean }
 }

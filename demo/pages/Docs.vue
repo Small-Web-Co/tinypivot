@@ -102,7 +102,8 @@ const { copiedKey, copy } = useCopy()
           <ul class="docs-text studio-list">
             <li><strong>Trace.</strong> Each step, the agent's or yours, with its reason (the <code>why</code> the agent passes on every data tool), what it shows, and the SQL or file filter behind it. <em>Open</em> shows the data as it was right after that step.</li>
             <li><strong>SQL editor.</strong> Edit a step's SQL or write new SQL over local files and loaded tables, and run it with DuckDB, read-only. The result keeps the step's chart when its fields still exist.</li>
-            <li><strong>Notes.</strong> Write what to check or change, optionally about one step. The agent receives your notes at the end of its next TinyPivot reply; <em>Copy as prompt</em> sends one at once.</li>
+            <li><strong>Messages, with data.</strong> Write what to check or change, about one step if you like, and attach a row, a pivot cell's rows or the current view. In pi the message starts a turn at once and the answer comes back to the Studio; in Claude Code it does the same when started with <code>--dangerously-load-development-channels server:tinypivot</code>. Other agents get it with their next TinyPivot reply, or you can use <em>Copy as prompt</em>.</li>
+            <li><strong>AI Analyst (Pro).</strong> Ask questions about the loaded data in the Analyst tab. Your own agent answers, and the SQL it suggests runs locally.</li>
             <li><strong>History.</strong> Every table the agent pulled, kept on your machine for 30 days, reopened without running the query again.</li>
           </ul>
           <p class="docs-text">

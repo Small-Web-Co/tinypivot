@@ -1,10 +1,12 @@
 import type { ChartThemePreset } from '@smallwebco/tinypivot-core'
 import type { AddressInfo } from 'node:net'
 import type { DatasetStore } from './store.js'
+import type { NoteAttachment, StudioNote } from './studio-protocol.js'
 import type { Studio } from './studio.js'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
+import { handleAnalystAction } from './analyst-endpoint.js'
 import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { STUDIO_HEADER } from './studio-protocol.js'
@@ -30,9 +32,10 @@ export interface StartCompanionOptions {
 }
 
 /**
- * Only this machine's browser, on this server's own address, may use the API. Checking Host stops
- * DNS rebinding; requiring the custom header and a matching Origin on writes stops other sites
- * from posting to it.
+ * Only this machine, on this server's own address, may use the API. Checking Host stops DNS
+ * rebinding. Writes from a browser must come from the Studio's own page (browsers always send
+ * Origin on cross-site POSTs); writes from local tools without an Origin, such as the pi
+ * extension, must carry the Studio header.
  */
 export function isAllowedRequest(
   request: { method?: string, host?: string, origin?: string, studioHeader?: string },
@@ -43,9 +46,35 @@ export function isAllowedRequest(
     return false
   if (request.method === 'GET' || request.method === 'HEAD')
     return true
-  if (request.studioHeader !== '1')
-    return false
-  return !request.origin || allowedHosts.some(host => request.origin === `http://${host}`)
+  if (request.origin)
+    return allowedHosts.some(host => request.origin === `http://${host}`)
+  return request.studioHeader === '1'
+}
+
+function parseAttachment(value: unknown): NoteAttachment | undefined {
+  const { label, text } = (value ?? {}) as { label?: unknown, text?: unknown }
+  return typeof label === 'string' && typeof text === 'string' && text.trim() ? { label, text } : undefined
+}
+
+/** Holds an SSE stream open as a live way to reach the agent until the extension disconnects. */
+function openAgentStream(studio: Studio, agentName: string, req: http.IncomingMessage, res: http.ServerResponse): void {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' })
+  res.write(': connected\n\n')
+  const disconnect = studio.agent.connect({
+    name: agentName,
+    push: (note: StudioNote, text: string) => {
+      if (res.writableEnded)
+        return false
+      res.write(`event: message\ndata: ${JSON.stringify({ id: note.id, kind: note.kind, text })}\n\n`)
+      return true
+    },
+  })
+  const keepAlive = setInterval(() => res.write(': ping\n\n'), 25_000)
+  keepAlive.unref()
+  req.on('close', () => {
+    clearInterval(keepAlive)
+    disconnect()
+  })
 }
 
 function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
@@ -187,11 +216,29 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       const text = typeof body.text === 'string' ? body.text.trim() : ''
       if (!text || text.length > MAX_NOTE_CHARS)
         return sendJson(res, 400, { error: `Write a note of up to ${MAX_NOTE_CHARS.toLocaleString('en-US')} characters.` })
-      const note = studio.addNote(text, typeof body.stepId === 'string' ? body.stepId : undefined)
+      const note = studio.addNote(text, {
+        stepId: typeof body.stepId === 'string' ? body.stepId : undefined,
+        attachment: parseAttachment(body.attachment),
+      })
       return sendJson(res, 200, { note })
     }
     if (pathname === '/api/studio/note/delete') {
       return sendJson(res, 200, { removed: typeof body.id === 'string' && studio.removeNote(body.id) })
+    }
+    if (pathname === '/api/studio/reply') {
+      const text = typeof body.text === 'string' ? body.text.trim() : ''
+      if (!text)
+        return sendJson(res, 400, { error: 'Send the reply text.' })
+      studio.reply(text.slice(0, 20_000), typeof body.re === 'string' ? body.re : undefined)
+      return sendJson(res, 200, { ok: true })
+    }
+    if (pathname === '/api/studio/agent-status') {
+      studio.setAgentBusy(body.busy === true)
+      return sendJson(res, 200, { ok: true })
+    }
+    if (pathname === '/api/studio/analyst') {
+      const result = await handleAnalystAction(studio, body)
+      return sendJson(res, result.status, result.body)
     }
     if (pathname === '/api/studio/show') {
       try {
@@ -249,6 +296,15 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
         res.write(`event: studio\ndata: ${JSON.stringify(studio.snapshot())}\n\n`)
       sseClients.add(res)
       req.on('close', () => sseClients.delete(res))
+      return
+    }
+
+    // A local agent extension (pi) listens here and puts Studio messages into its conversation.
+    if (req.method === 'GET' && pathname === '/api/studio/agent-stream') {
+      if (!studio || req.headers[STUDIO_HEADER] !== '1')
+        return sendJson(res, 403, { error: 'Forbidden' })
+      const agentName = (urlObj.searchParams.get('agent') || 'agent').slice(0, 40)
+      openAgentStream(studio, agentName, req, res)
       return
     }
 

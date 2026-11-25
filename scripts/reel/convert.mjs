@@ -15,7 +15,8 @@
  *     "startAfter": "regex",           or: start after the last frame showing this (a startup notice)
  *     "busyWhen": "regex",             frames matching this play `busySpeed` times faster
  *     "busySpeed": 4, "maxHold": 2500, "endHold": 3500,
- *     "captions": [{ "when": "regex", "title": "...", "body": "..." }] }
+ *     "captions": [{ "when": "regex", "title": "...", "body": "..." }],
+ *     "studio": "name.studio.json" }  Studio screenshots taken alongside (record-studio.mjs)
  *
  * Text swaps that are specific to the machine a take was recorded on (the working folder, a
  * provider label) live outside the repository, in the optional redactions file:
@@ -28,6 +29,8 @@ import process from 'node:process'
 import { parseScreen, rowText, TERMINAL_THEME } from './ansi.mjs'
 
 const DEFAULTS = { busySpeed: 4, maxHold: 2500, endHold: 3500, replace: [], captions: [] }
+/** Screen time each Studio screenshot gets while the terminal sits idle (the user is busy in the Studio). */
+const STUDIO_FRAME_HOLD = 1700
 const LICENSE_KEY_RE = /TP-[A-Z]{3,5}-[A-Z0-9]{6,}/
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}/gi
 const USER_NAME = userInfo().username
@@ -186,6 +189,46 @@ function placeCaptions(captions, frames, times) {
   })
 }
 
+/** How long each terminal frame really stayed up; the last one counts as `endHold`. */
+function realDurations(frames, endHold) {
+  return frames.map((frame, index) => (frames[index + 1] ? frames[index + 1].t - frame.t : endHold))
+}
+
+/** Index of the terminal frame on screen at raw time `raw`, or -1 before the first. */
+function frameAt(frames, raw) {
+  return frames.findLastIndex(frame => frame.t <= raw)
+}
+
+/**
+ * While the user works in the Studio the terminal is idle, and capping idle time would squeeze
+ * their screenshots together. Such frames hold long enough for each screenshot to be seen.
+ */
+function holdsForStudio(frames, holds, rawTimes, endHold) {
+  const real = realDurations(frames, endHold)
+  const counts = Array.from({ length: frames.length }).fill(0)
+  for (const raw of rawTimes) {
+    const index = frameAt(frames, raw)
+    if (index >= 0)
+      counts[index]++
+  }
+  return holds.map((hold, index) => (counts[index] ? Math.max(hold, Math.min(real[index], counts[index] * STUDIO_FRAME_HOLD)) : hold))
+}
+
+/**
+ * Puts each Studio screenshot on the replay's clock: within the terminal frame that was on
+ * screen when it was taken, as far in as it really was, scaled to that frame's shortened hold.
+ */
+function placeStudioFrames(studioFrames, rawTimes, frames, holds, times, endHold) {
+  const real = realDurations(frames, endHold)
+  return studioFrames.map(({ src }, n) => {
+    const index = frameAt(frames, rawTimes[n])
+    if (index < 0)
+      return { t: 0, src }
+    const fraction = real[index] > 0 ? Math.min(1, (rawTimes[n] - frames[index].t) / real[index]) : 0
+    return { t: Math.round(times[index] + holds[index] * fraction), src }
+  })
+}
+
 function assertNothingPrivate(id, frames) {
   for (const frame of frames) {
     const leak = (frame.text.includes(USER_NAME) && USER_NAME)
@@ -205,7 +248,12 @@ function convert(entry, takesDir) {
   assertNothingPrivate(options.id, frames)
 
   const table = createStyleTable()
-  const { frames: output, duration } = diffFrames(frames, frameHolds(frames, options), table)
+  const studioFrames = options.studio ? JSON.parse(readFileSync(join(takesDir, options.studio), 'utf8')) : []
+  const studioRaw = studioFrames.map(frame => frame.at - Date.parse(meta.recordedAt))
+  const holds = holdsForStudio(frames, frameHolds(frames, options), studioRaw, options.endHold)
+  const { frames: output, duration } = diffFrames(frames, holds, table)
+  const times = output.map(frame => frame.t)
+  const studio = options.studio ? placeStudioFrames(studioFrames, studioRaw, frames, holds, times, options.endHold) : undefined
   return {
     id: options.id,
     cols: meta.cols,
@@ -214,7 +262,8 @@ function convert(entry, takesDir) {
     theme: { fg: TERMINAL_THEME.fg, bg: TERMINAL_THEME.bg },
     styles: table.styles,
     frames: output,
-    captions: placeCaptions(options.captions, frames, output.map(frame => frame.t)),
+    captions: placeCaptions(options.captions, frames, times),
+    ...(studio ? { studio } : {}),
     transcript: frames.at(-1).text.replace(/[ \t]+$/gm, '').trim(),
   }
 }

@@ -1,6 +1,46 @@
 {
   "recordings": [
     {
+      "id": "studio-pi",
+      "take": "studio-pi-7.jsonl",
+      "studio": "studio-pi-7.studio.json",
+      "busyWhen": "Working",
+      "busySpeed": 7,
+      "maxHold": 3500,
+      "captions": [
+        {
+          "when": "chart MRR by month from acme",
+          "title": "Ask pi in the terminal",
+          "body": "One sentence about 44,714 orders on disk. TinyPivot opens its Studio beside the terminal."
+        },
+        {
+          "when": "mcp__tinypivot",
+          "title": "pi works through TinyPivot",
+          "body": "A monthly chart and a 2026 pivot by region and channel, both computed from the file on disk."
+        },
+        {
+          "when": "Message from the user in TinyPivot Studio",
+          "title": "Every step is in the Studio",
+          "body": "Why pi took it and the SQL behind it. Attach the pivot, say what looks wrong, and pi starts on it at once."
+        },
+        {
+          "when": "Yes — but it's one month, and it's global",
+          "title": "The answer comes back to the Studio",
+          "body": "pi splits Partner by month and finds March 2026: 90 orders against about 300 in a normal month."
+        },
+        {
+          "when": "Question from the user in TinyPivot Studio",
+          "title": "Ask the AI Analyst",
+          "body": "The Analyst in the Studio is pi itself: the same session, the same tools, no other model or key."
+        },
+        {
+          "when": "Team grew fastest — \\+29.7%",
+          "title": "Answered where you asked",
+          "body": "Team grew fastest, +29.7%. The answer shows in the Analyst and joins the trace."
+        }
+      ]
+    },
+    {
       "id": "claude-code",
       "take": "claude-7.jsonl",
       "startWhen": "❯",

@@ -188,6 +188,11 @@ const aiAnalystRef = ref<InstanceType<typeof AIAnalyst> | null>(null)
 // Must be defined before displayData and dataRef
 const aiLoadedData = ref<Record<string, unknown>[] | null>(null)
 
+// New data from the parent replaces whatever the AI Analyst loaded over the old data.
+watch(() => props.data, () => {
+  aiLoadedData.value = null
+})
+
 // Data to display - AI loaded data takes precedence
 const displayData = computed(() => aiLoadedData.value || props.data)
 

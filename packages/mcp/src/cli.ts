@@ -414,8 +414,8 @@ async function main() {
       return companionPromise
     companionPromise = startCompanion(port)
       .catch((err) => {
-        if (explicitPort || process.env.TINYPIVOT_PORT)
-          throw err
+        // Another session (or anything else) holds the port: a Studio elsewhere beats none.
+        console.error(`[tinypivot-mcp] Port ${port} is taken (${err instanceof Error ? err.message : err}); using a free port for the Studio.`)
         return startCompanion(0)
       })
       .then((handle) => {

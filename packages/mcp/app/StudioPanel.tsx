@@ -1,12 +1,13 @@
 import type { HistoryEntry } from '../src/history'
-import type { StudioNote, StudioSnapshot, TraceStep } from '../src/studio-protocol'
+import type { NoteAttachment, StudioNote, StudioSnapshot, TraceStep } from '../src/studio-protocol'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { postToStudio } from './companionApi'
 
 /**
  * The Studio side panel: every data step the agent and the user took, with the reason and the
- * SQL behind it; an editor to change and rerun that SQL; and notes the agent gets with its next
- * TinyPivot reply.
+ * SQL behind it; an editor to change and rerun that SQL; and messages to the agent, with data
+ * attached, that reach it live where the harness allows and with its next TinyPivot reply
+ * otherwise. The agent's answers come back into the trace.
  */
 
 type StudioStep = StudioSnapshot['steps'][number]
@@ -16,6 +17,10 @@ interface StudioPanelProps {
   /** Loaded datasets, which SQL can read by id. */
   tables: Array<{ id: string, name: string }>
   activeDatasetId: string
+  /** A row, pivot slice or view the user picked to send along. */
+  attachment: NoteAttachment | null
+  onAttachView?: () => void
+  onClearAttachment: () => void
   notify: (message: string) => void
 }
 
@@ -29,6 +34,8 @@ const TOOL_LABELS: Record<string, string> = {
   profile: 'profile',
   history: 'reopen',
   note: 'note',
+  ask: 'ask',
+  reply: 'reply',
 }
 
 const SQL_TOKEN = /('(?:[^']|'')*'|"(?:[^"]|"")*"|--[^\n]*|\b\d+(?:\.\d+)?\b|\b[a-z_]+\b)/gi
@@ -106,6 +113,19 @@ export function highlightSql(sql: string): React.ReactNode[] {
   })
 }
 
+const INLINE_MARKDOWN = /(\*\*[^*\n]+\*\*|`[^`\n]+`)/g
+
+/** Bold and inline code, the Markdown agents use most in short replies; the rest stays as written. */
+export function renderInline(text: string): React.ReactNode[] {
+  return text.split(INLINE_MARKDOWN).map((part, index) => {
+    if (index % 2 === 0)
+      return part
+    return part.startsWith('**')
+      ? <strong key={index}>{part.slice(2, -2)}</strong>
+      : <code key={index}>{part.slice(1, -1)}</code>
+  })
+}
+
 function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
@@ -118,14 +138,17 @@ function stepTitle(step: TraceStep): string {
   return step.why || step.datasetName || step.view || TOOL_LABELS[step.tool] || step.tool
 }
 
-/** A prompt the user can paste into any agent: the step, its SQL, and what they want changed. */
-export function buildPrompt(note: string, step?: StudioStep): string {
-  if (!step)
-    return note
-  const lines = [`About this TinyPivot step: "${stepTitle(step)}"${step.datasetName ? ` (${step.datasetName}, ${step.view ?? 'table'})` : ''}.`]
-  if (step.editableSql)
-    lines.push('', '```sql', step.editableSql, '```')
-  lines.push('', note)
+/** A prompt the user can paste into any agent: the step, its SQL, any attached data, and what they want. */
+export function buildPrompt(note: string, step?: StudioStep, attachment?: NoteAttachment | null): string {
+  const lines: string[] = []
+  if (step) {
+    lines.push(`About this TinyPivot step: "${stepTitle(step)}"${step.datasetName ? ` (${step.datasetName}, ${step.view ?? 'table'})` : ''}.`)
+    if (step.editableSql)
+      lines.push('', '```sql', step.editableSql, '```')
+  }
+  if (attachment)
+    lines.push(...(lines.length ? [''] : []), `Attached from TinyPivot (${attachment.label}):`, attachment.text)
+  lines.push(...(lines.length ? [''] : []), note)
   return lines.join('\n')
 }
 
@@ -149,7 +172,7 @@ function StepRow({ step, selected, active, onSelect, children }: StepRowProps) {
           <span>{clockTime(step.at)}</span>
           {typeof step.rows === 'number' && <span>{`${step.rows.toLocaleString()} rows`}</span>}
         </span>
-        <span className="tp-studio-step-why">{stepTitle(step)}</span>
+        <span className="tp-studio-step-why">{renderInline(stepTitle(step))}</span>
         {step.view && step.tool !== 'note' && <span className="tp-studio-step-view">{step.view}</span>}
       </button>
       {selected && children}
@@ -268,17 +291,63 @@ function SqlEditor({ initialSql, fromStepId, tables, onClose, notify }: SqlEdito
   )
 }
 
+/** Who the Studio talks to, and whether messages reach it now or with its next TinyPivot reply. */
+function AgentStatus({ agent }: { agent: StudioSnapshot['agent'] }) {
+  const name = agent.name ?? 'Your agent'
+  const live = agent.live.length > 0
+  return (
+    <div className={`tp-studio-agent ${live ? 'is-live' : ''} ${agent.busy ? 'is-busy' : ''}`} title={live ? `Connected through ${agent.live.join(', ')}` : undefined}>
+      <span className="tp-studio-agent-dot" aria-hidden="true" />
+      <span>
+        <strong>{name}</strong>
+        {agent.busy ? ' is working…' : live ? ' · live: messages start a turn now' : ' · messages go with its next TinyPivot reply'}
+      </span>
+      {!live && name === 'Claude Code' && (
+        <code className="tp-studio-agent-tip" title="Start Claude Code with this to send live">--dangerously-load-development-channels server:tinypivot</code>
+      )}
+    </div>
+  )
+}
+
 interface NoteComposerProps {
   notes: StudioNote[]
+  agent: StudioSnapshot['agent']
   aboutStep?: StudioStep
+  attachment: NoteAttachment | null
+  onAttachView?: () => void
+  onClearAttachment: () => void
   onDetach: () => void
   notify: (message: string) => void
   focusKey: number
 }
 
-function NoteComposer({ notes, aboutStep, onDetach, notify, focusKey }: NoteComposerProps) {
+function QueuedNotes({ notes }: { notes: StudioNote[] }) {
+  if (notes.length === 0)
+    return null
+  return (
+    <ul className="tp-studio-queue" aria-label="Messages waiting for the agent">
+      {notes.map(note => (
+        <li key={note.id}>
+          <span>{note.attachment ? `${note.text} · ${note.attachment.label}` : note.text}</span>
+          <button
+            type="button"
+            className="tp-studio-icon-btn"
+            aria-label="Remove message"
+            onClick={() => void postToStudio('/api/studio/note/delete', { id: note.id }).catch(() => {})}
+          >
+            ×
+          </button>
+        </li>
+      ))}
+      <li className="tp-studio-queue-hint">Sent with the agent&apos;s next TinyPivot reply. To send now, copy it as a prompt.</li>
+    </ul>
+  )
+}
+
+function NoteComposer({ notes, agent, aboutStep, attachment, onAttachView, onClearAttachment, onDetach, notify, focusKey }: NoteComposerProps) {
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const live = agent.live.length > 0
 
   useEffect(() => {
     if (focusKey > 0)
@@ -289,9 +358,11 @@ function NoteComposer({ notes, aboutStep, onDetach, notify, focusKey }: NoteComp
     if (!text.trim())
       return
     try {
-      await postToStudio('/api/studio/note', { text, stepId: aboutStep?.id })
+      await postToStudio('/api/studio/note', { text, stepId: aboutStep?.id, attachment: attachment ?? undefined })
       setText('')
       onDetach()
+      onClearAttachment()
+      notify(live ? `Sent to ${agent.name ?? 'your agent'}` : 'Queued for the agent\'s next TinyPivot reply')
     }
     catch (err) {
       notify(err instanceof Error ? err.message : String(err))
@@ -300,7 +371,7 @@ function NoteComposer({ notes, aboutStep, onDetach, notify, focusKey }: NoteComp
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(buildPrompt(text.trim(), aboutStep))
+      await navigator.clipboard.writeText(buildPrompt(text.trim(), aboutStep, attachment))
       notify('Copied. Paste it into your agent.')
     }
     catch {
@@ -310,24 +381,8 @@ function NoteComposer({ notes, aboutStep, onDetach, notify, focusKey }: NoteComp
 
   return (
     <div className="tp-studio-composer">
-      {notes.length > 0 && (
-        <ul className="tp-studio-queue" aria-label="Notes waiting for the agent">
-          {notes.map(note => (
-            <li key={note.id}>
-              <span>{note.text}</span>
-              <button
-                type="button"
-                className="tp-studio-icon-btn"
-                aria-label="Remove note"
-                onClick={() => void postToStudio('/api/studio/note/delete', { id: note.id }).catch(() => {})}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-          <li className="tp-studio-queue-hint">Sent with the agent&apos;s next TinyPivot reply. To send now, copy it as a prompt.</li>
-        </ul>
-      )}
+      <AgentStatus agent={agent} />
+      <QueuedNotes notes={notes} />
       {aboutStep && (
         <div className="tp-studio-about">
           <span className="tp-studio-label">about</span>
@@ -335,13 +390,26 @@ function NoteComposer({ notes, aboutStep, onDetach, notify, focusKey }: NoteComp
           <button type="button" className="tp-studio-icon-btn" aria-label="Detach from step" onClick={onDetach}>×</button>
         </div>
       )}
+      {attachment
+        ? (
+            <div className="tp-studio-about tp-studio-attachment">
+              <span className="tp-studio-label">data</span>
+              <span className="tp-studio-about-text" title={attachment.text}>{attachment.label}</span>
+              <button type="button" className="tp-studio-icon-btn" aria-label="Remove attached data" onClick={onClearAttachment}>×</button>
+            </div>
+          )
+        : onAttachView && (
+          <button type="button" className="tp-studio-attach-btn" onClick={onAttachView}>
+            + Attach the current view (or click a row or pivot cell)
+          </button>
+        )}
       <textarea
         ref={inputRef}
         className="tp-studio-note-input"
         placeholder="Tell the agent what to check, fix or try next…"
         value={text}
         rows={2}
-        aria-label="Note for the agent"
+        aria-label="Message for the agent"
         onChange={e => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -352,7 +420,9 @@ function NoteComposer({ notes, aboutStep, onDetach, notify, focusKey }: NoteComp
       />
       <div className="tp-studio-actions">
         <button type="button" className="tp-studio-btn tp-studio-btn-ghost" disabled={!text.trim()} onClick={() => void copy()}>Copy as prompt</button>
-        <button type="button" className="tp-studio-btn tp-studio-btn-primary" disabled={!text.trim()} onClick={() => void send()}>Send to agent</button>
+        <button type="button" className="tp-studio-btn tp-studio-btn-primary" disabled={!text.trim()} onClick={() => void send()}>
+          {live ? `Send to ${agent.name ?? 'agent'}` : 'Queue for agent'}
+        </button>
       </div>
     </div>
   )
@@ -397,7 +467,7 @@ function useFollowLatest(count: number) {
   return { listRef, onScroll }
 }
 
-export function StudioPanel({ snapshot, tables, activeDatasetId, notify }: StudioPanelProps) {
+export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onAttachView, onClearAttachment, notify }: StudioPanelProps) {
   const [tab, setTab] = useState<'trace' | 'history'>('trace')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editor, setEditor] = useState<{ sql: string, fromStepId?: string } | null>(null)
@@ -477,7 +547,17 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, notify }: Studi
               )}
       </div>
 
-      <NoteComposer notes={snapshot.notes} aboutStep={aboutStep} onDetach={() => setAboutId(null)} notify={notify} focusKey={focusKey} />
+      <NoteComposer
+        notes={snapshot.notes}
+        agent={snapshot.agent}
+        aboutStep={aboutStep}
+        attachment={attachment}
+        onAttachView={onAttachView}
+        onClearAttachment={onClearAttachment}
+        onDetach={() => setAboutId(null)}
+        notify={notify}
+        focusKey={focusKey}
+      />
     </aside>
   )
 }

@@ -11,12 +11,15 @@ import { formatClock, recordingUrl, reelScenes, shotCaptions, shotsDuration } fr
 import { usePlayback } from '../site/reel/usePlayback'
 import ReelCounter from './site/ReelCounter.vue'
 import ScreenReplay from './site/ScreenReplay.vue'
+import StudioReplay from './site/StudioReplay.vue'
 import TerminalReplay from './site/TerminalReplay.vue'
 
 /** Stage proportions before a recording arrives, so the page does not jump when it does. */
 const PLACEHOLDER_ASPECT = '96 / 58.8'
 /** Terminal rows the stage shows; recordings are taller and the camera moves over them. */
 const STAGE_ROWS = 28
+/** A session shown beside the Studio gets a narrower, taller terminal, level with the Studio pane. */
+const SPLIT_STAGE_ROWS = 36
 const VISIBLE_ENOUGH = 0.35
 /** Title card timing: wipe across, hold on the harness name, wipe away. */
 const WIPE_MS = 420
@@ -163,6 +166,15 @@ onBeforeUnmount(() => {
 
     <div class="reel-stage">
       <ScreenReplay v-if="shots" :key="scene.id" :shots="shots" :time="time" />
+      <div v-else-if="recording?.studio" class="reel-split">
+        <TerminalReplay
+          :recording="recording"
+          :time="time"
+          :label="`Recorded ${scene.harness} session. ${scene.headline}`"
+          :view-rows="SPLIT_STAGE_ROWS"
+        />
+        <StudioReplay :frames="recording.studio" :time="time" />
+      </div>
       <TerminalReplay
         v-else-if="recording"
         :recording="recording"
@@ -288,6 +300,23 @@ onBeforeUnmount(() => {
   overflow: hidden;
   /* Same surface as the amber terminal theme, so nothing flashes while a recording loads. */
   background: #140e06;
+}
+
+/* The agent's terminal and the Studio side by side; stacked on narrow screens. */
+.reel-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 760px) {
+  .reel-split {
+    grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
+    align-items: center;
+  }
+
+  .reel-split > :last-child {
+    border-left: 2px solid #2a1d0a;
+  }
 }
 
 .reel-waiting {

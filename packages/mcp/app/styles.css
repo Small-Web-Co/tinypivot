@@ -1546,3 +1546,122 @@ body,
     animation: none;
   }
 }
+
+/* ── Studio: the agent connection, attached data and replies ──────────────── */
+
+.tp-studio-agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.tp-studio-agent strong {
+  color: var(--color-text-primary, #e2e8f0);
+  font-weight: 600;
+}
+
+.tp-studio-agent-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--color-text-tertiary, #64748b);
+  border-radius: 50%;
+}
+
+.tp-studio-agent.is-busy .tp-studio-agent-dot {
+  animation: tp-studio-pulse 1.2s ease-in-out infinite;
+}
+
+.tp-studio-agent.is-live .tp-studio-agent-dot {
+  border-color: var(--tp-accent-2);
+  background: var(--tp-accent-2);
+  box-shadow: 0 0 8px var(--tp-accent-2);
+}
+
+.tp-studio-agent-tip {
+  flex-basis: 100%;
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
+  font: 10.5px/1.4 var(--tp-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tp-studio-attachment .tp-studio-label {
+  color: var(--tp-accent-2);
+}
+
+.tp-studio-attach-btn {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-tertiary, #64748b);
+  font: 11.5px/1.3 var(--tp-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tp-studio-attach-btn:hover {
+  color: var(--tp-accent);
+}
+
+/* The agent's answers read as prose; long ones open fully when selected. */
+.tp-studio-step-why {
+  white-space: pre-wrap;
+}
+
+.tp-studio-step-why strong {
+  color: var(--tp-accent);
+}
+
+.tp-studio-step-why code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
+  font: 0.9em var(--tp-mono);
+}
+
+.tp-studio-step:not(.is-selected) .tp-studio-step-why {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+
+/* Desktop and IDE hosts: a comment to go with the row or slice sent into the chat. */
+.tp-mcp-ask {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.18));
+  background: var(--tp-accent-soft);
+}
+
+.tp-mcp-ask-label {
+  flex: none;
+  max-width: 30%;
+  overflow: hidden;
+  font: 600 11px/1.3 var(--tp-mono);
+  color: var(--tp-accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tp-mcp-ask-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-secondary, rgba(148, 163, 184, 0.32));
+  border-radius: 6px;
+  background: var(--color-background-primary, #0b101b);
+  color: var(--color-text-primary, #e2e8f0);
+  font: 12px/1.3 var(--tp-sans);
+  outline: none;
+}
