@@ -1,9 +1,7 @@
 /**
- * The scenes shown in the homepage reel. Terminal scenes replay a recording from
- * /reel/<id>.json; a scene with `shots` plays product screenshots instead.
+ * The scenes shown in the homepage reel. Each replays a real session recorded from
+ * /reel/<id>.json, some with the TinyPivot Studio beside the terminal.
  */
-import type { RecordingCaption } from './player'
-
 export interface ReelScene {
   id: string
   /** Tab label: the harness the session was recorded in. */
@@ -12,18 +10,6 @@ export interface ReelScene {
   detail: string
   /** Two measured numbers from the session, shown beside the caption. */
   stats: ReelStat[]
-  /** Screenshots to play in place of a terminal recording. */
-  shots?: ReelShot[]
-}
-
-/** One screenshot in a scene, with the caption shown while it is up. */
-export interface ReelShot {
-  src: string
-  alt: string
-  title: string
-  body: string
-  /** How long it stays on screen, in milliseconds. */
-  hold: number
 }
 
 export interface ReelStat {
@@ -57,6 +43,16 @@ export const reelScenes: ReelScene[] = [
     stats: [
       { value: 2, label: 'questions sent from the Studio, both answered by pi' },
       { value: ROWS_ON_DISK, label: 'rows queried on your machine' },
+    ],
+  },
+  {
+    id: 'charts',
+    harness: 'Charts',
+    headline: 'A map, a slope and a bullet chart, each from one sentence.',
+    detail: 'Three questions to pi, two of them asked in the Studio. Each answer comes with its chart, and the Studio checks every number in it against the data.',
+    stats: [
+      { value: 3, label: 'chart types from three questions' },
+      { value: 13, label: 'numbers in the last answer, all found in the data' },
     ],
   },
   {
@@ -99,87 +95,7 @@ export const reelScenes: ReelScene[] = [
       { value: 2, label: 'tool calls you approved' },
     ],
   },
-  {
-    id: 'studio',
-    harness: 'Studio',
-    headline: 'Every step the agent took, with the SQL behind it.',
-    detail: 'The first TinyPivot step opens the Studio in your browser. It follows the session live: the agent\'s reasons, its SQL, your edits and your notes back.',
-    stats: [
-      { value: 7, label: 'steps in the trace, 2 of them yours' },
-      { value: ROWS_ON_DISK, label: 'rows queried on your machine' },
-    ],
-    shots: [
-      {
-        src: '/reel/studio/trace.jpg',
-        alt: 'TinyPivot Studio: a trace of the agent\'s steps beside a line chart of monthly revenue, with the SQL behind the selected step.',
-        title: 'Why, what and how, for each step',
-        body: 'Each step carries the agent\'s reason, what it shows and the exact SQL. Open one to see the data as it was then.',
-        hold: 4600,
-      },
-      {
-        src: '/reel/studio/edit.jpg',
-        alt: 'The Studio SQL editor with the step\'s query, edited to leave out the Partner channel.',
-        title: 'Disagree? Edit the SQL',
-        body: 'Change the agent\'s query and run it yourself with DuckDB, read-only, on your machine.',
-        hold: 4200,
-      },
-      {
-        src: '/reel/studio/rerun.jpg',
-        alt: 'The rerun query in the trace as the user\'s step, keeping the line chart.',
-        title: 'Your step joins the trace',
-        body: 'The result keeps the step\'s chart and is marked as yours, so the agent and you share one record.',
-        hold: 4200,
-      },
-      {
-        src: '/reel/studio/pivot.jpg',
-        alt: 'A pivot table of 2026 revenue by region and channel, opened from an earlier step.',
-        title: 'Go back to any step',
-        body: 'A later step turned this pivot into a chart. Opening the step shows the pivot again, exactly as the agent made it.',
-        hold: 4200,
-      },
-      {
-        src: '/reel/studio/note.jpg',
-        alt: 'A note to the agent about a step, waiting to be sent.',
-        title: 'Notes back to the agent',
-        body: 'Point at a step and say what to change. The agent gets the note with its next TinyPivot reply, or copy it as a prompt.',
-        hold: 4400,
-      },
-      {
-        src: '/reel/studio/history.jpg',
-        alt: 'The Studio history list of every pull in the session, beside the rows of one result.',
-        title: 'Nothing gets lost',
-        body: 'Every table the agent pulled is kept for 30 days on your machine and reopens without running the query again.',
-        hold: 4200,
-      },
-    ],
-  },
 ]
-
-/** Total running time of a screenshot scene. */
-export function shotsDuration(shots: ReelShot[]): number {
-  return shots.reduce((total, shot) => total + shot.hold, 0)
-}
-
-/** Which screenshot is showing at `time`; stays on the last one once the scene is over. */
-export function shotIndexAt(shots: ReelShot[], time: number): number {
-  let elapsed = 0
-  for (let index = 0; index < shots.length; index++) {
-    elapsed += shots[index].hold
-    if (time < elapsed)
-      return index
-  }
-  return shots.length - 1
-}
-
-/** The screenshots' captions on the scene's timeline, in the shape terminal recordings use. */
-export function shotCaptions(shots: ReelShot[]): RecordingCaption[] {
-  let start = 0
-  return shots.map((shot) => {
-    const caption = { t: start, title: shot.title, body: shot.body }
-    start += shot.hold
-    return caption
-  })
-}
 
 export function recordingUrl(sceneId: string): string {
   return `/reel/${sceneId}.json`

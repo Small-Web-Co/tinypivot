@@ -7,10 +7,9 @@
 import type { Recording } from '../site/reel/player'
 import { computed, onBeforeUnmount, onMounted, ref, shallowReactive } from 'vue'
 import { captionAt } from '../site/reel/player'
-import { formatClock, recordingUrl, reelScenes, shotCaptions, shotsDuration, themeLabel } from '../site/reel/scenes'
+import { formatClock, recordingUrl, reelScenes, themeLabel } from '../site/reel/scenes'
 import { usePlayback } from '../site/reel/usePlayback'
 import ReelCounter from './site/ReelCounter.vue'
-import ScreenReplay from './site/ScreenReplay.vue'
 import StudioReplay from './site/StudioReplay.vue'
 import TerminalReplay from './site/TerminalReplay.vue'
 
@@ -33,9 +32,8 @@ const curtain = ref<Curtain>('open')
 const recordings = shallowReactive(new Map<string, Recording>())
 const scene = computed(() => reelScenes[activeIndex.value])
 const recording = computed(() => recordings.get(scene.value.id))
-const shots = computed(() => scene.value.shots)
-const duration = computed(() => (shots.value ? shotsDuration(shots.value) : recording.value?.duration ?? 0))
-const ready = computed(() => Boolean(shots.value || recording.value))
+const duration = computed(() => recording.value?.duration ?? 0)
+const ready = computed(() => Boolean(recording.value))
 const theme = computed(() => themeLabel(recording.value?.theme.id))
 /** The stage takes the recording's own background, so nothing flashes around it. */
 const stageStyle = computed(() => (recording.value ? { '--reel-bg': recording.value.theme.bg, '--reel-fg': recording.value.theme.fg } : {}))
@@ -44,7 +42,7 @@ const { time, playing, play, pause, seek } = usePlayback(duration, playNextScene
 const progress = computed(() => (duration.value ? time.value / duration.value : 0))
 
 /** The step being shown: a timed caption from the recording, or the scene's own summary. */
-const steps = computed(() => (shots.value ? shotCaptions(shots.value) : recording.value?.captions ?? []))
+const steps = computed(() => recording.value?.captions ?? [])
 const step = computed(() => captionAt(steps.value, time.value))
 const stepNumber = computed(() => (step.value ? steps.value.indexOf(step.value) + 1 : 0))
 const caption = computed(() => step.value ?? { title: scene.value.headline, body: scene.value.detail })
@@ -57,9 +55,9 @@ let sceneChange = 0
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-/** Fetches a terminal scene's recording. Screenshot scenes have nothing to fetch. */
+/** Fetches a scene's recording, once. */
 async function loadRecording(id: string) {
-  if (recordings.has(id) || reelScenes.find(item => item.id === id)?.shots)
+  if (recordings.has(id))
     return
   const response = await fetch(recordingUrl(id))
   if (response.ok)
@@ -168,8 +166,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="reel-stage" :style="stageStyle">
-      <ScreenReplay v-if="shots" :key="scene.id" :shots="shots" :time="time" />
-      <div v-else-if="recording?.studio" class="reel-split">
+      <div v-if="recording?.studio" class="reel-split">
         <TerminalReplay
           :recording="recording"
           :time="time"
@@ -214,7 +211,7 @@ onBeforeUnmount(() => {
     <div class="reel-info">
       <div class="reel-caption">
         <p class="label">
-          {{ scene.harness }} · {{ shots ? 'real screenshots, driven by the same tool calls' : 'real session, thinking time fast-forwarded' }}<template v-if="theme">
+          {{ scene.harness }} · real session, thinking time fast-forwarded<template v-if="theme">
             · {{ theme }}
           </template>
         </p>

@@ -42,6 +42,47 @@
       ]
     },
     {
+      "id": "charts",
+      "take": "charts-pi-5.jsonl",
+      "theme": "paper",
+      "studio": "charts-pi-5.studio.json",
+      "busyWhen": "Working",
+      "busySpeed": 7,
+      "maxHold": 3500,
+      "captions": [
+        {
+          "when": "map 2026 MRR by region",
+          "title": "Ask for a map",
+          "body": "One sentence in pi. TinyPivot sums 2026 MRR by region on your machine and shades the world map."
+        },
+        {
+          "when": "largest region",
+          "title": "Every number checked",
+          "body": "North America leads at $17.12M. All eight numbers in the answer are found in the data."
+        },
+        {
+          "when": "Message from the user in TinyPivot Studio: Which",
+          "title": "Ask the next one in the Studio",
+          "body": "Which plans grew, Jan–Oct like-for-like? Show it as a slope."
+        },
+        {
+          "when": "All four plans",
+          "title": "A slope chart",
+          "body": "All four plans grew. Team fastest at +29.8%, Enterprise the largest gain at +$7.93M."
+        },
+        {
+          "when": "Message from the user in TinyPivot Studio: Compare",
+          "title": "Actual against target",
+          "body": "Each region's 2026 MRR against 2025 as a bullet chart, in the deck layout made for slides."
+        },
+        {
+          "when": "All four regions",
+          "title": "Check this answer",
+          "body": "Every region beat its 2025 target. The Studio reruns the SQL and finds all 13 numbers in the data."
+        }
+      ]
+    },
+    {
       "id": "claude-code",
       "take": "claude-7.jsonl",
       "theme": "paper",

@@ -54,7 +54,8 @@ const shown = computed(() => props.frames
   position: relative;
   aspect-ratio: 1280 / 800;
   overflow: hidden;
-  background: #140e06;
+  /* The recording's own colours, so the Studio pane matches the terminal beside it. */
+  background: var(--reel-bg, #140e06);
 }
 
 .studio-frame {
@@ -75,7 +76,7 @@ const shown = computed(() => props.frames
 }
 
 .studio-replay-label {
-  color: #ffb000;
+  color: var(--reel-fg, #ffb000);
   font: 600 10px/1.4 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -88,14 +89,14 @@ const shown = computed(() => props.frames
   place-items: center;
   margin: 0;
   padding: 24px;
-  color: #a8771a;
+  color: color-mix(in srgb, var(--reel-fg, #ffb000) 65%, transparent);
   font: 13px/1.5 var(--font-mono, ui-monospace, monospace);
   text-align: center;
 }
 
 .studio-replay-cursor {
   margin-left: 2px;
-  color: #ffb000;
+  color: var(--reel-fg, #ffb000);
   animation: studio-blink 1s steps(1) infinite;
 }
 
