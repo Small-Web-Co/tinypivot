@@ -2,8 +2,9 @@
   "recordings": [
     {
       "id": "studio-pi",
-      "take": "studio-pi-7.jsonl",
-      "studio": "studio-pi-7.studio.json",
+      "take": "studio-pi-9.jsonl",
+      "theme": "crt-amber",
+      "studio": "studio-pi-9.studio.json",
       "busyWhen": "Working",
       "busySpeed": 7,
       "maxHold": 3500,
@@ -19,30 +20,31 @@
           "body": "A monthly chart and a 2026 pivot by region and channel, both computed from the file on disk."
         },
         {
-          "when": "Message from the user in TinyPivot Studio",
-          "title": "Every step is in the Studio",
-          "body": "Why pi took it and the SQL behind it. Attach the pivot, say what looks wrong, and pi starts on it at once."
+          "when": "Message from the user in TinyPivot Studio: Partner",
+          "title": "Send the pivot back with a comment",
+          "body": "Attach the pivot in the Studio, say what looks wrong and press Enter. pi starts on it at once."
         },
         {
-          "when": "Yes — but it's one month, and it's global",
+          "when": "March 2026 is the outlier",
           "title": "The answer comes back to the Studio",
           "body": "pi splits Partner by month and finds March 2026: 90 orders against about 300 in a normal month."
         },
         {
-          "when": "Question from the user in TinyPivot Studio",
-          "title": "Ask the AI Analyst",
-          "body": "The Analyst in the Studio is pi itself: the same session, the same tools, no other model or key."
+          "when": "Message from the user in TinyPivot Studio: Which",
+          "title": "Ask the next question from the Studio",
+          "body": "No second chat and no other model: the message goes straight into the same pi session."
         },
         {
-          "when": "Team grew fastest — \\+29.7%",
+          "when": "Team \\+29\\.7%",
           "title": "Answered where you asked",
-          "body": "Team grew fastest, +29.7%. The answer shows in the Analyst and joins the trace."
+          "body": "Team grew fastest, +29.7%, while Enterprise added three quarters of the new MRR. The answer joins the trace."
         }
       ]
     },
     {
       "id": "claude-code",
       "take": "claude-7.jsonl",
+      "theme": "paper",
       "startWhen": "❯",
       "busyWhen": "esc to interrupt",
       "busySpeed": 4,
@@ -83,6 +85,7 @@
     {
       "id": "pi",
       "take": "pi-8.jsonl",
+      "theme": "crt-green",
       "busyWhen": "Working",
       "busySpeed": 7,
       "maxHold": 4500,
@@ -94,7 +97,7 @@
         },
         {
           "when": "rows · Area",
-          "title": "An area chart in the amber theme",
+          "title": "An area chart, in the green CRT theme",
           "body": "Twenty-two months of revenue, drawn in braille dots and coloured by the theme you pick."
         },
         {
@@ -112,6 +115,7 @@
     {
       "id": "opencode",
       "take": "opencode-2.jsonl",
+      "theme": "onebit",
       "startAfter": "Authentication Required",
       "busyWhen": "esc interrupt",
       "busySpeed": 7,
@@ -142,6 +146,7 @@
     {
       "id": "antigravity",
       "take": "agy-2.jsonl",
+      "theme": "greenbar",
       "startWhen": "for shortcuts",
       "busyWhen": "esc to cancel|Thinking|Generating|Working",
       "busySpeed": 5,
