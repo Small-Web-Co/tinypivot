@@ -14,6 +14,8 @@ import { vi } from 'vitest'
 process.env.XDG_DATA_HOME = mkdtempSync(join(tmpdir(), 'tinypivot-test-data-'))
 process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), 'tinypivot-test-config-'))
 process.env.TINYPIVOT_TELEMETRY = '0'
+// SQLFluff takes about a second a query; tests that format pass their own formatter.
+process.env.TINYPIVOT_SQLFLUFF = 'off'
 
 // Mock console.warn to reduce noise in tests
 vi.spyOn(console, 'warn').mockImplementation(() => {})

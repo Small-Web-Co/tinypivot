@@ -1,6 +1,7 @@
 import type { ChartConfig, DataGridViewMode, PivotConfig } from '@smallwebco/tinypivot-core'
 import type { ClaimSource } from './claims.js'
 import type { HistoryEntry, RecordInput } from './history.js'
+import type { SqlFormatter } from './sql-format.js'
 import type { DatasetStore, RowFilter, StoredDataset } from './store.js'
 import type { AgentHint, Fingerprint, NoteAttachment, SourceFile, StepActor, StepCheck, StudioFile, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
 import crypto from 'node:crypto'
@@ -11,6 +12,7 @@ import { checkClaims } from './claims.js'
 import { DuckDbRunner, quoteIdentifier, quoteLiteral } from './duckdb.js'
 import { HistoryStore, SESSIONS_DIR, UPLOADS_DIR } from './history.js'
 import { groupRuns } from './runs.js'
+import { sqlfluffFormatter } from './sql-format.js'
 import { DEFAULT_SESSION_KEY } from './store.js'
 
 /**
@@ -205,6 +207,9 @@ export class Studio {
   private agentName?: string
   private agentBusy = false
   private agentHint?: AgentHint
+  readonly formatSql: SqlFormatter
+  /** Each step's SQL as SQLFluff lays it out, once formatted (null: SQLFluff is not available). */
+  private readonly formattedSql = new Map<string, string | null>()
 
   /**
    * Which conversation this Studio belongs to. Each server process is one conversation, so its
@@ -212,8 +217,9 @@ export class Studio {
    */
   readonly sessionId: string
 
-  constructor(readonly store: DatasetStore, options: { history?: HistoryStore, duck?: DuckDbRunner, sessionId?: string } = {}) {
+  constructor(readonly store: DatasetStore, options: { history?: HistoryStore, duck?: DuckDbRunner, sessionId?: string, formatSql?: SqlFormatter } = {}) {
     this.history = options.history ?? new HistoryStore()
+    this.formatSql = options.formatSql ?? sqlfluffFormatter()
     this.duck = options.duck ?? new DuckDbRunner()
     this.sessionId = options.sessionId ?? newSessionId()
     this.steps = this.readTraceFile()
@@ -238,15 +244,29 @@ export class Studio {
 
   snapshot(sessionKey = DEFAULT_SESSION_KEY): StudioSnapshot {
     return {
-      steps: this.steps.map(step => ({
-        ...step,
-        editableSql: step.sql ?? (step.file ? fileStepSql(step.file, step.where) : undefined),
-      })),
+      steps: this.steps.map((step) => {
+        const editableSql = step.sql ?? (step.file ? fileStepSql(step.file, step.where) : undefined)
+        const formattedSql = editableSql ? this.formatted(editableSql) : undefined
+        return { ...step, editableSql, ...(formattedSql ? { formattedSql } : {}) }
+      }),
       history: this.history.enabled ? this.history.list(HISTORY_IN_SNAPSHOT) : [],
       historyEnabled: this.history.enabled,
       loadedIds: this.store.listMetadata(sessionKey).map(meta => meta.id),
       agent: { name: this.agentName ? agentLabel(this.agentName) : undefined, live: this.agent.live(), busy: this.agentBusy, ...(this.agentHint ? { hint: this.agentHint } : {}) },
     }
+  }
+
+  /** SQL as SQLFluff lays it out, once it has; asks for it the first time, and tells the Studio when it lands. */
+  private formatted(sql: string): string | undefined {
+    if (!this.formattedSql.has(sql)) {
+      this.formattedSql.set(sql, null)
+      void this.formatSql(sql).then((text) => {
+        this.formattedSql.set(sql, text)
+        if (text)
+          this.changed()
+      })
+    }
+    return this.formattedSql.get(sql) ?? undefined
   }
 
   /** What would let this agent receive Studio messages live, shown while it cannot. */

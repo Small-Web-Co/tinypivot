@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { groupRuns } from '../src/runs'
 import { postToStudio, uploadToStudio } from './companionApi'
 import { checkReport, claimSummary, lastStep, markClaims, runTitle, stageOf } from './runs'
-import { formatSql, sqlOneLine } from './sqlFormat'
+import { shownSql, sqlOneLine } from './sqlFormat'
 import { SqlWorkbench } from './SqlWorkbench'
 
 /**
@@ -270,7 +270,7 @@ function Stage({ step, index, active, canOpen, checks, onOpen, onEdit }: StagePr
         {stage === 'answer' ? <AnswerText step={step} /> : step.why && <p className="tp-run-why">{renderInline(step.why)}</p>}
         {sql && stage !== 'view' && (
           showSql
-            ? <pre className="tp-studio-sql"><code>{highlightSql(formatSql(sql))}</code></pre>
+            ? <pre className="tp-studio-sql"><code>{highlightSql(shownSql(step))}</code></pre>
             : <button type="button" className="tp-run-sql-line" onClick={() => setShowSql(true)} title="Show the SQL">{sqlOneLine(sql)}</button>
         )}
         {(result || canOpen) && stage !== 'answer' && (
@@ -650,8 +650,9 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
   const loaded = useMemo(() => new Set(snapshot.loadedIds), [snapshot.loadedIds])
   // Each loaded table with the columns its latest step recorded, for the workbench's list and autocomplete.
   const workbenchTables = useMemo(() => tables.map((table) => {
-    const step = [...snapshot.steps].reverse().find(s => s.datasetId === table.id && s.columns?.length)
-    return { ...table, columns: step?.columns ?? [] }
+    const steps = [...snapshot.steps].reverse().filter(s => s.datasetId === table.id)
+    const withSql = steps.find(s => s.editableSql)
+    return { ...table, columns: steps.find(s => s.columns?.length)?.columns ?? [], sql: withSql ? shownSql(withSql) : undefined }
   }), [snapshot.steps, tables])
   const live = snapshot.agent.live.length > 0
   // The newest question stays open until the user picks another.
@@ -713,7 +714,7 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
                       checking={checking === run.id}
                       onToggle={() => setOpenId(run.id === shownId ? '' : run.id)}
                       onOpenStep={(step, viewMode) => void post('/api/studio/show', { stepId: step.id, viewMode })}
-                      onEdit={step => setEditor({ sql: step.editableSql ?? '', fromStepId: step.id })}
+                      onEdit={step => setEditor({ sql: shownSql(step), fromStepId: step.id })}
                       onCheck={() => void check(run)}
                       onCopy={() => {
                         if (live) {

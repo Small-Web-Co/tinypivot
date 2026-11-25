@@ -107,8 +107,11 @@ export interface AgentHint {
 
 /** What the browser Studio shows: the trace, saved pulls and how to reach the agent. */
 export interface StudioSnapshot {
-  /** Each step, with the SQL that reproduces it when there is one (file loads included). */
-  steps: Array<TraceStep & { editableSql?: string }>
+  /**
+   * Each step, with the SQL that reproduces it when there is one (file loads included), and that
+   * SQL laid out by SQLFluff once it has been (absent without SQLFluff: the browser formats it).
+   */
+  steps: Array<TraceStep & { editableSql?: string, formattedSql?: string }>
   history: HistoryEntry[]
   historyEnabled: boolean
   /** Ids of the datasets loaded right now, so a step can open its dataset directly. */

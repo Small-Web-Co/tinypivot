@@ -299,6 +299,13 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
         return sendJson(res, 400, { error: errorMessage(error) })
       }
     }
+    if (pathname === '/api/studio/format') {
+      const sql = typeof body.sql === 'string' ? body.sql : ''
+      if (!sql.trim() || sql.length > MAX_SQL_CHARS)
+        return sendJson(res, 400, { error: 'Send the SQL to format.' })
+      // null: no SQLFluff on this machine, and the Studio formats in the browser.
+      return sendJson(res, 200, { sql: await studio.formatSql(sql) })
+    }
     if (pathname === '/api/studio/note') {
       const text = typeof body.text === 'string' ? body.text.trim() : ''
       if (!text || text.length > MAX_NOTE_CHARS)
