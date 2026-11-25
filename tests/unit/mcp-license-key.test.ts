@@ -20,8 +20,10 @@ describe('resolveLicenseKey', () => {
   })
 
   it('treats an unexpanded plugin placeholder as no key', () => {
+    // What Claude Code may pass when the option is left empty.
+    const placeholder = ['$', '{user_config.license_key}'].join('')
     vi.stubEnv('TINYPIVOT_LICENSE_KEY', '')
-    vi.stubEnv('CLAUDE_PLUGIN_OPTION_LICENSE_KEY', '${user_config.license_key}')
-    expect(resolveLicenseKey()).not.toBe('${user_config.license_key}')
+    vi.stubEnv('CLAUDE_PLUGIN_OPTION_LICENSE_KEY', placeholder)
+    expect(resolveLicenseKey()).not.toBe(placeholder)
   })
 })
