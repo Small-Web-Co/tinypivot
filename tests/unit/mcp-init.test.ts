@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import mcpPluginConfig from '../../packages/mcp/.mcp.json'
 import { MCP_NPX_SPEC, PI_ENTRY_EXTRAS, runInitCommand, TINYPIVOT_CLAUDE_RULE_BLOCK, TINYPIVOT_PI_RULE_BLOCK } from '../../packages/mcp/src/init'
+import { bumpMcpVersion, nextVersion } from '../../scripts/bump-mcp-version.mjs'
 
 describe('init writes configs that fetch the newest release', () => {
   let home: string
@@ -39,6 +40,16 @@ describe('init writes configs that fetch the newest release', () => {
 
     const codex = await fs.readFile(path.join(home, '.codex', 'config.toml'), 'utf8')
     expect(codex).toContain(`args = ["-y", "${MCP_NPX_SPEC}"]`)
+  })
+
+  it('installs the OpenCode Studio plugin next to the OpenCode config', async () => {
+    const { buildOpenCodePluginSource } = await import('../../packages/mcp/src/opencode-plugin')
+    await runInitCommand(['--targets=opencode', '--no-rules'])
+
+    const plugin = await fs.readFile(path.join(home, '.config', 'opencode', 'plugins', 'tinypivot.js'), 'utf8')
+    expect(plugin).toBe(buildOpenCodePluginSource())
+    // Other harnesses' extensions are left alone.
+    await expect(fs.access(path.join(home, '.pi', 'agent', 'extensions', 'tinypivot.ts'))).rejects.toThrow()
   })
 
   it('wires the Antigravity CLI separately from the Antigravity IDE', async () => {
@@ -86,36 +97,128 @@ describe('init writes configs that fetch the newest release', () => {
     expect(TINYPIVOT_CLAUDE_RULE_BLOCK).toMatch(/ranking.*instead of a Markdown table/)
     expect(TINYPIVOT_PI_RULE_BLOCK).toMatch(/ranking.*instead of a Markdown table/)
   })
+})
 
-  it('ships the same spec in the Claude Code plugin config', () => {
-    expect(mcpPluginConfig.mcpServers.tinypivot.args).toEqual(['-y', MCP_NPX_SPEC])
+describe('plugin manifests for each agent marketplace', () => {
+  const read = async (file: string) => JSON.parse(await fs.readFile(path.join(__dirname, '../..', file), 'utf8'))
+
+  it('start the same npx spec in every harness but Claude Code', async () => {
+    // Cursor (mcp.json), Antigravity (mcp_config.json), Gemini CLI.
+    for (const file of ['packages/mcp/mcp.json', 'packages/mcp/mcp_config.json', 'gemini-extension.json']) {
+      const { tinypivot } = (await read(file)).mcpServers
+      expect({ file, command: tinypivot.command, args: tinypivot.args }).toEqual({ file, command: 'npx', args: ['-y', MCP_NPX_SPEC] })
+    }
+  })
+
+  it('carry the MCP package license', async () => {
+    const { license } = await read('packages/mcp/package.json')
+    for (const file of ['packages/mcp/.claude-plugin/plugin.json', 'packages/mcp/.cursor-plugin/plugin.json', 'packages/mcp/.codex-plugin/plugin.json', 'packages/mcp/plugin.json'])
+      expect({ file, license: (await read(file)).license }).toEqual({ file, license })
+    expect((await read('.claude-plugin/marketplace.json')).plugins[0].license).toBe(license)
+  })
+
+  // Claude's plugin directory rejects an unpinned npx launcher, so the Claude plugin starts the
+  // exact release it was listed with; scripts/bump-mcp-version.mjs moves the pin with each release.
+  it('pin the Claude Code plugin to the package version', async () => {
+    const { version } = await read('packages/mcp/package.json')
+    expect(mcpPluginConfig.mcpServers.tinypivot).toEqual({ command: 'npx', args: ['-y', `@smallwebco/tinypivot-mcp@${version}`] })
+  })
+
+  it('carry the MCP package version, so a release updates every listing', async () => {
+    const { version } = await read('packages/mcp/package.json')
+    const versions = {
+      'claude plugin': (await read('packages/mcp/.claude-plugin/plugin.json')).version,
+      'claude marketplace': (await read('.claude-plugin/marketplace.json')).plugins[0].version,
+      'cursor plugin': (await read('packages/mcp/.cursor-plugin/plugin.json')).version,
+      'codex plugin': (await read('packages/mcp/.codex-plugin/plugin.json')).version,
+      'antigravity plugin': (await read('packages/mcp/plugin.json')).version,
+      'gemini extension': (await read('gemini-extension.json')).version,
+      'mcp registry': (await read('packages/mcp/server.json')).version,
+    }
+    expect(versions).toEqual(Object.fromEntries(Object.keys(versions).map(key => [key, version])))
+  })
+
+  it('declare the Studio channel on the server the plugin starts', async () => {
+    const plugin = await read('packages/mcp/.claude-plugin/plugin.json')
+    expect(plugin.channels).toEqual([{ server: 'tinypivot', displayName: 'TinyPivot Studio' }])
+    expect(Object.keys(mcpPluginConfig.mcpServers)).toContain(plugin.channels[0].server)
   })
 })
 
-describe('refreshPiExtension', () => {
+describe('bump-mcp-version', () => {
+  const repo = path.join(__dirname, '../..')
+  const files = [
+    'packages/mcp/package.json',
+    'packages/mcp/server.json',
+    'packages/mcp/.claude-plugin/plugin.json',
+    'packages/mcp/.cursor-plugin/plugin.json',
+    'packages/mcp/.codex-plugin/plugin.json',
+    'packages/mcp/plugin.json',
+    'packages/mcp/.mcp.json',
+    'packages/mcp/src/server.ts',
+    'packages/mcp/src/telemetry.ts',
+    'gemini-extension.json',
+    '.claude-plugin/marketplace.json',
+  ]
+  let root: string
+
+  beforeEach(async () => {
+    root = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-bump-'))
+    for (const file of files) {
+      await fs.mkdir(path.dirname(path.join(root, file)), { recursive: true })
+      await fs.copyFile(path.join(repo, file), path.join(root, file))
+    }
+  })
+
+  afterEach(async () => {
+    await fs.rm(root, { recursive: true, force: true })
+  })
+
+  it('computes the next version from a bump type or takes an exact one', () => {
+    expect(nextVersion('0.6.0', 'patch')).toBe('0.6.1')
+    expect(nextVersion('0.6.3', 'minor')).toBe('0.7.0')
+    expect(nextVersion('0.6.3', 'major')).toBe('1.0.0')
+    expect(nextVersion('0.6.3', '2.1.0')).toBe('2.1.0')
+    expect(() => nextVersion('0.6.3', 'latest')).toThrow()
+  })
+
+  it('moves every manifest, the server strings and the Claude plugin pin together', async () => {
+    const { version } = JSON.parse(await fs.readFile(path.join(repo, 'packages/mcp/package.json'), 'utf8'))
+    expect(bumpMcpVersion(root, '9.8.7')).toBe('9.8.7')
+    const read = async (file: string) => fs.readFile(path.join(root, file), 'utf8')
+    for (const file of files.filter(f => f.endsWith('.json'))) {
+      const original = await fs.readFile(path.join(repo, file), 'utf8')
+      expect({ file, text: await read(file) }).toEqual({ file, text: original.replaceAll(version, '9.8.7') })
+    }
+    expect(JSON.parse(await read('packages/mcp/.mcp.json')).mcpServers.tinypivot.args).toEqual(['-y', '@smallwebco/tinypivot-mcp@9.8.7'])
+    expect(await read('packages/mcp/src/server.ts')).toMatch(/name: 'tinypivot',\s*version: '9\.8\.7'/)
+    expect(await read('packages/mcp/src/telemetry.ts')).toContain(`const PACKAGE_VERSION = '9.8.7'`)
+  })
+})
+
+describe('refreshAgentExtension', () => {
   let dir: string
   beforeEach(async () => {
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-piext-'))
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-agentext-'))
   })
   afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true })
   })
 
-  it('updates TinyPivot\'s own older extension and leaves everything else alone', async () => {
-    const { buildPiExtensionSource } = await import('../../packages/mcp/src/pi-extension')
-    const { refreshPiExtension } = await import('../../packages/mcp/src/init')
+  it.each(['pi', 'opencode'] as const)('updates TinyPivot\'s own older %s extension and leaves everything else alone', async (agent) => {
+    const { AGENT_EXTENSIONS, refreshAgentExtension } = await import('../../packages/mcp/src/init')
     const file = path.join(dir, 'tinypivot.ts')
 
-    expect(await refreshPiExtension(file)).toBe('absent')
+    expect(await refreshAgentExtension(agent, file)).toBe('absent')
     await expect(fs.access(file)).rejects.toThrow()
 
     await fs.writeFile(file, '// Auto-installed by @smallwebco/tinypivot-mcp init — do not edit by hand.\n// an older version\n')
-    expect(await refreshPiExtension(file)).toBe('updated')
-    expect(await fs.readFile(file, 'utf8')).toBe(buildPiExtensionSource())
-    expect(await refreshPiExtension(file)).toBe('current')
+    expect(await refreshAgentExtension(agent, file)).toBe('updated')
+    expect(await fs.readFile(file, 'utf8')).toBe(AGENT_EXTENSIONS[agent].build())
+    expect(await refreshAgentExtension(agent, file)).toBe('current')
 
     await fs.writeFile(file, '// my own extension\n')
-    expect(await refreshPiExtension(file)).toBe('custom')
+    expect(await refreshAgentExtension(agent, file)).toBe('custom')
     expect(await fs.readFile(file, 'utf8')).toBe('// my own extension\n')
   })
 })

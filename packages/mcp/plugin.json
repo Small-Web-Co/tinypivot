@@ -1,4 +1,20 @@
 {
   "name": "tinypivot",
-  "description": "Interactive pivot tables, data grids, charts, drill-through, and Excel export inside AI workflows."
+  "displayName": "TinyPivot",
+  "version": "0.6.0",
+  "description": "Data analysis studio for AI agents: turn CSV, JSON, API/MCP outputs, and SQL results into charts, pivot tables, data grids, terminal cards, and Excel exports, with a live Studio that shows every step.",
+  "logo": "assets/icon.png",
+  "author": {
+    "name": "Small Web, LLC",
+    "url": "https://tiny-pivot.com"
+  },
+  "homepage": "https://tiny-pivot.com/mcp",
+  "repository": "https://github.com/Small-Web-Co/tinypivot",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "keywords": ["tinypivot", "mcp", "charts", "pivot-table", "data-grid", "analytics", "csv", "sql", "excel"],
+  "suggestedPrompts": [
+    "Chart revenue by region from sales.csv",
+    "Pivot orders.csv by month and product",
+    "Open TinyPivot Studio"
+  ]
 }

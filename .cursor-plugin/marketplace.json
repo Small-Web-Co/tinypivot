@@ -1,0 +1,17 @@
+{
+  "name": "tinypivot",
+  "owner": {
+    "name": "Small Web, LLC",
+    "email": "license@tiny-pivot.com"
+  },
+  "metadata": {
+    "description": "TinyPivot: charts, pivot tables and a live data Studio inside your AI agent."
+  },
+  "plugins": [
+    {
+      "name": "tinypivot",
+      "source": "packages/mcp",
+      "description": "Charts, pivot tables, data grids and Excel exports from CSV, JSON and SQL results, with a live Studio that shows every step."
+    }
+  ]
+}

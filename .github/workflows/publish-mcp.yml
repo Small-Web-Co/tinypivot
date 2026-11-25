@@ -5,8 +5,9 @@
 #   Trusted Publisher → GitHub Actions
 #   Organization: Small-Web-Co · Repository: tinypivot · Workflow: publish-mcp.yml
 #
-# To release: bump the version in packages/mcp (package.json, server.json,
-# src/server.ts, src/telemetry.ts), commit, then push a tag `mcp-v<version>`.
+# To release: `pnpm release:mcp <patch|minor|major|x.y.z>` bumps the version in the package, the
+# MCP Registry entry, every agent plugin manifest and the Claude plugin's pinned npx version;
+# commit, then push a tag `mcp-v<version>`.
 # Keep this workflow tag-only, like publish.yml.
 name: Publish MCP to npm & MCP Registry
 

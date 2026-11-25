@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tinypivot": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smallwebco/tinypivot-mcp@latest"
+      ]
+    }
+  }
+}
