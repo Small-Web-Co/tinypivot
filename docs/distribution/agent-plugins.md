@@ -37,7 +37,7 @@ Requirements:
 - Everything the plugin runs must be inside `packages/mcp`. It is: the plugin only starts `npx`.
 
 Ready:
-- `packages/mcp/.claude-plugin/plugin.json` now has `displayName`, `icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`, `termsOfServiceUrl`, `network.hosts` (registry.npmjs.org for npx and DuckDB, tiny-pivot.com for usage statistics) and the `channels` entry.
+- `packages/mcp/.claude-plugin/plugin.json` now has `displayName`, `icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`, `termsOfServiceUrl`, `network.hosts` (registry.npmjs.org for npx and DuckDB, tiny-pivot.com for usage statistics, and www.tiny-pivot.com, where the site redirects it) and the `channels` entry.
 - `claude plugin validate --strict packages/mcp` passes, including its directory checks.
 
 **Pinned npx.** The directory's checklist says an `npx` launcher must be pinned to an exact version and that an unpinned one blocks submission. The plugin's `.mcp.json` therefore starts `@smallwebco/tinypivot-mcp@0.6.0`, and `pnpm release:mcp` moves the pin with each release. Plugin users get a release once the directory picks up the new commit. Everything else, including `init`'s configs and the Cursor, Antigravity and Gemini manifests, keeps `@latest` so a release reaches users on restart (see `MCP_NPX_SPEC` in `src/init.ts`).
