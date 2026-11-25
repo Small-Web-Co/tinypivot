@@ -172,10 +172,12 @@ function periodStem(column: string): string {
 
 /** Gaps and changes between period columns of each row, e.g. mrr_2025 → mrr_2026 for APAC. */
 function rowChanges(rows: Record<string, unknown>[], measures: string[], pool: Pool): void {
-  for (const [i, from] of measures.entries()) {
-    for (const to of measures.slice(i + 1)) {
-      if (periodStem(from) !== periodStem(to) || from === to)
+  for (const [i, first] of measures.entries()) {
+    for (const second of measures.slice(i + 1)) {
+      if (periodStem(first) !== periodStem(second) || first === second)
         continue
+      // Earlier period first, whichever column the view measures: mrr_2025 → mrr_2026.
+      const [from, to] = [first, second].sort()
       for (const row of rows)
         addChange(row[from], row[to], `${from} → ${to} · ${rowLabel(row)}`, pool)
     }

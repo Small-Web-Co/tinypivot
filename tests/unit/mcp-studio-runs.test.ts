@@ -89,6 +89,8 @@ describe('reading the numbers in an answer', () => {
       { text: '30%', status: 'unchecked' },
       { text: '-$9.9M', status: 'not-found' },
     ])
+    // The later period first, as a bullet chart measures it: still read from earlier to later.
+    expect(checkClaims('EMEA grew 34.7%.', [{ name: 'Bullet', rows: wide, measures: ['mrr_2026'] }])[0]).toMatchObject({ status: 'found' })
     // Long periods: rows that share a label are one item in two periods.
     const long = [{ plan: 'Team', year: '2025', mrr: 2_080_000 }, { plan: 'Team', year: '2026', mrr: 2_699_000 }]
     expect(checkClaims('Team rose 29.8%, +$619K.', [{ name: 'Slope', rows: long }]).map(claim => claim.status)).toEqual(['found', 'found'])
