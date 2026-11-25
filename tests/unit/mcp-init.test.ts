@@ -7,16 +7,19 @@ import { MCP_NPX_SPEC, runInitCommand } from '../../packages/mcp/src/init'
 
 describe('init writes configs that fetch the newest release', () => {
   let home: string
-  const realHome = process.env.HOME
 
+  // Every location init resolves must land in the throwaway home, on any OS and CI runner.
   beforeEach(async () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-init-'))
-    process.env.HOME = home
+    vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
+    vi.stubEnv('XDG_CONFIG_HOME', path.join(home, '.config'))
+    vi.stubEnv('APPDATA', path.join(home, 'AppData', 'Roaming'))
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
   afterEach(async () => {
-    process.env.HOME = realHome
+    vi.unstubAllEnvs()
     vi.restoreAllMocks()
     await fs.rm(home, { recursive: true, force: true })
   })

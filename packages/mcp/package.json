@@ -2,7 +2,7 @@
   "name": "@smallwebco/tinypivot-mcp",
   "mcpName": "io.github.Small-Web-Co/tinypivot",
   "type": "module",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "TinyPivot MCP Server, Interactive MCP App & Claude Plugin — turn CSV, JSON, API/MCP outputs, and queries from any database into interactive charts, pivot tables, terminal cards, live TUI, drill-through, and Excel exports inside AI agents.",
   "author": "Small Web, LLC",
   "license": "MIT",
