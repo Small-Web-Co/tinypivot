@@ -7,8 +7,8 @@
 #
 # To release: `pnpm release:mcp <patch|minor|major|x.y.z>` bumps the version in the package, the
 # MCP Registry entry, every agent plugin manifest and the Claude plugin's pinned npx version;
-# commit, then push a tag `mcp-v<version>`. Afterwards copy the plugin files to
-# Small-Web-Co/tinypivot-plugin with scripts/sync-plugin-repo.mjs and push there.
+# commit, then push a tag `mcp-v<version>`. The tag publishes to npm and the MCP Registry and
+# copies the plugin files to Small-Web-Co/tinypivot-plugin (sync-plugin-repo job).
 # Keep this workflow tag-only, like publish.yml.
 name: Publish MCP to npm & MCP Registry
 
@@ -133,3 +133,56 @@ jobs:
           cd packages/mcp
           mcp-publisher login github-oidc
           mcp-publisher publish
+
+  # The plugin directories list github.com/Small-Web-Co/tinypivot-plugin, which pins this exact
+  # version, so copy the plugin files there once npm serves the release. Pushes with a deploy key
+  # (write access to that repository only), stored here as PLUGIN_REPO_DEPLOY_KEY.
+  sync-plugin-repo:
+    name: Sync Small-Web-Co/tinypivot-plugin
+    runs-on: ubuntu-latest
+    needs: [publish]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout plugin repository
+        uses: actions/checkout@v4
+        with:
+          repository: Small-Web-Co/tinypivot-plugin
+          ssh-key: ${{ secrets.PLUGIN_REPO_DEPLOY_KEY }}
+          path: plugin-repo
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Wait for npm version to propagate
+        run: |
+          set -euo pipefail
+          pkg_version="$(node -p "require('./packages/mcp/package.json').version")"
+          for attempt in $(seq 1 36); do
+            if curl -fsS "https://registry.npmjs.org/@smallwebco%2ftinypivot-mcp/${pkg_version}" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for @smallwebco/tinypivot-mcp@${pkg_version} on npm." >&2
+          exit 1
+
+      - name: Copy plugin files and push
+        run: |
+          set -euo pipefail
+          node scripts/sync-plugin-repo.mjs plugin-repo
+          cd plugin-repo
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Plugin repository already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "TinyPivot MCP ${GITHUB_REF_NAME#mcp-v} (from Small-Web-Co/tinypivot@${GITHUB_SHA::7})"
+          git push

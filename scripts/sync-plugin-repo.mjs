@@ -5,7 +5,7 @@
  *
  * The plugin directories won't list a plugin from this monorepo: Claude's flags the workspace's
  * package-manager settings (pnpm-workspace.yaml) for any plugin folder inside it. packages/mcp stays
- * the source; run this after `pnpm release:mcp`, then commit and push in the plugin repository.
+ * the source; the mcp-v* tag workflow (publish-mcp.yml) runs this and pushes the result.
  *
  * Gemini CLI stays in this repository (gemini-extension.json at the root): its keychain setting
  * reaches the server through a ${TINYPIVOT_LICENSE_KEY} mapping, which Claude's directory reads
