@@ -62,7 +62,7 @@ export const plans: Record<Product, Plan[]> = {
         '9+ aggregations (median, std dev, % of total…)',
         'Formatted .xlsx export, no watermark',
         'Read-only Postgres connector (query_postgres)',
-        'All 5 themes',
+        'All 10 themes',
       ],
       action: { kind: 'checkout' },
     },

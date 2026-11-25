@@ -103,7 +103,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Terminal Companion Data IDE (`--open` / live SSE) | Included | Included |
 | Universal DB support via `load_file`, stdin pipe & `load_data` | Included | Included |
 | Dataset row limit | Up to 2,500 rows (explicitly bannered if truncated) | Unlimited |
-| Visual themes | `Code` theme (Dark & Light) | All 5 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`) |
+| Visual themes | `Code` theme (Dark & Light) | All 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`) |
 | Drill-Through modals | — | Included |
 | Formatted `.xlsx` Excel export | — | Included |
 | Optional direct `query_postgres` (`DATABASE_URL`) | — | Included |

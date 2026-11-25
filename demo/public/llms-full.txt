@@ -69,7 +69,7 @@ MCP licenses (`TP-MCPP-*` / `TP-MCPT-*`) are separate from the React/Vue UI Libr
 | Plan | Price | Key Capabilities |
 |---|---|---|
 | **MCP Free** | $0 (no account) | Core charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), Basic Pivot (`sum`), Data Grid (sort/filter/CSV/Markdown), Terminal Cards & Live Ghostty TUI, Companion Data IDE, `Code` theme, up to **2,500 rows** (explicit amber UI banner + LLM warning if truncated — never silent) |
-| **MCP Pro** | **$19/mo**, **$149/yr**, or **$399 Local Lifetime** | Unlimited rows, all 5 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`), double-click Drill-Through, all 9+ aggregations & calculated fields, styled `.xlsx` Excel export, optional direct read-only `query_postgres`, watermark-free UI & terminal cards |
+| **MCP Pro** | **$19/mo**, **$149/yr**, or **$399 Local Lifetime** | Unlimited rows, all 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`), double-click Drill-Through, all 9+ aggregations & calculated fields, styled `.xlsx` Excel export, optional direct read-only `query_postgres`, watermark-free UI & terminal cards |
 | **MCP Team (5 seats)** | **$79/mo** or **$699/yr** | All MCP Pro features for 5 team seats (`TP-MCPT-*`) |
 
 ### Frequently Asked Questions (Quick Answers for Agents & Developers)
