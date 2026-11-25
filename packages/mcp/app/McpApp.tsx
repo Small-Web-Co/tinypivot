@@ -171,6 +171,8 @@ export function McpApp() {
   const licenseAppliedRef = useRef(false)
   const userPickedThemeRef = useRef(false)
   const userPickedModeRef = useRef(false)
+  /** The live stream from the local Studio server, closed when the user stops the Studio. */
+  const eventSourceRef = useRef<EventSource | null>(null)
   /** The pivot and chart as the user last arranged them in the grid, which may differ from the agent's. */
   const livePivotConfig = useRef<Partial<PivotConfig> | undefined>(undefined)
   const liveChartConfig = useRef<Partial<ChartConfig> | undefined>(undefined)
@@ -559,6 +561,7 @@ export function McpApp() {
       // Live SSE stream so terminal agent turns (Claude Code, OpenCode, pi, Ghostty) update instantly
       try {
         eventSource = new EventSource('/api/events')
+        eventSourceRef.current = eventSource
         eventSource.addEventListener('update', (ev) => {
           if (!active)
             return
@@ -717,6 +720,21 @@ export function McpApp() {
     setSelectedContext(viewAttachment(datasetName, datasetId, view, rows))
   }, [chartConfig, datasetId, datasetName, pivotConfig, rows, viewMode])
 
+  const [studioStopped, setStudioStopped] = useState(false)
+  /** Closes the Studio's local server; the agent's next TinyPivot call starts a new one. */
+  const stopStudio = useCallback(async () => {
+    if (!window.confirm('Stop TinyPivot Studio? Your agent keeps working, and its next TinyPivot call starts the Studio again.'))
+      return
+    try {
+      await postToStudio('/api/studio/stop', {})
+      eventSourceRef.current?.close()
+      setStudioStopped(true)
+    }
+    catch (err) {
+      showToast(`Could not stop the Studio: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }, [showToast])
+
   const handleCopyMarkdown = useCallback(async () => {
     const container = mainRef.current
     if (!container)
@@ -776,6 +794,9 @@ export function McpApp() {
     !customizeOpen ? 'tp-mcp-focus' : '',
     `tp-mcp-view-${viewMode}`,
   ].filter(Boolean).join(' ')
+
+  if (studioStopped)
+    return <StudioStopped />
 
   return (
     <div
@@ -841,6 +862,16 @@ export function McpApp() {
             <span className="tp-mcp-pill tp-mcp-pill-live" title="Live-synced with your AI agent">
               ● LIVE
             </span>
+          )}
+          {transportMode === 'companion' && (
+            <button
+              type="button"
+              className="tp-mcp-pill"
+              title="Stop this Studio's local server. Your agent keeps working, and its next TinyPivot call starts the Studio again."
+              onClick={() => void stopStudio()}
+            >
+              Stop
+            </button>
           )}
           {studio && (
             <button
@@ -1244,6 +1275,17 @@ export function McpApp() {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Shown after the user stops the Studio: the tab has nothing left to talk to. */
+function StudioStopped() {
+  return (
+    <div className="tp-mcp-stopped" role="status">
+      <h1>TinyPivot Studio stopped</h1>
+      <p>Your agent keeps working. Its next TinyPivot call starts the Studio again, and the Live link in that reply opens it.</p>
+      <p>You can close this tab.</p>
     </div>
   )
 }

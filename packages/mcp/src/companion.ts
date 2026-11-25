@@ -29,7 +29,17 @@ export interface StartCompanionOptions {
   port?: number
   /** Trace, notes and history shown in the Studio; without one the Studio routes answer 404. */
   studio?: Studio
+  /**
+   * How long the server stays up after the last Studio tab closes. Only counts once a tab has
+   * connected, so a Live link printed in a card keeps working until someone opens it. 0 keeps it up.
+   */
+  idleStopMs?: number
+  /** Called once the server has closed itself: the user pressed Stop, or every tab stayed closed. */
+  onStopped?: (reason: 'stopped' | 'idle') => void
 }
+
+/** Long enough to reload the page or reopen a tab without losing the Studio. */
+export const STUDIO_IDLE_STOP_MS = 2 * 60 * 1000
 
 /**
  * Only this machine, on this server's own address, may use the API. Checking Host stops DNS
@@ -276,6 +286,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
 
   /** Set once listening; read from here because server.address() is null once closing starts. */
   let listenPort = 0
+  let closePromise: Promise<void> | null = null
+  let idleTimer: ReturnType<typeof setTimeout> | undefined
   const server = http.createServer(async (req, res) => {
     const urlObj = new URL(req.url || '/', 'http://127.0.0.1')
     const pathname = urlObj.pathname
@@ -307,7 +319,18 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       if (studio)
         res.write(`event: studio\ndata: ${JSON.stringify(studio.snapshot())}\n\n`)
       sseClients.add(res)
-      req.on('close', () => sseClients.delete(res))
+      clearTimeout(idleTimer)
+      req.on('close', () => {
+        sseClients.delete(res)
+        armIdleStop()
+      })
+      return
+    }
+
+    // The Studio's Stop button: close this server. The agent keeps its tools; its next TinyPivot call starts a new Studio.
+    if (req.method === 'POST' && pathname === '/api/studio/stop') {
+      sendJson(res, 200, { stopped: true })
+      setImmediate(() => void stopSelf('stopped'))
       return
     }
 
@@ -403,44 +426,59 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
   }
   catch {}
 
-  let closePromise: Promise<void> | null = null
+  function closeServer(): Promise<void> {
+    if (closePromise)
+      return closePromise
+    clearTimeout(idleTimer)
+    closePromise = (async () => {
+      for (const client of sseClients) {
+        try {
+          client.end()
+        }
+        catch {}
+      }
+      sseClients.clear()
+
+      // Agent streams and keep-alive sockets stay open on their own; close them so this resolves.
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve())
+        server.closeAllConnections()
+      })
+
+      // Clean up companion.json only if this process still owns it
+      try {
+        const raw = await fs.readFile(sessionFile, 'utf8')
+        const parsed = JSON.parse(raw) as { pid?: number }
+        if (parsed.pid === process.pid) {
+          await fs.unlink(sessionFile)
+        }
+      }
+      catch {
+        // Ignore if already removed or overwritten
+      }
+    })()
+    return closePromise
+  }
+
+  async function stopSelf(reason: 'stopped' | 'idle') {
+    await closeServer()
+    options.onStopped?.(reason)
+  }
+
+  /** After the last tab closes, stop unless one comes back within the grace period. */
+  function armIdleStop() {
+    clearTimeout(idleTimer)
+    if (!options.idleStopMs || sseClients.size > 0 || closePromise)
+      return
+    idleTimer = setTimeout(() => void stopSelf('idle'), options.idleStopMs)
+    idleTimer.unref()
+  }
 
   return {
     url,
     port: address.port,
     broadcastUpdate,
     clientCount: () => sseClients.size,
-    close: () => {
-      if (closePromise)
-        return closePromise
-      closePromise = (async () => {
-        for (const client of sseClients) {
-          try {
-            client.end()
-          }
-          catch {}
-        }
-        sseClients.clear()
-
-        // Agent streams and keep-alive sockets stay open on their own; close them so this resolves.
-        await new Promise<void>((resolve) => {
-          server.close(() => resolve())
-          server.closeAllConnections()
-        })
-
-        // Clean up companion.json only if this process still owns it
-        try {
-          const raw = await fs.readFile(sessionFile, 'utf8')
-          const parsed = JSON.parse(raw) as { pid?: number }
-          if (parsed.pid === process.pid) {
-            await fs.unlink(sessionFile)
-          }
-        }
-        catch {
-          // Ignore if already removed or overwritten
-        }
-      })()
-      return closePromise
-    },
+    close: closeServer,
   }
 }

@@ -122,3 +122,40 @@ describe('studio routes', () => {
     controller.abort()
   })
 })
+
+describe('stopping the Studio server', () => {
+  const start = (idleStopMs = 0) => new Promise<{ handle: CompanionServerHandle, stopped: Promise<string> }>((resolve) => {
+    let onStopped: (reason: string) => void = () => {}
+    const stopped = new Promise<string>((done) => {
+      onStopped = done
+    })
+    void startCompanionServer({ store: new DatasetStore(), loadHtml: async () => '', idleStopMs, onStopped }).then(handle => resolve({ handle, stopped }))
+  })
+
+  it('closes when the user presses Stop, and stops taking requests', async () => {
+    const { handle, stopped } = await start()
+    const res = await fetch(`${handle.url}/api/studio/stop`, { method: 'POST', headers: { [STUDIO_HEADER]: '1' } })
+    expect(res.status).toBe(200)
+    expect(await stopped).toBe('stopped')
+    await expect(fetch(`${handle.url}/api/state`)).rejects.toThrow()
+  })
+
+  it('ignores a Stop without the Studio header', async () => {
+    const { handle } = await start()
+    expect((await fetch(`${handle.url}/api/studio/stop`, { method: 'POST' })).status).toBe(403)
+    expect((await fetch(`${handle.url}/api/state`)).ok).toBe(true)
+    await handle.close()
+  })
+
+  it('closes a while after the last tab closes, but not before any tab has opened', async () => {
+    const { handle, stopped } = await start(60)
+    await new Promise(resolve => setTimeout(resolve, 120))
+    expect((await fetch(`${handle.url}/api/state`)).ok).toBe(true)
+
+    const controller = new AbortController()
+    const tab = await fetch(`${handle.url}/api/events`, { signal: controller.signal })
+    await tab.body!.getReader().read()
+    controller.abort()
+    expect(await stopped).toBe('idle')
+  })
+})

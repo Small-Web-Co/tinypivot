@@ -1705,3 +1705,29 @@ body,
   font-size: 11px;
 }
 
+
+/* After the user stops the Studio: a quiet page, in the active theme, with nothing left to do. */
+.tp-mcp-stopped {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+  min-height: 100vh;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--color-text-primary, inherit);
+  font: 14px/1.55 var(--tp-sans, system-ui, sans-serif);
+}
+
+.tp-mcp-stopped h1 {
+  margin: 0 0 4px;
+  font: 600 13px/1.3 var(--tp-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tp-mcp-stopped p {
+  margin: 0;
+  color: var(--color-text-secondary, inherit);
+}

@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 import { PassThrough } from 'node:stream'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
-import { startCompanionServer } from './companion.js'
+import { startCompanionServer, STUDIO_IDLE_STOP_MS } from './companion.js'
 import { runInitCommand } from './init.js'
 import { createTinyPivotMcpServer, isMcpLicenseKey, loadAppHtml, resolveLicenseKey } from './server.js'
 import { DatasetStore, FREE_TIER_ROW_LIMIT, getPreferencesPath, loadSavedVisualTheme, parseDelimitedText, saveVisualThemePreference } from './store.js'
@@ -313,6 +313,13 @@ Options:
 `.trim())
 }
 
+/** TINYPIVOT_STUDIO_IDLE_MINUTES: how long the Studio stays up with no tab open (0 keeps it up). */
+function studioIdleStopMs(): number {
+  const raw = process.env.TINYPIVOT_STUDIO_IDLE_MINUTES?.trim()
+  const minutes = raw ? Number(raw) : Number.NaN
+  return Number.isFinite(minutes) && minutes >= 0 ? minutes * 60_000 : STUDIO_IDLE_STOP_MS
+}
+
 async function main() {
   const args = process.argv.slice(2)
   if (args[0] === '-h' || args[0] === '--help') {
@@ -389,6 +396,8 @@ async function main() {
   let companionPromise: Promise<CompanionServerHandle | undefined> | null = null
 
   const studio = new Studio(store)
+  /** Once the user has stopped the Studio (or closed its tabs), later restarts do not open a tab. */
+  let studioWasStopped = false
   const startCompanion = (onPort: number) => startCompanionServer({
     store,
     studio,
@@ -396,6 +405,13 @@ async function main() {
     licenseKey,
     demoToken,
     port: onPort,
+    idleStopMs: studioIdleStopMs(),
+    onStopped: (reason) => {
+      console.error(`[tinypivot-mcp] TinyPivot Studio stopped (${reason === 'idle' ? 'no tab open' : 'Stop pressed'}); the next TinyPivot call starts it again.`)
+      companion = undefined
+      companionPromise = null
+      studioWasStopped = true
+    },
   })
 
   /** Opens the Studio unless a tab from an earlier session reconnects first. */
@@ -422,6 +438,8 @@ async function main() {
       .then((handle) => {
         companion = handle
         console.error(`[tinypivot-mcp] TinyPivot Studio ready at ${handle.url}`)
+        if (studioWasStopped)
+          return handle
         if (autoOpen)
           openInBrowser(handle.url)
         else if (openStudio)
