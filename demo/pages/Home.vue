@@ -21,7 +21,7 @@ const facts = ['free', 'runs locally', 'no signup', 'no API key']
 // The hero's fine print comes from the measured benchmark shown in the savings section.
 const headline = benchmarkHeadline()
 
-const heroPoints = ['A trace you can check', 'Edit and rerun', 'Talk back, with the data'] as const
+const heroPoints = ['Exact totals, computed on your machine', 'Every figure in the answer checked', 'Every step with its SQL, in the Studio'] as const
 
 const capabilities = [
   {
@@ -53,12 +53,11 @@ const capabilities = [
                 Data analysis studio for AI agents
               </p>
               <h1 class="display">
-                Your agent works the data. <em>You see every step.</em>
+                Ask your data in any agent. <em>Every number checked.</em>
               </h1>
               <p class="lede">
-                Claude, Cursor, Antigravity, OpenCode and pi load files, run SQL and build charts through TinyPivot.
-                Each step lands live in TinyPivot Studio on your machine, with the agent's reason and the exact SQL,
-                so you can check it, rerun it, or tell the agent what to change.
+                TinyPivot runs the numbers on your machine, draws the chart, and checks each figure in the agent's answer
+                against the data. It never sends your raw rows to the model. Works in Claude Code, Cursor, pi, OpenCode and Antigravity.
               </p>
               <ul class="hero-points">
                 <li v-for="point in heroPoints" :key="point">

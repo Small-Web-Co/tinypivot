@@ -98,8 +98,8 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot — Charts & pivot tables inside your AI agent, without the token bill',
-      description: 'MCP server that renders interactive charts, pivot tables and drill-through inside Claude, Cursor, Antigravity, OpenCode and pi. The model gets a short summary; rows stay local.',
+      title: 'TinyPivot — Ask your data in any agent. Every number checked.',
+      description: 'TinyPivot runs the numbers on your machine, draws the chart, and checks each figure in your agent\'s answer against the data. It never sends your raw rows to the model. Works in Claude Code, Cursor, pi, OpenCode and Antigravity.',
     },
   },
   {
