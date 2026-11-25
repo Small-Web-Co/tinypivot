@@ -2,6 +2,7 @@
 import type { Framework } from '../site/ui'
 import { DataGrid } from 'tinypivot'
 import { computed, ref } from 'vue'
+import ChartGlyphs from '../components/site/ChartGlyphs.vue'
 import CodeBlock from '../components/site/CodeBlock.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import SegmentedControl from '../components/site/SegmentedControl.vue'
@@ -139,6 +140,7 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
             Most of it is <em>free.</em>
           </h2>
         </header>
+        <ChartGlyphs class="chart-types" />
         <ul class="feature-list ledger">
           <li v-for="f in features" :key="f.name" class="feature">
             <span class="feature-name">{{ f.name }}</span>
@@ -296,6 +298,10 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
 .quotes,
 .closing {
   border-top: var(--line);
+}
+
+.chart-types {
+  margin-bottom: 36px;
 }
 
 .feature-list {

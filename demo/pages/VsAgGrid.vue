@@ -376,9 +376,9 @@ const data = [/* your data */]
 }
 
 .stat-value {
-  font-family: var(--font-display);
-  font-size: 2.8rem;
-  line-height: 0.95;
+  font-family: var(--font-dot);
+  font-size: 2rem;
+  line-height: 1.1;
 }
 
 .stat-card.highlight .stat-value {

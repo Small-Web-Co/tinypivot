@@ -8,8 +8,12 @@ import {
   usdSavedPerAnalysis,
   WEEKS_PER_MONTH,
 } from '../../site/savings'
+import BreakEvenChart from './BreakEvenChart.vue'
 
+// Keep in step with the MCP Pro prices in site/pricing.ts.
 const PRO_MONTHLY_USD = 19
+const PRO_YEARLY_USD = 149
+const proYearlyLabel = `Pro yearly ($${PRO_YEARLY_USD})`
 
 const input = reactive({
   rows: 2000,
@@ -99,6 +103,13 @@ const proMarkerPct = computed(() => {
           </span>
         </div>
       </div>
+
+      <div class="calc-breakeven">
+        <p class="label">
+          Does Pro pay for itself? · {{ reference.name }}
+        </p>
+        <BreakEvenChart :monthly-saving="reference.monthly" :cost="PRO_YEARLY_USD" :cost-label="proYearlyLabel" />
+      </div>
     </div>
   </div>
 </template>
@@ -180,15 +191,20 @@ input[type='range'] {
 
 .calc-metrics dd {
   margin-top: 4px;
-  font-family: var(--font-mono);
-  font-size: 1.6rem;
-  font-weight: 500;
+  font-family: var(--font-dot);
+  font-size: 1.9rem;
   color: var(--win-accent);
 }
 
-.calc-models {
+.calc-models,
+.calc-breakeven {
   display: grid;
   gap: 12px;
+}
+
+.calc-breakeven {
+  padding-top: 20px;
+  border-top: 1px dashed var(--win-rule);
 }
 
 .calc-models-head {

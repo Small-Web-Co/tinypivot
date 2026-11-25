@@ -130,9 +130,8 @@ const lines = [
 }
 
 .receipt-total .tok {
-  font-family: var(--font-display);
-  font-size: 2.4rem;
-  font-weight: 400;
+  font-family: var(--font-dot);
+  font-size: 2.2rem;
   line-height: 1;
   color: var(--plus);
 }

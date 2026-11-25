@@ -1,7 +1,7 @@
 /**
  * tiny-pivot.com site system — "1-bit workstation".
- * Cream paper, black ink, one orange accent, hard shadows, dithered fills,
- * pixel display type. Green ledger stripes mark the places where data lives.
+ * Cream paper, black ink, one orange accent, hard shadows, dithered fills.
+ * Serif headlines, dot-matrix numerals. Green ledger stripes mark where data lives.
  * Mobile-first: base rules target ~375px, min-width queries scale up.
  */
 
@@ -25,7 +25,9 @@
   --win-muted: #9a958a;
   --win-accent: #ff7a4d;
 
-  --font-display: 'Jersey 25', 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  /* Dot-matrix numerals for big figures only (28px and up). */
+  --font-dot: 'Doto', 'JetBrains Mono', ui-monospace, monospace;
   --font-body: 'Newsreader', 'Iowan Old Style', Georgia, serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
@@ -119,32 +121,23 @@ kbd {
 .heading {
   font-family: var(--font-display);
   font-weight: 400;
-  letter-spacing: 0.005em;
+  letter-spacing: -0.01em;
 }
 
 .display {
-  font-size: clamp(2.9rem, 11vw, 4.5rem);
-  line-height: 0.95;
+  font-size: clamp(2.6rem, 9.5vw, 4.5rem);
+  line-height: 1.02;
 }
 
 .heading {
-  font-size: clamp(2.3rem, 7vw, 3.4rem);
-  line-height: 1;
+  font-size: clamp(2rem, 6vw, 3rem);
+  line-height: 1.08;
 }
 
-/* Emphasis is an inverted block in headlines, accent ink in section headings. */
-.display em {
-  padding: 0 0.12em;
-  background: var(--ink);
-  color: var(--paper);
-  font-style: normal;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-}
-
+.display em,
 .heading em {
   color: var(--accent);
-  font-style: normal;
+  font-style: italic;
 }
 
 .lede {
@@ -235,18 +228,18 @@ kbd {
 .article h2 {
   font-family: var(--font-display);
   font-weight: 400;
-  letter-spacing: 0.005em;
+  letter-spacing: -0.01em;
 }
 
 .article h1 {
-  font-size: clamp(2.8rem, 10vw, 4.6rem);
-  line-height: 0.96;
+  font-size: clamp(2.4rem, 8vw, 4rem);
+  line-height: 1.04;
 }
 
 .article h2 {
   margin-bottom: 14px;
-  font-size: clamp(2.1rem, 6vw, 2.8rem);
-  line-height: 1;
+  font-size: clamp(1.8rem, 5vw, 2.4rem);
+  line-height: 1.1;
 }
 
 .article h3 {

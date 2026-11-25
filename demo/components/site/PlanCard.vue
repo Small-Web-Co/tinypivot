@@ -94,9 +94,9 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
 
 .plan-name {
   font-family: var(--font-display);
-  font-size: 2.6rem;
+  font-size: 2rem;
   font-weight: 400;
-  line-height: 0.9;
+  line-height: 1;
 }
 
 .plan-flag {

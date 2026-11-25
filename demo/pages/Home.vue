@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import McpHighlightReel from '../components/McpHighlightReel.vue'
+import ContextMeter from '../components/site/ContextMeter.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
@@ -90,6 +91,9 @@ const capabilities = [
           </router-link>
         </div>
         <TokenReceipt />
+      </div>
+      <div class="wrap savings-meter">
+        <ContextMeter />
       </div>
     </section>
 
@@ -196,6 +200,10 @@ const capabilities = [
   gap: 32px;
 }
 
+.savings-meter {
+  margin-top: 40px;
+}
+
 .savings-grid > div {
   display: grid;
   gap: 16px;
@@ -232,7 +240,7 @@ const capabilities = [
 
 .cap-title {
   font-family: var(--font-display);
-  font-size: 2.3rem;
+  font-size: 1.7rem;
   font-weight: 400;
   line-height: 1.1;
 }
