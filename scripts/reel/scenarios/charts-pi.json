@@ -11,7 +11,7 @@
       "sleep": 1000
     },
     {
-      "type": "show 2026 MRR by region on a world map, from acme-orders.csv"
+      "type": "map 2026 MRR by region from acme-orders.csv"
     },
     {
       "sleep": 500
@@ -34,8 +34,8 @@
   "studio": {
     "theme": "paper",
     "messages": [
-      "Which plans grew from 2025 to 2026? Show it as a slope.",
-      "Compare each region's 2026 MRR with its 2025 MRR as a bullet chart, 2025 as the target. Use the chart's deck layout."
+      "Which plans grew from 2025 to 2026, Jan–Oct like-for-like? Show it as a slope.",
+      "Compare each region's 2026 MRR with its 2025 MRR, Jan–Oct like-for-like, as a bullet chart with 2025 as the target. Use the chart's deck layout."
     ],
     "check": true
   }
