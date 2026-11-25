@@ -16,7 +16,7 @@
  * it follows the trace, sends the agent's pivot back with a comment, then asks a follow-up
  * question; pi answers both in the trace. Every time the Studio changes it saves a screenshot with the time,
  * so convert.mjs can line the Studio up with the terminal. Nothing is staged: pi does the work.
- * Build first (`pnpm build:mcp`) and run under `with-secrets` so the server gets a Pro key.
+ * Build first (`pnpm build && pnpm build:mcp`: the Studio bundles core from its build) and run under `with-secrets` so the server gets a Pro key.
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'

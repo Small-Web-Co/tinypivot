@@ -51,6 +51,21 @@ describe('reading the numbers in an answer', () => {
     expect(checkClaims('Starter is 25%.', [{ name: 'Orders', rows: raw, dimensions: ['plan'] }])[0]).toMatchObject({ status: 'found', where: 'share of amount · Starter' })
   })
 
+  it('reads the whole table, the view\'s measure first, and leaves links, code and arithmetic alone', () => {
+    const regions = ['EMEA', 'APAC', 'LATAM', 'North America']
+    // More rows than a first slice would cover, and seats that match mrr everywhere: the total,
+    // the row count and the share must come from all the rows and from the measure the view shows.
+    const rows = Array.from({ length: 30_000 }, (_, i) => ({ region: regions[i % 4], seats: i % 4 === 2 ? 1 : 3, mrr: i % 4 === 2 ? 1 : 3 }))
+    const answer = 'MRR totals 75,000 across 30,000 rows; LATAM is 10.0% of it, so about 10 months × 12. Studio: http://127.0.0.1:47391/s/20261125-x, see `~/.config/tinypivot/v1.2`.'
+    expect(checkClaims(answer, [{ name: 'Orders', rows, dimensions: ['region'], measures: ['mrr'] }])).toEqual([
+      { text: '75,000', status: 'found', where: 'mrr · total of Orders' },
+      { text: '30,000', status: 'found', where: 'rows in Orders' },
+      { text: '10.0%', status: 'found', where: 'share of mrr · LATAM' },
+      { text: '10', status: 'unchecked' },
+      { text: '12', status: 'unchecked' },
+    ])
+  })
+
   it('checks nothing when there is no data to check against', () => {
     expect(checkClaims('Revenue was 1.2M', [])).toEqual([])
   })

@@ -313,8 +313,13 @@ function runBadges(run: Run, checks: Record<string, StepCheck[]>) {
 /** The result of checking a question, at the top of what the user reads after pressing Check. */
 function CheckReport({ lines, at }: { lines: Array<{ ok: boolean, text: string }>, at: string }) {
   const allOk = lines.every(line => line.ok)
+  const box = useRef<HTMLDivElement | null>(null)
+  // A new check brings its report into view: it lands below a long answer.
+  useEffect(() => {
+    box.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }, [at])
   return (
-    <div className={`tp-run-report ${allOk ? 'is-ok' : 'is-warn'}`} role="status">
+    <div ref={box} className={`tp-run-report ${allOk ? 'is-ok' : 'is-warn'}`} role="status">
       <p className="tp-run-report-head">{`${allOk ? 'Checked' : 'Check found problems'} · ${clockTime(at)}`}</p>
       {lines.length === 0
         ? <p>Nothing in this question could be checked: it has no source file, SQL or numbers to compare.</p>

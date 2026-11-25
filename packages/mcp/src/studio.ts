@@ -83,6 +83,12 @@ function viewDimensions(dataset: StoredDataset): string[] {
     .filter((field): field is string => Boolean(field))
 }
 
+/** The fields a dataset's chart or pivot measures. */
+function viewMeasures(dataset: StoredDataset): string[] {
+  return [dataset.chartConfig?.yAxis?.field, ...(dataset.pivotConfig?.valueFields ?? []).map(value => value.field)]
+    .filter((field): field is string => Boolean(field))
+}
+
 /** SQL for a load_file filter, comparing as text the way the in-memory filter does. */
 export function whereSql(where: RowFilter[]): string {
   return where
@@ -514,7 +520,7 @@ export class Studio {
     const ids = new Set(this.steps.slice(Math.max(0, lastAsk)).flatMap(step => (step.datasetId ? [step.datasetId] : [])))
     return [...ids].reverse().flatMap((id) => {
       const dataset = this.store.get(id, sessionKey)
-      return dataset ? [{ name: dataset.name, rows: dataset.rows, dimensions: viewDimensions(dataset) }] : []
+      return dataset ? [{ name: dataset.name, rows: dataset.rows, dimensions: viewDimensions(dataset), measures: viewMeasures(dataset) }] : []
     })
   }
 

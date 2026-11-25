@@ -35,7 +35,7 @@
     "theme": "paper",
     "messages": [
       "Which plans grew from 2025 to 2026? Show it as a slope.",
-      "Compare each region's 2026 MRR with its 2025 MRR as a bullet chart, 2025 as the target, in deck style."
+      "Compare each region's 2026 MRR with its 2025 MRR as a bullet chart, 2025 as the target. Use the chart's deck layout."
     ],
     "check": true
   }
