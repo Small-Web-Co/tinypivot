@@ -791,8 +791,8 @@ export function formatDatasetSummary(
 
   parts.push('', formatColumnNotes(dataset.columns))
 
-  // The card's footer already carries the Studio link; state it separately only without a card.
-  if (companionUrl && !chartBlock)
+  // A card's footer already carries the Studio link; a small table as Markdown does not.
+  if (companionUrl && !chartBlock?.includes(companionUrl))
     parts.push(`Studio: ${companionUrl}`)
 
   return parts.join('\n')

@@ -392,8 +392,8 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('load_data')
     expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('load_file')
     expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('chartConfig')
-    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('period comparisons')
-    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('instead of drawing them yourself')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('any ranking, breakdown, comparison, trend')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('instead of Markdown tables')
     expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('verbatim')
 
     const { server } = createTinyPivotMcpServer()
@@ -408,7 +408,7 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(once).toContain('Always use pnpm.')
     expect(once).toContain('<!-- tinypivot:start -->')
     expect(once).toContain('<!-- tinypivot:end -->')
-    expect(once).toContain('instead of drawing them yourself')
+    expect(once).toContain('instead of a Markdown table')
 
     // Re-running must be 100% idempotent with zero duplication
     const twice = upsertTinyPivotRuleBlock(once)

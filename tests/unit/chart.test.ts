@@ -382,3 +382,15 @@ describe('missing values in category charts', () => {
     expect(res.categories).toEqual(['Jan', 'Mar', 'Feb'])
   })
 })
+
+describe('chartMarkers', () => {
+  it('draws points only on short line and area series by default', async () => {
+    const { chartMarkers, AUTO_MARKER_MAX_POINTS } = await import('../../packages/core/src/chart')
+    expect(chartMarkers('line', AUTO_MARKER_MAX_POINTS).size).toBe(3)
+    expect(chartMarkers('line', 22).size).toBe(0)
+    expect(chartMarkers('line', 22).hover?.size).toBe(5)
+    expect(chartMarkers('area', 22, 'all').size).toBe(3)
+    expect(chartMarkers('line', 4, 'none')).toMatchObject({ size: 0, hover: { size: 0 } })
+    expect(chartMarkers('bar', 4, 'all')).toEqual({ size: 0 })
+  })
+})

@@ -3,6 +3,7 @@ import type {
   ChartAggregation,
   ChartConfig,
   ChartFieldInfo,
+  ChartMarkers,
   ChartSortOrder,
   ChartThemePreset,
   ChartType,
@@ -16,9 +17,11 @@ import type { ApexOptions } from 'apexcharts'
 import {
   analyzeFieldsForChart,
   CHART_AGGREGATIONS,
+  CHART_MARKER_OPTIONS,
   CHART_THEME_PRESETS,
   CHART_TYPES,
   chartGlowApplies,
+  chartMarkers,
   chartPatternFill,
   createDefaultChartConfig,
   getChartGuidance,
@@ -110,15 +113,16 @@ function selectChartTheme(preset: ChartThemePreset) {
   emit('chartThemeChange', preset)
 }
 
-function selectSortOrder(nextOrder: ChartSortOrder) {
+function updateChartOptions(patch: Partial<NonNullable<ChartConfig['options']>>) {
   chartConfig.value = {
     ...chartConfig.value,
-    options: {
-      ...chartConfig.value.options,
-      sortOrder: nextOrder,
-    },
+    options: { ...chartConfig.value.options, ...patch },
   }
   emit('configChange', chartConfig.value)
+}
+
+function selectSortOrder(sortOrder: ChartSortOrder) {
+  updateChartOptions({ sortOrder })
 }
 
 // Field analysis (applies consumer overrides when provided)
@@ -470,14 +474,6 @@ const chartOptions = computed<ApexOptions>(() => {
         formatter: (val: number) => formatValue(val, options.valueFormat, options.decimals),
       },
     },
-    markers: isLineOrArea
-      ? {
-          size: 3,
-          strokeWidth: 2,
-          strokeColors: look.surfaceColor,
-          hover: { size: 6 },
-        }
-      : { size: 0 },
     stroke: {
       curve: look.curve,
       width: config.type === 'line' ? look.lineWidth : config.type === 'area' ? 2 : isBarLike ? look.markStrokeWidth : 1.5,
@@ -671,6 +667,7 @@ const activeSortMeta = computed(() => SORT_CYCLE.find(s => s.value === activeSor
 const chartOptionsWithCategories = computed<ApexOptions>(() => {
   const options = { ...chartOptions.value }
   const config = chartConfig.value
+  options.markers = chartMarkers(config.type, chartLabels.value.length, config.options?.markers, getChartLook(props.theme, activeChartTheme.value).surfaceColor)
 
   // Heatmap, scatter, bubble have x values in data itself
   if (!['pie', 'donut', 'scatter', 'bubble', 'heatmap'].includes(config.type)) {
@@ -827,6 +824,17 @@ onMounted(() => {
           @change="selectSortOrder(($event.target as HTMLSelectElement).value as ChartSortOrder)"
         >
           <option v-for="opt in SORT_CYCLE" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+        <select
+          v-if="chartConfig.type === 'line' || chartConfig.type === 'area'"
+          class="vpg-chart-theme-swatch"
+          aria-label="Points on the line"
+          :value="chartConfig.options?.markers ?? 'auto'"
+          @change="updateChartOptions({ markers: ($event.target as HTMLSelectElement).value as ChartMarkers })"
+        >
+          <option v-for="opt in CHART_MARKER_OPTIONS" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </option>
         </select>

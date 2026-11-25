@@ -1,4 +1,4 @@
-import type { AIAnalystConfig, AIDataSource, AITableSchema, ChartConfig, QueryExecutorResult, Theme } from '@smallwebco/tinypivot-core'
+import type { AIAnalystConfig, AIDataSource, AITableSchema, ChartConfig, PivotConfig, QueryExecutorResult, Theme } from '@smallwebco/tinypivot-core'
 import { CHART_THEME_PRESETS, UNIFIED_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { onMounted, ref } from 'vue'
 import { DATASETS, getDataset } from '../datasets'
@@ -59,6 +59,15 @@ export const numberFormats = [
 ] as const
 
 /** So the Chart view opens on a real chart instead of an empty builder. */
+/** What Pivot shows first: sales by region and quarter, so the view opens on a real table. */
+export const demoPivotConfig: Partial<PivotConfig> = {
+  rowFields: ['region'],
+  columnFields: ['quarter'],
+  valueFields: [{ field: 'sales', aggregation: 'sum' }],
+  showRowTotals: true,
+  showColumnTotals: true,
+}
+
 export const demoChartConfig: Partial<ChartConfig> = {
   type: 'stackedBar',
   xAxis: { field: 'quarter', label: 'Quarter', role: 'dimension' },

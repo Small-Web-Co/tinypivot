@@ -199,3 +199,14 @@ describe('what TinyPivot costs on every request', () => {
     expect(client.getInstructions()).not.toContain('show the returned')
   })
 })
+
+describe('small tables in replies', () => {
+  it('still link to the Studio, so a pi session can find it', async () => {
+    const { formatDatasetSummary } = await import('../../packages/mcp/src/summary')
+    const { DatasetStore } = await import('../../packages/mcp/src/store')
+    const ds = new DatasetStore().register({ name: 'Top', source: 'test', rows: [{ country: 'US', mrr: 10 }, { country: 'CA', mrr: 8 }], viewMode: 'grid' })
+    const text = formatDatasetSummary(ds, 'http://127.0.0.1:47317')
+    expect(text).toContain('| country | mrr |')
+    expect(text).toContain('Studio: http://127.0.0.1:47317')
+  })
+})

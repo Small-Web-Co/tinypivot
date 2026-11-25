@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import mcpPluginConfig from '../../packages/mcp/.mcp.json'
-import { MCP_NPX_SPEC, runInitCommand } from '../../packages/mcp/src/init'
+import { MCP_NPX_SPEC, PI_ENTRY_EXTRAS, runInitCommand, TINYPIVOT_CLAUDE_RULE_BLOCK, TINYPIVOT_PI_RULE_BLOCK } from '../../packages/mcp/src/init'
 
 describe('init writes configs that fetch the newest release', () => {
   let home: string
@@ -68,6 +68,23 @@ describe('init writes configs that fetch the newest release', () => {
     expect(mcpServers.tinypivot.args).toEqual(['-y', MCP_NPX_SPEC])
     expect(mcpServers.tinypivot.env).toEqual({ DATABASE_URL: 'postgres://example' })
     expect(mcpServers.other).toEqual({ command: 'node', args: ['other.js'] })
+  })
+
+  it('declares TinyPivot\'s data tools to pi directly, keeping exposure the user chose', async () => {
+    const configPath = path.join(home, '.pi', 'agent', 'mcp.json')
+    await fs.mkdir(path.dirname(configPath), { recursive: true })
+    await fs.writeFile(configPath, JSON.stringify({ mcpServers: { tinypivot: { command: 'npx', args: ['-y', MCP_NPX_SPEC], toolExposure: { query: 'hidden' } } } }))
+
+    await runInitCommand(['--targets=pi', '--no-rules'])
+
+    const { tinypivot } = JSON.parse(await fs.readFile(configPath, 'utf8')).mcpServers
+    expect(tinypivot.description).toBe(PI_ENTRY_EXTRAS.description)
+    expect(tinypivot.toolExposure).toEqual({ ...PI_ENTRY_EXTRAS.toolExposure, query: 'hidden' })
+  })
+
+  it('tells agents to show figures through TinyPivot, not Markdown tables', () => {
+    expect(TINYPIVOT_CLAUDE_RULE_BLOCK).toMatch(/ranking.*instead of a Markdown table/)
+    expect(TINYPIVOT_PI_RULE_BLOCK).toMatch(/ranking.*instead of a Markdown table/)
   })
 
   it('ships the same spec in the Claude Code plugin config', () => {

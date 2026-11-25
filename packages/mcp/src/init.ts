@@ -39,7 +39,23 @@ const RULE_REPLACE_RE = /<!-- tinypivot(?:-mcp)?:start -->[\s\S]*?<!-- tinypivot
 // The rule blocks are read on every request in every session, charting or not: keep them to the
 // one behaviour the server's own instructions cannot guarantee, using TinyPivot at all.
 const RULE_HEADING = '## Charts & pivot tables (TinyPivot MCP)'
-const RULE_USE = 'Use the `tinypivot` MCP server for charts, pivot tables and data exploration instead of drawing them yourself.'
+const RULE_USE = 'Whenever an answer shows figures (a ranking, a breakdown by category, a comparison, a trend, a chart or a pivot), present them with the `tinypivot` MCP server instead of a Markdown table or a chart you draw yourself.'
+
+/**
+ * pi hides MCP tools behind codemode unless told otherwise, so its model only sees a one-line
+ * summary of each server. TinyPivot's data tools are declared directly, with a summary that says
+ * when to use them, so tables of figures go through TinyPivot without the user asking.
+ */
+export const PI_ENTRY_EXTRAS = {
+  description: 'Show any table of figures, ranking, breakdown, trend, chart or pivot to the user. Use it instead of Markdown tables.',
+  toolExposure: {
+    load_file: 'direct',
+    load_data: 'direct',
+    query: 'direct',
+    configure_chart: 'direct',
+    configure_pivot: 'direct',
+  },
+} as const
 
 export const TINYPIVOT_CLAUDE_RULE_BLOCK = `${RULE_START}
 ${RULE_HEADING}
@@ -198,6 +214,7 @@ async function upsertStandardMcpJson(
   detectDir: string,
   opts: InitOptions,
   cliPath: string,
+  extras: { description?: string, toolExposure?: Record<string, string> } = {},
 ): Promise<TargetResult> {
   const explicit = opts.targets?.has(id) ?? false
   const shouldInclude = opts.targets ? explicit : (opts.all || await exists(configPath) || await exists(detectDir))
@@ -210,9 +227,16 @@ async function upsertStandardMcpJson(
     const mcpServers = (json.mcpServers && typeof json.mcpServers === 'object' && !Array.isArray(json.mcpServers))
       ? { ...(json.mcpServers as Record<string, unknown>) }
       : {}
-    const nextEntry = buildStdioServerEntry(opts, cliPath)
+    const nextEntry: Record<string, unknown> = { ...buildStdioServerEntry(opts, cliPath) }
     // Preserve existing env vars (such as DATABASE_URL or TINYPIVOT_LICENSE_KEY) if already set
     const existing = mcpServers.tinypivot as Record<string, unknown> | undefined
+    if (extras.description)
+      nextEntry.description = extras.description
+    if (extras.toolExposure) {
+      // Exposure the user chose for a tool stays.
+      const chosen = existing?.toolExposure && typeof existing.toolExposure === 'object' ? existing.toolExposure as Record<string, string> : {}
+      nextEntry.toolExposure = { ...extras.toolExposure, ...chosen }
+    }
     if (existing?.env && typeof existing.env === 'object' && !Array.isArray(existing.env)) {
       nextEntry.env = {
         ...(existing.env as Record<string, unknown>),
@@ -541,6 +565,7 @@ export async function runInitCommand(args: string[]): Promise<void> {
       path.join(home, '.pi'),
       opts,
       cliPath,
+      PI_ENTRY_EXTRAS,
     ),
     await upsertOpenCodeJson(opts, cliPath),
     await upsertCodexToml(opts, cliPath),

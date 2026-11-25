@@ -51,20 +51,37 @@ export async function loadData(tableName: string, data: Record<string, unknown>[
 /**
  * Execute a SQL query
  */
+/**
+ * A value from an Arrow column as the grid should show it: Arrow hands dates and timestamps over
+ * as epoch milliseconds and 64-bit integers as BigInt.
+ */
+export function plainArrowValue(value: unknown, arrowType: string): unknown {
+  if (value === null || value === undefined)
+    return null
+  if (typeof value === 'bigint')
+    return Number.isSafeInteger(Number(value)) ? Number(value) : value.toString()
+  const epoch = value instanceof Date ? value.getTime() : typeof value === 'number' ? value : null
+  if (epoch !== null && /^Date/i.test(arrowType))
+    return new Date(epoch).toISOString().slice(0, 10)
+  if (epoch !== null && /^Timestamp/i.test(arrowType))
+    return new Date(epoch).toISOString()
+  return value
+}
+
 export async function executeQuery(sql: string): Promise<{ rows: Record<string, unknown>[], columns: string[] }> {
   if (!conn)
     throw new Error('DuckDB not initialized')
 
   const result = await conn.query(sql)
-  const columns = result.schema.fields.map(f => f.name)
+  const fields = result.schema.fields
+  const columns = fields.map(f => f.name)
   const rows: Record<string, unknown>[] = []
 
   for (let i = 0; i < result.numRows; i++) {
     const row: Record<string, unknown> = {}
-    for (const col of columns) {
-      const value = result.getChildAt(columns.indexOf(col))?.get(i)
-      row[col] = value
-    }
+    fields.forEach((field, index) => {
+      row[field.name] = plainArrowValue(result.getChildAt(index)?.get(i), String(field.type))
+    })
     rows.push(row)
   }
 

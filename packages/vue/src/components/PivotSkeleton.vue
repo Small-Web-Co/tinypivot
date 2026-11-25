@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotLayout, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
-import { computeRowSpans, getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
+import { selectionBounds as boundsBetween, computeRowSpans, getAggregationLabel, getAggregationSymbol, selectionCellClass } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display
  * Visual layout for pivot configuration and results
@@ -228,16 +228,12 @@ const isSelecting = ref(false)
 const showCopyToast = ref(false)
 const copyToastMessage = ref('')
 
-const selectionBounds = computed(() => {
-  if (!selectionStart.value || !selectionEnd.value)
-    return null
-  return {
-    minRow: Math.min(selectionStart.value.row, selectionEnd.value.row),
-    maxRow: Math.max(selectionStart.value.row, selectionEnd.value.row),
-    minCol: Math.min(selectionStart.value.col, selectionEnd.value.col),
-    maxCol: Math.max(selectionStart.value.col, selectionEnd.value.col),
-  }
-})
+const selectionBounds = computed(() => (selectionStart.value && selectionEnd.value ? boundsBetween(selectionStart.value, selectionEnd.value) : null))
+
+/** Selection classes for a cell: the range, or the single selected cell, outlined once. */
+function cellSelectionClass(rowIndex: number, colIndex: number): string {
+  return selectionCellClass(selectionBounds.value ?? boundsBetween(selectedCell.value, selectedCell.value), rowIndex, colIndex)
+}
 
 function handleCellMouseDown(rowIndex: number, colIndex: number, event: MouseEvent) {
   event.preventDefault()
@@ -261,14 +257,6 @@ function handleCellMouseEnter(rowIndex: number, colIndex: number) {
 
 function handleMouseUp() {
   isSelecting.value = false
-}
-
-function isCellSelected(rowIndex: number, colIndex: number): boolean {
-  if (!selectionBounds.value) {
-    return selectedCell.value?.row === rowIndex && selectedCell.value?.col === colIndex
-  }
-  const { minRow, maxRow, minCol, maxCol } = selectionBounds.value
-  return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
 }
 
 function copySelectionToClipboard() {
@@ -918,7 +906,7 @@ function onDrillThroughGrandTotal() {
                 :key="colIdx"
                 class="vpg-data-cell"
                 :class="[
-                  isCellSelected(sortedRowIndices.indexOf(sortedIdx), colIdx) && 'selected',
+                  cellSelectionClass(sortedRowIndices.indexOf(sortedIdx), colIdx),
                   cell.value === null && 'vpg-is-null',
                 ]"
                 :style="{ width: `${dataColWidth}px` }"

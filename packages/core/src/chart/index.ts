@@ -7,6 +7,7 @@ import type {
   ChartConfig,
   ChartData,
   ChartFieldInfo,
+  ChartMarkers,
   ChartSeries,
   ChartSortOrder,
   ChartThemePreset,
@@ -205,6 +206,33 @@ export function getChartThemeColors(preset: ChartThemePreset = 'code'): string[]
  * Default color palette for charts (Code IDE preset — works in light and dark mode)
  */
 export const CHART_COLORS = CHART_THEME_PRESETS.code.colors
+
+/** Longest series that still gets a point on every value when markers are `auto`. */
+export const AUTO_MARKER_MAX_POINTS = 12
+
+export const CHART_MARKER_OPTIONS: Array<{ value: ChartMarkers, label: string }> = [
+  { value: 'auto', label: 'Points: auto' },
+  { value: 'none', label: 'Points: off' },
+  { value: 'all', label: 'Points: on' },
+]
+
+/** ApexCharts `markers` for a chart: points on line and area charts per the `markers` setting. */
+export function chartMarkers(
+  type: ChartType,
+  pointCount: number,
+  setting: ChartMarkers = 'auto',
+  surfaceColor = '#ffffff',
+): { size: number, strokeWidth?: number, strokeColors?: string, hover?: { size: number } } {
+  if (type !== 'line' && type !== 'area')
+    return { size: 0 }
+  const show = setting === 'all' || (setting === 'auto' && pointCount <= AUTO_MARKER_MAX_POINTS)
+  return {
+    size: show ? 3 : 0,
+    strokeWidth: 2,
+    strokeColors: surfaceColor,
+    hover: { size: setting === 'none' ? 0 : 5 },
+  }
+}
 
 /**
  * Detect the role of a field based on its data.

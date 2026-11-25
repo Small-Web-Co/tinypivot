@@ -1121,14 +1121,14 @@
   --vpg-dim-col-bg: #ece7dc;
   --vpg-dim-col-text: #111111;
   --vpg-dim-col-border: #111111;
-  --vpg-dim-value-bg: #111111;
-  --vpg-dim-value-text: #ece7dc;
+  --vpg-dim-value-bg: #d9d3c5;
+  --vpg-dim-value-text: #111111;
   --vpg-dim-value-border: #111111;
   --vpg-dim-calc-bg: #ece7dc;
   --vpg-dim-calc-text: #111111;
   --vpg-dim-calc-border: #111111;
-  --vpg-highlight-bg: #111111;
-  --vpg-highlight-text: #ece7dc;
+  --vpg-highlight-bg: #d9d3c5;
+  --vpg-highlight-text: #111111;
   --vpg-highlight-border: #111111;
 }
 
@@ -1142,6 +1142,13 @@
 .vpg-theme-onebit *::before,
 .vpg-theme-onebit *::after {
   border-radius: 0 !important;
+}
+
+/* Icons drawn on solid ink need paper-coloured glyphs. */
+.vpg-theme-onebit .vpg-field-item.vpg-is-numeric .vpg-field-type-icon,
+.vpg-theme-onebit .vpg-zone-icon,
+.vpg-theme-onebit .vpg-item-badge {
+  color: #ece7dc;
 }
 
 /* A 4px checkerboard stands in for mid-grey on the toolbar. */

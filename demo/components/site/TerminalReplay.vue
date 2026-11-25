@@ -51,6 +51,8 @@ let resizeObserver: ResizeObserver | undefined
 let card: ReturnType<typeof findCard> = null
 let cardSince = 0
 let contentRow = 0
+/** The first row the plain view showed last, so it only moves when output nears the edge. */
+let followRow = 0
 
 function fontFor(style: RecordingStyle): string {
   const size = cellWidth / CELL_WIDTH_EM
@@ -132,6 +134,8 @@ function drawRows(rows: Iterable<number>) {
 /** Notes when a new chart card lands, so the camera can push in on it for a few seconds. */
 function trackCard(time: number, restarted: boolean) {
   const found = findCard(screen)
+  if (restarted)
+    followRow = 0
   if (restarted || found?.title !== card?.title)
     cardSince = found ? time : 0
   card = found
@@ -140,7 +144,13 @@ function trackCard(time: number, restarted: boolean) {
 
 function aimCamera(time: number) {
   const fresh = card && time >= cardSince && time - cardSince < CARD_DWELL_MS
-  camera.value = fresh && card ? cameraFor(card, grid.value, MAX_ZOOM) : wideShot(grid.value, contentRow)
+  if (fresh && card) {
+    camera.value = cameraFor(card, grid.value, MAX_ZOOM)
+    return
+  }
+  const shot = wideShot(grid.value, contentRow, followRow)
+  followRow = shot.firstRow
+  camera.value = { scale: shot.scale, x: shot.x, y: shot.y }
 }
 
 /** Brings the screen to `time`. Going backwards replays from the start, which is cheap. */
@@ -211,7 +221,8 @@ canvas {
   display: block;
   max-width: 100%;
   transform-origin: 0 0;
-  transition: transform 800ms cubic-bezier(0.2, 0.7, 0.15, 1);
+  /* Long and eased at both ends: the camera glides into a card and back out instead of snapping. */
+  transition: transform 1100ms cubic-bezier(0.45, 0, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

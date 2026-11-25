@@ -2,6 +2,7 @@ import type {
   ChartAggregation,
   ChartConfig,
   ChartFieldInfo,
+  ChartMarkers,
   ChartSortOrder,
   ChartThemePreset,
   ChartType,
@@ -15,9 +16,11 @@ import type { ApexOptions } from 'apexcharts'
 import {
   analyzeFieldsForChart,
   CHART_AGGREGATIONS,
+  CHART_MARKER_OPTIONS,
   CHART_THEME_PRESETS,
   CHART_TYPES,
   chartGlowApplies,
+  chartMarkers,
   chartPatternFill,
   createDefaultChartConfig,
   getChartGuidance,
@@ -402,6 +405,14 @@ export function ChartBuilder({
   }, [])
 
   // Chart options — high-craft code-style defaults (monospace numerals, subtle dashed hairlines, crisp geometry)
+  const updateChartOptions = useCallback((patch: Partial<NonNullable<ChartConfig['options']>>) => {
+    setChartConfig((prev) => {
+      const next: ChartConfig = { ...prev, options: { ...prev.options, ...patch } }
+      onConfigChange?.(next)
+      return next
+    })
+  }, [onConfigChange])
+
   const chartOptions = useMemo<ApexOptions>(() => {
     const config = chartConfig
     const options = config.options || {}
@@ -523,14 +534,6 @@ export function ChartBuilder({
           formatter: (val: number) => formatValue(val, options.valueFormat, options.decimals),
         },
       },
-      markers: isLineOrArea
-        ? {
-            size: 3,
-            strokeWidth: 2,
-            strokeColors: look.surfaceColor,
-            hover: { size: 6 },
-          }
-        : { size: 0 },
       stroke: {
         curve: look.curve,
         width: config.type === 'line' ? look.lineWidth : config.type === 'area' ? 2 : isBarLike ? look.markStrokeWidth : 1.5,
@@ -727,6 +730,7 @@ export function ChartBuilder({
   const chartOptionsWithCategories = useMemo<ApexOptions>(() => {
     const options = { ...chartOptions }
     const config = chartConfig
+    options.markers = chartMarkers(config.type, chartLabels.length, config.options?.markers, getChartLook(theme, activeChartTheme ?? config.options?.chartTheme ?? 'code').surfaceColor)
 
     // Heatmap, scatter, bubble have x values in data itself
     if (!['pie', 'donut', 'scatter', 'bubble', 'heatmap'].includes(config.type)) {
@@ -785,7 +789,7 @@ export function ChartBuilder({
     }
 
     return options
-  }, [chartOptions, chartConfig, chartLabels, activeChartTheme])
+  }, [chartOptions, chartConfig, chartLabels, activeChartTheme, theme])
 
   // Icons for chart types (inline SVG paths)
   const getChartIcon = useCallback((type: ChartType): string => {
@@ -835,14 +839,7 @@ export function ChartBuilder({
             aria-label="Sort chart bars"
             title={activeSortMeta.title}
             value={activeSortOrder}
-            onChange={(e) => {
-              const nextOrder = e.target.value as ChartSortOrder
-              setChartConfig((prev) => {
-                const next: ChartConfig = { ...prev, options: { ...prev.options, sortOrder: nextOrder } }
-                onConfigChange?.(next)
-                return next
-              })
-            }}
+            onChange={e => updateChartOptions({ sortOrder: e.target.value as ChartSortOrder })}
           >
             {SORT_CYCLE.map(opt => (
               <option key={opt.value} value={opt.value}>
@@ -850,6 +847,18 @@ export function ChartBuilder({
               </option>
             ))}
           </select>
+          {(chartConfig.type === 'line' || chartConfig.type === 'area') && (
+            <select
+              className="vpg-chart-theme-swatch"
+              aria-label="Points on the line"
+              value={chartConfig.options?.markers ?? 'auto'}
+              onChange={e => updateChartOptions({ markers: e.target.value as ChartMarkers })}
+            >
+              {CHART_MARKER_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          )}
           {CHART_THEME_LIST.map(([presetId, presetMeta]) => {
             const isActive = activeChartTheme === presetId
             return (

@@ -54,7 +54,7 @@ const active = computed(() => shotIndexAt(props.shots, props.time))
 .screen.current {
   transform-origin: 30% 40%;
   animation:
-    screen-wipe 420ms steps(12) both,
+    screen-wipe 520ms cubic-bezier(0.45, 0, 0.2, 1) both,
     screen-drift var(--hold) linear both;
 }
 

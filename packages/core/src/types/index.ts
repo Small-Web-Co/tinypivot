@@ -467,6 +467,9 @@ export type ChartThemePreset
 export type ChartSortOrder = 'value-desc' | 'value-asc' | 'label-asc' | 'label-desc' | 'data'
 
 /** Visual and display options for charts */
+/** Points on line and area charts: `auto` on short series only, `none`, or `all`. */
+export type ChartMarkers = 'auto' | 'none' | 'all'
+
 export interface ChartOptions {
   /** Built-in chart preset (see `ChartThemePreset`) */
   chartTheme?: ChartThemePreset
@@ -474,6 +477,11 @@ export interface ChartOptions {
   sortOrder?: ChartSortOrder
   /** Show data labels on chart */
   showDataLabels?: boolean
+  /**
+   * Points on line and area charts. `auto` (default) draws them only on short series, where each
+   * one is a reading worth seeing; on long ones only the hovered point shows.
+   */
+  markers?: ChartMarkers
   /** Show legend */
   showLegend?: boolean
   /** Legend position */

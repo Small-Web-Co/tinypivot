@@ -35,6 +35,10 @@ const CARD_TOP = '╭'
 const CARD_BOTTOM = '╰'
 /** Breathing room kept around the card, in cells. */
 const PADDING = { cols: 3, rows: 1 }
+/** Rows kept free below the newest output before the view moves on. */
+const FOLLOW_MARGIN = 2
+/** How far the view moves once it does, as a share of the stage: few large moves read calmer than many small ones. */
+const FOLLOW_STEP = 1 / 3
 
 function rowText(runs: Run[]): string {
   return runs.map(([text]) => text).join('')
@@ -75,13 +79,20 @@ function clampShift(shift: number, least: number): number {
 }
 
 /**
- * The plain view: full width, following the newest output the way a terminal does.
- * Early in a session that is the top of the screen; once output passes the stage it scrolls.
+ * The plain view: full width, following the newest output. It holds still while output stays
+ * clear of the bottom edge, then moves a third of the stage at once, so streaming text does not
+ * nudge the camera on every line. Pass the first row from the previous shot to keep it steady.
  */
-export function wideShot(grid: Grid, contentRow: number): Camera {
-  const firstRow = Math.max(0, Math.min(contentRow + 2 - grid.viewRows, grid.rows - grid.viewRows))
+export function wideShot(grid: Grid, contentRow: number, previousFirstRow = 0): Camera & { firstRow: number } {
+  const lastFirstRow = Math.max(0, grid.rows - grid.viewRows)
+  let firstRow = Math.min(previousFirstRow, lastFirstRow)
+  if (contentRow < firstRow)
+    firstRow = contentRow - FOLLOW_MARGIN
+  else if (contentRow + FOLLOW_MARGIN >= firstRow + grid.viewRows)
+    firstRow = contentRow + FOLLOW_MARGIN + 1 - grid.viewRows + Math.round(grid.viewRows * FOLLOW_STEP)
+  firstRow = Math.max(0, Math.min(firstRow, lastFirstRow))
   // A translate of 0 would be -0 here, which reads oddly in the style attribute.
-  return { scale: 1, x: 0, y: firstRow === 0 ? 0 : (-firstRow / grid.rows) * 100 }
+  return { scale: 1, x: 0, y: firstRow === 0 ? 0 : (-firstRow / grid.rows) * 100, firstRow }
 }
 
 /** The tightest view that shows `focus` whole, never zooming past `maxScale` or off the grid. */

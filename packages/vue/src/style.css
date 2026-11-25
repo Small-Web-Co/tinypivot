@@ -2459,3 +2459,351 @@
   color: #1e293b !important;
 }
 
+/* @design-layer:start */
+/**
+ * TinyPivot - Design layer
+ *
+ * Kept last in style.css, so it wins over the rules above, and identical in the React and Vue
+ * packages (tests/unit/library-styles.test.ts checks). It sits on top of the base styles and the
+ * theme palettes and makes the grid calmer to read: compact headers, one outline around a selected
+ * range, quiet totals, one consistent control style per theme, and scrolling that stays inside
+ * the grid. Selectors go through real ancestors so they also outrank Vue's scoped styles.
+ */
+
+/* ==========================================================================
+   Tokens
+   ========================================================================== */
+.vpg-data-grid,
+.vpg-pivot-config,
+.vpg-pivot-skeleton,
+.vpg-filter-dropdown,
+.vpg-modal-overlay {
+  --vpg-radius: 6px;
+  --vpg-control-height: 1.75rem;
+  --vpg-control-border: var(--vpg-border-default);
+  --vpg-control-font: inherit;
+  --vpg-control-case: none;
+  --vpg-control-tracking: 0;
+  --vpg-data-font: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+  --vpg-selection-bg: color-mix(in srgb, var(--vpg-accent) 11%, transparent);
+  --vpg-selection-edge: var(--vpg-accent);
+  --vpg-total-rule: var(--vpg-border-strong);
+}
+
+/* Workstation themes (Paper, Greenbar, 1-Bit, Amber CRT, Green CRT): square corners, ink rules and
+   mono labels, the same language as tiny-pivot.com. */
+:is(.vpg-data-grid, .vpg-pivot-config, .vpg-pivot-skeleton, .vpg-filter-dropdown, .vpg-modal-overlay):is(.vpg-theme-paper, .vpg-theme-greenbar, .vpg-theme-onebit, .vpg-theme-crt-amber, .vpg-theme-crt-green) {
+  --vpg-radius: 0;
+  --vpg-control-border: var(--vpg-border-strong);
+  --vpg-control-font: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+  --vpg-control-case: uppercase;
+  --vpg-control-tracking: 0.06em;
+  --vpg-total-rule: var(--vpg-text-primary);
+}
+
+/* 1-Bit has no tints: a selection is dithered, not filled, so the text on it stays black on paper. */
+:is(.vpg-data-grid, .vpg-pivot-skeleton).vpg-theme-onebit {
+  --vpg-selection-bg: repeating-conic-gradient(#d9d3c5 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+}
+
+/* ==========================================================================
+   Controls: one shape for every button in the toolbar, pivot and chart builder
+   ========================================================================== */
+.vpg-data-grid .vpg-toolbar :is(.vpg-view-toggle, .vpg-font-size-toggle) {
+  overflow: hidden;
+  border: 1px solid var(--vpg-control-border);
+  border-radius: var(--vpg-radius);
+  background: var(--vpg-surface-bg);
+  box-shadow: none;
+}
+
+.vpg-data-grid .vpg-toolbar :is(.vpg-view-btn, .vpg-font-size-btn, .vpg-export-btn, .vpg-config-toggle, .vpg-reset-data-btn, .vpg-clear-filters, .vpg-icon-btn),
+.vpg-data-grid .vpg-footer .vpg-page-btn,
+.vpg-data-grid .vpg-chart-builder :is(.vpg-chart-type-btn, .vpg-chart-theme-swatch) {
+  min-height: var(--vpg-control-height);
+  font-family: var(--vpg-control-font);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: var(--vpg-control-tracking);
+  text-transform: var(--vpg-control-case);
+  border-radius: var(--vpg-radius);
+  box-shadow: none;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+/* Segments inside a group share the group's border. */
+.vpg-data-grid .vpg-toolbar :is(.vpg-view-toggle .vpg-view-btn, .vpg-font-size-toggle .vpg-font-size-btn) {
+  border: 0;
+  border-radius: 0;
+}
+
+.vpg-data-grid .vpg-toolbar .vpg-view-toggle .vpg-view-btn + .vpg-view-btn {
+  border-left: 1px solid var(--vpg-border-subtle);
+}
+
+/* Standalone buttons: an outline in the theme's ink, filled only when on. */
+.vpg-data-grid .vpg-toolbar :is(.vpg-export-btn, .vpg-config-toggle, .vpg-reset-data-btn, .vpg-clear-filters) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.75rem;
+  color: var(--vpg-text-primary);
+  background: var(--vpg-surface-bg);
+  border: 1px solid var(--vpg-control-border);
+}
+
+.vpg-data-grid .vpg-toolbar :is(.vpg-view-btn, .vpg-font-size-btn, .vpg-export-btn, .vpg-config-toggle, .vpg-reset-data-btn, .vpg-clear-filters):hover {
+  background: var(--vpg-surface-hover);
+  color: var(--vpg-text-primary);
+}
+
+.vpg-data-grid .vpg-toolbar :is(.vpg-view-btn, .vpg-font-size-btn, .vpg-config-toggle).active,
+.vpg-data-grid .vpg-toolbar :is(.vpg-export-btn--open) {
+  background: var(--vpg-text-primary);
+  color: var(--vpg-surface-bg);
+  box-shadow: none;
+}
+
+/* Colourful themes keep their accent for the active view. */
+.vpg-data-grid:not(.vpg-theme-paper, .vpg-theme-greenbar, .vpg-theme-onebit, .vpg-theme-crt-amber, .vpg-theme-crt-green) .vpg-toolbar :is(.vpg-view-btn, .vpg-font-size-btn).active {
+  background: var(--vpg-accent);
+  color: var(--vpg-text-inverse);
+}
+
+.vpg-data-grid .vpg-toolbar .vpg-pro-badge {
+  border-radius: var(--vpg-radius);
+  font-family: var(--vpg-control-font);
+}
+
+/* ==========================================================================
+   Column headers: compact, with icons beside the name rather than across the cell
+   ========================================================================== */
+.vpg-data-grid .vpg-table .vpg-header-cell {
+  padding: 0.375rem 0.625rem;
+  background: var(--vpg-surface-panel);
+  border-right-color: var(--vpg-border-subtle);
+  transition: background-color 120ms ease;
+}
+
+.vpg-data-grid .vpg-table .vpg-header-cell .vpg-header-content {
+  justify-content: flex-start;
+  gap: 0.25rem;
+}
+
+.vpg-data-grid .vpg-table .vpg-header-cell.vpg-is-number .vpg-header-content {
+  flex-direction: row-reverse;
+}
+
+.vpg-data-grid .vpg-table .vpg-header-cell .vpg-header-text {
+  font-family: var(--vpg-control-font);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+}
+
+/* The filter arrow appears on hover or focus, and stays when a filter or sort is on. */
+.vpg-data-grid .vpg-table .vpg-header-cell .vpg-dropdown-arrow {
+  opacity: 0;
+  border-radius: var(--vpg-radius);
+  transition: opacity 120ms ease;
+}
+
+.vpg-data-grid .vpg-table .vpg-header-cell:is(:hover, :focus-within, .vpg-is-active, .vpg-has-filter, .vpg-is-sorted) .vpg-dropdown-arrow {
+  opacity: 1;
+}
+
+/* Sorted and filtered columns are marked by their icons, not by tinted headers. */
+.vpg-data-grid .vpg-table .vpg-header-cell:is(.vpg-is-sorted, .vpg-has-filter, .vpg-is-active) {
+  background: var(--vpg-surface-panel);
+  box-shadow: inset 0 -2px 0 var(--vpg-accent);
+}
+
+.vpg-data-grid .vpg-table .vpg-header-cell .vpg-sort-indicator {
+  color: var(--vpg-accent);
+}
+
+/* ==========================================================================
+   Cells, hover and selection
+   ========================================================================== */
+.vpg-data-grid .vpg-table .vpg-cell {
+  transition: none;
+}
+
+.vpg-data-grid .vpg-table .vpg-cell:hover {
+  box-shadow: none;
+}
+
+.vpg-data-grid .vpg-table .vpg-row:hover {
+  background: var(--vpg-surface-hover);
+}
+
+/* A selected range is tinted and outlined once, along its outer edges; the text on it keeps its colour. */
+.vpg-data-grid .vpg-table .vpg-cell.vpg-selected,
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell.vpg-selected {
+  position: relative;
+  background: var(--vpg-selection-bg);
+  color: inherit;
+  box-shadow: none;
+}
+
+.vpg-data-grid .vpg-table .vpg-cell.vpg-selected::after,
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell.vpg-selected::after {
+  content: '';
+  position: absolute;
+  inset: -1px 0 0 -1px;
+  border: 0 solid var(--vpg-selection-edge);
+  pointer-events: none;
+}
+
+:is(.vpg-data-grid .vpg-table .vpg-cell, .vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell).vpg-sel-top::after { border-top-width: 2px; }
+:is(.vpg-data-grid .vpg-table .vpg-cell, .vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell).vpg-sel-bottom::after { border-bottom-width: 2px; }
+:is(.vpg-data-grid .vpg-table .vpg-cell, .vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell).vpg-sel-left::after { border-left-width: 2px; }
+:is(.vpg-data-grid .vpg-table .vpg-cell, .vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell).vpg-sel-right::after { border-right-width: 2px; }
+
+/* Selection stats read as plain text in the theme's ink. */
+.vpg-data-grid .vpg-footer .vpg-selection-stats,
+.vpg-pivot-skeleton .vpg-skeleton-footer .vpg-selection-stats,
+.vpg-pivot-skeleton .vpg-skeleton-footer .vpg-selection-stats.vpg-selection-stats {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.vpg-data-grid .vpg-footer .vpg-stat-value,
+.vpg-pivot-skeleton .vpg-skeleton-footer .vpg-selection-stats .vpg-stat-value {
+  color: var(--vpg-text-primary);
+  font-family: var(--vpg-data-font);
+}
+
+/* ==========================================================================
+   Pivot table: full width, quiet totals
+   ========================================================================== */
+/* Auto layout lets the value columns share the spare width instead of squeezing to fit it. */
+.vpg-pivot-skeleton .vpg-table-container .vpg-pivot-table {
+  width: 100%;
+  table-layout: auto;
+}
+
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell:hover {
+  box-shadow: none;
+  background: var(--vpg-surface-hover);
+}
+
+/* Totals are set apart by weight and a hairline, not by a coloured block. */
+.vpg-pivot-skeleton .vpg-pivot-table :is(.vpg-total-header, .vpg-total-label, .vpg-totals-row, .vpg-data-cell.vpg-total-cell, .vpg-data-cell.vpg-grand-total-cell) {
+  background: inherit;
+  color: var(--vpg-text-primary);
+}
+
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-total-header {
+  background: var(--vpg-surface-panel);
+  border-left: 1px solid var(--vpg-total-rule);
+  font-weight: 600;
+}
+
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell.vpg-total-cell {
+  font-weight: 600;
+  border-left: 1px solid var(--vpg-total-rule);
+}
+
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-totals-row > * {
+  border-top: 1px solid var(--vpg-total-rule);
+  font-weight: 600;
+}
+
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-totals-row .vpg-total-label {
+  background: var(--vpg-surface-bg);
+}
+
+.vpg-pivot-skeleton .vpg-pivot-table .vpg-data-cell.vpg-grand-total-cell {
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Scrolling: smooth, contained, and nothing showing through sticky edges
+   ========================================================================== */
+.vpg-data-grid .vpg-grid-container,
+.vpg-pivot-skeleton .vpg-table-container,
+.vpg-data-grid .vpg-pivot-config-panel {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--vpg-scrollbar-thumb) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vpg-data-grid .vpg-grid-container {
+  background: var(--vpg-surface-bg);
+}
+
+.vpg-data-grid .vpg-grid-container::-webkit-scrollbar,
+.vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.vpg-data-grid .vpg-grid-container::-webkit-scrollbar-thumb,
+.vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar-thumb {
+  background: var(--vpg-scrollbar-thumb);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.vpg-data-grid .vpg-grid-container::-webkit-scrollbar-track,
+.vpg-pivot-skeleton .vpg-table-container::-webkit-scrollbar-track,
+.vpg-data-grid .vpg-grid-container::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Sticky headers sit on an opaque surface and a hairline, so rows never show through them. */
+.vpg-pivot-skeleton .vpg-pivot-table thead {
+  box-shadow: 0 1px 0 var(--vpg-border-default);
+}
+
+.vpg-pivot-skeleton .vpg-pivot-table :is(.vpg-row-header-label, .vpg-column-header-cell, .vpg-row-header-cell) {
+  background-clip: padding-box;
+}
+
+/* ==========================================================================
+   Footer: the free-tier signature is a quiet link, not a badge
+   ========================================================================== */
+.vpg-data-grid .vpg-footer .vpg-watermark-inline a {
+  gap: 0.3rem;
+  padding: 0;
+  color: var(--vpg-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.vpg-data-grid .vpg-footer .vpg-watermark-inline a:hover {
+  color: var(--vpg-accent);
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.vpg-data-grid .vpg-footer .vpg-watermark-inline a svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Inside a grid the footer already carries the signature; the pivot does not repeat it. */
+.vpg-data-grid .vpg-pivot-skeleton .vpg-watermark {
+  display: none;
+}
+
+/* The bottom edge's grip: a thin bar that darkens when it can be dragged. */
+.vpg-data-grid .vpg-vertical-resize-handle .vpg-resize-grip span {
+  border-radius: 0;
+  background: var(--vpg-border-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vpg-data-grid *,
+  .vpg-pivot-skeleton * {
+    transition: none !important;
+  }
+}
+/* @design-layer:end */

@@ -353,11 +353,11 @@ onBeforeUnmount(() => {
 }
 
 .reel-curtain[data-state='closing'] .reel-curtain-dither {
-  animation: reel-wipe-in 320ms steps(12) forwards;
+  animation: reel-wipe-in 380ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
 }
 
 .reel-curtain[data-state='closing'] .reel-curtain-ink {
-  animation: reel-wipe-in 320ms steps(12) 100ms forwards;
+  animation: reel-wipe-in 380ms cubic-bezier(0.45, 0, 0.2, 1) 80ms forwards;
 }
 
 .reel-curtain[data-state='closed'] .reel-curtain-dither,
@@ -366,11 +366,11 @@ onBeforeUnmount(() => {
 }
 
 .reel-curtain[data-state='opening'] .reel-curtain-ink {
-  animation: reel-wipe-out 320ms steps(12) forwards;
+  animation: reel-wipe-out 380ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
 }
 
 .reel-curtain[data-state='opening'] .reel-curtain-dither {
-  animation: reel-wipe-out 320ms steps(12) 100ms both;
+  animation: reel-wipe-out 380ms cubic-bezier(0.45, 0, 0.2, 1) 80ms both;
 }
 
 @keyframes reel-wipe-in {
@@ -501,7 +501,7 @@ onBeforeUnmount(() => {
 
 .reel-step-enter-active,
 .reel-step-leave-active {
-  transition: opacity 180ms steps(4), transform 180ms steps(4);
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(0.45, 0, 0.2, 1);
 }
 
 .reel-step-enter-from {

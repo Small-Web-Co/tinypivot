@@ -44,11 +44,14 @@ export type { DemoScenario, DemoTrigger } from './ai'
 export {
   aggregateValues,
   analyzeFieldsForChart,
+  AUTO_MARKER_MAX_POINTS,
   CHART_AGGREGATIONS,
   CHART_COLORS,
+  CHART_MARKER_OPTIONS,
   CHART_THEME_IDS,
   CHART_THEME_PRESETS,
   CHART_TYPES,
+  chartMarkers,
   createDefaultChartConfig,
   detectFieldRole,
   formatFieldLabel,
@@ -65,7 +68,6 @@ export {
   resolveChartSortOrder,
   saveChartConfig,
 } from './chart'
-
 export type { HeatmapSeriesData, ScatterPoint, ScatterSeriesData } from './chart'
 
 // Export Utilities
@@ -79,8 +81,12 @@ export {
   exportToXLSX,
   formatSelectionForClipboard,
 } from './export'
-
 export type { PivotExportData, SourceData } from './export'
+
+// Layout
+export { FILL_SNAP_PX, heightToFill, measureFill, snapToFill } from './layout'
+
+export type { FillGeometry } from './layout'
 
 // License Management
 export {
@@ -138,12 +144,17 @@ export {
   validateFormula,
   validateSimpleFormula,
 } from './pivot'
+
 export type { ComputePivotOptions, FormulaFunction } from './pivot'
 
 // Grouped pivot layout helpers
 export { computeRowSpans } from './pivot/rowspan'
-
 export type { RowSpanCell } from './pivot/rowspan'
+
+// Selection
+export { isInSelection, selectionBounds, selectionCellClass } from './selection'
+
+export type { CellPosition } from './selection'
 
 // Unified themes
 export {
@@ -197,6 +208,7 @@ export type {
   ChartData,
   ChartField,
   ChartFieldInfo,
+  ChartMarkers,
   ChartOptions,
   ChartSeries,
   ChartSortOrder,

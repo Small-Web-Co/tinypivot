@@ -20,7 +20,7 @@ import type {
   Theme,
 } from '@smallwebco/tinypivot-core'
 import type { AIAnalystHandle } from './AIAnalyst'
-import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues } from '@smallwebco/tinypivot-core'
+import { selectionBounds as boundsBetween, canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues, heightToFill, measureFill, selectionCellClass, snapToFill } from '@smallwebco/tinypivot-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useExcelGrid } from '../hooks/useExcelGrid'
@@ -65,6 +65,11 @@ interface DataGridProps {
   initialHeight?: number
   minHeight?: number
   maxHeight?: number
+  /**
+   * Fill the parent's height and follow it as it resizes. Dragging the bottom edge sets a fixed
+   * height; dragging it back to the parent's bottom fills again.
+   */
+  fillHeight?: boolean
   /** Number display format */
   numberFormat?: NumberFormat
   /** Date display format */
@@ -132,6 +137,7 @@ export function DataGrid({
   initialHeight = 600,
   minHeight = 300,
   maxHeight = 1200,
+  fillHeight = false,
   numberFormat = 'us',
   dateFormat = 'iso',
   fieldRoleOverrides,
@@ -184,6 +190,34 @@ export function DataGrid({
   const [resizeStartX, setResizeStartX] = useState(0)
   const [resizeStartWidth, setResizeStartWidth] = useState(0)
   const [gridHeight, setGridHeight] = useState(initialHeight)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [filling, setFilling] = useState(fillHeight)
+  /** The height that reaches the container's bottom, measured when a drag starts; null when the container has no bottom of its own. */
+  const dragFillRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    setFilling(fillHeight)
+  }, [fillHeight])
+
+  // While filling, follow the container's size.
+  useEffect(() => {
+    const root = rootRef.current
+    if (!filling || !root?.parentElement || typeof ResizeObserver === 'undefined')
+      return
+    const fit = () => {
+      const geometry = measureFill(root)
+      if (geometry)
+        setGridHeight(Math.max(minHeight, heightToFill(geometry)))
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(root.parentElement)
+    window.addEventListener('resize', fit)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', fit)
+    }
+  }, [filling, minHeight])
   const [isResizingVertically, setIsResizingVertically] = useState(false)
   const [verticalResizeStartY, setVerticalResizeStartY] = useState(0)
   const [verticalResizeStartHeight, setVerticalResizeStartHeight] = useState(0)
@@ -475,16 +509,10 @@ export function DataGrid({
   }, [columnFilters, globalSearchTerm])
 
   // Selection bounds
-  const selectionBounds = useMemo(() => {
-    if (!selectionStart || !selectionEnd)
-      return null
-    return {
-      minRow: Math.min(selectionStart.row, selectionEnd.row),
-      maxRow: Math.max(selectionStart.row, selectionEnd.row),
-      minCol: Math.min(selectionStart.col, selectionEnd.col),
-      maxCol: Math.max(selectionStart.col, selectionEnd.col),
-    }
-  }, [selectionStart, selectionEnd])
+  const selectionBounds = useMemo(
+    () => (selectionStart && selectionEnd ? boundsBetween(selectionStart, selectionEnd) : null),
+    [selectionStart, selectionEnd],
+  )
 
   // Selection stats
   const selectionStats = useMemo(() => {
@@ -609,8 +637,12 @@ export function DataGrid({
       setIsResizingVertically(true)
       setVerticalResizeStartY(event.clientY)
       setVerticalResizeStartHeight(gridHeight)
+      const geometry = rootRef.current && measureFill(rootRef.current)
+      const fill = geometry ? heightToFill(geometry) : null
+      // A container that just wraps the grid has no bottom of its own to snap to.
+      dragFillRef.current = fill !== null && Math.abs(fill - gridHeight) > 1 ? Math.max(minHeight, fill) : null
     },
-    [enableVerticalResize, gridHeight],
+    [enableVerticalResize, gridHeight, minHeight],
   )
 
   useEffect(() => {
@@ -619,8 +651,11 @@ export function DataGrid({
 
     const handleVerticalResizeMove = (event: MouseEvent) => {
       const diff = event.clientY - verticalResizeStartY
-      const newHeight = Math.max(minHeight, Math.min(maxHeight, verticalResizeStartHeight + diff))
-      setGridHeight(newHeight)
+      const dragged = Math.max(minHeight, Math.min(maxHeight, verticalResizeStartHeight + diff))
+      const fill = dragFillRef.current
+      const { height, filled } = fill === null ? { height: dragged, filled: false } : snapToFill(dragged, fill)
+      setGridHeight(height)
+      setFilling(filled)
     }
 
     const handleVerticalResizeEnd = () => {
@@ -1012,14 +1047,10 @@ export function DataGrid({
     [getSortDirection, toggleSort],
   )
 
-  const isCellSelected = useCallback(
-    (rowIndex: number, colIndex: number): boolean => {
-      if (!selectionBounds) {
-        return selectedCell?.row === rowIndex && selectedCell?.col === colIndex
-      }
-      const { minRow, maxRow, minCol, maxCol } = selectionBounds
-      return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
-    },
+  /** Selection classes for a cell: the range, or the single selected cell, outlined once. */
+  const cellSelectionClass = useCallback(
+    (rowIndex: number, colIndex: number): string =>
+      selectionCellClass(selectionBounds ?? boundsBetween(selectedCell, selectedCell), rowIndex, colIndex),
     [selectionBounds, selectedCell],
   )
 
@@ -1075,6 +1106,7 @@ export function DataGrid({
 
   return (
     <div
+      ref={rootRef}
       className={`vpg-data-grid vpg-font-${currentFontSize} vpg-theme-${currentTheme} ${stripedRows ? 'vpg-striped' : ''} ${resizingColumnId ? 'vpg-resizing' : ''} ${isResizingVertically ? 'vpg-resizing-vertical' : ''}`}
       style={{ height: `${gridHeight}px` }}
     >
@@ -1465,7 +1497,7 @@ export function DataGrid({
                     {columnKeys.map(colId => (
                       <th
                         key={colId}
-                        className={`vpg-header-cell ${hasActiveFilter(colId) ? 'vpg-has-filter' : ''} ${getSortDirection(colId) !== null ? 'vpg-is-sorted' : ''} ${activeFilterColumn === colId ? 'vpg-is-active' : ''}`}
+                        className={`vpg-header-cell ${hasActiveFilter(colId) ? 'vpg-has-filter' : ''} ${getSortDirection(colId) !== null ? 'vpg-is-sorted' : ''} ${activeFilterColumn === colId ? 'vpg-is-active' : ''} ${getColumnStats(colId).type === 'number' ? 'vpg-is-number' : ''}`}
                         style={{
                           width: `${columnWidths[colId] || MIN_COL_WIDTH}px`,
                           minWidth: `${columnWidths[colId] || MIN_COL_WIDTH}px`,
@@ -1560,7 +1592,7 @@ export function DataGrid({
                       {columnKeys.map((colId, colIndex) => (
                         <td
                           key={colId}
-                          className={`vpg-cell ${isCellSelected(rowIndex, colIndex) ? 'vpg-selected' : ''} ${getColumnStats(colId).type === 'number' ? 'vpg-is-number' : ''}`}
+                          className={`vpg-cell ${cellSelectionClass(rowIndex, colIndex)} ${getColumnStats(colId).type === 'number' ? 'vpg-is-number' : ''}`}
                           data-row={rowIndex}
                           data-col={colIndex}
                           style={{

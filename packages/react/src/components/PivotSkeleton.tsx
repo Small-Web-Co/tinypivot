@@ -1,5 +1,5 @@
 import type { AggregationFunction, CalculatedField, PivotGroupStart, PivotLayout, PivotResult, PivotValueField } from '@smallwebco/tinypivot-core'
-import { computeRowSpans, getAggregationLabel, getAggregationSymbol } from '@smallwebco/tinypivot-core'
+import { selectionBounds as boundsBetween, computeRowSpans, getAggregationLabel, getAggregationSymbol, selectionCellClass } from '@smallwebco/tinypivot-core'
 /**
  * Pivot Table Skeleton + Data Display for React
  * Visual layout for pivot configuration and results
@@ -120,16 +120,10 @@ export function PivotSkeleton({
   const [showCopyToast, setShowCopyToast] = useState(false)
   const [copyToastMessage, setCopyToastMessage] = useState('')
 
-  const selectionBounds = useMemo(() => {
-    if (!selectionStart || !selectionEnd)
-      return null
-    return {
-      minRow: Math.min(selectionStart.row, selectionEnd.row),
-      maxRow: Math.max(selectionStart.row, selectionEnd.row),
-      minCol: Math.min(selectionStart.col, selectionEnd.col),
-      maxCol: Math.max(selectionStart.col, selectionEnd.col),
-    }
-  }, [selectionStart, selectionEnd])
+  const selectionBounds = useMemo(
+    () => (selectionStart && selectionEnd ? boundsBetween(selectionStart, selectionEnd) : null),
+    [selectionStart, selectionEnd],
+  )
 
   const handleCellMouseDown = useCallback(
     (rowIndex: number, colIndex: number, event: React.MouseEvent) => {
@@ -157,14 +151,10 @@ export function PivotSkeleton({
     [isSelecting],
   )
 
-  const isCellSelected = useCallback(
-    (rowIndex: number, colIndex: number): boolean => {
-      if (!selectionBounds) {
-        return selectedCell?.row === rowIndex && selectedCell?.col === colIndex
-      }
-      const { minRow, maxRow, minCol, maxCol } = selectionBounds
-      return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
-    },
+  /** Selection classes for a cell: the range, or the single selected cell, outlined once. */
+  const cellSelectionClass = useCallback(
+    (rowIndex: number, colIndex: number): string =>
+      selectionCellClass(selectionBounds ?? boundsBetween(selectedCell, selectedCell), rowIndex, colIndex),
     [selectionBounds, selectedCell],
   )
 
@@ -1046,7 +1036,7 @@ export function PivotSkeleton({
                       {pivotResult.data[sortedIdx].map((cell, colIdx) => (
                         <td
                           key={colIdx}
-                          className={`vpg-data-cell ${isCellSelected(rowPos, colIdx) ? 'selected' : ''} ${cell.value === null ? 'vpg-is-null' : ''}`}
+                          className={`vpg-data-cell ${cellSelectionClass(rowPos, colIdx)} ${cell.value === null ? 'vpg-is-null' : ''}`}
                           onMouseDown={e => handleCellMouseDown(rowPos, colIdx, e)}
                           onMouseEnter={() => handleCellMouseEnter(rowPos, colIdx)}
                           onDoubleClick={enableDrillThrough !== false ? () => handleDrillThroughCell(sortedIdx, colIdx) : undefined}

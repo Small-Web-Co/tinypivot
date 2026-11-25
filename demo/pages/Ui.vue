@@ -7,7 +7,7 @@ import CodeBlock from '../components/site/CodeBlock.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import SegmentedControl from '../components/site/SegmentedControl.vue'
 import { aiAnalystCode, analystPoints, features, frameworks, quickstartCode, testimonials } from '../site/ui'
-import { aiAnalystConfig, dateFormats, demoChartConfig, numberFormats, themeChoices, useLiveDemo } from '../site/useLiveDemo'
+import { aiAnalystConfig, dateFormats, demoChartConfig, demoPivotConfig, numberFormats, themeChoices, useLiveDemo } from '../site/useLiveDemo'
 
 const framework = ref<Framework>('vue')
 const quickstart = computed(() => quickstartCode(framework.value))
@@ -101,6 +101,8 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
               export-filename="tinypivot-demo.csv"
               :ai-analyst="aiAnalystConfig"
               :chart-config="demoChartConfig"
+              :pivot-config="demoPivotConfig"
+              :fill-height="true"
             />
             <p v-else class="demo-loading mono">
               Loading 10,000 rows…

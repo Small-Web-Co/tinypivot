@@ -165,11 +165,16 @@ describe('reel: camera', () => {
   const grid = { cols: 96, rows: 44, viewRows: 28 }
 
   it('follows the newest output: top of the screen first, scrolling once it fills the stage', () => {
-    expect(wideShot(grid, 5)).toEqual({ scale: 1, x: 0, y: 0 })
-    // Content down to row 35 puts rows 9 to 36 in view.
-    expect(wideShot(grid, 35).y).toBeCloseTo((-9 / 44) * 100)
+    expect(wideShot(grid, 5)).toEqual({ scale: 1, x: 0, y: 0, firstRow: 0 })
+    // Output near the bottom edge moves the view a third of the stage at once.
+    const moved = wideShot(grid, 26)
+    expect(moved.firstRow).toBe(10)
+    // It then holds still while output stays clear of the edge.
+    expect(wideShot(grid, 30, moved.firstRow).firstRow).toBe(10)
     // Never scrolls past the last row.
-    expect(wideShot(grid, 43).y).toBeCloseTo((-16 / 44) * 100)
+    expect(wideShot(grid, 43, moved.firstRow).y).toBeCloseTo((-16 / 44) * 100)
+    // A cleared screen brings it back up.
+    expect(wideShot(grid, 3, 16).firstRow).toBe(1)
     expect(lastContentRow(screen(['a', '', 'b', '  ', '']))).toBe(2)
   })
 

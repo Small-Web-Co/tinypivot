@@ -16,7 +16,7 @@ import type {
   PivotLayout,
   Theme,
 } from '@smallwebco/tinypivot-core'
-import { canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues, loadCalculatedFields, saveCalculatedFields } from '@smallwebco/tinypivot-core'
+import { selectionBounds as boundsBetween, canUseDrillThrough, formatDate as coreFormatDate, formatNumber as coreFormatNumber, getDrillThroughRows, getFieldUniqueValues, heightToFill, loadCalculatedFields, measureFill, saveCalculatedFields, selectionCellClass, snapToFill } from '@smallwebco/tinypivot-core'
 /**
  * TinyPivot - Main DataGrid Component
  * Excel-like data grid with optional pivot table functionality
@@ -62,6 +62,11 @@ const props = withDefaults(defineProps<{
   initialHeight?: number
   minHeight?: number
   maxHeight?: number
+  /**
+   * Fill the parent's height and follow it as it resizes. Dragging the bottom edge sets a fixed
+   * height; dragging it back to the parent's bottom fills again.
+   */
+  fillHeight?: boolean
   /** AI Data Analyst configuration (Pro feature, disabled by default) */
   aiAnalyst?: AIAnalystConfig
   /** Number display format */
@@ -104,6 +109,7 @@ const props = withDefaults(defineProps<{
   initialHeight: 600,
   minHeight: 300,
   maxHeight: 1200,
+  fillHeight: false,
   aiAnalyst: undefined,
   numberFormat: 'us',
   dateFormat: 'iso',
@@ -168,6 +174,33 @@ const resizeStartWidth = ref(0)
 
 // Vertical resize state
 const gridHeight = ref(props.initialHeight)
+const rootRef = ref<HTMLDivElement | null>(null)
+const filling = ref(props.fillHeight)
+/** The height that reaches the container's bottom, measured when a drag starts; null when the container has no bottom of its own. */
+let dragFill: number | null = null
+
+watch(() => props.fillHeight, (value) => {
+  filling.value = value
+})
+
+// While filling, follow the container's size.
+function fitToContainer() {
+  const geometry = rootRef.value && measureFill(rootRef.value)
+  if (geometry)
+    gridHeight.value = Math.max(props.minHeight, heightToFill(geometry))
+}
+watch([filling, rootRef], ([fill, root], _previous, onCleanup) => {
+  if (!fill || !root?.parentElement || typeof ResizeObserver === 'undefined')
+    return
+  fitToContainer()
+  const observer = new ResizeObserver(fitToContainer)
+  observer.observe(root.parentElement)
+  window.addEventListener('resize', fitToContainer)
+  onCleanup(() => {
+    observer.disconnect()
+    window.removeEventListener('resize', fitToContainer)
+  })
+}, { immediate: true, flush: 'post' })
 const isResizingVertically = ref(false)
 const verticalResizeStartY = ref(0)
 const verticalResizeStartHeight = ref(0)
@@ -527,6 +560,10 @@ function startVerticalResize(event: MouseEvent) {
   isResizingVertically.value = true
   verticalResizeStartY.value = event.clientY
   verticalResizeStartHeight.value = gridHeight.value
+  const geometry = rootRef.value && measureFill(rootRef.value)
+  const fill = geometry ? heightToFill(geometry) : null
+  // A container that just wraps the grid has no bottom of its own to snap to.
+  dragFill = fill !== null && Math.abs(fill - gridHeight.value) > 1 ? Math.max(props.minHeight, fill) : null
 
   document.addEventListener('mousemove', handleVerticalResizeMove)
   document.addEventListener('mouseup', handleVerticalResizeEnd)
@@ -536,11 +573,13 @@ function handleVerticalResizeMove(event: MouseEvent) {
   if (!isResizingVertically.value)
     return
   const diff = event.clientY - verticalResizeStartY.value
-  const newHeight = Math.max(
+  const dragged = Math.max(
     props.minHeight,
     Math.min(props.maxHeight, verticalResizeStartHeight.value + diff),
   )
-  gridHeight.value = newHeight
+  const { height, filled } = dragFill === null ? { height: dragged, filled: false } : snapToFill(dragged, dragFill)
+  gridHeight.value = height
+  filling.value = filled
 }
 
 function handleVerticalResizeEnd() {
@@ -895,22 +934,11 @@ function handleHeaderClick(colIndex: number, event: MouseEvent) {
   }
 }
 
-const selectionBounds = computed(() => {
-  if (!selectionStart.value || !selectionEnd.value)
-    return null
-  return {
-    minRow: Math.min(selectionStart.value.row, selectionEnd.value.row),
-    maxRow: Math.max(selectionStart.value.row, selectionEnd.value.row),
-    minCol: Math.min(selectionStart.value.col, selectionEnd.value.col),
-    maxCol: Math.max(selectionStart.value.col, selectionEnd.value.col),
-  }
-})
+const selectionBounds = computed(() => (selectionStart.value && selectionEnd.value ? boundsBetween(selectionStart.value, selectionEnd.value) : null))
 
-function isCellInSelection(rowIndex: number, colIndex: number): boolean {
-  if (!selectionBounds.value)
-    return false
-  const { minRow, maxRow, minCol, maxCol } = selectionBounds.value
-  return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol
+/** Selection classes for a cell: the range, or the single selected cell, outlined once. */
+function cellSelectionClass(rowIndex: number, colIndex: number): string {
+  return selectionCellClass(selectionBounds.value ?? boundsBetween(selectedCell.value, selectedCell.value), rowIndex, colIndex)
 }
 
 const selectionStats = computed(() => {
@@ -1078,12 +1106,6 @@ function handleMouseUp() {
   isSelecting.value = false
 }
 
-function isCellSelected(rowIndex: number, colIndex: number): boolean {
-  if (isCellInSelection(rowIndex, colIndex))
-    return true
-  return selectedCell.value?.row === rowIndex && selectedCell.value?.col === colIndex
-}
-
 // Format cell value
 const noFormatPatterns = /^(?:.*_)?(?:id|code|year|month|quarter|day|week|date|zip|phone|fax|ssn|ein|npi|ndc|gpi|hcpcs|icd|cpt|rx|bin|pcn|group|member|claim|rx_number|script|fill)(?:_.*)?$/i
 
@@ -1178,6 +1200,7 @@ function handleContainerClick(event: MouseEvent) {
 
 <template>
   <div
+    ref="rootRef"
     class="vpg-data-grid"
     :class="[
       `vpg-font-${currentFontSize}`,
@@ -1461,6 +1484,7 @@ function handleContainerClick(event: MouseEvent) {
                     'vpg-has-filter': hasActiveFilter(colId),
                     'vpg-is-sorted': getSortDirection(colId) !== null,
                     'vpg-is-active': activeFilterColumn === colId,
+                    'vpg-is-number': getColumnStats(colId).type === 'number',
                   }"
                   :style="{ width: `${columnWidths[colId] || MIN_COL_WIDTH}px`, minWidth: `${columnWidths[colId] || MIN_COL_WIDTH}px` }"
                   @click="handleHeaderClick(colIndex, $event)"
@@ -1508,10 +1532,10 @@ function handleContainerClick(event: MouseEvent) {
                   v-for="(colId, colIndex) in columnKeys"
                   :key="colId"
                   class="vpg-cell"
-                  :class="{
-                    'vpg-selected': isCellSelected(rowIndex, colIndex),
-                    'vpg-is-number': getColumnStats(colId).type === 'number',
-                  }"
+                  :class="[
+                    cellSelectionClass(rowIndex, colIndex),
+                    { 'vpg-is-number': getColumnStats(colId).type === 'number' },
+                  ]"
                   :data-row="rowIndex"
                   :data-col="colIndex"
                   :style="{ width: `${columnWidths[colId] || MIN_COL_WIDTH}px`, minWidth: `${columnWidths[colId] || MIN_COL_WIDTH}px` }"
