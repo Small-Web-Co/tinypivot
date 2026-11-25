@@ -5,13 +5,16 @@ const e = estimateTokens(workload)
 const savedPct = Math.floor(e.savedShare * 1000) / 10
 const fmt = (n: number) => n.toLocaleString('en-US')
 
+/** Each line's tokens, under the way of working that spends them: pasting rows, or TinyPivot. */
 const lines = [
-  { sign: '-', label: `${fmt(workload.rows)} rows pasted into context`, tokens: e.pasted },
-  { sign: '-', label: `${workload.followUps} follow-ups re-read them (cached)`, tokens: e.rereads },
-  { sign: '-', label: `${workload.followUps} tables rewritten by the model`, tokens: e.rewrites },
-  { sign: '+', label: `${workload.followUps + 1} tinypivot replies, re-read (cached)`, tokens: e.withInput },
-  { sign: '+', label: 'chart cards reprinted by the model', tokens: e.withOutput },
+  { label: `${fmt(workload.rows)} rows pasted into context`, pasting: e.pasted },
+  { label: `${workload.followUps} follow-ups re-read them (cached)`, pasting: e.rereads },
+  { label: `${workload.followUps} tables rewritten by the model`, pasting: e.rewrites },
+  { label: `${workload.followUps + 1} TinyPivot replies, re-read (cached)`, tinypivot: e.withInput },
+  { label: 'chart cards reprinted by the model', tinypivot: e.withOutput },
 ] as const
+const pastingTotal = e.pasted + e.rereads + e.rewrites
+const tinypivotTotal = e.withInput + e.withOutput
 </script>
 
 <template>
@@ -19,13 +22,47 @@ const lines = [
     <figcaption class="receipt-head">
       <span>{{ fmt(workload.rows) }} rows × {{ workload.cols }} cols · {{ workload.followUps }} follow-up questions</span>
     </figcaption>
-    <ol class="receipt-lines">
-      <li v-for="line in lines" :key="line.label" :class="line.sign === '-' ? 'minus' : 'plus'">
-        <span class="sign" aria-hidden="true">{{ line.sign }}</span>
-        <span class="what">{{ line.label }}</span>
-        <span class="tok">{{ fmt(line.tokens) }}</span>
-      </li>
-    </ol>
+    <table class="receipt-lines">
+      <thead>
+        <tr>
+          <th scope="col">
+            Tokens
+          </th>
+          <th scope="col" class="tok">
+            Pasting
+          </th>
+          <th scope="col" class="tok">
+            TinyPivot
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="line in lines" :key="line.label">
+          <th scope="row" class="what">
+            {{ line.label }}
+          </th>
+          <td class="tok pasting">
+            {{ 'pasting' in line ? fmt(line.pasting) : '' }}
+          </td>
+          <td class="tok tinypivot">
+            {{ 'tinypivot' in line ? fmt(line.tinypivot) : '' }}
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row" class="what">
+            Total
+          </th>
+          <td class="tok pasting">
+            {{ fmt(pastingTotal) }}
+          </td>
+          <td class="tok tinypivot">
+            {{ fmt(tinypivotTotal) }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
     <div class="receipt-total">
       <span class="what">Context you don't pay for</span>
       <span class="tok">{{ fmt(e.totalSaved) }} <small>tok · {{ savedPct }}%</small></span>
@@ -77,50 +114,56 @@ const lines = [
 }
 
 .receipt-lines {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.receipt-lines li,
-.receipt-total {
-  display: grid;
-  grid-template-columns: 14px 1fr auto;
-  gap: 8px;
-  align-items: baseline;
+.receipt-lines th,
+.receipt-lines td {
   padding: 9px 10px;
+  font-weight: 400;
+  text-align: left;
+  vertical-align: baseline;
 }
 
-.receipt-lines li:nth-child(odd) {
+.receipt-lines thead th {
+  padding-block: 8px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.receipt-lines tbody tr:nth-child(odd) {
   background: var(--ledger);
 }
 
-.sign {
+.receipt-lines tfoot th,
+.receipt-lines tfoot td {
+  border-top: 1px solid var(--rule);
   font-weight: 700;
 }
 
-.minus .sign,
-.minus .tok {
+.pasting {
   color: var(--minus);
 }
 
-.minus .tok {
-  text-decoration: line-through;
-}
-
-.plus .sign,
-.plus .tok {
+.tinypivot {
   color: var(--plus);
   font-weight: 700;
 }
 
 .tok {
-  text-align: right;
+  text-align: right !important;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .receipt-total {
+  display: grid;
+  gap: 8px;
   grid-template-columns: 1fr auto;
   align-items: center;
   padding: 14px 10px;
