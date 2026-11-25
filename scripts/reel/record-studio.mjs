@@ -3,7 +3,13 @@
  * Records a real pi session together with TinyPivot Studio, for the homepage reel.
  *
  *   node scripts/reel/record-studio.mjs <takes-dir> <take-name> --cwd <data-dir> --frames <out-dir>
+ *     [--scenario <file>]            the story (default scenarios/studio-pi.json)
  *     [--keep-extension <path>]...   other pi extensions to keep loaded (a sandbox, say)
+ *
+ * The scenario's steps drive pi in the terminal; its `studio` block plays the user in the Studio:
+ *   { "theme": "paper", "messages": ["…", "…"], "attachFirst": true, "check": true }
+ * Each message goes in through the Studio's message box (the first with the current view attached
+ * when `attachFirst`), and pi answers it in the trace; `check` presses Check this answer at the end.
  *
  * record.mjs runs pi in tmux with this build of TinyPivot and its pi extension, and types the
  * opening prompt. Meanwhile this script plays the user's side in the Studio in a browser:
@@ -13,7 +19,7 @@
  * Build first (`pnpm build:mcp`) and run under `with-secrets` so the server gets a Pro key.
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -32,14 +38,11 @@ const QUIET_MS = 2500
 const AGENT_TIMEOUT_MS = 6 * 60 * 1000
 const MIN_FRAME_GAP_MS = 800
 
-const NOTE = 'Partner looks weak outside North America. Split Partner MRR by month for 2026 and tell me if one month is the problem.'
-const QUESTION = 'Which plan grew fastest from 2025 to 2026?'
-
 function readArgs(argv) {
   const [takesDir, takeName, ...rest] = argv
   const values = name => rest.flatMap((arg, i) => (arg === name ? [rest[i + 1]] : []))
   if (!takesDir || !takeName || !values('--cwd')[0] || !values('--frames')[0]) {
-    console.error('Usage: node scripts/reel/record-studio.mjs <takes-dir> <take-name> --cwd <data-dir> --frames <out-dir> [--keep-extension <path>]')
+    console.error('Usage: node scripts/reel/record-studio.mjs <takes-dir> <take-name> --cwd <data-dir> --frames <out-dir> [--scenario <file>] [--keep-extension <path>]')
     process.exit(1)
   }
   return {
@@ -48,10 +51,12 @@ function readArgs(argv) {
     cwd: resolve(values('--cwd')[0]),
     framesDir: resolve(values('--frames')[0]),
     keepExtensions: values('--keep-extension').map(path => resolve(path)),
+    scenario: resolve(values('--scenario')[0] ?? join(ROOT, 'scripts/reel/scenarios/studio-pi.json')),
   }
 }
 
 const args = readArgs(process.argv.slice(2))
+const story = JSON.parse(readFileSync(args.scenario, 'utf8')).studio ?? {}
 const work = mkdtempSync(join(tmpdir(), 'tinypivot-studio-reel-'))
 const doneFile = join(work, 'done')
 const dataFolder = `${args.cwd}/`
@@ -77,7 +82,7 @@ async function prepare() {
           TINYPIVOT_LICENSE_KEY: ['$', '{TINYPIVOT_LICENSE_KEY}'].join(''),
           TINYPIVOT_PORT: String(PORT),
           TINYPIVOT_OPEN_STUDIO: '0',
-          TINYPIVOT_THEME: 'crt-amber',
+          TINYPIVOT_THEME: story.theme ?? 'crt-amber',
           TINYPIVOT_TELEMETRY: '0',
           XDG_DATA_HOME: join(work, 'data'),
           XDG_CONFIG_HOME: join(work, 'config'),
@@ -95,7 +100,7 @@ function startRecorder(extension) {
     .join(' ')
   return spawn(process.execPath, [
     join(ROOT, 'scripts/reel/record.mjs'),
-    join(ROOT, 'scripts/reel/scenarios/studio-pi.json'),
+    args.scenario,
     join(args.takesDir, `${args.takeName}.jsonl`),
     '--cwd',
     args.cwd,
@@ -174,7 +179,7 @@ function followStudio(camera) {
   void (async () => {
     while (state.running) {
       const snapshot = await studioSnapshot()
-      const signature = JSON.stringify([snapshot?.steps.length, snapshot?.notes.length, snapshot?.agent.live])
+      const signature = JSON.stringify([snapshot?.steps.length, snapshot?.agent.busy, snapshot?.agent.live])
       if (snapshot && signature !== last) {
         last = signature
         await sleep(700)
@@ -188,30 +193,35 @@ function followStudio(camera) {
   }
 }
 
+const replies = snapshot => snapshot?.steps.filter(step => step.tool === 'reply').length ?? 0
+
+/** Types a message in the Studio, sends it, and waits for pi's answer to land in the trace. */
+async function sendMessage(page, camera, text, attach) {
+  const before = replies(await studioSnapshot())
+  if (attach)
+    await page.getByRole('button', { name: /Attach the current view/ }).click()
+  await page.locator('.tp-studio-note-input').pressSequentially(text, { delay: 18 })
+  await camera.shoot()
+  await page.keyboard.press('Enter')
+  await waitFor(async () => replies(await studioSnapshot()) > before, AGENT_TIMEOUT_MS, `pi to answer "${text.slice(0, 40)}"`)
+  await waitForQuiet(2)
+  await sleep(1200)
+  await camera.shoot()
+}
+
+/** The user's side of the story: each Studio message in turn, then a check of the last answer. */
 async function playUser(page, camera) {
-  const snapshot = await waitForQuiet(2)
-  // Show the pivot the agent made, and send it back with a comment.
-  const pivot = [...snapshot.steps].reverse().find(step => step.view?.startsWith('pivot')) ?? snapshot.steps.at(-1)
-  await page.locator('.tp-studio-step-btn', { hasText: pivot.why ?? pivot.datasetName ?? '' }).first().click()
-  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await waitForQuiet(1)
   await sleep(1500)
   await camera.shoot()
-  await page.getByRole('button', { name: /Attach the current view/ }).click()
-  await page.locator('.tp-studio-note-input').pressSequentially(NOTE, { delay: 18 })
-  await camera.shoot()
-  const repliesBefore = snapshot.steps.filter(step => step.tool === 'reply').length
-  await page.keyboard.press('Enter')
-  await waitFor(async () => (await studioSnapshot())?.steps.filter(step => step.tool === 'reply').length > repliesBefore, AGENT_TIMEOUT_MS, 'pi to answer the note')
-  await waitForQuiet(2)
-  await camera.shoot()
-
-  // A follow-up question, answered in the trace.
-  await page.locator('.tp-studio-note-input').pressSequentially(QUESTION, { delay: 22 })
-  await camera.shoot()
-  await page.keyboard.press('Enter')
-  await waitFor(async () => (await studioSnapshot())?.steps.filter(step => step.tool === 'reply').length > repliesBefore + 1, AGENT_TIMEOUT_MS, 'pi to answer the question')
-  await waitForQuiet(2)
-  await camera.shoot()
+  for (const [index, message] of (story.messages ?? []).entries())
+    await sendMessage(page, camera, message, Boolean(story.attachFirst) && index === 0)
+  if (story.check) {
+    await page.getByRole('button', { name: /Check this answer/ }).last().click()
+    await page.waitForSelector('.tp-run-report', { timeout: AGENT_TIMEOUT_MS })
+    await sleep(800)
+    await camera.shoot()
+  }
 }
 
 if (await studioSnapshot())
@@ -230,7 +240,7 @@ try {
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 })
   await page.goto(STUDIO, { waitUntil: 'domcontentloaded' })
   // A large dataset keeps the page busy for a while after its first paint; start once it has settled.
-  await page.waitForFunction(() => document.querySelector('.tp-studio-step') && !document.body.textContent.includes('Add a Values'), null, { timeout: 30_000 }).catch(() => {})
+  await page.waitForFunction(() => document.querySelector('.tp-run') && !document.body.textContent.includes('Add a Values'), null, { timeout: 30_000 }).catch(() => {})
   const camera = createCamera(page)
   const stopFollowing = followStudio(camera)
   await playUser(page, camera)

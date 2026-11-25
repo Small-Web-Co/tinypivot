@@ -30,5 +30,13 @@
       "idle": 3000,
       "timeout": 60000
     }
-  ]
+  ],
+  "studio": {
+    "theme": "crt-amber",
+    "messages": [
+      "Partner looks weak outside North America. Split Partner MRR by month for 2026 and tell me if one month is the problem.",
+      "Which plan grew fastest from 2025 to 2026?"
+    ],
+    "attachFirst": true
+  }
 }

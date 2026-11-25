@@ -1,0 +1,42 @@
+{
+  "command": "sh -c 'exec pi --no-extensions $REEL_PI_EXTENSIONS --approve --no-skills --no-prompt-templates'",
+  "cols": 96,
+  "rows": 46,
+  "steps": [
+    {
+      "idle": 2500,
+      "timeout": 40000
+    },
+    {
+      "sleep": 1000
+    },
+    {
+      "type": "map 2026 MRR by region from acme-orders.csv"
+    },
+    {
+      "sleep": 500
+    },
+    {
+      "key": "Enter"
+    },
+    {
+      "sleep": 3000
+    },
+    {
+      "untilFile": "$REEL_DONE_FILE",
+      "timeout": 900000
+    },
+    {
+      "idle": 3000,
+      "timeout": 60000
+    }
+  ],
+  "studio": {
+    "theme": "paper",
+    "messages": [
+      "Which plans grew from 2025 to 2026? Show it as a slope.",
+      "Compare each region's 2026 MRR with its 2025 MRR as a bullet chart, 2025 as the target, in deck style."
+    ],
+    "check": true
+  }
+}
