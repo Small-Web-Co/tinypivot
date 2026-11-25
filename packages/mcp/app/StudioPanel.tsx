@@ -3,7 +3,7 @@ import type { Claim, NoteAttachment, StepCheck, StudioSnapshot } from '../src/st
 import type { Run, StudioStep } from './runs'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { postToStudio } from './companionApi'
-import { claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from './runs'
+import { checkReport, claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from './runs'
 
 /**
  * The Studio side panel reads the trace as questions. Each one shows what was asked, then how the
@@ -270,6 +270,8 @@ interface RunCardProps {
   activeDatasetId: string
   loaded: Set<string>
   checks: Record<string, StepCheck[]>
+  /** When each question was last checked, by run id. */
+  checkTimes: Record<string, string>
   checking: boolean
   onToggle: () => void
   onOpenStep: (step: StudioStep, viewMode?: 'grid') => void
@@ -286,11 +288,34 @@ function runBadges(run: Run, checks: Record<string, StepCheck[]>) {
   return { summary, checked: results.length > 0, allOk: results.every(check => check.ok) }
 }
 
+/** The result of checking a question, at the top of what the user reads after pressing Check. */
+function CheckReport({ lines, at }: { lines: Array<{ ok: boolean, text: string }>, at: string }) {
+  const allOk = lines.every(line => line.ok)
+  return (
+    <div className={`tp-run-report ${allOk ? 'is-ok' : 'is-warn'}`} role="status">
+      <p className="tp-run-report-head">{`${allOk ? 'Checked' : 'Check found problems'} · ${clockTime(at)}`}</p>
+      {lines.length === 0
+        ? <p>Nothing in this question could be checked: it has no source file, SQL or numbers to compare.</p>
+        : (
+            <ul>
+              {lines.map(line => (
+                <li key={line.text} className={line.ok ? 'is-ok' : 'is-warn'}>
+                  <span aria-hidden="true">{line.ok ? '✓' : '!'}</span>
+                  {line.text}
+                </li>
+              ))}
+            </ul>
+          )}
+    </div>
+  )
+}
+
 /** A question and, when open, every step that answered it. */
-function RunCard({ run, open, activeDatasetId, loaded, checks, checking, onToggle, onOpenStep, onEdit, onCheck, onCopy }: RunCardProps) {
+function RunCard({ run, open, activeDatasetId, loaded, checks, checkTimes, checking, onToggle, onOpenStep, onEdit, onCheck, onCopy }: RunCardProps) {
   const stages = run.steps.filter(step => step.tool !== 'note')
   const { summary, checked, allOk } = runBadges(run, checks)
   const verifiable = run.steps.some(step => step.fingerprint || step.source)
+  const checkedAt = checked ? checkTimes[run.id] : undefined
   return (
     <li className={`tp-run ${open ? 'is-open' : ''}`}>
       <button type="button" className="tp-run-head" aria-expanded={open} onClick={onToggle}>
@@ -319,10 +344,11 @@ function RunCard({ run, open, activeDatasetId, loaded, checks, checking, onToggl
               />
             ))}
           </ol>
+          {checkedAt && <CheckReport lines={checkReport(run, checks)} at={checkedAt} />}
           <div className="tp-studio-actions">
             {verifiable && (
               <button type="button" className="tp-studio-btn" disabled={checking} onClick={onCheck} title="Check the sources are unchanged and the SQL gives the same rows again">
-                {checking ? 'Checking…' : 'Check this answer'}
+                {checking ? 'Checking…' : checkedAt ? 'Check again' : 'Check this answer'}
               </button>
             )}
             <button type="button" className="tp-studio-btn tp-studio-btn-ghost" onClick={onCopy}>Copy for terminal</button>
@@ -581,6 +607,7 @@ function useFollowLatest(count: number) {
 /** Verifies every step of a question that can be checked, one after another. */
 function useChecks(notify: (message: string) => void) {
   const [checks, setChecks] = useState<Record<string, StepCheck[]>>({})
+  const [checkTimes, setCheckTimes] = useState<Record<string, string>>({})
   const [checking, setChecking] = useState<string | null>(null)
   const check = useCallback(async (run: Run) => {
     setChecking(run.id)
@@ -589,15 +616,18 @@ function useChecks(notify: (message: string) => void) {
         const result = await postToStudio<{ checks: StepCheck[] }>('/api/studio/verify', { stepId: step.id })
         setChecks(prev => ({ ...prev, [step.id]: result.checks }))
       }
+      setCheckTimes(prev => ({ ...prev, [run.id]: new Date().toISOString() }))
     }
     catch (err) {
-      notify(err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      // An agent started before this version keeps its older server, which has no check to run.
+      notify(/not found/i.test(message) ? 'This Studio\'s server is from an older TinyPivot. Restart your agent to check answers.' : message)
     }
     finally {
       setChecking(null)
     }
   }, [notify])
-  return { checks, checking, check }
+  return { checks, checkTimes, checking, check }
 }
 
 export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onAttachView, onClearAttachment, notify }: StudioPanelProps) {
@@ -608,7 +638,7 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
   const [aboutId, setAboutId] = useState<string | null>(null)
   const [focusKey, setFocusKey] = useState(0)
   const { listRef, onScroll } = useFollowLatest(snapshot.steps.length)
-  const { checks, checking, check } = useChecks(notify)
+  const { checks, checkTimes, checking, check } = useChecks(notify)
 
   const loaded = useMemo(() => new Set(snapshot.loadedIds), [snapshot.loadedIds])
   const live = snapshot.agent.live.length > 0
@@ -667,6 +697,7 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
                       activeDatasetId={activeDatasetId}
                       loaded={loaded}
                       checks={checks}
+                      checkTimes={checkTimes}
                       checking={checking === run.id}
                       onToggle={() => setOpenId(run.id === shownId ? '' : run.id)}
                       onOpenStep={(step, viewMode) => void post('/api/studio/show', { stepId: step.id, viewMode })}

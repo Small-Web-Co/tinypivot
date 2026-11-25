@@ -1605,6 +1605,8 @@ body,
 
 .tp-runs {
   display: grid;
+  /* One column no wider than the panel: a long SQL line or view name is cut, it never widens the card. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   margin: 0;
   padding: 0;
@@ -1679,6 +1681,7 @@ body,
 
 .tp-run-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 0 10px 10px;
 }
@@ -1687,6 +1690,7 @@ body,
 .tp-run-stages {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin: 0;
   padding: 0;
@@ -1736,6 +1740,7 @@ body,
 
 .tp-run-stage-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 5px;
   min-width: 0;
 }
@@ -1771,6 +1776,8 @@ body,
 
 /* The SQL, one line until asked for in full. */
 .tp-run-sql-line {
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   padding: 3px 6px;
   border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.2));
@@ -1927,4 +1934,52 @@ body,
   .tp-studio-agent.is-busy .tp-studio-agent-dot {
     animation: none;
   }
+}
+
+/* What checking a question showed: a short report above its buttons, green when everything held. */
+.tp-run-report {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid currentColor;
+  border-radius: var(--tp-radius);
+  font: 11.5px/1.45 var(--tp-mono);
+}
+
+.tp-run-report.is-ok {
+  color: var(--tp-ok);
+  background: color-mix(in srgb, var(--tp-ok) 8%, transparent);
+}
+
+.tp-run-report.is-warn {
+  color: var(--tp-warn);
+  background: color-mix(in srgb, var(--tp-warn) 8%, transparent);
+}
+
+.tp-run-report p {
+  margin: 0;
+}
+
+.tp-run-report-head {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+}
+
+.tp-run-report ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tp-run-report li {
+  display: flex;
+  gap: 6px;
+}
+
+.tp-run-report li.is-ok {
+  color: var(--color-text-primary, inherit);
 }

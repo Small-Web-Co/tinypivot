@@ -1,6 +1,6 @@
 import type { StudioStep } from '../../packages/mcp/app/runs'
 import { describe, expect, it } from 'vitest'
-import { claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from '../../packages/mcp/app/runs'
+import { checkReport, claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from '../../packages/mcp/app/runs'
 import { checkClaims, extractNumbers } from '../../packages/mcp/src/claims'
 
 let clock = 0
@@ -89,5 +89,38 @@ describe('the trace as questions', () => {
     const claims = [{ text: '1.20M', status: 'found' as const, where: 'q1' }, { text: '9%', status: 'unchecked' as const }]
     expect(markClaims('Q1 was 1.20M, up 9%.', claims)).toEqual(['Q1 was ', claims[0], ', up ', claims[1], '.'])
     expect(claimSummary(claims).text).toBe('1 of 1 number found in the data')
+  })
+})
+
+describe('the report after checking a question', () => {
+  const run = groupRuns([
+    step({ tool: 'load_file', ask: 'MRR by region', file: '/data/acme.csv', datasetId: 'a', fingerprint: { rows: 5, hash: 'x' }, source: { file: '/data/acme.csv', bytes: 10, modifiedAt: 'then' } }),
+    step({ tool: 'query', sql: 'SELECT …', datasetId: 'b', fingerprint: { rows: 4, hash: 'y' } }),
+    step({ tool: 'reply', why: 'EMEA leads at 1.4M; LATAM 5.4M.', claims: [{ text: '1.4M', status: 'found' }, { text: '5.4M', status: 'not-found' }] }),
+  ])[0]
+
+  it('rolls up what held and names what did not', () => {
+    const [load, query] = run.steps
+    const report = checkReport(run, {
+      [load.id]: [{ kind: 'source', ok: true, detail: 'The file is unchanged since this step.' }, { kind: 'rerun', ok: true, detail: '…' }],
+      [query.id]: [{ kind: 'rerun', ok: false, detail: 'Different result: 3 rows now, 4 then.' }],
+    })
+    expect(report).toEqual([
+      { ok: true, text: 'Source file unchanged' },
+      { ok: false, text: 'Different result: 3 rows now, 4 then.' },
+      { ok: false, text: '1 of 2 numbers in the answer found in the data; not found: 5.4M' },
+    ])
+  })
+
+  it('says so when every step and number held', () => {
+    const [load, query] = run.steps
+    const allFound = { ...run, steps: run.steps.map(s => (s.tool === 'reply' ? { ...s, claims: [{ text: '1.4M', status: 'found' as const }] } : s)) }
+    expect(checkReport(allFound, {
+      [load.id]: [{ kind: 'rerun', ok: true, detail: '' }],
+      [query.id]: [{ kind: 'rerun', ok: true, detail: '' }],
+    })).toEqual([
+      { ok: true, text: '2 steps gave the same rows again' },
+      { ok: true, text: 'The number in the answer was found in the data' },
+    ])
   })
 })
