@@ -252,8 +252,7 @@ describe('reel: tabs', () => {
   it('groups the tabs by where the agent runs, keeping the order they play in', () => {
     const groups = reelGroups()
     expect(groups.map(group => [group.label, group.scenes.map(({ scene }) => scene.harness)])).toEqual([
-      ['Terminal', ['pi + Studio', 'Claude Code', 'pi', 'OpenCode']],
-      ['Editor', ['Antigravity']],
+      ['Terminal', ['pi + Studio', 'Claude Code', 'pi', 'OpenCode', 'Antigravity CLI']],
     ])
     expect(groups.flatMap(group => group.scenes.map(({ index }) => index))).toEqual(reelScenes.map((_, index) => index))
   })

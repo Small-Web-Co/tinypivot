@@ -97,8 +97,8 @@ export const reelScenes: ReelScene[] = [
   },
   {
     id: 'antigravity',
-    harness: 'Antigravity',
-    surface: 'editor',
+    harness: 'Antigravity CLI',
+    surface: 'terminal',
     theme: 'greenbar',
     headline: 'Works in Antigravity too.',
     detail: 'The agent asks permission, calls TinyPivot once, and the chart is in the reply.',
