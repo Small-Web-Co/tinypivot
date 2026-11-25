@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { CHART_THEME_IDS, computePivotResult, processChartData, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
+import { saveVisualThemePreference } from './store.js'
 import { padEndVisual, padStartVisual, truncateVisual, visualWidth } from './summary.js'
 
 interface TuiPayload {
@@ -531,12 +532,13 @@ export async function runTuiCommand(args: string[]): Promise<void> {
       lines.push(frameTuiLine(c, innerWidth, pal))
     lines.push(frameTuiLine('', innerWidth, pal))
 
+    const liveLink = fg(pal.accent, `↗ Live UI: ${baseUrl}`)
     const keysText = '[1] Chart  [2] Pivot  [3] Data  [c] Type  [t] Theme  [r] Sync  [q] Quit'
     const brandText = payload?.tier === 'pro' ? 'TinyPivot Pro' : 'tiny-pivot.com'
     const safeKeys = truncateVisual(keysText, Math.max(16, innerWidth - visualWidth(brandText) - 5))
     const botDashes = Math.max(1, innerWidth - 4 - visualWidth(safeKeys) - visualWidth(brandText))
     const botBorder = `${fg(pal.border, '╰─')} ${DIM}${fg(pal.muted, safeKeys)}${RESET} ${fg(pal.border, '─'.repeat(botDashes))} ${fg(pal.accent, brandText)} ${fg(pal.border, '─╯')}`
-    lines.push(botBorder)
+    lines.push(divider, frameTuiLine(liveLink, innerWidth, pal), botBorder)
 
     process.stdout.write(`${lines.map(l => ` ${l}`).join('\n')}\n`)
   }
@@ -587,6 +589,13 @@ export async function runTuiCommand(args: string[]): Promise<void> {
       }
       else if (key === 't') {
         themeIdx = (themeIdx + 1) % THEME_ORDER.length
+        const nextTheme = THEME_ORDER[themeIdx]
+        saveVisualThemePreference(nextTheme)
+        void fetch(`${baseUrl}/api/theme`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme: nextTheme }),
+        }).catch(() => {})
       }
       else if (key === 'c') {
         activeView = 'chart'
