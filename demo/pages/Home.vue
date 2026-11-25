@@ -21,7 +21,11 @@ const facts = ['free', 'runs locally', 'no signup', 'no API key']
 // The hero's fine print comes from the measured benchmark shown in the savings section.
 const headline = benchmarkHeadline()
 
-const heroPoints = ['Exact totals, computed on your machine', 'Every figure in the answer checked', 'Every step with its SQL, in the Studio'] as const
+const heroPoints = [
+  '50k–500k rows locally in ~200ms — 0 raw rows to the LLM',
+  'Drag-and-drop pivots, drill-through & .xlsx ($0 tokens)',
+  'Every answer figure checked, with saved SQL in Studio',
+] as const
 
 const capabilities = [
   {
@@ -50,25 +54,31 @@ const capabilities = [
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
-                Data analysis studio for AI agents
+                Local data studio for agents · Not a chat artifact
               </p>
               <h1 class="display">
-                Ask your data in any agent. <em>Every number checked.</em>
+                Real pivots in any agent. <em>Zero rows to the LLM.</em>
               </h1>
               <p class="lede">
-                TinyPivot runs the numbers on your machine, draws the chart, and checks each figure in the agent's answer
-                against the data. It never sends your raw rows to the model. Works in Claude Code, Cursor, pi, OpenCode and Antigravity.
+                Chat artifacts don't exist in Claude Code, Cursor, pi or OpenCode—and choke past a few hundred rows.
+                TinyPivot streams 50k+ rows locally in milliseconds, lets you pivot, drill through and export .xlsx at $0 tokens,
+                and checks every figure against the data.
               </p>
               <ul class="hero-points">
                 <li v-for="point in heroPoints" :key="point">
                   {{ point }}
                 </li>
               </ul>
-              <a href="#savings" class="hero-fine">
-                Measured in Claude Code: {{ headline.cheaperThanPythonPct }}% cheaper than an agent writing Python
-                on a {{ headline.largeRows.toLocaleString('en-US') }}-row file, with {{ headline.correct }}/{{ headline.questions }} exact answers.
-                Benchmark ↓
-              </a>
+              <div class="hero-meta-links">
+                <a href="#savings" class="hero-fine">
+                  Measured in Claude Code: {{ headline.cheaperThanPythonPct }}% cheaper than Python
+                  on a {{ headline.largeRows.toLocaleString('en-US') }}-row file ({{ headline.correct }}/{{ headline.questions }} exact).
+                  Benchmark ↓
+                </a>
+                <router-link to="/docs#why" class="hero-why-link">
+                  Why TinyPivot, not a chat artifact →
+                </router-link>
+              </div>
             </div>
             <div class="hero-side">
               <HeroCharts class="hero-charts" />
@@ -253,11 +263,23 @@ const capabilities = [
   font-weight: 700;
 }
 
+.hero-meta-links {
+  display: grid;
+  gap: 6px;
+}
+
 .hero-fine {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1.5;
   color: var(--ink-muted);
+}
+
+.hero-why-link {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--accent);
+  text-underline-offset: 4px;
 }
 
 .facts {

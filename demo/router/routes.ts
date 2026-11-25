@@ -98,8 +98,8 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot — Ask your data in any agent. Every number checked.',
-      description: 'TinyPivot runs the numbers on your machine, draws the chart, and checks each figure in your agent\'s answer against the data. It never sends your raw rows to the model. Works in Claude Code, Cursor, pi, OpenCode and Antigravity.',
+      title: 'TinyPivot — Real pivots in any agent. Zero rows to the LLM.',
+      description: 'Local data studio for Claude Code, Cursor, pi, OpenCode, Antigravity & Claude Desktop. Stream 50k+ rows locally in milliseconds, pivot, drill through & export .xlsx at $0 tokens—every figure checked.',
     },
   },
   {
