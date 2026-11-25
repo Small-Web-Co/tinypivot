@@ -77,6 +77,24 @@ export const modelRates: readonly ModelRate[] = [
 
 export const WEEKS_PER_MONTH = 4.33
 
+/** The model the homepage headline prices its example at. */
+export const EXAMPLE_RATE: ModelRate = modelRates.find(rate => rate.name === 'Claude Opus 5.5') ?? modelRates[0]
+
+/**
+ * The headline numbers: what the worked example saves, as a share of tokens and in dollars.
+ * This is one worked example, not a measured average across users.
+ */
+export function exampleSavings() {
+  const estimate = estimateTokens(EXAMPLE_WORKLOAD)
+  return {
+    /** Rounded down to one decimal so the claim never overstates. */
+    percent: Math.floor(estimate.savedShare * 1000) / 10,
+    usd: usdSavedPerAnalysis(estimate, EXAMPLE_RATE),
+    tokensWithout: estimate.withoutInput + estimate.rewrites,
+    tokensWith: estimate.withInput,
+  }
+}
+
 export function usdSavedPerAnalysis(estimate: TokenEstimate, rate: ModelRate): number {
   return (estimate.inputSaved / 1_000_000) * rate.input + (estimate.outputSaved / 1_000_000) * rate.output
 }

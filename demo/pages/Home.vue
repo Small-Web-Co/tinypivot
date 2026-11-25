@@ -5,7 +5,7 @@ import ContextMeter from '../components/site/ContextMeter.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
-import { estimateTokens, EXAMPLE_WORKLOAD } from '../site/savings'
+import { EXAMPLE_RATE, EXAMPLE_WORKLOAD, exampleSavings, formatUsd } from '../site/savings'
 
 // The showcase loads the real grid and chart library, so it is fetched in the
 // browser only and kept out of the prerendered HTML and the first bundle.
@@ -17,14 +17,15 @@ onMounted(() => {
 
 const facts = ['free', 'runs locally', 'no signup', 'no API key']
 
-// Hero proof line: the same worked example as the receipt further down the page.
-const example = estimateTokens(EXAMPLE_WORKLOAD)
+// Hero figures: the same worked example as the receipt further down the page.
+const savings = exampleSavings()
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US')
 const heroProof = {
+  percent: savings.percent,
+  usd: formatUsd(savings.usd),
   rows: fmt(EXAMPLE_WORKLOAD.rows),
-  without: fmt(example.withoutInput + example.rewrites),
-  withTinyPivot: fmt(example.withInput),
-  savedPct: Math.floor(example.savedShare * 1000) / 10,
+  followUps: EXAMPLE_WORKLOAD.followUps,
+  model: EXAMPLE_RATE.name,
 }
 
 const capabilities = [
@@ -54,19 +55,31 @@ const capabilities = [
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
-                MCP server · cuts token spend on data questions
+                MCP server for AI coding agents
               </p>
               <h1 class="display">
-                Your agent reads the <em>summary.</em> You read the data.
+                Stop spending tokens on <em>reading data.</em>
               </h1>
               <p class="lede">
                 Paste query results into chat and you pay for every row, again on every follow-up.
-                TinyPivot draws them as a chart and pivot inside Claude, Cursor, Antigravity, OpenCode and pi,
-                and gives the model a ~200-token summary instead.
+                TinyPivot keeps the rows on your machine, draws the chart and pivot inside Claude, Cursor,
+                Antigravity, OpenCode and pi, and sends the model a short summary instead.
               </p>
               <a href="#savings" class="hero-proof">
-                <strong>{{ heroProof.withTinyPivot }} tokens instead of {{ heroProof.without }}</strong>
-                on a {{ heroProof.rows }}-row result. That is {{ heroProof.savedPct }}% less to pay for. See the math ↓
+                <span class="hero-stats">
+                  <span class="hero-stat">
+                    <strong>{{ heroProof.percent }}<span class="hero-unit">%</span></strong>
+                    fewer tokens
+                  </span>
+                  <span class="hero-stat">
+                    <strong>{{ heroProof.usd }}</strong>
+                    saved per analysis
+                  </span>
+                </span>
+                <span class="hero-fine">
+                  Example: {{ heroProof.rows }} rows, {{ heroProof.followUps }} follow-ups, {{ heroProof.model }} prices.
+                  See the math ↓
+                </span>
               </a>
             </div>
             <div id="install" class="hero-install">
@@ -213,19 +226,55 @@ const capabilities = [
 }
 
 .hero-proof {
-  display: block;
-  padding: 10px 12px;
-  border-left: 4px solid var(--plus);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: var(--line);
   background: var(--ledger);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  line-height: 1.5;
   text-decoration: none;
 }
 
-.hero-proof strong {
-  display: block;
-  font-size: 0.9rem;
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.hero-stat {
+  display: grid;
+  gap: 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.hero-stat + .hero-stat {
+  padding-left: 12px;
+  border-left: var(--line);
+}
+
+.hero-stat strong {
+  font-family: var(--font-dot);
+  font-size: clamp(2rem, 9vw, 3rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+/* The dot-matrix face draws "%" too loosely to read at a glance, so the unit uses the mono face. */
+.hero-unit {
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  font-weight: 700;
+}
+
+.hero-fine {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
 }
 
 .facts {

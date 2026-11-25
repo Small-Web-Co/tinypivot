@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   estimateTokens,
+  EXAMPLE_RATE,
+  exampleSavings,
   formatTokens,
   formatUsd,
   SCHEMA_SUMMARY_TOKENS,
@@ -52,5 +54,21 @@ describe('formatters', () => {
     expect(formatUsd(0.184)).toBe('$0.18')
     expect(formatUsd(42.6)).toBe('$43')
     expect(formatUsd(12_345.6)).toBe('$12,346')
+  })
+})
+
+describe('homepage headline figures', () => {
+  it('come from the worked example at a named model price', () => {
+    const savings = exampleSavings()
+    expect(EXAMPLE_RATE.name).toBe('Claude Opus 5.5')
+    expect(savings.tokensWithout).toBe(93_000)
+    expect(savings.tokensWith).toBe(300)
+    // 89,700 input tokens at $4/M plus 3,000 output tokens at $20/M.
+    expect(savings.usd).toBeCloseTo(0.4188)
+  })
+
+  it('round the percentage down so the claim never overstates', () => {
+    expect(exampleSavings().percent).toBe(99.6)
+    expect(exampleSavings().percent).toBeLessThanOrEqual((92_700 / 93_000) * 100)
   })
 })
