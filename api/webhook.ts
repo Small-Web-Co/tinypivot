@@ -136,7 +136,7 @@ async function sendLicenseEmail(email: string, licenseKey: string, plan: string)
     ? `
           <h2>1-Command Setup for Your AI Harnesses:</h2>
           <pre style="background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; font-size: 13px; overflow-x: auto;">
-npx @smallwebco/tinypivot-mcp init --license=${licenseKey}
+npx @smallwebco/tinypivot-mcp@latest init --license=${licenseKey}
           </pre>
           <p>Or set <code>TINYPIVOT_LICENSE_KEY</code> in your MCP config's <code>env</code> block and restart your AI harness (Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, or pi).</p>
           <p>This unlocks unlimited rows, all 5 chart themes, double-click drill-through, advanced aggregations, styled <code>.xlsx</code> exports, and read-only <code>query_postgres</code>.</p>

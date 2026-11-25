@@ -107,19 +107,23 @@ async function copyActive() {
 
 .install-cmd {
   margin: 0;
-  overflow-x: auto;
   font-size: 0.78rem;
   line-height: 1.7;
-  white-space: pre;
-  scrollbar-width: thin;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
+/* Long commands wrap instead of scrolling, with continuation lines indented past the prompt. */
 .install-line {
   display: block;
+  padding-left: 2ch;
+  text-indent: -2ch;
 }
 
 .install-prompt {
-  margin-right: 10px;
+  display: inline-block;
+  width: 2ch;
+  text-indent: 0;
   color: var(--accent);
   user-select: none;
 }

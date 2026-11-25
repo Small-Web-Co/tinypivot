@@ -1,4 +1,4 @@
-import { INIT_COMMAND, MCP_PACKAGE } from './install'
+import { INIT_COMMAND, MCP_SPEC } from './install'
 
 export interface HarnessSetup {
   id: string
@@ -13,7 +13,7 @@ function npxServer(env?: Record<string, string>) {
     mcpServers: {
       tinypivot: {
         command: 'npx',
-        args: ['-y', MCP_PACKAGE],
+        args: ['-y', MCP_SPEC],
         ...(env ? { env } : {}),
       },
     },
@@ -26,7 +26,7 @@ export const harnesses: HarnessSetup[] = [
     label: 'Claude Code, OpenCode, pi, Codex',
     summary: 'Unicode charts and pivot cards in the terminal, plus a live Data IDE on localhost.',
     filename: 'shell',
-    code: `# Wire every harness it finds:\n${INIT_COMMAND}\n\n# Or add it to Claude Code by hand:\nclaude mcp add tinypivot -- npx -y ${MCP_PACKAGE} --open`,
+    code: `# Wire every harness it finds:\n${INIT_COMMAND}\n\n# Or add it to Claude Code by hand:\nclaude mcp add tinypivot -- npx -y ${MCP_SPEC} --open`,
   },
   {
     id: 'claude-desktop',

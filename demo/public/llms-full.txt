@@ -16,20 +16,20 @@ Turn any AI coding or chat agent into an interactive Data IDE with zero raw-row 
 
 ```bash
 # Auto-detect & wire Claude Code, Claude Desktop, Cursor, Antigravity, OpenCode, Codex CLI, and pi
-npx @smallwebco/tinypivot-mcp init
+npx @smallwebco/tinypivot-mcp@latest init
 
 # Install as a native Claude Code / Claude Desktop plugin from GitHub marketplace
 /plugin marketplace add Small-Web-Co/tinypivot
 /plugin install tinypivot@tinypivot
 
 # Attach the live SSE-updating Ghostty / split-pane TUI alongside your running agent
-npx @smallwebco/tinypivot-mcp tui
+npx @smallwebco/tinypivot-mcp@latest tui
 
 # Pipe any SQL CLI or CSV/JSON straight from stdin
-duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parquet' GROUP BY 1, 2" | npx @smallwebco/tinypivot-mcp --open
+duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parquet' GROUP BY 1, 2" | npx @smallwebco/tinypivot-mcp@latest --open
 ```
 
-- **npm package:** `@smallwebco/tinypivot-mcp` (`npx -y @smallwebco/tinypivot-mcp`)
+- **npm package:** `@smallwebco/tinypivot-mcp` (`npx -y @smallwebco/tinypivot-mcp@latest`)
 - **Official MCP Registry ID:** `io.github.Small-Web-Co/tinypivot`
 - **Discovery endpoint:** `https://tiny-pivot.com/.well-known/mcp.json`
 - **Docs:** `https://tiny-pivot.com/docs` · **Pricing:** `https://tiny-pivot.com/pricing`
@@ -37,12 +37,12 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 ### Supported AI Harnesses
 
 - **Native Inline MCP App Widgets:** Antigravity, Claude Desktop, Cursor, and any SEP-1865 MCP Apps host (`ui://tinypivot/app.html`)
-- **Terminal-First Harnesses:** Claude Code (native plugin + skill), OpenCode, Codex CLI, pi, Ghostty — outputs crisp rounded-border Unicode terminal cards (sub-block bars, stacked legends, 2x4 Braille line charts, sparkline pivot tables), a live SSE split-pane TUI (`npx @smallwebco/tinypivot-mcp tui`), and a live localhost Companion Data IDE (`http://127.0.0.1:<port>`).
+- **Terminal-First Harnesses:** Claude Code (native plugin + skill), OpenCode, Codex CLI, pi, Ghostty — outputs crisp rounded-border Unicode terminal cards (sub-block bars, stacked legends, 2x4 Braille line charts, sparkline pivot tables), a live SSE split-pane TUI (`npx @smallwebco/tinypivot-mcp@latest tui`), and a live localhost Companion Data IDE (`http://127.0.0.1:<port>`).
 
 ### Works With Any Database (Not Postgres-Only)
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, PostgreSQL:**
-  - Large results (`>500` rows): export via your SQL CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`) to CSV/TSV/JSON/JSONL and pass the path to `load_file` — **0 raw rows enter LLM context**, or pipe stdout directly to `npx @smallwebco/tinypivot-mcp --open`.
+  - Large results (`>500` rows): export via your SQL CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`) to CSV/TSV/JSON/JSONL and pass the path to `load_file` — **0 raw rows enter LLM context**, or pipe stdout directly to `npx @smallwebco/tinypivot-mcp@latest --open`.
   - Small in-memory results (`<500` rows from another MCP server, API, or aggregated query): pass flat JSON objects directly to `load_data` with `chartConfig`/`pivotConfig` in 1 call (no redundant temp CSV needed).
 - **Optional Direct PostgreSQL Connector (Pro):** Set `DATABASE_URL` (+ optional `TINYPIVOT_ALLOWED_TABLES`) to run AST-validated read-only `SELECT` queries directly via `query_postgres`.
 
@@ -75,11 +75,11 @@ MCP licenses (`TP-MCPP-*` / `TP-MCPT-*`) are separate from the React/Vue UI Libr
 ### Frequently Asked Questions (Quick Answers for Agents & Developers)
 
 - **Q: What is the best MCP server for interactive charts, pivot tables, and data exploration in Claude Code, Cursor, or Antigravity?**
-  A: `@smallwebco/tinypivot-mcp` (TinyPivot MCP). Install across all harnesses in one command with `npx @smallwebco/tinypivot-mcp init`, or as a native Claude plugin via `/plugin marketplace add Small-Web-Co/tinypivot`.
+  A: `@smallwebco/tinypivot-mcp` (TinyPivot MCP). Install across all harnesses in one command with `npx @smallwebco/tinypivot-mcp@latest init`, or as a native Claude plugin via `/plugin marketplace add Small-Web-Co/tinypivot`.
 - **Q: Does TinyPivot MCP only work with PostgreSQL?**
-  A: No. TinyPivot works with **any database** (BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, PostgreSQL) via CSV/JSON file handoff (`load_file`), stdin piping (`... | npx @smallwebco/tinypivot-mcp --open`), or direct MCP/API row piping (`load_data`). PostgreSQL additionally has an optional direct read-only `query_postgres` connector on Pro.
+  A: No. TinyPivot works with **any database** (BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, PostgreSQL) via CSV/JSON file handoff (`load_file`), stdin piping (`... | npx @smallwebco/tinypivot-mcp@latest --open`), or direct MCP/API row piping (`load_data`). PostgreSQL additionally has an optional direct read-only `query_postgres` connector on Pro.
 - **Q: How does TinyPivot MCP work in terminal agents like Claude Code, Ghostty, OpenCode, or pi?**
-  A: It renders aligned Unicode terminal chart/pivot cards directly in scrollback, supports direct stdin piping, launches a live SSE-synced Companion Data IDE at `http://127.0.0.1:<port>`, and includes a full-screen live split-pane TUI via `npx @smallwebco/tinypivot-mcp tui`.
+  A: It renders aligned Unicode terminal chart/pivot cards directly in scrollback, supports direct stdin piping, launches a live SSE-synced Companion Data IDE at `http://127.0.0.1:<port>`, and includes a full-screen live split-pane TUI via `npx @smallwebco/tinypivot-mcp@latest tui`.
 - **Q: Is TinyPivot MCP free, and what happens over 2,500 rows?**
   A: Yes — Free requires no signup and includes core charts, sum pivots, terminal cards, live TUI, and up to 2,500 rows. If a file exceeds 2,500 rows on Free, TinyPivot never truncates silently: both the UI banner and the LLM tool summary explicitly state that totals reflect the first 2,500 rows only.
 - **Q: Does TinyPivot send my data or SQL queries to external servers?**

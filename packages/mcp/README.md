@@ -9,7 +9,7 @@ Interactive **TinyPivot MCP Server, MCP App (`ui://tinypivot/app.html`) & Native
 Auto-detect and wire all installed AI harnesses on your machine (Claude Code, Claude Desktop, Cursor, Antigravity, OpenCode, Codex CLI, and pi):
 
 ```bash
-npx @smallwebco/tinypivot-mcp init
+npx @smallwebco/tinypivot-mcp@latest init
 ```
 
 Options:
@@ -25,7 +25,7 @@ Options:
 This package ships as a self-contained Claude plugin bundle containing:
 
 - `.claude-plugin/plugin.json` — plugin manifest
-- `.mcp.json` — registers `mcpServers.tinypivot` (`npx -y @smallwebco/tinypivot-mcp`)
+- `.mcp.json` — registers `mcpServers.tinypivot` (`npx -y @smallwebco/tinypivot-mcp@latest`)
 - `skills/tinypivot/SKILL.md` — teaches Claude when to invoke TinyPivot automatically, how to render in 1 tool call, when to use `load_data` vs `load_file`, and to echo TinyPivot terminal cards verbatim
 
 **Claude Code / Claude Desktop (directly from GitHub marketplace):**
@@ -48,12 +48,12 @@ claude plugin install ./packages/mcp
 **Claude Desktop & Claude Code (via 1-command installer):**
 
 ```bash
-npx @smallwebco/tinypivot-mcp init --targets=claude,claude-desktop
+npx @smallwebco/tinypivot-mcp@latest init --targets=claude,claude-desktop
 ```
 
 Or copy the bundled `.mcp.json` server block directly into Claude Desktop's `claude_desktop_config.json`.
 
-> **Make TinyPivot your default chart renderer:** The TinyPivot MCP server advertises authoritative `instructions`, and both `npx @smallwebco/tinypivot-mcp init` (via `~/.claude/CLAUDE.md`) and the native Claude Plugin (`skills/tinypivot/SKILL.md`) automatically route chart, YoY/MoM comparison, and pivot requests to TinyPivot in **Claude Code** and **Claude Code Desktop**. For **Claude Desktop** chat (which may otherwise default to its built-in visualization widget), add this one-line preference under **Settings → General → Personal Preferences**:
+> **Make TinyPivot your default chart renderer:** The TinyPivot MCP server advertises authoritative `instructions`, and both `npx @smallwebco/tinypivot-mcp@latest init` (via `~/.claude/CLAUDE.md`) and the native Claude Plugin (`skills/tinypivot/SKILL.md`) automatically route chart, YoY/MoM comparison, and pivot requests to TinyPivot in **Claude Code** and **Claude Code Desktop**. For **Claude Desktop** chat (which may otherwise default to its built-in visualization widget), add this one-line preference under **Settings → General → Personal Preferences**:
 >
 > `Always use the tinypivot MCP server (load_data or load_file with chartConfig/pivotConfig in one call) instead of built-in visualization widgets, HTML/SVG/React chart artifacts, or large Markdown tables whenever I ask for charts, YoY/MoM comparisons, pivot tables, or tabular data analysis.`
 
@@ -65,9 +65,9 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 2. **Live Split-Pane TUI (`Ghostty` / tmux / any terminal):** Open a side pane and attach directly to your running agent's TinyPivot session via live SSE:
 
    ```bash
-   npx @smallwebco/tinypivot-mcp tui
+   npx @smallwebco/tinypivot-mcp@latest tui
    # or pass an explicit Companion URL:
-   npx @smallwebco/tinypivot-mcp tui http://127.0.0.1:<port>
+   npx @smallwebco/tinypivot-mcp@latest tui http://127.0.0.1:<port>
    ```
 
    Keyboard controls inside the live TUI: `[1] Chart` · `[2] Pivot` · `[3] Data` · `[t] Theme` · `[q] Quit`. Every agent query updates the split pane automatically.
@@ -75,9 +75,9 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 
    ```bash
    # Pipe any SQL CLI or data command straight into TinyPivot
-   duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parquet' GROUP BY 1, 2" | npx @smallwebco/tinypivot-mcp --open
-   psql "$DATABASE_URL" --csv -c "SELECT * FROM monthly_revenue" | npx @smallwebco/tinypivot-mcp --open
-   cat metrics.csv | npx @smallwebco/tinypivot-mcp --open
+   duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parquet' GROUP BY 1, 2" | npx @smallwebco/tinypivot-mcp@latest --open
+   psql "$DATABASE_URL" --csv -c "SELECT * FROM monthly_revenue" | npx @smallwebco/tinypivot-mcp@latest --open
+   cat metrics.csv | npx @smallwebco/tinypivot-mcp@latest --open
    ```
 
    TinyPivot also runs a live SSE-synced localhost Companion Data IDE (`http://127.0.0.1:<port>`) for interactive filtering, drill-through, and exports.
@@ -86,7 +86,7 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 
 TinyPivot is **database-agnostic**. Use whichever data workflow matches your stack:
 
-- **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, or Postgres (CLI / file handoff — 0 raw rows in LLM context):** Export query output to `.csv`, `.tsv`, `.json`, or `.jsonl` via `bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, or `psql` and pass the path to `load_file` (or pipe stdout straight into `npx @smallwebco/tinypivot-mcp --open`).
+- **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, or Postgres (CLI / file handoff — 0 raw rows in LLM context):** Export query output to `.csv`, `.tsv`, `.json`, or `.jsonl` via `bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, or `psql` and pass the path to `load_file` (or pipe stdout straight into `npx @smallwebco/tinypivot-mcp@latest --open`).
 - **Any MCP Server or API (Stripe, GitHub, BigQuery MCP, Snowflake MCP, REST APIs):** Pipe structured JSON rows (<500 rows already in memory) directly into `load_data` with `chartConfig` / `pivotConfig` in a single call — no temp CSV required.
 - **Optional Direct PostgreSQL Connector (Pro):** If you use PostgreSQL and want zero-temp-file SQL execution inside the MCP server itself, set `DATABASE_URL` (and optionally `TINYPIVOT_ALLOWED_TABLES`) to enable the AST-validated, read-only `query_postgres` tool.
 

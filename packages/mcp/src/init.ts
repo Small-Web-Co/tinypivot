@@ -25,6 +25,12 @@ interface TargetResult {
   detail: string
 }
 
+/**
+ * What generated configs hand to npx. The @latest tag makes npx check the registry on every
+ * start, so a new release reaches users without re-running init. A bare name reuses npx's cache.
+ */
+export const MCP_NPX_SPEC = '@smallwebco/tinypivot-mcp@latest'
+
 const RULE_START = '<!-- tinypivot:start -->'
 const RULE_END = '<!-- tinypivot:end -->'
 const RULE_TEST_RE = /<!-- tinypivot(?:-mcp)?:start -->[\s\S]*?<!-- tinypivot(?:-mcp)?:end -->/
@@ -62,7 +68,7 @@ function printHelp() {
 TinyPivot MCP — Multi-Harness Installer
 
 Usage:
-  npx @smallwebco/tinypivot-mcp init [options]
+  npx @smallwebco/tinypivot-mcp@latest init [options]
 
 Options:
   --local                 Wire this local build (node <path>/dist/cli.js) instead of npx
@@ -170,7 +176,7 @@ function getClaudeDesktopConfigPath(): string {
 
 function buildStdioServerEntry(opts: InitOptions, cliPath: string) {
   const command = opts.local ? process.execPath : 'npx'
-  const args = opts.local ? [cliPath] : ['-y', '@smallwebco/tinypivot-mcp']
+  const args = opts.local ? [cliPath] : ['-y', MCP_NPX_SPEC]
   const entry: Record<string, unknown> = { command, args }
   const env: Record<string, string> = {}
   if (opts.licenseKey)
@@ -256,7 +262,7 @@ async function upsertOpenCodeJson(opts: InitOptions, cliPath: string): Promise<T
     const mcp = (json.mcp && typeof json.mcp === 'object' && !Array.isArray(json.mcp))
       ? { ...(json.mcp as Record<string, unknown>) }
       : {}
-    const command = opts.local ? [process.execPath, cliPath] : ['npx', '-y', '@smallwebco/tinypivot-mcp']
+    const command = opts.local ? [process.execPath, cliPath] : ['npx', '-y', MCP_NPX_SPEC]
     const nextEntry: Record<string, unknown> = {
       type: 'local',
       command,
@@ -314,7 +320,7 @@ async function upsertCodexToml(opts: InitOptions, cliPath: string): Promise<Targ
   try {
     const existing = await exists(configPath) ? await fs.readFile(configPath, 'utf8') : ''
     const command = opts.local ? process.execPath : 'npx'
-    const args = opts.local ? [cliPath] : ['-y', '@smallwebco/tinypivot-mcp']
+    const args = opts.local ? [cliPath] : ['-y', MCP_NPX_SPEC]
     const argsToml = args.map(a => JSON.stringify(a)).join(', ')
     const codexEnvEntries: string[] = []
     if (opts.licenseKey)
@@ -481,7 +487,7 @@ export async function runInitCommand(args: string[]): Promise<void> {
   const home = os.homedir()
   const cliPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'cli.js')
 
-  console.log(`\nTinyPivot MCP Installer (${opts.local ? `local: ${cliPath}` : 'npx @smallwebco/tinypivot-mcp'})${opts.dryRun ? ' [DRY RUN]' : ''}\n`)
+  console.log(`\nTinyPivot MCP Installer (${opts.local ? `local: ${cliPath}` : `npx ${MCP_NPX_SPEC}`})${opts.dryRun ? ' [DRY RUN]' : ''}\n`)
 
   const results: TargetResult[] = [
     await upsertStandardMcpJson(
