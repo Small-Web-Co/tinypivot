@@ -287,7 +287,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.2.4',
+      version: '0.2.5',
     },
     {
       capabilities: {
@@ -298,20 +298,40 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
+  const clientRendersWidget = () => clientSupportsMcpAppsUi(server.server.getClientCapabilities())
+
   const resolveCompanionUrlForTool = async (forceCompanion = false): Promise<string | undefined> => {
     if (activeCompanionUrl)
       return activeCompanionUrl
     if (!options.ensureCompanion)
       return undefined
-    if (!forceCompanion && clientSupportsMcpAppsUi(server.server.getClientCapabilities()))
+    if (!forceCompanion && clientRendersWidget())
       return undefined
     activeCompanionUrl = await options.ensureCompanion()
     return activeCompanionUrl
   }
 
+  /**
+   * The app payload (preview rows, model catalog, license) exists to feed the inline widget.
+   * Hosts without MCP Apps give structuredContent to the model in place of the text, which costs
+   * thousands of tokens and hides the terminal card, so they get the text summary on its own.
+   */
+  const dataToolResult = (summaryText: string, payload: ReturnType<typeof buildAppPayload>) => {
+    const content = [{ type: 'text' as const, text: summaryText }]
+    return clientRendersWidget() ? { content, structuredContent: payload } : { content }
+  }
+
+  /** Tools only the widget calls. A host with no widget would just list them for the model. */
+  const widgetOnlyTools: Array<{ disable: () => void }> = []
+  const widgetOnly = (tool: { disable: () => void }) => {
+    widgetOnlyTools.push(tool)
+  }
+
   let detectedClientName: string | undefined
   const getClientName = () => detectedClientName ?? server.server.getClientVersion()?.name
   server.server.oninitialized = () => {
+    if (!clientRendersWidget())
+      widgetOnlyTools.forEach(tool => tool.disable())
     detectedClientName = server.server.getClientVersion()?.name
     recordTelemetry({
       event: 'server_start',
@@ -417,10 +437,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         truncated: ds.truncatedForFreeTier,
       })
       notifyCompanion()
-      return {
-        content: [{ type: 'text', text: summaryText }],
-        structuredContent: payload,
-      }
+      return dataToolResult(summaryText, payload)
     },
   )
 
@@ -477,10 +494,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           truncated: ds.truncatedForFreeTier,
         })
         notifyCompanion()
-        return {
-          content: [{ type: 'text', text: summaryText }],
-          structuredContent: payload,
-        }
+        return dataToolResult(summaryText, payload)
       }
       catch (err) {
         return {
@@ -541,10 +555,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         truncated: ds.truncatedForFreeTier,
       })
       notifyCompanion()
-      return {
-        content: [{ type: 'text', text: summaryText }],
-        structuredContent: payload,
-      }
+      return dataToolResult(summaryText, payload)
     },
   )
 
@@ -612,10 +623,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       })
       notifyCompanion()
 
-      return {
-        content: [{ type: 'text', text: summary }],
-        structuredContent: payload,
-      }
+      return dataToolResult(summary, payload)
     },
   )
 
@@ -691,10 +699,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         truncated: ds.truncatedForFreeTier,
       })
       notifyCompanion()
-      return {
-        content: [{ type: 'text', text: summaryText }],
-        structuredContent: payload,
-      }
+      return dataToolResult(summaryText, payload)
     },
   )
 
@@ -762,10 +767,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           truncated: ds.truncatedForFreeTier,
         })
         notifyCompanion()
-        return {
-          content: [{ type: 'text', text: summaryText }],
-          structuredContent: payload,
-        }
+        return dataToolResult(summaryText, payload)
       }
       catch (err) {
         return {
@@ -815,7 +817,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   )
 
   // 8. App-only tool: stream full dataset rows directly to the UI iframe (0 LLM tokens!)
-  server.registerTool(
+  widgetOnly(server.registerTool(
     'fetch_dataset_rows',
     {
       title: 'Fetch Dataset Rows (App Internal)',
@@ -873,10 +875,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         },
       }
     },
-  )
+  ))
 
   // 9. App-only tool: set active LLM model for session dollarization
-  server.registerTool(
+  widgetOnly(server.registerTool(
     'set_session_model',
     {
       title: 'Set Active LLM Model (App Internal)',
@@ -895,10 +897,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         structuredContent: { session },
       }
     },
-  )
+  ))
 
   // 10. App-only tool: record a local 0-token user exploration (chart/pivot/filter/drill-through)
-  server.registerTool(
+  widgetOnly(server.registerTool(
     'record_local_action',
     {
       title: 'Record Local 0-Token Action (App Internal)',
@@ -919,7 +921,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         },
       }
     },
-  )
+  ))
 
   // 11. Set the visual theme preset (callable by both the model in chat and the UI app)
   server.registerTool(
@@ -951,7 +953,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   )
 
   // 12. App-only tool: fetch datasets list for switcher dropdown
-  server.registerTool(
+  widgetOnly(server.registerTool(
     'get_datasets_state',
     {
       title: 'Get Datasets State (App Internal)',
@@ -966,7 +968,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         datasets: store.listMetadata(),
       },
     }),
-  )
+  ))
 
   return { server, store }
 }

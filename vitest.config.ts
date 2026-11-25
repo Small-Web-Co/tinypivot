@@ -18,9 +18,14 @@ export default defineConfig({
   },
   resolve: {
     // Resolve workspace packages from source so tests run without a prior build (as in CI).
-    alias: {
-      '@smallwebco/tinypivot-core': resolve(__dirname, './packages/core/src'),
-      '@smallwebco/tinypivot-server': resolve(__dirname, './packages/server/src'),
-    },
+    alias: [
+      { find: '@smallwebco/tinypivot-core', replacement: resolve(__dirname, './packages/core/src') },
+      { find: '@smallwebco/tinypivot-server', replacement: resolve(__dirname, './packages/server/src') },
+      // Only packages/mcp depends on the MCP SDK; tests that drive the server need its client too.
+      {
+        find: /^@modelcontextprotocol\/sdk\/(.*)$/,
+        replacement: resolve(__dirname, './packages/mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/$1'),
+      },
+    ],
   },
 })

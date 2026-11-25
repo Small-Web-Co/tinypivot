@@ -395,7 +395,7 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
   it('plots multi-series YoY Braille line charts independently without summing series or dropping missing months to zero', () => {
     const store = new DatasetStore()
     const ds = store.register({
-      name: 'Edgeworth YoY',
+      name: 'Acme YoY',
       source: 'test',
       rows: [
         { month: 'Jan', year: '2025', revenue: 6_540_000 },
@@ -414,7 +414,7 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
       xAxis: { field: 'month', role: 'dimension' },
       yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' },
       seriesField: { field: 'year', role: 'dimension' },
-      options: { title: 'Edgeworth Revenue YoY (2025 vs 2026)' },
+      options: { title: 'Acme Revenue YoY (2025 vs 2026)' },
     })
 
     assertUniformCardBorderWidth(card)

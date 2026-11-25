@@ -209,6 +209,26 @@ function flattenRow(input: unknown): Record<string, unknown> {
   return out
 }
 
+/** Distinct values are counted across every row, up to this many per column. */
+export const DISTINCT_COUNT_CAP = 1000
+
+/**
+ * Counts over the whole dataset, not a sample: files are often sorted, so the first rows of a
+ * date-ordered export hold a single year and month and would describe the column wrongly.
+ */
+function collectDistinct(rows: Record<string, unknown>[], name: string): Set<string> {
+  const distinct = new Set<string>()
+  for (const row of rows) {
+    const val = row[name]
+    if (val === null || val === undefined || val === '')
+      continue
+    distinct.add(String(val))
+    if (distinct.size >= DISTINCT_COUNT_CAP)
+      break
+  }
+  return distinct
+}
+
 export function inferColumns(rows: Record<string, unknown>[]): ColumnSummary[] {
   if (rows.length === 0)
     return []
@@ -227,13 +247,11 @@ export function inferColumns(rows: Record<string, unknown>[]): ColumnSummary[] {
     let boolCount = 0
     let dateCount = 0
     let strCount = 0
-    const distinct = new Set<string>()
 
     for (let i = 0; i < sampleLimit; i++) {
       const val = rows[i][name]
       if (val === null || val === undefined || val === '')
         continue
-      distinct.add(String(val))
       if (typeof val === 'number') {
         numCount++
       }
@@ -261,6 +279,7 @@ export function inferColumns(rows: Record<string, unknown>[]): ColumnSummary[] {
         type = 'string'
     }
 
+    const distinct = collectDistinct(rows, name)
     summaries.push({
       name,
       type,

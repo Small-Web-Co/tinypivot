@@ -1,6 +1,7 @@
 import type { ChartConfig, ChartThemePreset, PivotConfig, TerminalPalette } from '@smallwebco/tinypivot-core'
 import type { StoredDataset } from './store.js'
 import { computePivotResult, processChartData, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
+import { DISTINCT_COUNT_CAP } from './store.js'
 
 const SUB_BLOCKS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
 const SERIES_GLYPHS = ['█', '▓', '▒', '░']
@@ -645,13 +646,18 @@ export function formatTerminalChart(
   return wrapInCard(title, `Total ${formatCompactNumber(grandTotal)}`, body, footerLeft, footerRight, 66, { palette: pal, raw: options.raw })
 }
 
+/** A column at the cap has at least that many values, so it reads as "1,000+". */
+function formatDistinctCount(count: number): string {
+  return count >= DISTINCT_COUNT_CAP ? `${DISTINCT_COUNT_CAP.toLocaleString('en-US')}+` : String(count)
+}
+
 export function formatDatasetSummary(
   dataset: StoredDataset,
   companionUrl?: string,
   options: TerminalFormatOptions = {},
 ): string {
   const cols = dataset.columns
-    .map(c => `- \`${c.name}\` (${c.type}, ${c.distinctCount} distinct; e.g. ${c.sampleValues.slice(0, 3).join(', ')})`)
+    .map(c => `- \`${c.name}\` (${c.type}, ${formatDistinctCount(c.distinctCount)} distinct; e.g. ${c.sampleValues.slice(0, 3).join(', ')})`)
     .join('\n')
 
   const chartBlock = formatTerminalChart(dataset, dataset.chartConfig, {
