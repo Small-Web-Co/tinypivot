@@ -236,7 +236,12 @@ export interface SlopeData {
 export function processChartDataForSlope(data: Record<string, unknown>[], config: ChartConfig): SlopeData | null {
   if (!config.xAxis || !config.yAxis || !config.seriesField)
     return null
-  const chart = processChartData(data, { ...config, options: { ...config.options, sortOrder: 'label-asc' } })
+  const sorted = { ...config, options: { ...config.options, sortOrder: 'label-asc' as const } }
+  let chart = processChartData(data, sorted)
+  // A slope compares two periods across many items. Two x values against many series means the
+  // fields came the other way round (periods on x, items as series), so read them that way.
+  if (chart.categories.length === 2 && chart.series.length > 2)
+    chart = processChartData(data, { ...sorted, xAxis: { ...config.seriesField, role: 'dimension' }, seriesField: { ...config.xAxis, role: 'dimension' } })
   const periods = chart.series.map(s => s.name).sort(compareLabels)
   if (periods.length < 2)
     return null

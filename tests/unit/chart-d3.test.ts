@@ -361,6 +361,14 @@ describe('slope data and chart stories', () => {
     expect(processChartDataForSlope(rows, { ...slopeConfig, seriesField: undefined })).toBeNull()
   })
 
+  it('reads the fields the other way round when the periods were put on x', () => {
+    const plans = ['Starter', 'Team', 'Business', 'Enterprise']
+    const byYear = plans.flatMap((plan, i) => [{ plan, year: '2025', mrr: 10 + i }, { plan, year: '2026', mrr: 20 + i }])
+    const swapped = processChartDataForSlope(byYear, { type: 'slope', xAxis: dimension('year'), yAxis: measure('mrr'), seriesField: dimension('plan') })!
+    expect([swapped.from, swapped.to]).toEqual(['2025', '2026'])
+    expect(swapped.rows.map(r => r.label).sort()).toEqual([...plans].sort())
+  })
+
   it('requires a period field to be valid', () => {
     expect(isChartConfigValid({ ...slopeConfig, seriesField: undefined })).toBe(false)
     expect(isChartConfigValid(slopeConfig)).toBe(true)

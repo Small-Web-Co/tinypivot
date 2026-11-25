@@ -49,7 +49,7 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false }
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
     `For files use load_file, so the rows stay out of your context; to filter, join or aggregate files first, use query with SQL. Use load_data only for rows you already have, up to about ${LOAD_DATA_ROW_GUIDE}; write larger sets to a file first. history lists and reopens earlier pulls.`,
-    `Chart types: ${CHART_TYPES.map(t => t.type).join(', ')}; names like map also work. seriesField: slope period, treemap parent; targetField: bullet target.`,
+    `Chart types: ${CHART_TYPES.map(t => t.type).join(', ')}; names like map also work. slope: xAxisField the items, seriesField the two periods; treemap: seriesField the parent; bullet: targetField the target.`,
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     'On every data call pass why (one short sentence for TinyPivot Studio); when loading or querying, also ask (the user\'s request, verbatim).',
