@@ -2,6 +2,7 @@
 import { defineAsyncComponent, onMounted, ref } from 'vue'
 import HarnessReel from '../components/HarnessReel.vue'
 import BenchmarkTable from '../components/site/BenchmarkTable.vue'
+import HeroQuestion from '../components/site/HeroQuestion.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
@@ -70,13 +71,16 @@ const capabilities = [
                 Benchmark ↓
               </a>
             </div>
-            <div id="install" class="hero-install">
-              <InstallBox source="hero" />
-              <ul class="facts" aria-label="Free tier">
-                <li v-for="fact in facts" :key="fact">
-                  {{ fact }}
-                </li>
-              </ul>
+            <div class="hero-side">
+              <HeroQuestion class="hero-question" />
+              <div id="install" class="hero-install">
+                <InstallBox source="hero" />
+                <ul class="facts" aria-label="Free tier">
+                  <li v-for="fact in facts" :key="fact">
+                    {{ fact }}
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </RetroWindow>
@@ -216,6 +220,17 @@ const capabilities = [
 .hero-copy {
   display: grid;
   gap: 16px;
+}
+
+/* Install first on a phone; beside the copy, the Studio card leads and install sits under it. */
+.hero-side {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+.hero-question {
+  order: 2;
 }
 
 .hero .lede {
@@ -412,8 +427,12 @@ const capabilities = [
 @media (min-width: 1024px) {
   .hero-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-    align-items: end;
+    align-items: start;
     gap: 56px;
+  }
+
+  .hero-question {
+    order: 0;
   }
 
   .savings-grid {
