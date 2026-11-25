@@ -5,6 +5,7 @@ import type {
   ChartThemePreset,
   PivotConfig,
 } from '@smallwebco/tinypivot-core'
+import type { AgentExtension } from './init.js'
 import type { PostgresConfig } from './postgres.js'
 import type { StoredDataset } from './store.js'
 import type { AgentHint } from './studio-protocol.js'
@@ -19,13 +20,13 @@ import { z } from 'zod'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList } from './history.js'
-import { refreshPiExtension } from './init.js'
+import { refreshAgentExtension } from './init.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
-import { Studio } from './studio.js'
+import { agentLabel, Studio } from './studio.js'
 import { describeChartForText, formatDatasetSummary, formatPivotSummary } from './summary.js'
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
@@ -222,12 +223,14 @@ function normalizePivot(pivotConfig: z.infer<typeof pivotConfigSchema>): Partial
   }
 }
 
-/** What the Studio tells a pi user, by the state of TinyPivot's pi extension. */
-const PI_HINTS: Record<Awaited<ReturnType<typeof refreshPiExtension>>, AgentHint | undefined> = {
-  current: undefined,
-  custom: undefined,
-  updated: { text: 'TinyPivot\'s pi extension was just updated. Restart pi to send messages live.' },
-  absent: { text: 'Install TinyPivot\'s pi extension, then restart pi, to send messages live:', command: 'npx @smallwebco/tinypivot-mcp@latest init --targets=pi' },
+/** What the Studio tells a pi or OpenCode user, by the state of TinyPivot's extension for it. */
+function extensionHint(agent: AgentExtension, status: Awaited<ReturnType<typeof refreshAgentExtension>>): AgentHint | undefined {
+  const name = agentLabel(agent)
+  if (status === 'updated')
+    return { text: `TinyPivot's ${name} extension was just updated. Restart ${name} to send messages live.` }
+  if (status === 'absent')
+    return { text: `Install TinyPivot's ${name} extension, then restart ${name}, to send messages live:`, command: `npx @smallwebco/tinypivot-mcp@latest init --targets=${agent}` }
+  return undefined
 }
 
 /**
@@ -366,11 +369,29 @@ export function isMcpLicenseKey(key?: string | null): boolean {
   return key.startsWith('TP-MCPP-') || key.startsWith('TP-MCPT-')
 }
 
+/**
+ * Where a key can come from: TINYPIVOT_LICENSE_KEY (set by init and hand-written configs), then
+ * the Claude plugin's license_key option, which Claude Code hands over as
+ * CLAUDE_PLUGIN_OPTION_LICENSE_KEY. An option left empty can arrive as the unexpanded
+ * `${user_config.license_key}`, which counts as no key.
+ */
+const LICENSE_KEY_ENV_VARS = ['TINYPIVOT_LICENSE_KEY', 'CLAUDE_PLUGIN_OPTION_LICENSE_KEY']
+
+function licenseKeyFromEnv(): string | undefined {
+  for (const name of LICENSE_KEY_ENV_VARS) {
+    const value = process.env[name]?.trim()
+    if (value && !value.startsWith('${'))
+      return value
+  }
+  return undefined
+}
+
 export function resolveLicenseKey(explicit?: string): string | undefined {
   if (explicit?.trim())
     return explicit.trim()
-  if (process.env.TINYPIVOT_LICENSE_KEY?.trim())
-    return process.env.TINYPIVOT_LICENSE_KEY.trim()
+  const fromEnv = licenseKeyFromEnv()
+  if (fromEnv)
+    return fromEnv
 
   const here = path.dirname(fileURLToPath(import.meta.url))
   const candidates = [
@@ -422,7 +443,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.6.0',
+      version: '0.6.1',
     },
     {
       capabilities: {
@@ -491,8 +512,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const connectAgent = () => {
     const clientName = server.server.getClientVersion()?.name
     studio.setAgentName(clientName)
-    if (clientName === 'pi')
-      void refreshPiExtension().then(status => studio.setAgentHint(PI_HINTS[status])).catch(() => {})
+    if (clientName === 'pi' || clientName === 'opencode')
+      void refreshAgentExtension(clientName).then(status => studio.setAgentHint(extensionHint(clientName, status))).catch(() => {})
     if (clientName === 'claude-code' && !claudeChannel)
       studio.setAgentHint(CLAUDE_CHANNEL_HINT)
     if (claudeChannel) {

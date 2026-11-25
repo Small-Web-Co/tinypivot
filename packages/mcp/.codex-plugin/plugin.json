@@ -1,0 +1,36 @@
+{
+  "name": "tinypivot",
+  "version": "0.6.1",
+  "description": "Data analysis studio for AI agents: turn CSV, JSON, API/MCP outputs, and SQL results into charts, pivot tables, data grids, terminal cards, and Excel exports, with a live Studio that shows every step.",
+  "author": {
+    "name": "Small Web, LLC",
+    "email": "license@tiny-pivot.com",
+    "url": "https://tiny-pivot.com"
+  },
+  "homepage": "https://tiny-pivot.com/mcp",
+  "repository": "https://github.com/Small-Web-Co/tinypivot",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "keywords": ["tinypivot", "mcp", "charts", "pivot-table", "data-grid", "analytics", "csv", "sql", "excel"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "TinyPivot",
+    "shortDescription": "Charts & pivots for your data",
+    "longDescription": "TinyPivot turns CSV, TSV, JSON, API/MCP outputs and SQL results into charts, pivot tables, data grids and Excel exports. Rows stay on your computer; the model gets a short summary. A local Studio shows every step the agent takes and lets you send it messages.",
+    "developerName": "Small Web, LLC",
+    "category": "Productivity",
+    "capabilities": ["Chart data", "Pivot data", "Query files with SQL"],
+    "websiteURL": "https://tiny-pivot.com/mcp",
+    "supportURL": "https://github.com/Small-Web-Co/tinypivot/issues",
+    "privacyPolicyURL": "https://tiny-pivot.com/privacy",
+    "termsOfServiceURL": "https://tiny-pivot.com/terms",
+    "defaultPrompt": [
+      "Chart revenue by region from sales.csv",
+      "Pivot orders.csv by month and product",
+      "Open TinyPivot Studio"
+    ],
+    "brandColor": "#E8502A",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

@@ -1101,10 +1101,12 @@ import type {
 
 ## License
 
-- **Free Tier**: MIT License for core grid and pivot features
-- **Pro Features**: Commercial license required
+TinyPivot is **source-available (dual-licensed)**:
 
-See [LICENSE.md](./LICENSE.md) for details.
+- **Free Tier**: MIT License (core UI grid & basic pivots; TinyPivot Studio / MCP up to 2,500 rows)
+- **Pro & Team Features**: Commercial license required (removing or bypassing license checks is not permitted)
+
+See [LICENSE.md](./LICENSE.md) for full terms.
 
 ---
 
@@ -1118,7 +1120,3 @@ This repository uses the following topics for discoverability:
 Built with ❤️ by [Small Web, LLC](https://thesmallweb.co)
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-❤️-pink)](https://github.com/sponsors/Small-Web-Co)
-
-## License
-
-TinyPivot is licensed under the MIT License. See [LICENSE.md](./LICENSE.md) for details.

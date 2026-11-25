@@ -1,6 +1,7 @@
 {
   "name": "tinypivot",
-  "version": "0.6.0",
+  "displayName": "TinyPivot",
+  "version": "0.6.1",
   "description": "Data analysis studio inside Claude — turn CSV, TSV, JSON, JSONL, API/MCP outputs, and SQL results from any database into interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, and Excel exports.",
   "author": {
     "name": "Small Web, LLC",
@@ -8,7 +9,7 @@
   },
   "homepage": "https://tiny-pivot.com/mcp",
   "repository": "https://github.com/Small-Web-Co/tinypivot",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE.md",
   "keywords": [
     "tinypivot",
     "mcp",
@@ -24,5 +25,23 @@
     "snowflake",
     "postgres",
     "excel"
-  ]
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://tiny-pivot.com/mcp",
+  "supportUrl": "https://github.com/Small-Web-Co/tinypivot/issues",
+  "privacyPolicyUrl": "https://tiny-pivot.com/privacy",
+  "termsOfServiceUrl": "https://tiny-pivot.com/terms",
+  "channels": [
+    {
+      "server": "tinypivot",
+      "displayName": "TinyPivot Studio"
+    }
+  ],
+  "network": {
+    "hosts": [
+      "registry.npmjs.org",
+      "tiny-pivot.com",
+      "www.tiny-pivot.com"
+    ]
+  }
 }

@@ -17,7 +17,8 @@ How a message reaches your agent depends on the harness. The Studio shows which 
 | Agent | How Studio messages arrive |
 |---|---|
 | pi | Live: TinyPivot's pi extension starts a turn, and the answer comes back to the Studio's trace. `init` installs the extension, and TinyPivot keeps it up to date (restart pi after an update). Its cards are drawn in full colour, each series in its own. |
-| Claude Code | Live when started with `claude --dangerously-load-development-channels server:tinypivot` (Claude Code channels, a research preview). The agent answers with `studio_reply`. Otherwise, with its next TinyPivot reply. |
+| OpenCode | Live: TinyPivot's OpenCode plugin (`~/.config/opencode/plugins/tinypivot.js`) sends the message as a prompt to the session that last used TinyPivot, and the answer comes back to the Studio's trace. `init` installs the plugin, and TinyPivot keeps it up to date (restart OpenCode after an update). Tested with OpenCode 1.19; OpenCode 2's new plugin API is not supported yet. |
+| Claude Code | Live when started with `claude --dangerously-load-development-channels server:tinypivot`, or `plugin:tinypivot@tinypivot` when installed as a plugin (Claude Code channels, a research preview). The agent answers with `studio_reply`. Otherwise, with its next TinyPivot reply. Once TinyPivot is on Anthropic's channel allowlist, `claude --channels plugin:tinypivot@<marketplace>` will work without the development flag. |
 | Others | With the agent's next TinyPivot reply. **Copy as prompt** puts the message, the step, its SQL and the data on your clipboard to paste now. |
 
 In desktop and IDE hosts that show TinyPivot inline (Claude Desktop, VS Code, Cursor), click a row or drill into a pivot cell, then **Send to chat** to post it to the conversation with your comment.
@@ -46,7 +47,7 @@ Options:
 
 This package ships as a self-contained Claude plugin bundle containing:
 
-- `.claude-plugin/plugin.json` — plugin manifest
+- `.claude-plugin/plugin.json` — plugin manifest, which also declares the TinyPivot Studio channel
 - `.mcp.json` — registers `mcpServers.tinypivot` (`npx -y @smallwebco/tinypivot-mcp@latest`)
 - `skills/tinypivot/SKILL.md` — teaches Claude when to invoke TinyPivot automatically, how to render in 1 tool call, when to use `load_data` vs `load_file`, and to echo TinyPivot terminal cards verbatim
 
@@ -78,6 +79,18 @@ Or copy the bundled `.mcp.json` server block directly into Claude Desktop's `cla
 > **Make TinyPivot your default chart renderer:** The TinyPivot MCP server advertises authoritative `instructions`, and both `npx @smallwebco/tinypivot-mcp@latest init` (via `~/.claude/CLAUDE.md`) and the native Claude Plugin (`skills/tinypivot/SKILL.md`) automatically route chart, YoY/MoM comparison, and pivot requests to TinyPivot in **Claude Code** and **Claude Code Desktop**. For **Claude Desktop** chat (which may otherwise default to its built-in visualization widget), add this one-line preference under **Settings → General → Personal Preferences**:
 >
 > `Always use the tinypivot MCP server (load_data or load_file with chartConfig/pivotConfig in one call) instead of built-in visualization widgets, HTML/SVG/React chart artifacts, or large Markdown tables whenever I ask for charts, YoY/MoM comparisons, pivot tables, or tabular data analysis.`
+
+### Option 3: Plugins for Other Agents
+
+The same folder is also a plugin for other agents' plugin systems. Each one starts the same `npx -y @smallwebco/tinypivot-mcp@latest` server:
+
+| Agent | Install | Files |
+|---|---|---|
+| Gemini CLI | `gemini extensions install https://github.com/Small-Web-Co/tinypivot` | `gemini-extension.json` (repo root) |
+| Antigravity | `agy plugin install ./packages/mcp` from a clone of this repository | `plugin.json`, `mcp_config.json` |
+| Cursor | Cursor marketplace (once listed), or a team marketplace that imports this repository | `.cursor-plugin/plugin.json`, `mcp.json`, `.cursor-plugin/marketplace.json` (repo root) |
+| Codex | `codex plugin marketplace add Small-Web-Co/tinypivot` | `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json` (repo root) |
+| OpenCode | `npx @smallwebco/tinypivot-mcp@latest init --targets=opencode` | registers the server and installs the Studio plugin |
 
 ## Terminal Cards, Stdin Piping & Live Ghostty TUI
 
@@ -167,7 +180,13 @@ Data tools take an optional `why`: one sentence the agent writes about each step
 
 ## Privacy & Telemetry
 
+Full policy: [tiny-pivot.com/privacy](https://tiny-pivot.com/privacy). Terms: [tiny-pivot.com/terms](https://tiny-pivot.com/terms).
+
 TinyPivot MCP sends minimal, **zero-PII** anonymous usage pings (`event`, `tool`, `rowBucket`, `client`, `tier`, `truncated`, `version`, `os`, and a random local UUID) to help us improve harness compatibility and reliability.
 
 - **Never collected:** row data, column names, SQL queries, file paths, hostnames, or user identities.
 - **Opt out anytime:** set `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` in your environment or MCP server `env` block.
+
+## License
+
+TinyPivot is **source-available (dual-licensed)**: Free Tier features are licensed under MIT, and Pro / Team features require a commercial license from Small Web, LLC. See [LICENSE.md](./LICENSE.md) for full terms.

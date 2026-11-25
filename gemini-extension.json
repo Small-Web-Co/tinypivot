@@ -1,0 +1,22 @@
+{
+  "name": "tinypivot",
+  "version": "0.6.1",
+  "description": "Data analysis studio for AI agents: charts, pivot tables, data grids, terminal cards and Excel exports from CSV, JSON and SQL results, with a live Studio that shows every step.",
+  "mcpServers": {
+    "tinypivot": {
+      "command": "npx",
+      "args": ["-y", "@smallwebco/tinypivot-mcp@latest"],
+      "env": {
+        "TINYPIVOT_LICENSE_KEY": "${TINYPIVOT_LICENSE_KEY}"
+      }
+    }
+  },
+  "settings": [
+    {
+      "name": "TinyPivot license key",
+      "description": "Optional Pro/Team key (TP-MCPP-* or TP-MCPT-*). Leave empty for the free tier.",
+      "envVar": "TINYPIVOT_LICENSE_KEY",
+      "sensitive": true
+    }
+  ]
+}

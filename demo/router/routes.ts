@@ -1,3 +1,5 @@
+import { privacyPolicy, termsOfService } from '../site/legal'
+
 /**
  * Shared route definitions — used by both the client router and the SSR prerender.
  * Extracted so the SSR entry can reuse them without the DOM-touching beforeEach guard.
@@ -138,6 +140,26 @@ export const routeDefinitions = [
     meta: {
       title: 'TinyPivot vs AG Grid - Lightweight Pivot Table Comparison',
       description: 'Compare TinyPivot and AG Grid for React and Vue. TinyPivot is a focused data grid with free pivot tables and lifetime Pro licensing.',
+    },
+  },
+  {
+    path: '/privacy',
+    name: 'privacy',
+    component: () => import('../pages/Legal.vue'),
+    props: { doc: privacyPolicy },
+    meta: {
+      title: 'Privacy policy | TinyPivot',
+      description: 'What TinyPivot sends and what stays on your computer: anonymous MCP usage statistics, payments through Stripe, and the tiny-pivot.com website.',
+    },
+  },
+  {
+    path: '/terms',
+    name: 'terms',
+    component: () => import('../pages/Legal.vue'),
+    props: { doc: termsOfService },
+    meta: {
+      title: 'Terms of service | TinyPivot',
+      description: 'The terms for using TinyPivot: the MCP server and Studio, the React and Vue libraries, paid plans and the tiny-pivot.com website.',
     },
   },
   ...marketingGuides.map(guide => ({

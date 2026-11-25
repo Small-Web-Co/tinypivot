@@ -10,6 +10,7 @@ import { commandEnablesChannel } from '../../packages/mcp/src/claude-channel'
 import { startCompanionServer } from '../../packages/mcp/src/companion'
 import { DuckDbRunner } from '../../packages/mcp/src/duckdb'
 import { HistoryStore } from '../../packages/mcp/src/history'
+import { buildOpenCodePluginSource } from '../../packages/mcp/src/opencode-plugin'
 import { buildPiExtensionSource } from '../../packages/mcp/src/pi-extension'
 import { DatasetStore } from '../../packages/mcp/src/store'
 import { Studio } from '../../packages/mcp/src/studio'
@@ -93,6 +94,66 @@ describe('pi extension bridge', () => {
 
     handlers.get('session_shutdown')!({})
     await vi.waitFor(() => expect(studio.snapshot().agent.live).toEqual([]), { timeout: 3000 })
+  }, 20_000)
+})
+
+describe('openCode plugin bridge', () => {
+  let handle: CompanionServerHandle
+
+  afterEach(async () => {
+    await handle?.close()
+  })
+
+  it('prompts the OpenCode session that used TinyPivot and sends its answer back', async () => {
+    handle = await startCompanionServer({ store: studio.store, studio, loadHtml: async () => '' })
+    const file = path.join(dir, 'tinypivot-opencode.mjs')
+    fs.writeFileSync(file, buildOpenCodePluginSource())
+    const mod = await import(pathToFileURL(file).href)
+    // OpenCode calls every exported function as a plugin, so the file exports only the plugin.
+    expect(Object.keys(mod)).toEqual(['TinyPivotStudio'])
+
+    const prompts: Array<{ path: { id: string }, body: { parts: Array<{ type: string, text: string }> } }> = []
+    const client = {
+      session: {
+        promptAsync: async (request: typeof prompts[number]) => {
+          prompts.push(request)
+          return {}
+        },
+        messages: async () => ({
+          data: [
+            { info: { role: 'user' }, parts: [{ type: 'text', text: 'Which region is biggest?' }] },
+            { info: { role: 'assistant' }, parts: [{ type: 'reasoning', text: 'thinking' }, { type: 'text', text: 'North America, at 17.1M.' }] },
+          ],
+        }),
+      },
+    }
+    const hooks = await mod.TinyPivotStudio({ client })
+
+    // A tool that is not TinyPivot's does not connect the session.
+    await hooks['tool.execute.after']({ tool: 'bash', sessionID: 'other', callID: 'c0' }, { output: `Studio: ${handle.url}` })
+    expect(studio.snapshot().agent.live).toEqual([])
+
+    // OpenCode names MCP tools <server>_<tool> and hands over their MCP content; the reply carries the Studio address.
+    await hooks['tool.execute.after']({ tool: 'tinypivot_load_file', sessionID: 'ses_1', callID: 'c1' }, { content: [{ type: 'text', text: `Loaded. Studio: ${handle.url}` }] })
+    await vi.waitFor(() => expect(studio.snapshot().agent.live).toEqual(['opencode']), { timeout: 3000 })
+
+    // OpenCode reports when the session works, so the Studio can show progress.
+    await hooks.event({ event: { type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'busy' } } } })
+    expect(studio.snapshot().agent.busy).toBe(true)
+    await hooks.event({ event: { type: 'session.status', properties: { sessionID: 'other', status: { type: 'idle' } } } })
+    expect(studio.snapshot().agent.busy).toBe(true)
+    await hooks.event({ event: { type: 'session.idle', properties: { sessionID: 'ses_1' } } })
+    expect(studio.snapshot().agent.busy).toBe(false)
+    // An idle session with no Studio message pending sends nothing back.
+    expect(studio.recentSteps().some(step => step.tool === 'reply')).toBe(false)
+
+    studio.addNote('Which region is biggest?')
+    await vi.waitFor(() => expect(prompts).toHaveLength(1), { timeout: 3000 })
+    expect(prompts[0]).toEqual({ path: { id: 'ses_1' }, body: { parts: [{ type: 'text', text: 'Message from the user in TinyPivot Studio: Which region is biggest?' }] } })
+
+    // The turn the message started ends; its answer lands in the trace.
+    await hooks.event({ event: { type: 'session.idle', properties: { sessionID: 'ses_1' } } })
+    await vi.waitFor(() => expect(studio.recentSteps().at(-1)).toMatchObject({ actor: 'agent', tool: 'reply', why: 'North America, at 17.1M.' }), { timeout: 3000 })
   }, 20_000)
 })
 

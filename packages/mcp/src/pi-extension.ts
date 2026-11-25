@@ -1,4 +1,5 @@
 import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
+import { EXTENSION_HEADER } from './agent-bridge.js'
 
 /**
  * Generates a self-contained pi coding-agent extension (`~/.pi/agent/extensions/tinypivot.ts`)
@@ -17,7 +18,7 @@ export function buildPiExtensionSource(): string {
   const palettesJson = JSON.stringify(TERMINAL_PALETTES, null, 2)
   const themeOrderJson = JSON.stringify(CHART_THEME_IDS)
 
-  return `// Auto-installed by @smallwebco/tinypivot-mcp init — do not edit by hand.
+  return `${EXTENSION_HEADER} — do not edit by hand.
 // Renders TinyPivot charts & pivot tables in full 24-bit truecolor inside pi
 // and adds the /tinypivot-theme slash command.
 
