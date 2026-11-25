@@ -1,9 +1,18 @@
 <script setup lang="ts">
+import { defineAsyncComponent, onMounted, ref } from 'vue'
 import McpHighlightReel from '../components/McpHighlightReel.vue'
 import ContextMeter from '../components/site/ContextMeter.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
+
+// The showcase loads the real grid and chart library, so it is fetched in the
+// browser only and kept out of the prerendered HTML and the first bundle.
+const ThemeShowcase = defineAsyncComponent(() => import('../components/site/ThemeShowcase.vue'))
+const isMounted = ref(false)
+onMounted(() => {
+  isMounted.value = true
+})
 
 const facts = ['free', 'runs locally', 'no signup', 'no API key']
 
@@ -70,6 +79,27 @@ const capabilities = [
         <RetroWindow title="tinypivot — highlight reel" flush>
           <McpHighlightReel />
         </RetroWindow>
+      </div>
+    </section>
+
+    <section id="themes" class="block themes" aria-labelledby="themes-title">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            Live · the real library
+          </p>
+          <h2 id="themes-title" class="heading">
+            One theme, <em>every surface.</em>
+          </h2>
+          <p class="lede">
+            Pick a theme. The grid, the pivot and the chart restyle together, and the terminal prints the same data in the same colours.
+            Rich surfaces get gradients, glow and smooth curves; the terminal gets the best it can draw.
+          </p>
+        </header>
+        <ThemeShowcase v-if="isMounted" />
+        <p v-else class="themes-loading mono">
+          Loading the live grid…
+        </p>
       </div>
     </section>
 
@@ -187,6 +217,16 @@ const capabilities = [
   gap: 12px;
   max-width: 40rem;
   margin-bottom: 32px;
+}
+
+.themes {
+  border-top: var(--line);
+}
+
+.themes-loading {
+  min-height: 420px;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
 }
 
 .savings {

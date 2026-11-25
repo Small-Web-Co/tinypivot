@@ -123,7 +123,7 @@ export function useLiveDemo(rowCount = 10_000) {
   const isMounted = ref(false)
   const rows = ref<ReturnType<typeof generateSalesRows>>([])
   const pageSize = ref(1000)
-  const theme = ref<Theme>('dark')
+  const theme = ref<Theme>('paper')
   const numberFormat = ref<(typeof numberFormats)[number]['value']>('us')
   const dateFormat = ref<(typeof dateFormats)[number]['value']>('iso')
 
