@@ -1,7 +1,8 @@
 import type { StudioStep } from '../../packages/mcp/app/runs'
 import { describe, expect, it } from 'vitest'
-import { checkReport, claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from '../../packages/mcp/app/runs'
+import { checkReport, claimSummary, lastStep, markClaims, runTitle, stageOf } from '../../packages/mcp/app/runs'
 import { checkClaims, extractNumbers } from '../../packages/mcp/src/claims'
+import { groupRuns } from '../../packages/mcp/src/runs'
 
 let clock = 0
 function step(fields: Partial<StudioStep> & Pick<StudioStep, 'tool'>): StudioStep {

@@ -10,6 +10,7 @@ import { AgentBridge } from './agent-bridge.js'
 import { checkClaims } from './claims.js'
 import { DuckDbRunner, quoteIdentifier, quoteLiteral } from './duckdb.js'
 import { HistoryStore, SESSIONS_DIR, UPLOADS_DIR } from './history.js'
+import { groupRuns } from './runs.js'
 import { DEFAULT_SESSION_KEY } from './store.js'
 
 /**
@@ -509,15 +510,12 @@ export class Studio {
   }
 
   /**
-   * The datasets the current question has used and that are still loaded, newest first. A
-   * question starts at a Studio message, the user's own SQL, or a step carrying the request.
+   * The datasets the current question has used, newest first: the question as the Studio shows
+   * it, so an agent that repeats the request on each step still has its earlier steps checked.
    */
   private datasetsSinceLastAsk(sessionKey: string): ClaimSource[] {
-    const startsQuestion = (step: TraceStep) => Boolean(step.ask) || (step.actor === 'user' && (step.tool === 'note' || step.tool === 'query'))
-    let lastAsk = this.steps.length - 1
-    while (lastAsk > 0 && !startsQuestion(this.steps[lastAsk]))
-      lastAsk--
-    const ids = new Set(this.steps.slice(Math.max(0, lastAsk)).flatMap(step => (step.datasetId ? [step.datasetId] : [])))
+    const question = groupRuns(this.steps).at(-1)?.steps ?? []
+    const ids = new Set(question.flatMap(step => (step.datasetId ? [step.datasetId] : [])))
     return [...ids].reverse().flatMap((id) => {
       const dataset = this.store.get(id, sessionKey)
       return dataset ? [{ name: dataset.name, rows: dataset.rows, dimensions: viewDimensions(dataset), measures: viewMeasures(dataset) }] : []

@@ -1,9 +1,10 @@
 import type { HistoryEntry } from '../src/history'
 import type { Claim, NoteAttachment, StepCheck, StudioFile, StudioSnapshot } from '../src/studio-protocol'
-import type { Run, StudioStep } from './runs'
+import type { StudioRun, StudioStep } from './runs'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { groupRuns } from '../src/runs'
 import { postToStudio, uploadToStudio } from './companionApi'
-import { checkReport, claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from './runs'
+import { checkReport, claimSummary, lastStep, markClaims, runTitle, stageOf } from './runs'
 import { formatSql, sqlOneLine } from './sqlFormat'
 import { SqlWorkbench } from './SqlWorkbench'
 
@@ -155,7 +156,7 @@ function resultText(step: StudioStep): string | undefined {
 }
 
 /** A prompt the user can paste into any agent: the question, how it was answered so far, and what they want now. */
-export function buildPrompt(note: string, run?: Run, attachment?: NoteAttachment | null): string {
+export function buildPrompt(note: string, run?: StudioRun, attachment?: NoteAttachment | null): string {
   const lines: string[] = []
   if (run) {
     lines.push(`About this TinyPivot question: "${runTitle(run)}".`)
@@ -287,7 +288,7 @@ function Stage({ step, index, active, canOpen, checks, onOpen, onEdit }: StagePr
 }
 
 interface RunCardProps {
-  run: Run
+  run: StudioRun
   open: boolean
   activeDatasetId: string
   loaded: Set<string>
@@ -302,7 +303,7 @@ interface RunCardProps {
   onCopy: () => void
 }
 
-function runBadges(run: Run, checks: Record<string, StepCheck[]>) {
+function runBadges(run: StudioRun, checks: Record<string, StepCheck[]>) {
   const answer = lastStep(run, step => step.tool === 'reply')
   const claims = answer?.claims ?? []
   const summary = claims.length ? claimSummary(claims) : undefined
@@ -417,7 +418,7 @@ function AgentStatus({ agent }: { agent: StudioSnapshot['agent'] }) {
 
 interface NoteComposerProps {
   agent: StudioSnapshot['agent']
-  aboutRun?: Run
+  aboutRun?: StudioRun
   attachment: NoteAttachment | null
   onAttachView?: () => void
   onClearAttachment: () => void
@@ -615,7 +616,7 @@ function useChecks(notify: (message: string) => void) {
   const [checks, setChecks] = useState<Record<string, StepCheck[]>>({})
   const [checkTimes, setCheckTimes] = useState<Record<string, string>>({})
   const [checking, setChecking] = useState<string | null>(null)
-  const check = useCallback(async (run: Run) => {
+  const check = useCallback(async (run: StudioRun) => {
     setChecking(run.id)
     try {
       for (const step of run.steps.filter(s => s.fingerprint || s.source)) {

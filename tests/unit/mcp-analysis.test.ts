@@ -213,6 +213,16 @@ describe('query, profile and history tools', () => {
     ])
   }, 30_000)
 
+  it('checks an answer against every step of its question when the agent repeats the request', async () => {
+    const { call, studio } = await connect()
+    const ask = 'Which region leads?'
+    await call('query', { sql: `SELECT region, sum(mrr) * 12 AS arr FROM ${quoteLiteral(csvPath)} GROUP BY 1`, ask })
+    // The agent repeats the request on its next step: still the same question.
+    await call('query', { sql: `SELECT count(*) AS orders FROM ${quoteLiteral(csvPath)}`, ask })
+    const reply = studio.reply('APAC leads with 38,400 ARR.')
+    expect(reply.claims).toEqual([{ text: '38,400', status: 'found', where: 'arr · APAC' }])
+  }, 30_000)
+
   it('records the user\'s own queries as theirs and reloads the trace after a restart', async () => {
     const { studio, store, history } = await connect()
     const { dataset } = await studio.runQuery({ sql: `SELECT count(*) AS n FROM ${quoteLiteral(csvPath)}`, actor: 'user' })
