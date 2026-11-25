@@ -74,11 +74,22 @@ export const tools = [
   { name: 'load_file', role: 'Local files', desc: 'Loads a CSV, TSV or JSON file, including exports from BigQuery, Snowflake, MySQL, DuckDB or Databricks. Rows stay out of context.' },
   { name: 'load_data', role: 'Rows from other tools', desc: 'Takes JSON rows from Stripe, GitHub, an API or another SQL MCP server and renders a chart and pivot.' },
   { name: 'configure_pivot', role: 'Exact pivots', desc: 'Sums, averages, medians and totals computed by TinyPivot, not by the model.' },
-  { name: 'configure_chart', role: 'Chart types', desc: 'Bar, stacked bar, line, area, pie, donut, scatter, heatmap or radar.' },
+  { name: 'configure_chart', role: 'Chart types', desc: 'Bar, stacked bar, line, area, pie, donut, scatter, bubble, heatmap and radar, plus maps of countries, US states or sales regions, bullet (actual against target), slope, treemap, sunburst and radial charts. Ask for a dashboard and it adds filter controls above every view.' },
   { name: 'query', role: 'SQL over files', desc: 'Read-only DuckDB SQL over CSV, Parquet and JSON files and earlier pulls. Joins and filters run locally; only the chart comes back.' },
   { name: 'profile', role: 'Know the columns', desc: 'Empty share, ranges and commonest values per column, so the agent can plan without reading rows.' },
   { name: 'history', role: 'Every pull, kept', desc: 'Lists earlier pulls and reopens any of them without re-querying. Saved locally for 30 days.' },
   { name: 'query_postgres', role: 'Pro · Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
+] as const
+
+/** What TinyPivot does that a chat artifact or a pasted table cannot, each backed by the product or a measurement. */
+export const edges = [
+  { title: 'Works where you work', body: 'Terminal agents (Claude Code, pi, OpenCode, Codex CLI), editors (Cursor, Antigravity) and chat apps that show MCP views. Chat artifacts do not exist in a terminal.' },
+  { title: 'Raw rows stay on your machine', body: 'load_file and query read local files with DuckDB. The model gets the schema, a profile and the result: in our Claude Code recording, about 540 tokens for a 44,714-row file.' },
+  { title: 'Exact numbers', body: 'Sums, averages, medians and shares come from the TinyPivot engine, not from the model doing arithmetic.' },
+  { title: 'Exploring costs no tokens', body: 'Dragging pivot fields, filtering, switching charts and running your own SQL happen in the Studio on your machine, not in another prompt. Pro adds drill-through to the rows behind a cell and formatted .xlsx export.' },
+  { title: 'Every step reproducible', body: 'Each step keeps its reason and its exact SQL. Rerun it, edit it, or reopen any pull from the last 30 days without querying again.' },
+  { title: 'Answers checked against the data', body: 'Each number in the agent\'s answer is looked up in the data the question used, and Check this answer reruns every step. See Checking answers below.' },
+  { title: 'Charts that follow good practice', body: 'TinyPivot tells the agent when a chart has too many colours, slices too close to compare, missing months or too many bars, so it can fix the chart before you see it.' },
 ] as const
 
 export const prompts = [

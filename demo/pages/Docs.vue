@@ -2,7 +2,7 @@
 import CodeBlock from '../components/site/CodeBlock.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import SavingsCalculator from '../components/site/SavingsCalculator.vue'
-import { harnesses, prompts, telemetryEnvVars, tools } from '../site/docs'
+import { edges, harnesses, prompts, telemetryEnvVars, tools } from '../site/docs'
 import { CACHED_REREAD_FACTOR, CARD_ECHO_TOKENS, OUTPUT_TOKENS_PER_REWRITE, TOKENS_PER_CELL, TOOL_REPLY_TOKENS } from '../site/savings'
 import { useCopy } from '../site/useCopy'
 
@@ -10,7 +10,9 @@ const toc = [
   { id: 'quickstart', label: 'Quick start' },
   { id: 'setup', label: 'Setup by harness' },
   { id: 'prompts', label: 'Prompts' },
+  { id: 'why', label: 'Why TinyPivot' },
   { id: 'studio', label: 'Studio' },
+  { id: 'checks', label: 'Checking answers' },
   { id: 'tools', label: 'Tools' },
   { id: 'savings', label: 'Token savings' },
   { id: 'privacy', label: 'Privacy' },
@@ -91,6 +93,25 @@ const { copiedKey, copy } = useCopy()
           </ul>
         </section>
 
+        <section id="why" class="docs-section">
+          <h2 class="heading">
+            Why TinyPivot, <em>not a chat artifact</em>
+          </h2>
+          <p class="docs-text">
+            A chat app can draw a chart from a few rows you paste in. TinyPivot is for real files and real questions, in the agent you already use.
+          </p>
+          <dl class="tools ledger">
+            <div v-for="edge in edges" :key="edge.title" class="tool">
+              <dt>
+                <strong>{{ edge.title }}</strong>
+              </dt>
+              <dd class="docs-text">
+                {{ edge.body }}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
         <section id="studio" class="docs-section">
           <h2 class="heading">
             TinyPivot Studio
@@ -100,13 +121,32 @@ const { copiedKey, copy } = useCopy()
             A Studio tab left open from an earlier session reconnects instead. Set <code>TINYPIVOT_OPEN_STUDIO=0</code> to open it yourself.
           </p>
           <ul class="docs-text studio-list">
-            <li><strong>Trace.</strong> Each step, the agent's or yours, with its reason (the <code>why</code> the agent passes on every data tool), what it shows, and the SQL or file filter behind it. <em>Open</em> shows the data as it was right after that step.</li>
-            <li><strong>SQL editor.</strong> Edit a step's SQL or write new SQL over local files and loaded tables, and run it with DuckDB, read-only. The result keeps the step's chart when its fields still exist.</li>
-            <li><strong>Messages, with data.</strong> Write what to check or change, about one step if you like, and attach a row, a pivot cell's rows or the current view. In pi the message starts a turn at once and the answer comes back to the Studio; in Claude Code it does the same when started with <code>--dangerously-load-development-channels server:tinypivot</code>. Other agents get it with their next TinyPivot reply, or you can use <em>Copy as prompt</em>.</li>
+            <li><strong>Questions.</strong> Each question you ask, with every step that answered it: the source, the SQL, the rows, the chart and the agent's answer. Each step carries the agent's reason (the <code>why</code> it passes on every data tool); <em>Rows</em> and <em>Chart</em> show the data as it was right after that step.</li>
+            <li><strong>SQL workbench.</strong> Edit a step's SQL, or start from the SQL behind any loaded table, with completion for tables, columns and DuckDB functions. It runs read-only with DuckDB on your machine, and the result becomes your own step, keeping the step's chart when its fields still exist. SQL is laid out by <a href="https://sqlfluff.com" target="_blank" rel="noopener">SQLFluff</a> when it is installed (<code>uv tool install sqlfluff</code>), and by a built-in formatter otherwise.</li>
+            <li><strong>Messages.</strong> Write what to check or change, drop in files or images, and attach the current view. In pi, in OpenCode (with the plugin <code>init</code> installs) and in Claude Code started with <code>--dangerously-load-development-channels server:tinypivot</code>, the message starts a turn at once and the answer comes back to the Studio. In other agents the message box says how to ask from the terminal instead.</li>
+            <li><strong>Dashboard filters.</strong> Ask for a dashboard you can filter by some columns, and a filter bar appears above the grid, pivot and chart.</li>
             <li><strong>History.</strong> Every table the agent pulled, kept on your machine for 30 days, reopened without running the query again.</li>
+            <li><strong>Your layout.</strong> The theme you pick applies to the Studio, the charts and the terminal cards, and is remembered. Drag the bar between the questions and the chart to resize them. <em>Stop</em> shuts the Studio down; it also stops after two idle minutes with no page open.</li>
           </ul>
           <p class="docs-text">
             The Studio answers only this machine, on its own address, and accepts changes only from its own page.
+          </p>
+        </section>
+
+        <section id="checks" class="docs-section">
+          <h2 class="heading">
+            Checking answers
+          </h2>
+          <p class="docs-text">
+            The agent writes the answer; TinyPivot checks it. Every check runs in DuckDB and the Studio on your machine, so it costs no tokens, and the agent cannot write or skip it.
+          </p>
+          <ul class="docs-text studio-list">
+            <li><strong>Numbers in the answer.</strong> Each figure the agent quotes ($17.12M, 35.5%, +$7.93M) is looked up in the data the question used, at the precision the agent wrote it: 1.20M covers 1,195,000 to 1,205,000. A figure counts as found when it is a value, a total, a group total or a share of what the chart or pivot shows, or a gap or change between periods in a small summary table. Found figures are underlined in green; figures the data does not hold are marked.</li>
+            <li><strong>Check this answer.</strong> Reruns every step of the question. A file load checks that the file is the one the agent read (same size and modification time); a SQL step runs its query again and compares the result, row by row regardless of order, with what the agent got.</li>
+            <li><strong>Left alone on purpose.</strong> Years, dates, links, code, and small counts like "4 regions" are not checked. A growth rate the data cannot show directly is marked unchecked rather than wrong.</li>
+          </ul>
+          <p class="docs-text">
+            What this does not prove yet: that the agent asked the right question of the data, such as comparing a full year with ten months. Next, each figure gets its own proof query, run against a snapshot of the data as it was, and the agent's SQL gets structural checks for problems like a filter on one side of a comparison only.
           </p>
         </section>
 
