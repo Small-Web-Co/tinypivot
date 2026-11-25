@@ -2,7 +2,7 @@
 import { defineAsyncComponent, onMounted, ref } from 'vue'
 import HarnessReel from '../components/HarnessReel.vue'
 import BenchmarkTable from '../components/site/BenchmarkTable.vue'
-import HeroQuestion from '../components/site/HeroQuestion.vue'
+import HeroCharts from '../components/site/HeroCharts.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
@@ -72,7 +72,7 @@ const capabilities = [
               </a>
             </div>
             <div class="hero-side">
-              <HeroQuestion class="hero-question" />
+              <HeroCharts class="hero-charts" />
               <div id="install" class="hero-install">
                 <InstallBox source="hero" />
                 <ul class="facts" aria-label="Free tier">
@@ -229,7 +229,7 @@ const capabilities = [
   align-content: start;
 }
 
-.hero-question {
+.hero-charts {
   order: 2;
 }
 
@@ -431,7 +431,7 @@ const capabilities = [
     gap: 56px;
   }
 
-  .hero-question {
+  .hero-charts {
     order: 0;
   }
 
