@@ -17,8 +17,10 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
   },
   resolve: {
+    // Resolve workspace packages from source so tests run without a prior build (as in CI).
     alias: {
       '@smallwebco/tinypivot-core': resolve(__dirname, './packages/core/src'),
+      '@smallwebco/tinypivot-server': resolve(__dirname, './packages/server/src'),
     },
   },
 })
