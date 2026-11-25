@@ -5,7 +5,7 @@
  * frame fades in over the last.
  */
 import type { StudioFrame } from '../../site/reel/player'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { frameIndexAt } from '../../site/reel/player'
 
 const props = withDefaults(defineProps<{
@@ -23,10 +23,28 @@ const props = withDefaults(defineProps<{
 
 /** -1 until the Studio's first screenshot: it opens once the agent's first data step runs. */
 const active = computed(() => frameIndexAt(props.frames, props.time))
-/** The frame on screen, the one under it while it fades in, and the next one, loaded early. */
+/** Frames that failed to load (a deploy swapping files, a dropped connection): never shown broken. */
+const failed = ref(new Set<string>())
+/** The frame to show: the current one, or the last one before it that loaded. */
+const onScreen = computed(() => {
+  for (let index = active.value; index >= 0; index--) {
+    if (!failed.value.has(props.frames[index].src))
+      return index
+  }
+  return -1
+})
+/**
+ * The frame on screen, the one under it while it fades in, and the next one, loaded early. A frame
+ * that fails drops out, and the last one that loaded stays up instead of a broken image.
+ */
 const shown = computed(() => props.frames
   .map((frame, index) => ({ ...frame, index }))
-  .filter(frame => frame.index >= active.value - 1 && frame.index <= active.value + 1))
+  .filter(frame => !failed.value.has(frame.src)
+    && (frame.index === onScreen.value || (frame.index >= active.value - 1 && frame.index <= active.value + 1))))
+
+function dropFrame(src: string) {
+  failed.value = new Set(failed.value).add(src)
+}
 </script>
 
 <template>
@@ -40,12 +58,13 @@ const shown = computed(() => props.frames
         v-for="frame in shown"
         :key="frame.src"
         class="studio-frame"
-        :class="{ current: frame.index === active, upcoming: frame.index > active }"
+        :class="{ current: frame.index === onScreen, upcoming: frame.index > onScreen }"
         :src="frame.src"
-        :alt="frame.index === active ? alt : ''"
+        :alt="frame.index === onScreen ? alt : ''"
         width="1280"
         height="800"
         decoding="async"
+        @error="dropFrame(frame.src)"
       >
     </div>
   </div>
