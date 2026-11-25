@@ -119,11 +119,14 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 |---|---|
 | `open_tinypivot` | Opens TinyPivot (side pane, sidebar, or inline). Works with `{}` using the built-in sample dataset. |
 | `load_file` | Loads a local `.csv`, `.tsv`, `.json`, or `.jsonl` file (including SQL CLI exports from any database) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call. Pass `where` (for example `[{"field":"year","equals":[2026]}]`) to load only the rows a question is about; filtering runs on disk. |
+| `query` | Runs one read-only DuckDB `SELECT` over local CSV, Parquet or JSON files and over loaded datasets (tables named by dataset id), then charts or pivots the result. Rows never enter the model's context. DuckDB (about 20 MB) downloads once, on first use, into `~/.cache/tinypivot`. |
 | `load_data` | Loads flat JSON rows already in memory (<500 rows) from any other MCP tool, API, or small SQL query without writing a temp CSV; renders chart + pivot in 1 call. |
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
 | `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, etc.). |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
+| `profile` | Describes each column of a loaded dataset: empty share, number and date ranges, commonest values. |
+| `history` | Lists every earlier pull, or reopens one by id without re-querying. Pulls are saved locally under `~/.local/share/tinypivot/history` for 30 days. |
 
 ## Environment Variables (Optional)
 
@@ -134,6 +137,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 - `TINYPIVOT_NO_COMPANION=1` — Disable the localhost Companion Data IDE server
 - `TINYPIVOT_PORT` — Fixed localhost port for the Companion Data IDE server
 - `TINYPIVOT_REPRINT_CARDS` — Set to `0` so the model does not reprint each chart card in a terminal. Saves about 400 output tokens per question; the card stays visible in the Data IDE, the `tui` pane and pi.
+- `TINYPIVOT_HISTORY` — Set to `0` to stop saving pulls to history. `TINYPIVOT_HISTORY_DAYS` sets how long they are kept (default 30).
 
 ## Privacy & Telemetry
 

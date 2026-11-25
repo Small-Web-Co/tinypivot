@@ -75,6 +75,9 @@ export const tools = [
   { name: 'load_data', role: 'Rows from other tools', desc: 'Takes JSON rows from Stripe, GitHub, an API or another SQL MCP server and renders a chart and pivot.' },
   { name: 'configure_pivot', role: 'Exact pivots', desc: 'Sums, averages, medians and totals computed by TinyPivot, not by the model.' },
   { name: 'configure_chart', role: 'Chart types', desc: 'Bar, stacked bar, line, area, pie, donut, scatter, heatmap or radar.' },
+  { name: 'query', role: 'SQL over files', desc: 'Read-only DuckDB SQL over CSV, Parquet and JSON files and earlier pulls. Joins and filters run locally; only the chart comes back.' },
+  { name: 'profile', role: 'Know the columns', desc: 'Empty share, ranges and commonest values per column, so the agent can plan without reading rows.' },
+  { name: 'history', role: 'Every pull, kept', desc: 'Lists earlier pulls and reopens any of them without re-querying. Saved locally for 30 days.' },
   { name: 'query_postgres', role: 'Pro · Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
 ] as const
 

@@ -6,7 +6,8 @@ export default defineConfig({
   dts: true,
   clean: true,
   target: 'es2022',
-  external: ['pg'],
+  // DuckDB is native and large: loaded at runtime, downloaded on first use (see src/duckdb.ts).
+  external: ['pg', '@duckdb/node-api'],
   noExternal: [
     '@smallwebco/tinypivot-core',
     '@smallwebco/tinypivot-server',

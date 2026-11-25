@@ -694,6 +694,31 @@ export function detectNonAdditiveSumWarning(
   return `> **Data Integrity Warning:** \`${yField}\` appears to be a non-additive percentage/ratio, and **${collisions}** ${grain} bucket${collisions === 1 ? '' : 's'} contain multiple rows that were summed (\`aggregation: "sum"\`). Re-aggregate in SQL or Python to strictly 1 row per ${grain} using \`SUM(numerator) / SUM(denominator)\` before passing to TinyPivot.`
 }
 
+/** A grid this small is sent as its rows: the model needs the values, and they cost less than a re-query. */
+export const SMALL_GRID_MAX_ROWS = 25
+const SMALL_GRID_MAX_COLUMNS = 10
+
+function tableCell(value: unknown): string {
+  if (value === null || value === undefined)
+    return ''
+  const text = typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 4 }) : String(value)
+  return text.replace(/\|/g, '\\|').replace(/\n/g, ' ')
+}
+
+/** The rows of a small dataset in grid view, as a Markdown table. */
+function smallGridTable(dataset: StoredDataset): string | null {
+  if (dataset.viewMode !== 'grid' || dataset.rows.length > SMALL_GRID_MAX_ROWS || dataset.columns.length > SMALL_GRID_MAX_COLUMNS)
+    return null
+  const names = dataset.columns.map(column => column.name)
+  if (names.length === 0)
+    return null
+  return [
+    `| ${names.join(' | ')} |`,
+    `|${names.map(() => '---').join('|')}|`,
+    ...dataset.rows.map(row => `| ${names.map(name => tableCell(row[name])).join(' | ')} |`),
+  ].join('\n')
+}
+
 /** The fenced pivot table for a dataset that is in pivot view with a value to aggregate. */
 function pivotTableCard(dataset: StoredDataset, options: TerminalFormatOptions): string | null {
   const pivot = dataset.pivotConfig
@@ -738,7 +763,7 @@ export function formatDatasetSummary(
 ): string {
   const cardOptions = { ...options, companionUrl: options.companionUrl ?? companionUrl }
   // A dataset opened in pivot view answers with the pivot table; anything else gets its chart.
-  const chartBlock = pivotTableCard(dataset, cardOptions) ?? formatTerminalChart(dataset, dataset.chartConfig, cardOptions)
+  const chartBlock = smallGridTable(dataset) ?? pivotTableCard(dataset, cardOptions) ?? formatTerminalChart(dataset, dataset.chartConfig, cardOptions)
   const rowHeadline = dataset.truncatedForFreeTier
     ? `**${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows (Free tier limit)**`
     : `**${dataset.rows.length.toLocaleString()} rows**`

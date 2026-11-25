@@ -6,8 +6,9 @@ import type {
   ChartType,
   PivotConfig,
 } from '@smallwebco/tinypivot-core'
+import type { HistoryEntry, RecordInput } from './history.js'
 import type { PostgresConfig } from './postgres.js'
-import type { StoredDataset } from './store.js'
+import type { RowFilter, StoredDataset } from './store.js'
 import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -15,9 +16,12 @@ import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
+import { DuckDbRunner, QueryRejected, quoteIdentifier, quoteLiteral, withinBudget } from './duckdb.js'
+import { formatHistoryList, HistoryStore } from './history.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
+import { formatProfile } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { detectNonAdditiveSumWarning, formatDatasetSummary, formatPivotSummary, formatTerminalChart } from './summary.js'
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
@@ -38,7 +42,7 @@ export function buildInstructions({ reprintCards = true }: { reprintCards?: bool
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Data IDE link.'
   return [
     'Use TinyPivot for charts, pivot tables, period comparisons and tabular exploration instead of drawing them yourself (HTML, SVG, matplotlib, Markdown tables), passing chartConfig or pivotConfig in the same call.',
-    `For files use load_file, so the rows stay out of your context. Use load_data only for rows you already have, up to about ${LOAD_DATA_ROW_GUIDE}; write larger sets to a file first.`,
+    `For files use load_file, so the rows stay out of your context; to filter, join or aggregate files first, use query with SQL. Use load_data only for rows you already have, up to about ${LOAD_DATA_ROW_GUIDE}; write larger sets to a file first. history lists and reopens earlier pulls.`,
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     cards,
@@ -126,6 +130,10 @@ export interface CreateTinyPivotMcpServerOptions {
    * Defaults to TINYPIVOT_REPRINT_CARDS, which turns it off with "0".
    */
   reprintCards?: boolean
+  /** Where pulls are saved; defaults to the user's data folder. */
+  history?: HistoryStore
+  /** SQL engine for the query tool; defaults to an embedded DuckDB, downloaded on first use. */
+  duckdb?: DuckDbRunner
 }
 
 export interface McpToolRequestExtra {
@@ -171,6 +179,33 @@ export function clientSupportsMcpAppsUi(
 /** A load that asks for a pivot and no chart opens in pivot view; everything else opens on its chart. */
 function initialViewMode(requested: ViewMode | undefined, hasPivot: boolean, hasChart: boolean): ViewMode {
   return requested ?? (hasPivot && !hasChart ? 'pivot' : 'chart')
+}
+
+/** Pivot settings from a tool call, with aggregation names typed for the core library. */
+function normalizePivot(pivotConfig: z.infer<typeof pivotConfigSchema>): Partial<PivotConfig> {
+  return {
+    ...pivotConfig,
+    valueFields: pivotConfig.valueFields.map(v => ({ field: v.field, aggregation: v.aggregation as AggregationFunction })),
+  }
+}
+
+/** How long a query waits for DuckDB on first use before asking the model to try again. */
+const DUCKDB_WAIT_MS = 45_000
+
+/** SQL for a load_file filter, comparing as text the way the in-memory filter does. */
+function whereSql(where: RowFilter[]): string {
+  return where
+    .map(filter => `CAST(${quoteIdentifier(filter.field)} AS VARCHAR) IN (${filter.equals.map(value => quoteLiteral(String(value))).join(', ')})`)
+    .join(' AND ')
+}
+
+/** How a query reads an earlier pull back: the source file, or the rows saved in history. */
+function historyTableExpression(entry: HistoryEntry, rowsPath: string | undefined): string | undefined {
+  if (entry.kind === 'file') {
+    const file = quoteLiteral(entry.source)
+    return entry.where?.length ? `(SELECT * FROM ${file} WHERE ${whereSql(entry.where)})` : file
+  }
+  return rowsPath ? `read_json_auto(${quoteLiteral(rowsPath)})` : undefined
 }
 
 function toCoreChartConfig(input: z.infer<typeof chartConfigSchema>): Partial<ChartConfig> {
@@ -342,7 +377,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.2.10',
+      version: '0.3.0',
     },
     {
       capabilities: {
@@ -375,6 +410,44 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     const content = [{ type: 'text' as const, text: summaryText }]
     return clientRendersWidget() ? { content, structuredContent: payload } : { content }
   }
+
+  /** The shared ending of every tool that loads a dataset: the card for the model, the payload for the widget. */
+  const replyWithDataset = async (ds: StoredDataset, sessionKey: string, tool: string, note = '') => {
+    const liveCompanionUrl = await resolveCompanionUrlForTool()
+    const summaryText = `${formatDatasetSummary(ds, liveCompanionUrl, cardFormat)}${note}`
+    const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
+    recordTelemetry({
+      event: 'tool_call',
+      tool,
+      rowBucket: bucketRowCount(ds.sourceTotalRows),
+      client: getClientName(),
+      tier,
+      truncated: ds.truncatedForFreeTier,
+    })
+    notifyCompanion()
+    return dataToolResult(summaryText, payload)
+  }
+
+  const history = options.history ?? new HistoryStore()
+  try {
+    history.prune()
+  }
+  catch (error) {
+    console.error(`[tinypivot-mcp] Could not prune history: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  /** The history entry behind each loaded dataset, so SQL can read it back by dataset id. */
+  const pullsByDataset = new Map<string, HistoryEntry>()
+  const remember = (ds: StoredDataset, input: RecordInput) => {
+    const entry = history.record(ds, input)
+    if (entry)
+      pullsByDataset.set(ds.id, entry)
+  }
+  const duck = options.duckdb ?? new DuckDbRunner()
+  const queryViews = (sessionKey: string) => store.listMetadata(sessionKey).flatMap((meta) => {
+    const entry = pullsByDataset.get(meta.id)
+    const from = entry && historyTableExpression(entry, history.rowsPath(entry))
+    return from ? [{ name: meta.id, from }] : []
+  })
 
   /** Tools only the widget calls. A host with no widget would just list them for the model. */
   const widgetOnlyTools: Array<{ disable: () => void }> = []
@@ -539,15 +612,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       try {
         const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
         const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep, where })
+        remember(ds, { kind: 'file', source: ds.source, where })
         const explicitChart = chartConfig ? toCoreChartConfig(chartConfig) : undefined
         if (pivotConfig) {
-          const normalizedPivot: Partial<PivotConfig> = {
-            ...pivotConfig,
-            valueFields: pivotConfig.valueFields.map(v => ({
-              field: v.field,
-              aggregation: v.aggregation as AggregationFunction,
-            })),
-          }
+          const normalizedPivot = normalizePivot(pivotConfig)
           store.updateView(ds.id, {
             viewMode: initialViewMode(viewMode, true, Boolean(explicitChart)),
             pivotConfig: normalizedPivot,
@@ -561,19 +629,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           }, sessionKey)
         }
 
-        const liveCompanionUrl = await resolveCompanionUrlForTool()
-        const summaryText = formatDatasetSummary(ds, liveCompanionUrl, cardFormat)
-        const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
-        recordTelemetry({
-          event: 'tool_call',
-          tool: 'load_file',
-          rowBucket: bucketRowCount(ds.sourceTotalRows),
-          client: getClientName(),
-          tier,
-          truncated: ds.truncatedForFreeTier,
-        })
-        notifyCompanion()
-        return dataToolResult(summaryText, payload)
+        return replyWithDataset(ds, sessionKey, 'load_file')
       }
       catch (err) {
         return {
@@ -603,41 +659,19 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
     async ({ name, rows, source, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
       const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
-      const normalizedPivot: Partial<PivotConfig> | undefined = pivotConfig
-        ? {
-            ...pivotConfig,
-            valueFields: pivotConfig.valueFields.map(v => ({
-              field: v.field,
-              aggregation: v.aggregation as AggregationFunction,
-            })),
-          }
-        : undefined
-
       const ds = store.register({
         name,
         source: source ?? 'inline JSON',
         ingestionMode: 'inline',
         rows,
         viewMode: initialViewMode(viewMode, Boolean(pivotConfig), Boolean(chartConfig)),
-        pivotConfig: normalizedPivot,
+        pivotConfig: pivotConfig ? normalizePivot(pivotConfig) : undefined,
         chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
         sessionKey,
         keepExisting: shouldKeep,
       })
-
-      const liveCompanionUrl = await resolveCompanionUrlForTool()
-      const summaryText = formatDatasetSummary(ds, liveCompanionUrl, cardFormat)
-      const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
-      recordTelemetry({
-        event: 'tool_call',
-        tool: 'load_data',
-        rowBucket: bucketRowCount(ds.sourceTotalRows),
-        client: getClientName(),
-        tier,
-        truncated: ds.truncatedForFreeTier,
-      })
-      notifyCompanion()
-      return dataToolResult(summaryText, payload)
+      remember(ds, { kind: 'data', source: source ?? 'inline JSON' })
+      return replyWithDataset(ds, sessionKey, 'load_data')
     },
   )
 
@@ -824,33 +858,12 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             ingestionMode: 'direct',
             rows: res.rows,
             viewMode: initialViewMode(viewMode, Boolean(pivotConfig), false),
-            pivotConfig: pivotConfig
-              ? {
-                  ...pivotConfig,
-                  valueFields: pivotConfig.valueFields.map(v => ({
-                    field: v.field,
-                    aggregation: v.aggregation as AggregationFunction,
-                  })),
-                }
-              : undefined,
+            pivotConfig: pivotConfig ? normalizePivot(pivotConfig) : undefined,
             sessionKey,
             keepExisting: shouldKeep,
           })
-
-          const liveCompanionUrl = await resolveCompanionUrlForTool()
-          const truncNote = res.truncated ? ' (capped at max rows)' : ''
-          const summaryText = `${formatDatasetSummary(ds, liveCompanionUrl, cardFormat)}${truncNote}`
-          const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
-          recordTelemetry({
-            event: 'tool_call',
-            tool: 'query_postgres',
-            rowBucket: bucketRowCount(ds.sourceTotalRows),
-            client: getClientName(),
-            tier,
-            truncated: ds.truncatedForFreeTier,
-          })
-          notifyCompanion()
-          return dataToolResult(summaryText, payload)
+          remember(ds, { kind: 'postgres', source: sql })
+          return replyWithDataset(ds, sessionKey, 'query_postgres', res.truncated ? ' (capped at max rows)' : '')
         }
         catch (err) {
           return {
@@ -863,6 +876,107 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   }
 
   // 7. List loaded datasets (and Postgres tables if configured)
+  // SQL over local files and earlier pulls, through an embedded DuckDB downloaded on first use.
+  server.registerTool(
+    'query',
+    {
+      title: 'Query Files with SQL',
+      description: 'Run one read-only DuckDB SELECT over local CSV, Parquet or JSON files (FROM \'path\') and loaded datasets (tables named by dataset id), then chart or pivot the result. Rows stay out of your context.',
+      inputSchema: {
+        sql: z.string(),
+        name: z.string().optional(),
+        viewMode: z.enum(VIEW_MODE_VALUES).optional(),
+        pivotConfig: pivotConfigSchema.optional(),
+        chartConfig: chartConfigSchema.optional(),
+        keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
+      },
+      _meta: INLINE_UI_META,
+    },
+    async ({ sql, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
+      const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
+      try {
+        if (await withinBudget(duck.prepare(), DUCKDB_WAIT_MS) === 'pending') {
+          return { content: [{ type: 'text' as const, text: 'DuckDB is downloading for its first use (about 20 MB, once). Run the same query again in a minute.' }] }
+        }
+        const result = await duck.run(sql, queryViews(sessionKey))
+        const ds = store.register({
+          name: name ?? 'SQL query',
+          source: sql,
+          ingestionMode: 'direct',
+          rows: result.rows,
+          viewMode: initialViewMode(viewMode, Boolean(pivotConfig), Boolean(chartConfig)),
+          pivotConfig: pivotConfig ? normalizePivot(pivotConfig) : undefined,
+          chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
+          sessionKey,
+          keepExisting: shouldKeep,
+        })
+        remember(ds, { kind: 'query', source: sql })
+        return replyWithDataset(ds, sessionKey, 'query', result.truncated ? `\n_Result cut at ${result.rows.length.toLocaleString('en-US')} rows._` : '')
+      }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { isError: true, content: [{ type: 'text' as const, text: error instanceof QueryRejected ? message : `Query failed: ${message}` }] }
+      }
+    },
+  )
+
+  // Column-level statistics, so the model can plan without reading rows.
+  server.registerTool(
+    'profile',
+    {
+      title: 'Profile Dataset',
+      description: 'Describe each column of a loaded dataset: empty share, number and date ranges, commonest values.',
+      inputSchema: {
+        datasetId: z.string().optional(),
+      },
+    },
+    async ({ datasetId }, extra) => {
+      const { sessionKey } = resolveSessionContext(extra)
+      const ds = store.get(datasetId, sessionKey)
+      if (!ds)
+        return { isError: true, content: [{ type: 'text' as const, text: `Dataset "${datasetId ?? '(active)'}" not found.` }] }
+      return { content: [{ type: 'text' as const, text: formatProfile(ds) }] }
+    },
+  )
+
+  // Every pull is saved locally; list them, or reopen one without re-querying.
+  server.registerTool(
+    'history',
+    {
+      title: 'Saved Pulls',
+      description: 'List data pulled in earlier sessions, or reopen one by id at no cost: nothing is re-queried.',
+      inputSchema: {
+        open: z.string().optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+      _meta: INLINE_UI_META,
+    },
+    async ({ open, limit }, extra) => {
+      if (!history.enabled)
+        return { content: [{ type: 'text' as const, text: 'History is off (TINYPIVOT_HISTORY=0).' }] }
+      if (!open)
+        return { content: [{ type: 'text' as const, text: formatHistoryList(history.list(limit ?? 15)) }] }
+      const entry = history.get(open)
+      if (!entry)
+        return { isError: true, content: [{ type: 'text' as const, text: `No saved pull "${open}". ${formatHistoryList(history.list(5))}` }] }
+      const { sessionKey } = resolveSessionContext(extra, true)
+      try {
+        const ds = entry.kind === 'file'
+          ? await store.loadFromFile(entry.source, entry.name, { sessionKey, keepExisting: true, where: entry.where })
+          : store.register({ name: entry.name, source: entry.source, ingestionMode: 'direct', rows: history.readRows(entry), sessionKey, keepExisting: true })
+        store.updateView(ds.id, {
+          ...(entry.chartConfig ? { chartConfig: entry.chartConfig } : {}),
+          ...(entry.pivotConfig ? { pivotConfig: entry.pivotConfig } : {}),
+        }, sessionKey)
+        pullsByDataset.set(ds.id, entry)
+        return replyWithDataset(ds, sessionKey, 'history')
+      }
+      catch (error) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Could not reopen "${open}": ${error instanceof Error ? error.message : String(error)}` }] }
+      }
+    },
+  )
+
   server.registerTool(
     'list_datasets',
     {
