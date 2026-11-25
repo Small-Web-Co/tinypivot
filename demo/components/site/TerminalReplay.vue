@@ -7,7 +7,7 @@ import type { Camera } from '../../site/reel/director'
 import type { Recording, RecordingStyle, Run } from '../../site/reel/player'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cameraFor, findCard, lastContentRow, wideShot } from '../../site/reel/director'
-import { glyphRects, sparklineCells, sparklineRect } from '../../site/reel/glyphs'
+import { barCells, glyphRects, insetBar, sparklineCells, sparklineRect } from '../../site/reel/glyphs'
 import { applyFrames, createScreen, frameIndexAt } from '../../site/reel/player'
 
 const props = defineProps<{
@@ -63,8 +63,17 @@ function colorsFor(style: RecordingStyle) {
   return style.inverse ? { fg: bg ?? props.recording.theme.bg, bg: fg } : { fg, bg }
 }
 
-function drawChar(ctx: CanvasRenderingContext2D, char: string, x: number, y: number, alpha: number, inSparkline: boolean) {
-  const rects = inSparkline ? [sparklineRect(char, cellWidth, cellHeight)] : glyphRects(char, cellWidth, cellHeight)
+type CellKind = 'text' | 'sparkline' | 'bar'
+
+function rectsFor(char: string, kind: CellKind) {
+  if (kind === 'sparkline')
+    return [sparklineRect(char, cellWidth, cellHeight)]
+  const rects = glyphRects(char, cellWidth, cellHeight)
+  return rects && kind === 'bar' ? insetBar(rects, cellHeight) : rects
+}
+
+function drawChar(ctx: CanvasRenderingContext2D, char: string, x: number, y: number, alpha: number, kind: CellKind) {
+  const rects = rectsFor(char, kind)
   if (!rects) {
     ctx.fillText(char, x, y + cellHeight / 2)
     return
@@ -91,9 +100,11 @@ function drawRun(ctx: CanvasRenderingContext2D, run: Run, column: number, y: num
   ctx.fillStyle = fg
   ctx.font = fontFor(style)
   const sparkline = sparklineCells(chars)
+  const bars = barCells(chars)
+  const kindOf = (offset: number): CellKind => (sparkline.has(offset) ? 'sparkline' : bars.has(offset) ? 'bar' : 'text')
   chars.forEach((char, offset) => {
     if (char !== ' ')
-      drawChar(ctx, char, x + offset * cellWidth, y, alpha, sparkline.has(offset))
+      drawChar(ctx, char, x + offset * cellWidth, y, alpha, kindOf(offset))
   })
   if (style.underline)
     ctx.fillRect(x, y + cellHeight - 2, chars.length * cellWidth, 1)

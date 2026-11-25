@@ -1,7 +1,7 @@
 import type { RecordingFrame, Run } from '../../demo/site/reel/player'
 import { describe, expect, it } from 'vitest'
 import { cameraFor, findCard, lastContentRow, wideShot } from '../../demo/site/reel/director'
-import { glyphRects, sparklineCells, sparklineRect } from '../../demo/site/reel/glyphs'
+import { barCells, glyphRects, insetBar, sparklineCells, sparklineRect } from '../../demo/site/reel/glyphs'
 import { applyFrames, captionAt, createScreen, frameIndexAt } from '../../demo/site/reel/player'
 import { applySgr, indexedColor, parseScreen, phosphor, rowText, TERMINAL_THEME, themed } from '../../scripts/reel/ansi.mjs'
 
@@ -118,6 +118,22 @@ describe('reel: drawing chart characters on the cell grid', () => {
       expect(bar.y).toBeGreaterThan(0)
       expect(bar.y + bar.h).toBeLessThan(CH)
     }
+  })
+
+  it('treats block runs as chart bars unless they are part of block art', () => {
+    expect([...barCells([...'│ ████▌   64.9M'])]).toEqual([2, 3, 4, 5, 6])
+    expect([...barCells([...'│ ███▓▓▒░  20M'])]).toEqual([2, 3, 4, 5, 6, 7, 8])
+    // A harness logo: full blocks flanked by quadrant and half blocks.
+    expect(barCells([...' ▐▛███▜▌'])).toEqual(new Set())
+    // A single legend swatch is not a bar.
+    expect(barCells([...'█ Enterprise'])).toEqual(new Set())
+  })
+
+  it('leaves a gap above and below a bar', () => {
+    const [bar] = insetBar(glyphRects('█', CW, CH) ?? [], CH)
+    expect(bar.y).toBeGreaterThan(0)
+    expect(bar.y + bar.h).toBeLessThan(CH)
+    expect(bar.w).toBe(CW)
   })
 
   it('joins box-drawing lines at the cell edges', () => {

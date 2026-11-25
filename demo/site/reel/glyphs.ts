@@ -164,6 +164,35 @@ export function sparklineCells(chars: string[]): Set<number> {
   return cells
 }
 
+/** Full and partial blocks that horizontal bars are made of, including the stacked-bar shades. */
+const BAR_RE = /[\u2588-\u258F\u2591-\u2593]{2,}/g
+/** Half and quadrant blocks. A block run touching one of these is a logo, not a bar. */
+const SHAPE_RE = /[\u2580\u2584\u2590\u2596-\u259F]/
+
+/**
+ * Finds horizontal chart bars in a line and returns the index of every character in one.
+ * Bars on neighbouring rows touch in a terminal and read as one slab, so the replay draws
+ * them slightly shorter than the row. Block art such as a harness logo is left solid.
+ */
+export function barCells(chars: string[]): Set<number> {
+  const cells = new Set<number>()
+  const text = chars.map(char => (char.length === 1 ? char : ' ')).join('')
+  for (const match of text.matchAll(BAR_RE)) {
+    const neighbours = text.charAt(match.index - 1) + text.charAt(match.index + match[0].length)
+    if (SHAPE_RE.test(neighbours))
+      continue
+    for (let offset = 0; offset < match[0].length; offset++)
+      cells.add(match.index + offset)
+  }
+  return cells
+}
+
+/** Shortens a bar's rectangles so a gap shows between it and the bars above and below. */
+export function insetBar(rects: GlyphRect[], ch: number): GlyphRect[] {
+  const gap = Math.max(1, Math.round(ch * 0.13))
+  return rects.map(rect => ({ ...rect, y: rect.y + gap, h: Math.max(1, rect.h - gap * 2) }))
+}
+
 /** One sparkline bar: narrower than the cell and shorter than the row, so bars stand apart. */
 export function sparklineRect(char: string, cw: number, ch: number): GlyphRect {
   const code = Math.min(SPARK_LAST, Math.max(SPARK_FIRST, char.codePointAt(0) ?? SPARK_FIRST))
