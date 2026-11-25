@@ -72,15 +72,16 @@
   --vpg-state-info: #0284c7;
   --vpg-scrollbar-thumb: #cbd5e1;
   --vpg-scrollbar-track: #f1f5f9;
-  --vpg-dim-row-bg: #eef2ff;
-  --vpg-dim-row-text: #3730a3;
-  --vpg-dim-row-border: #c7d2fe;
-  --vpg-dim-col-bg: #f5f3ff;
-  --vpg-dim-col-text: #6d28d9;
-  --vpg-dim-col-border: #ddd6fe;
-  --vpg-dim-value-bg: #ecfdf5;
-  --vpg-dim-value-text: #047857;
-  --vpg-dim-value-border: #a7f3d0;
+  /* Field zones stay neutral: the labels and icons tell rows, columns and values apart. */
+  --vpg-dim-row-bg: #f8fafc;
+  --vpg-dim-row-text: #334155;
+  --vpg-dim-row-border: #cbd5e1;
+  --vpg-dim-col-bg: #f8fafc;
+  --vpg-dim-col-text: #334155;
+  --vpg-dim-col-border: #cbd5e1;
+  --vpg-dim-value-bg: #f8fafc;
+  --vpg-dim-value-text: #334155;
+  --vpg-dim-value-border: #cbd5e1;
   --vpg-dim-calc-bg: #fdf4ff;
   --vpg-dim-calc-text: #86198f;
   --vpg-dim-calc-border: #f0abfc;
@@ -119,15 +120,15 @@
   --vpg-state-info: #38bdf8;
   --vpg-scrollbar-thumb: #475569;
   --vpg-scrollbar-track: #1e293b;
-  --vpg-dim-row-bg: #312e81;
-  --vpg-dim-row-text: #c7d2fe;
-  --vpg-dim-row-border: #4338ca;
-  --vpg-dim-col-bg: #4c1d95;
-  --vpg-dim-col-text: #c4b5fd;
-  --vpg-dim-col-border: #6d28d9;
-  --vpg-dim-value-bg: #064e3b;
-  --vpg-dim-value-text: #6ee7b7;
-  --vpg-dim-value-border: #047857;
+  --vpg-dim-row-bg: #162032;
+  --vpg-dim-row-text: #cbd5e1;
+  --vpg-dim-row-border: #475569;
+  --vpg-dim-col-bg: #162032;
+  --vpg-dim-col-text: #cbd5e1;
+  --vpg-dim-col-border: #475569;
+  --vpg-dim-value-bg: #162032;
+  --vpg-dim-value-text: #cbd5e1;
+  --vpg-dim-value-border: #475569;
   --vpg-dim-calc-bg: #581c87;
   --vpg-dim-calc-text: #f0abfc;
   --vpg-dim-calc-border: #86198f;
@@ -4755,6 +4756,13 @@
 /* ==========================================================================
    Pivot table: full width, quiet totals
    ========================================================================== */
+/* No cell draws outside its box: long labels end in an ellipsis (the full text is in the title). */
+.vpg-pivot-skeleton .vpg-pivot-table :is(.vpg-row-header-cell, .vpg-data-cell, .vpg-column-header-cell, .vpg-row-header-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28rem;
+}
+
 /* Auto layout lets the value columns share the spare width instead of squeezing to fit it. */
 .vpg-pivot-skeleton .vpg-table-container .vpg-pivot-table {
   width: 100%;

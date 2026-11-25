@@ -998,6 +998,7 @@ export function PivotSkeleton({
                                 className={`vpg-row-header-cell${enableDrillDown !== false && groupStart ? ' vpg-row-header-collapsible' : ''}`}
                                 rowSpan={rowSpans[rowPos][idx].rowspan}
                                 style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
+                                title={String(val)}
                                 onClick={enableDrillDown !== false && groupStart
                                   ? (e) => { e.stopPropagation(); handleChevronClick(groupStart, e) }
                                   : undefined}
@@ -1019,6 +1020,7 @@ export function PivotSkeleton({
                                 key={`row-${sortedIdx}-${idx}`}
                                 className="vpg-row-header-cell"
                                 style={{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }}
+                                title={String(val)}
                               >
                                 {enableDrillDown !== false && groupStart && (
                                   <span

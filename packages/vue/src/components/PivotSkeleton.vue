@@ -873,6 +873,7 @@ function onDrillThroughGrandTotal() {
                     :class="{ 'vpg-row-header-collapsible': enableDrillDown !== false && findGroupStart(sortedIdx, idx) }"
                     :rowspan="rowSpans[rowPos][idx].rowspan"
                     :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }"
+                    :title="String(val)"
                     @click.stop="enableDrillDown !== false && findGroupStart(sortedIdx, idx) ? onChevronClick(findGroupStart(sortedIdx, idx)!, $event) : undefined"
                   >
                     <span
@@ -891,6 +892,7 @@ function onDrillThroughGrandTotal() {
                   :key="`row-${sortedIdx}-${idx}`"
                   class="vpg-row-header-cell"
                   :style="{ width: `${rowHeaderColWidth}px`, minWidth: '80px', left: `${getRowHeaderLeftOffset(idx)}px` }"
+                  :title="String(val)"
                 >
                   <span
                     v-if="enableDrillDown !== false && findGroupStart(sortedIdx, idx)"
