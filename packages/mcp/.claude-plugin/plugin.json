@@ -31,6 +31,14 @@
   "supportUrl": "https://github.com/Small-Web-Co/tinypivot/issues",
   "privacyPolicyUrl": "https://tiny-pivot.com/privacy",
   "termsOfServiceUrl": "https://tiny-pivot.com/terms",
+  "userConfig": {
+    "license_key": {
+      "type": "string",
+      "title": "TinyPivot license key",
+      "description": "Optional Pro or Team key (TP-MCPP-… or TP-MCPT-…). Leave empty for the free tier.",
+      "sensitive": true
+    }
+  },
   "channels": [
     {
       "server": "tinypivot",
