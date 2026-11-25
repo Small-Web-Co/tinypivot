@@ -212,10 +212,34 @@ describe('claude Code channel server', () => {
 
 describe('agent answers', () => {
   it('leave out the terminal cards the agent echoed, which the Studio already shows', async () => {
-    const { withoutCards } = await import('../../packages/mcp/src/studio')
+    const { studioAnswer } = await import('../../packages/mcp/src/studio')
     const answer = 'Yes, March.\n\n```text\n╭─ Partner ─╮\n│ 163,459 │\n╰──────╯\n```\n\nEvery region drops.'
-    expect(withoutCards(answer)).toBe('Yes, March.\n\nEvery region drops.')
-    expect(withoutCards('```text\nplain block\n```')).toBe('```text\nplain block\n```')
+    expect(studioAnswer(answer)).toBe('Yes, March.\n\nEvery region drops.')
+    expect(studioAnswer('```text\nplain block\n```')).toBe('```text\nplain block\n```')
+  })
+
+  it('leave out what the agent says about TinyPivot itself, keeping what it says about the data', async () => {
+    const { studioAnswer } = await import('../../packages/mcp/src/studio')
+    const answer = [
+      '**Done — stacked bar of quarterly revenue by region is live in TinyPivot Studio:** http://127.0.0.1:47317/s/20261125-182841-wc3lbz5',
+      '',
+      'Note this is synthetic sample data I generated (16 rows), since no revenue file was provided. TinyPivot\'s built-in `sample_sales` dataset is also still loaded.',
+      '- APAC grew fastest, +43.4%.',
+      '- TinyPivot rendered the slope as a grouped bar in the text card.',
+      'Studio: http://127.0.0.1:47391/s/20261125-x',
+      '```sql',
+      'SELECT 1 -- TinyPivot',
+      '```',
+    ].join('\n')
+    expect(studioAnswer(answer)).toBe([
+      'Note this is synthetic sample data I generated (16 rows), since no revenue file was provided.',
+      '- APAC grew fastest, +43.4%.',
+      '```sql',
+      'SELECT 1 -- TinyPivot',
+      '```',
+    ].join('\n'))
+    // An answer that is only about TinyPivot stays as it was rather than vanishing.
+    expect(studioAnswer('The chart is in TinyPivot Studio.')).toBe('The chart is in TinyPivot Studio.')
   })
 })
 

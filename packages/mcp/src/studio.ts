@@ -127,13 +127,35 @@ function historyTableExpression(entry: HistoryEntry, rowsPath: string | undefine
   return rowsPath ? `read_json_auto(${quoteLiteral(rowsPath)})` : undefined
 }
 
+/** A sentence about the tool rather than the data: it names TinyPivot or the Studio, or links to it. */
+const ABOUT_TINYPIVOT = /TinyPivot|\bStudio\b|https?:\/\/(?:127\.0\.0\.1|localhost)[:/]/
+const SENTENCE_END = /(?<=[.!?:])\s+(?=\S)/
+
+/** A line without its sentences about TinyPivot; empty when nothing else was in it. */
+function withoutSelfReference(line: string): string {
+  const [, bullet = '', body] = /^(\s*(?:[-*]|\d+\.)\s+)?(.*)$/.exec(line)!
+  const kept = body.split(SENTENCE_END).filter(sentence => !ABOUT_TINYPIVOT.test(sentence)).join(' ')
+  return kept.trim() ? `${bullet}${kept}` : ''
+}
+
 /**
- * An answer without the terminal cards the agent echoed into it: the Studio already shows those
- * views, and box drawing does not read outside a terminal.
+ * An answer as the Studio shows it. Out go the terminal cards the agent echoed into it (the
+ * Studio already shows those views, and box drawing does not read outside a terminal) and its
+ * sentences about TinyPivot itself ("the chart is live in TinyPivot Studio: <link>"): the user
+ * is already in the Studio and wants the answer about their data.
  */
-export function withoutCards(text: string): string {
-  const stripped = text.replace(/```text\n[\s\S]*?```\n?/g, block => (/[╭╰│┤├]/.test(block) ? '' : block))
-  return stripped.replace(/\n{3,}/g, '\n\n').trim() || text.trim()
+export function studioAnswer(text: string): string {
+  const cardless = text.replace(/```text\n[\s\S]*?```\n?/g, block => (/[╭╰│┤├]/.test(block) ? '' : block))
+  let inCode = false
+  const lines = cardless.split('\n').flatMap((line) => {
+    if (line.trimStart().startsWith('```'))
+      inCode = !inCode
+    if (inCode || line.trimStart().startsWith('```') || !line.trim())
+      return [line]
+    const kept = withoutSelfReference(line)
+    return kept ? [kept] : []
+  })
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() || text.trim()
 }
 
 /** Rows reduce to a count and a hash of every row, sorted, so the same result in any order matches. */
@@ -524,7 +546,7 @@ export class Studio {
    * quotes checked against the data loaded since the user last asked something.
    */
   reply(text: string, sessionKey = DEFAULT_SESSION_KEY): TraceStep {
-    const answer = withoutCards(text)
+    const answer = studioAnswer(text)
     const claims = checkClaims(answer, this.datasetsSinceLastAsk(sessionKey))
     return this.record({ actor: 'agent', tool: 'reply', why: answer, ...(claims.length ? { claims } : {}) })
   }

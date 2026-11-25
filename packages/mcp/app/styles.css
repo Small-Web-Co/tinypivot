@@ -1077,8 +1077,41 @@ body,
   flex: 1;
   min-height: 0;
   display: grid;
-  /* The trace grows with wide windows, up to a comfortable reading width. */
-  grid-template-columns: clamp(300px, 24vw, 460px) minmax(0, 1fr);
+  /* The trace grows with wide windows, up to a comfortable reading width, unless the user dragged it. */
+  grid-template-columns: var(--tp-studio-width, clamp(300px, 24vw, 460px)) 0 minmax(0, 1fr);
+}
+
+/* A wide grab area over the Studio's right border, drawn as a line on hover or while dragging. */
+.tp-studio-resizer {
+  position: relative;
+  z-index: 5;
+  width: 10px;
+  margin-left: -5px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.tp-studio-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 4px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.tp-studio-resizer:hover::after,
+.tp-studio-resizer:focus-visible::after,
+.tp-studio-resizer.is-dragging::after {
+  background: var(--tp-accent);
+}
+
+.tp-studio-resizer:focus-visible {
+  outline: none;
+}
+
+body.tp-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .tp-studio-layout.is-closed {
@@ -1381,6 +1414,11 @@ body,
   .tp-studio-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 52vh) minmax(0, 1fr);
+  }
+
+  /* Stacked, the Studio and the grid share the height: nothing to drag. */
+  .tp-studio-resizer {
+    display: none;
   }
 
   /* On a narrow screen the trace gets the room; the composer stays to two lines. */

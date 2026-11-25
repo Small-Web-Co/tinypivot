@@ -12,6 +12,7 @@ import { INTERACTIVE_ROW_LIMIT, ROW_PAGE_SIZE } from '../src/limits'
 import { rowAttachment, sliceAttachment, viewAttachment } from './attachments'
 import { postToStudio } from './companionApi'
 import { StudioPanel } from './StudioPanel'
+import { StudioResizer, useStudioWidth } from './StudioResizer'
 
 interface DatasetMeta {
   id: string
@@ -162,6 +163,8 @@ const CHART_SORT_OPTIONS: Array<{ value: ChartSortOrder, short: string, label: s
 export function McpApp() {
   const appRef = useRef<App | null>(null)
   const mainRef = useRef<HTMLElement | null>(null)
+  const layoutRef = useRef<HTMLDivElement | null>(null)
+  const [studioWidth, setStudioWidth] = useStudioWidth()
   const licenseAppliedRef = useRef(false)
   const userPickedModeRef = useRef(false)
   /** The live stream from the local Studio server, closed when the user stops the Studio. */
@@ -1181,7 +1184,11 @@ export function McpApp() {
 
       {statusNote && <div className="tp-mcp-status">{statusNote}</div>}
 
-      <div className={studio && studioOpen ? 'tp-studio-layout' : 'tp-studio-layout is-closed'}>
+      <div
+        ref={layoutRef}
+        className={studio && studioOpen ? 'tp-studio-layout' : 'tp-studio-layout is-closed'}
+        style={studioWidth ? { '--tp-studio-width': `${studioWidth}px` } as React.CSSProperties : undefined}
+      >
         {studio && studioOpen && (
           <StudioPanel
             snapshot={studio}
@@ -1192,6 +1199,9 @@ export function McpApp() {
             onClearAttachment={() => setSelectedContext(null)}
             notify={message => showToast(message)}
           />
+        )}
+        {studio && studioOpen && (
+          <StudioResizer current={() => layoutRef.current?.firstElementChild?.getBoundingClientRect().width ?? 0} onResize={setStudioWidth} />
         )}
         <main ref={mainRef} className="tp-mcp-grid-wrap">
           {licenseReady && rows.length > 0
