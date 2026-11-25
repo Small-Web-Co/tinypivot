@@ -66,8 +66,8 @@
   ],
   "scripts": {
     "build": "tsup",
-    "type-check": "tsc --noEmit",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit"
   },
   "peerDependencies": {
     "react": "^18.0.0",

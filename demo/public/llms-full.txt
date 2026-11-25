@@ -67,7 +67,7 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 - `load_file` — Loads local `.csv`, `.tsv`, `.json`, or `.jsonl` files (or SQL CLI exports) with 0 raw rows in context; accepts `chartConfig` and `pivotConfig` in 1 call.
 - `load_data` — Loads flat JSON rows already in memory (`<500` rows) directly without temp CSVs; accepts `chartConfig` and `pivotConfig` in 1 call.
 - `configure_pivot` — Deterministic pivot calculation via `@smallwebco/tinypivot-core` (zero LLM arithmetic errors).
-- `configure_chart` — Interactive charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, `scatter`, `bubble`, `heatmap`, `radar`) + Unicode terminal cards.
+- `configure_chart` — Interactive charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, `scatter`, `bubble`, `heatmap`, `radar`, `choropleth` maps of countries / US states / sales regions, `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`) + Unicode terminal cards.
 - `query_postgres` — *(Optional Pro)* AST-validated read-only `SELECT` against `DATABASE_URL`.
 - `list_datasets` — Lists loaded datasets, row counts, and inferred schemas.
 

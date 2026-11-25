@@ -3,7 +3,6 @@ import type {
   ChartAggregation,
   ChartConfig,
   ChartThemePreset,
-  ChartType,
   PivotConfig,
 } from '@smallwebco/tinypivot-core'
 import type { PostgresConfig } from './postgres.js'
@@ -15,7 +14,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { completable } from '@modelcontextprotocol/sdk/server/completable.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
+import { CHART_THEME_IDS, CHART_TYPES, resolveChartType } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
@@ -27,7 +26,7 @@ import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { Studio } from './studio.js'
-import { formatDatasetSummary, formatPivotSummary } from './summary.js'
+import { describeChartForText, formatDatasetSummary, formatPivotSummary } from './summary.js'
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
 
@@ -46,8 +45,9 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false }
     ? 'In a terminal, show the returned ```text card verbatim with the Studio link, except in pi, which already shows it. Where TinyPivot shows its view in the chat, never repeat the card.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
   return [
-    'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
+    'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
     `For files use load_file, so the rows stay out of your context; to filter, join or aggregate files first, use query with SQL. Use load_data only for rows you already have, up to about ${LOAD_DATA_ROW_GUIDE}; write larger sets to a file first. history lists and reopens earlier pulls.`,
+    `Chart types: ${CHART_TYPES.map(t => t.type).join(', ')}; names like map also work. seriesField: slope period, treemap parent; targetField: bullet target.`,
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     'On every data call pass why (one short sentence for TinyPivot Studio); when loading or querying, also ask (the user\'s request, verbatim).',
@@ -74,18 +74,13 @@ const AGGREGATION_VALUES = [
   'percentOfTotal',
 ] as const
 
-const CHART_TYPE_VALUES = [
-  'bar',
-  'stackedBar',
-  'line',
-  'area',
-  'pie',
-  'donut',
-  'scatter',
-  'bubble',
-  'heatmap',
-  'radar',
-] as const
+/** Any chart type id or alias (see `resolveChartType`), bar when left out; unknown names fail with the list of types. */
+const chartTypeSchema = z.string().optional().superRefine((value, ctx) => {
+  if (value !== undefined && !resolveChartType(value))
+    ctx.addIssue({ code: 'custom', message: `Unknown chart type "${value}". Use one of: ${CHART_TYPES.map(t => t.type).join(', ')}.` })
+})
+
+const GEOGRAPHY_VALUES = ['auto', 'world', 'us-states'] as const
 
 const CHART_AGG_VALUES = ['sum', 'avg', 'count', 'min', 'max'] as const
 
@@ -120,14 +115,37 @@ const pivotConfigSchema = z.object({
   showColumnTotals: z.boolean().default(true),
 })
 
-const chartConfigSchema = z.object({
-  type: z.enum(CHART_TYPE_VALUES).default('bar'),
+/**
+ * Chart fields on the load tools' `chartConfig`. Kept terse: every word goes out on every request,
+ * so how the types use them is explained once, in the instructions.
+ */
+const chartFieldShape = {
+  type: chartTypeSchema,
   xAxisField: z.string().describe('Category or date column'),
-  yAxisField: z.string().describe('Column to aggregate'),
+  yAxisField: z.string(),
   aggregation: z.enum(CHART_AGG_VALUES).default('sum'),
-  seriesField: z.string().optional().describe('Column to split into series'),
+  seriesField: z.string().optional(),
+  targetField: z.string().optional(),
   title: z.string().optional(),
-})
+}
+
+/** Finishing touches only `configure_chart` takes: map geography, callouts, and the deck layout. */
+const chartStyleShape = {
+  geography: z.enum(GEOGRAPHY_VALUES).optional(),
+  annotations: z.boolean().optional(),
+  variant: z.enum(['editorial', 'deck']).optional(),
+  footnote: z.string().optional(),
+}
+
+const loadChartSchema = z.object(chartFieldShape)
+
+/** Every chart field, for converting either tool's input. */
+type ChartInput = z.infer<typeof loadChartSchema> & {
+  geography?: typeof GEOGRAPHY_VALUES[number]
+  annotations?: boolean
+  variant?: 'editorial' | 'deck'
+  footnote?: string
+}
 
 export interface CreateTinyPivotMcpServerOptions {
   store?: DatasetStore
@@ -229,22 +247,28 @@ const askParam = z.string().optional()
 /** How long a query waits for DuckDB on first use before asking the model to try again. */
 const DUCKDB_WAIT_MS = 45_000
 
-function toCoreChartConfig(input: z.infer<typeof chartConfigSchema>): Partial<ChartConfig> {
+/** `source` names the dataset in the footnote under D3 charts, so a pasted chart says where it came from. */
+function toCoreChartConfig(input: ChartInput, source?: string): Partial<ChartConfig> {
+  // The schema already rejected unknown names, so this always resolves.
+  const type = resolveChartType(input.type ?? 'bar') ?? 'bar'
+  const aggregation = input.aggregation as ChartAggregation
   return {
-    type: input.type as ChartType,
+    type,
     xAxis: { field: input.xAxisField, role: 'dimension' },
-    yAxis: {
-      field: input.yAxisField,
-      role: 'measure',
-      aggregation: input.aggregation as ChartAggregation,
-    },
+    yAxis: { field: input.yAxisField, role: 'measure', aggregation },
     seriesField: input.seriesField ? { field: input.seriesField, role: 'dimension' } : undefined,
+    targetField: input.targetField ? { field: input.targetField, role: 'measure', aggregation } : undefined,
     options: {
       title: input.title ?? '',
       showLegend: true,
       showDataLabels: false,
       showGrid: true,
-      stacked: input.type === 'stackedBar',
+      stacked: type === 'stackedBar',
+      ...(input.geography ? { geography: input.geography } : {}),
+      ...(input.annotations === undefined ? {} : { annotations: input.annotations }),
+      ...(source ? { source } : {}),
+      ...(input.variant ? { variant: input.variant } : {}),
+      ...(input.footnote ? { footnote: input.footnote } : {}),
     },
   }
 }
@@ -662,7 +686,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         where: z.array(rowFilterSchema).optional().describe('Keep only matching rows, e.g. [{"field":"year","equals":[2026]}]'),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
-        chartConfig: chartConfigSchema.optional(),
+        chartConfig: loadChartSchema.optional(),
         keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
       },
       _meta: INLINE_UI_META,
@@ -672,7 +696,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
         const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep, where })
         studio.remember(ds, { kind: 'file', source: ds.source, where })
-        const explicitChart = chartConfig ? toCoreChartConfig(chartConfig) : undefined
+        const explicitChart = chartConfig ? toCoreChartConfig(chartConfig, ds.name) : undefined
         if (pivotConfig) {
           const normalizedPivot = normalizePivot(pivotConfig)
           store.updateView(ds.id, {
@@ -714,7 +738,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         source: z.string().optional(),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
-        chartConfig: chartConfigSchema.optional(),
+        chartConfig: loadChartSchema.optional(),
         keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
       },
       _meta: INLINE_UI_META,
@@ -728,7 +752,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         rows,
         viewMode: initialViewMode(viewMode, Boolean(pivotConfig), Boolean(chartConfig)),
         pivotConfig: pivotConfig ? normalizePivot(pivotConfig) : undefined,
-        chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
+        chartConfig: chartConfig ? toCoreChartConfig(chartConfig, source ? `${name} (${source})` : name) : undefined,
         sessionKey,
         keepExisting: shouldKeep,
       })
@@ -816,18 +840,15 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       description: 'Chart the active dataset.',
       inputSchema: {
         datasetId: z.string().optional(),
-        type: z.enum(CHART_TYPE_VALUES).default('bar'),
-        xAxisField: z.string(),
-        yAxisField: z.string(),
-        aggregation: z.enum(CHART_AGG_VALUES).default('sum'),
-        seriesField: z.string().optional(),
-        title: z.string().optional(),
+        ...chartFieldShape,
+        ...chartStyleShape,
         why: whyParam,
         chartTheme: z.enum(VISUAL_THEME_VALUES).optional(),
       },
       _meta: INLINE_UI_META,
     },
-    async ({ datasetId, type, xAxisField, yAxisField, aggregation, seriesField, title, why, chartTheme }, extra) => {
+    async ({ datasetId, chartTheme, why, ...chartInput }, extra) => {
+      const { xAxisField, yAxisField, aggregation, seriesField } = chartInput
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const ds = store.get(datasetId, sessionKey)
       if (!ds) {
@@ -840,7 +861,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       if (chartTheme && (isPro || chartTheme === 'code')) {
         store.setVisualTheme(chartTheme as ChartThemePreset)
       }
-      const chartConfig = toCoreChartConfig({ type, xAxisField, yAxisField, aggregation, seriesField, title })
+      const chartConfig = toCoreChartConfig(chartInput, ds.name)
+      const type = chartConfig.type!
       store.updateView(ds.id, {
         viewMode: 'chart',
         chartConfig,
@@ -859,7 +881,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         summaryParts.push(integrityWarning, '')
       }
       summaryParts.push(
-        `Configured **${type}** chart on **${ds.name}**: X = \`${xAxisField}\`, Y = \`${aggregation}(${yAxisField})\`${seriesField ? `, series = \`${seriesField}\`` : ''}.`,
+        `Configured **${type}** chart on **${ds.name}**: X = \`${xAxisField}\`, Y = \`${aggregation}(${yAxisField})\`${seriesField ? `, series = \`${seriesField}\`` : ''}${chartInput.targetField ? `, target = \`${chartInput.targetField}\`` : ''}.`,
+        ...describeChartForText(ds.rows, chartConfig),
       )
       const liveCompanionUrl = await resolveCompanionUrlForTool()
       if (asciiChart)
@@ -959,7 +982,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         name: z.string().optional(),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
-        chartConfig: chartConfigSchema.optional(),
+        chartConfig: loadChartSchema.optional(),
         keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
       },
       _meta: INLINE_UI_META,

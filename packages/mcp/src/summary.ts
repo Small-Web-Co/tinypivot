@@ -1,7 +1,7 @@
-import type { PivotConfig } from '@smallwebco/tinypivot-core'
+import type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
 import type { TerminalFormatOptions } from './card.js'
 import type { ColumnSummary, StoredDataset } from './store.js'
-import { computePivotResult } from '@smallwebco/tinypivot-core'
+import { buildChartStory, computePivotResult, describeUnmatchedRegions, processChartDataForChoropleth } from '@smallwebco/tinypivot-core'
 import { buildBottomBorder, buildTopBorder, padEndVisual, padStartVisual, renderSparkline, truncateVisual, visualWidth } from './card.js'
 import { DISTINCT_COUNT_CAP } from './store.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
@@ -87,6 +87,26 @@ export function cardTitle(card: string): string | null {
   return /╭─ (.+?) ─/.exec(card.replace(/\x1B\[[0-9;]*m/g, ''))?.[1] ?? null
 }
 
+/**
+ * Plain-text lines about what a chart shows and leaves out: the computed
+ * takeaway and any map labels that matched nothing. Same words as the chart.
+ */
+export function describeChartForText(rows: Record<string, unknown>[], config?: Partial<ChartConfig>): string[] {
+  if (!config?.type || !config.xAxis || !config.yAxis)
+    return []
+  const full = config as ChartConfig
+  const lines: string[] = []
+  const story = full.options?.annotations === false ? null : buildChartStory(rows, full)
+  if (story)
+    lines.push(`Takeaway (computed from the data): ${story.headline}.`)
+  if (full.type === 'choropleth') {
+    const unmatched = describeUnmatchedRegions(processChartDataForChoropleth(rows, full))
+    if (unmatched)
+      lines.push(`> **Map warning**: ${unmatched}`)
+  }
+  return lines
+}
+
 export function formatDatasetSummary(
   dataset: StoredDataset,
   companionUrl?: string,
@@ -113,6 +133,10 @@ export function formatDatasetSummary(
   if (integrityWarning) {
     parts.push('', integrityWarning)
   }
+
+  const chartText = describeChartForText(dataset.rows, dataset.chartConfig)
+  if (chartText.length > 0)
+    parts.push('', ...chartText)
 
   if (chartBlock) {
     parts.push('', chartBlock)

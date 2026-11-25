@@ -1,7 +1,7 @@
 import type { ChartConfig, TerminalPalette } from '@smallwebco/tinypivot-core'
 import type { TerminalFormatOptions } from './card.js'
 import type { StoredDataset } from './store.js'
-import { processChartData, processChartDataForScatter } from '@smallwebco/tinypivot-core'
+import { getChartTypeInfo, processChartData, processChartDataForScatter } from '@smallwebco/tinypivot-core'
 import { ansiFg, ansiFgBold, BRAILLE_BITS, CARD_DIVIDER, formatCompactNumber, padEndVisual, padStartVisual, renderPreciseBar, renderSpacedBar, resolveTerminalPalette, SERIES_GLYPHS, truncateVisual, visualWidth, wrapInCard } from './card.js'
 
 /**
@@ -242,6 +242,8 @@ interface ChartContext {
   pal?: TerminalPalette
   liveRow: string | null
   statsLine: string
+  /** Why the card is not the chart asked for, when a text card cannot draw that kind. */
+  note?: string
   footerLeft: string
   raw?: boolean
 }
@@ -255,6 +257,8 @@ function paintSeries(ctx: ChartContext, index: number, text: string): string {
 
 function frame(ctx: ChartContext, badge: string, body: string[], kind: string, stats = ctx.statsLine): string {
   body.push(CARD_DIVIDER, paint(ctx, 'muted', stats))
+  if (ctx.note)
+    body.push(paint(ctx, 'muted', `ⓘ ${ctx.note}`))
   if (ctx.liveRow)
     body.push(ctx.liveRow)
   const footerRight = `${ctx.dataset.rows.length.toLocaleString()} rows · ${kind}`
@@ -556,8 +560,11 @@ export function formatTerminalChart(
 ): string {
   if (!chartConfig?.xAxis || !chartConfig?.yAxis || dataset.rows.length === 0)
     return ''
+  // Maps, bullets, radials and the like are drawn in TinyPivot; the card shows the nearest kind and says so.
+  const requested = chartConfig.type ?? 'bar'
+  const fallback = getChartTypeInfo(requested)?.terminalFallback
   const config: ChartConfig = {
-    type: chartConfig.type ?? 'bar',
+    type: fallback?.as ?? requested,
     xAxis: chartConfig.xAxis,
     yAxis: chartConfig.yAxis,
     seriesField: chartConfig.seriesField,
@@ -595,6 +602,7 @@ export function formatTerminalChart(
     statsLine: `▲ Peak: ${truncateVisual(String(processed.categories[peak]), 14)} (${formatCompactNumber(totalsPerCat[peak])})`
       + `  ·  ▼ Low: ${truncateVisual(String(processed.categories[low]), 14)} (${formatCompactNumber(totalsPerCat[low])})`
       + `  ·  ◆ Avg: ${formatCompactNumber(grandTotal / totalsPerCat.length)}`,
+    note: fallback?.note,
     footerLeft: options.showBranding !== false ? 'tiny-pivot.com' : '',
     raw: options.raw,
   }

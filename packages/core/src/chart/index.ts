@@ -12,117 +12,36 @@ import type {
   ChartSortOrder,
   ChartThemePreset,
   ChartType,
-  ChartTypeInfo,
   FieldRole,
   FieldRoleOverrides,
 } from '../types'
 import { looksLikeDate } from '../utils'
+import { getChartTypeInfo } from './registry'
 
-/**
- * Chart type definitions with metadata
- */
-export const CHART_TYPES: ChartTypeInfo[] = [
-  {
-    type: 'bar',
-    label: 'Bar Chart',
-    icon: 'bar',
-    description: 'Compare values across categories',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: ['dimension'],
-    guidance: 'Drag a category to X-axis and a number to Y-axis',
-    bestFor: ['Comparing categories', 'Ranking', 'Part-to-whole'],
-  },
-  {
-    type: 'stackedBar',
-    label: 'Stacked Bar',
-    icon: 'stackedBar',
-    description: 'Compare composition across categories',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: ['dimension'],
-    guidance: 'Drag a category to X-axis, a number to Y-axis, and a grouping field to Series',
-    bestFor: ['Part-to-whole comparison', 'Composition over categories', 'Cumulative totals'],
-  },
-  {
-    type: 'line',
-    label: 'Line Chart',
-    icon: 'line',
-    description: 'Show trends over time or sequence',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: ['dimension'],
-    guidance: 'Best with time/date on X-axis and numbers on Y-axis',
-    bestFor: ['Trends over time', 'Continuous data', 'Multiple series'],
-  },
-  {
-    type: 'area',
-    label: 'Area Chart',
-    icon: 'area',
-    description: 'Show magnitude and trends',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: ['dimension'],
-    guidance: 'Like line charts but emphasizes volume. Great for stacked comparisons.',
-    bestFor: ['Cumulative totals', 'Part-to-whole over time', 'Volume trends'],
-  },
-  {
-    type: 'pie',
-    label: 'Pie Chart',
-    icon: 'pie',
-    description: 'Show proportions of a whole',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: [],
-    guidance: 'Drag a category and a number. Best with 2-6 categories.',
-    bestFor: ['Part-to-whole', 'Proportions', 'Simple distributions'],
-  },
-  {
-    type: 'donut',
-    label: 'Donut Chart',
-    icon: 'donut',
-    description: 'Proportions with center space for metrics',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: [],
-    guidance: 'Like pie but allows showing a total in the center',
-    bestFor: ['Part-to-whole', 'Showing total', 'Dashboard KPIs'],
-  },
-  {
-    type: 'scatter',
-    label: 'Scatter Plot',
-    icon: 'scatter',
-    description: 'Show relationships between two variables',
-    requiredFields: ['measure', 'measure'],
-    optionalFields: ['dimension'],
-    guidance: 'Drag a number to X-axis and another number to Y-axis',
-    bestFor: ['Correlation', 'Outlier detection', 'Distribution'],
-  },
-  {
-    type: 'bubble',
-    label: 'Bubble Chart',
-    icon: 'bubble',
-    description: 'Three-dimensional comparison',
-    requiredFields: ['measure', 'measure'],
-    optionalFields: ['measure', 'dimension'],
-    guidance: 'Like scatter, plus drag a third number to Size for bubble size',
-    bestFor: ['Multi-variable comparison', 'Weighted relationships'],
-  },
-  {
-    type: 'heatmap',
-    label: 'Heatmap',
-    icon: 'heatmap',
-    description: 'Visualize density or intensity',
-    requiredFields: ['dimension', 'dimension', 'measure'],
-    optionalFields: [],
-    guidance: 'Drag two categories (X and Y) and a number to Color',
-    bestFor: ['Patterns', 'Density', 'Cross-tabulation'],
-  },
-  {
-    type: 'radar',
-    label: 'Radar Chart',
-    icon: 'radar',
-    description: 'Compare multiple variables',
-    requiredFields: ['dimension', 'measure'],
-    optionalFields: ['dimension'],
-    guidance: 'Best for comparing items across multiple metrics',
-    bestFor: ['Multi-metric comparison', 'Performance profiles', 'Balanced scorecards'],
-  },
-]
+export * from './d3-data'
+export * from './d3-theme'
+export {
+  detectGeography,
+  matchRegion,
+  matchRegions,
+  normalizeRegionName,
+  regionDisplayName,
+  US_STATE_ROWS,
+} from './geo'
+export type { MatchedRegion, RegionKind, RegionMatch, RegionMatchResult, ResolvedGeography } from './geo'
+export {
+  CHART_TYPE_IDS,
+  CHART_TYPES,
+  getChartRenderer,
+  getChartTypeInfo,
+  getChartZoneLabels,
+  getEffectiveChartOptions,
+  isD3ChartType,
+  resolveChartType,
+} from './registry'
+export { buildChartStory, categoryNoun, chartFootnote, chartKicker, commonLabelPrefix } from './story'
+
+export type { ChartStory } from './story'
 
 /**
  * Aggregation options for measures
@@ -380,46 +299,19 @@ export function formatFieldLabel(field: string): string {
 }
 
 /**
- * Get chart type info by type
- */
-export function getChartTypeInfo(type: ChartType): ChartTypeInfo | undefined {
-  return CHART_TYPES.find(ct => ct.type === type)
-}
-
-/**
  * Check if a chart configuration is valid/complete
  */
 export function isChartConfigValid(config: ChartConfig): boolean {
-  const typeInfo = getChartTypeInfo(config.type)
-  if (!typeInfo)
+  if (!getChartTypeInfo(config.type))
     return false
-
-  // Check required fields based on chart type
-  switch (config.type) {
-    case 'bar':
-    case 'stackedBar':
-    case 'line':
-    case 'area':
-    case 'pie':
-    case 'donut':
-    case 'radar':
-      return !!config.xAxis && !!config.yAxis
-
-    case 'scatter':
-      // Scatter needs two numeric fields (X and Y)
-      return !!config.xAxis && !!config.yAxis
-
-    case 'bubble':
-      // Bubble needs two numeric fields (X and Y), size is optional
-      return !!config.xAxis && !!config.yAxis
-
-    case 'heatmap':
-      // Heatmap needs two categories (X and Y) plus a measure for color intensity
-      return !!config.xAxis && !!config.yAxis && !!config.colorField
-
-    default:
-      return false
-  }
+  if (!config.xAxis || !config.yAxis)
+    return false
+  // Heatmap needs a measure for colour intensity; a slope chart needs periods to compare
+  if (config.type === 'heatmap')
+    return !!config.colorField
+  if (config.type === 'slope')
+    return !!config.seriesField
+  return true
 }
 
 /**
@@ -498,7 +390,7 @@ export function getChartGuidance(config: ChartConfig): string {
       return 'Chart is ready!'
 
     default:
-      return typeInfo.guidance
+      return getZoneGuidance(config)
   }
 }
 
@@ -523,6 +415,22 @@ export function createMeasureReader(aggregation: ChartAggregation): (raw: unknow
     }
   }
   return raw => Number(raw)
+}
+
+/** Guidance from the type's drop-zone labels, for types without a hand-written script. */
+function getZoneGuidance(config: ChartConfig): string {
+  const info = getChartTypeInfo(config.type)!
+  if (!config.xAxis)
+    return `Drag a field to ${info.zones.xAxis}`
+  if (!config.yAxis)
+    return `Drag a field to ${info.zones.yAxis}`
+  const size = info.zones.size
+  if (size && !config[size.slot])
+    return `Optionally drag a field to ${size.label}`
+  const extra = info.zones.extra
+  if (extra && !config[extra.slot])
+    return `Optionally drag a field to ${extra.label}`
+  return 'Chart is ready!'
 }
 
 /**
@@ -566,9 +474,7 @@ export function resolveChartSortOrder(config: ChartConfig, categories: string[])
     return config.options.sortOrder
   if (isTemporalCategories(config, categories))
     return 'label-asc'
-  if (config.type === 'bar' || config.type === 'stackedBar' || config.type === 'pie' || config.type === 'donut')
-    return 'value-desc'
-  return 'label-asc'
+  return getChartTypeInfo(config.type)?.defaults?.sortOrder ?? 'label-asc'
 }
 
 const MONTH_INDEX: Record<string, number> = {
@@ -632,7 +538,7 @@ function parseTemporalSortKey(label: string): number | null {
   return null
 }
 
-function compareLabels(a: string, b: string): number {
+export function compareLabels(a: string, b: string): number {
   const numA = Number.parseFloat(a)
   const numB = Number.parseFloat(b)
   if (!Number.isNaN(numA) && !Number.isNaN(numB) && String(numA) === a.trim() && String(numB) === b.trim()) {
@@ -752,6 +658,58 @@ export function processChartData(
   return { categories, series }
 }
 
+/** One aggregated value per category, in first-seen order. */
+export interface CategoryEntry {
+  category: string
+  value: number
+}
+
+/**
+ * Aggregate a measure per category value, skipping blank measures and, except
+ * for counts, non-numeric ones. Categories keep first-seen order (the grid's order).
+ */
+export function aggregateByCategory(
+  data: Record<string, unknown>[],
+  categoryField: string,
+  measureField: string,
+  aggregation: ChartAggregation = 'sum',
+): CategoryEntry[] {
+  const readMeasure = createMeasureReader(aggregation)
+  const grouped = new Map<string, number[]>()
+  for (const row of data) {
+    const raw = row[measureField]
+    if (raw === null || raw === undefined || raw === '')
+      continue
+    const value = readMeasure(raw)
+    if (Number.isNaN(value))
+      continue
+    const category = String(row[categoryField] ?? '(blank)')
+    const bucket = grouped.get(category)
+    if (bucket)
+      bucket.push(value)
+    else
+      grouped.set(category, [value])
+  }
+  return Array.from(grouped, ([category, values]) => ({ category, value: aggregateValues(values, aggregation) }))
+}
+
+/** Order entries by the chart's effective sort order. */
+export function sortCategoryEntries<T extends CategoryEntry>(config: ChartConfig, entries: T[]): T[] {
+  const sortOrder = resolveChartSortOrder(config, entries.map(e => e.category))
+  switch (sortOrder) {
+    case 'value-desc':
+      return [...entries].sort((a, b) => b.value - a.value || compareLabels(a.category, b.category))
+    case 'value-asc':
+      return [...entries].sort((a, b) => a.value - b.value || compareLabels(a.category, b.category))
+    case 'label-asc':
+      return [...entries].sort((a, b) => compareLabels(a.category, b.category))
+    case 'label-desc':
+      return [...entries].sort((a, b) => compareLabels(b.category, a.category))
+    default:
+      return entries
+  }
+}
+
 /**
  * Process data for pie/donut charts
  */
@@ -762,56 +720,11 @@ export function processChartDataForPie(
   if (!config.xAxis || !config.yAxis || data.length === 0) {
     return { categories: [], series: [] }
   }
-
-  const xField = config.xAxis.field
-  const yField = config.yAxis.field
-  const yAggregation = config.yAxis.aggregation || 'sum'
-  const readMeasure = createMeasureReader(yAggregation)
-
-  // Group by category
-  const grouped = new Map<string, number[]>()
-
-  for (const row of data) {
-    const rawY = row[yField]
-    if (rawY === null || rawY === undefined || rawY === '')
-      continue
-
-    const xValue = String(row[xField] ?? '(blank)')
-    const yValue = readMeasure(rawY)
-
-    if (Number.isNaN(yValue))
-      continue
-
-    if (!grouped.has(xValue)) {
-      grouped.set(xValue, [])
-    }
-    grouped.get(xValue)!.push(yValue)
-  }
-
-  const rawEntries = Array.from(grouped.entries()).map(([category, values]) => ({
-    category,
-    value: aggregateValues(values, yAggregation),
-  }))
-
-  const sortOrder = resolveChartSortOrder(config, rawEntries.map(e => e.category))
-  let entries = rawEntries
-  if (sortOrder === 'value-desc') {
-    entries = [...rawEntries].sort((a, b) => b.value - a.value)
-  }
-  else if (sortOrder === 'value-asc') {
-    entries = [...rawEntries].sort((a, b) => a.value - b.value)
-  }
-  else if (sortOrder === 'label-asc') {
-    entries = [...rawEntries].sort((a, b) => compareLabels(a.category, b.category))
-  }
-  else if (sortOrder === 'label-desc') {
-    entries = [...rawEntries].sort((a, b) => compareLabels(b.category, a.category))
-  }
-
+  const entries = sortCategoryEntries(config, aggregateByCategory(data, config.xAxis.field, config.yAxis.field, config.yAxis.aggregation))
   return {
     categories: entries.map(e => e.category),
     series: [{
-      name: formatFieldLabel(yField),
+      name: formatFieldLabel(config.yAxis.field),
       data: entries.map(e => e.value),
     }],
   }

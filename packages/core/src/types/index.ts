@@ -402,6 +402,17 @@ export type ChartType
     | 'bubble'
     | 'heatmap'
     | 'radar'
+    // D3-rendered (lazy-loaded from `@smallwebco/tinypivot-core/d3`)
+    | 'choropleth'
+    | 'bullet'
+    | 'radialBar'
+    | 'radialArea'
+    | 'treemap'
+    | 'sunburst'
+    | 'slope'
+
+/** Where a choropleth draws. `'auto'` picks from the region names in the data. */
+export type ChartGeography = 'auto' | 'world' | 'us-states'
 
 export type ChartAggregation = 'sum' | 'count' | 'avg' | 'min' | 'max' | 'countDistinct'
 
@@ -451,6 +462,8 @@ export interface ChartConfig {
   sizeField?: ChartField
   /** Field for color encoding */
   colorField?: ChartField
+  /** Comparative target measure (bullet charts) */
+  targetField?: ChartField
   /** Additional configuration options */
   options?: ChartOptions
 }
@@ -506,6 +519,26 @@ export interface ChartOptions {
   valueFormat?: 'number' | 'percent' | 'currency'
   /** Decimal places for values */
   decimals?: number
+  /** Map to draw for choropleths (default `'auto'`) */
+  geography?: ChartGeography
+  /** D3 charts: show the computed takeaway headline and callouts (default `true`) */
+  annotations?: boolean
+  /**
+   * D3 charts: `'highlight'` (default, the house style) draws the marks the
+   * takeaway is about in the accent and everything else muted; `'palette'`
+   * gives every series its own palette colour.
+   */
+  emphasis?: 'highlight' | 'palette'
+  /** Source line under D3 charts, e.g. a file or dataset name */
+  source?: string
+  /** Optional note under D3 charts ("Note: …"), e.g. a definition or caveat */
+  footnote?: string
+  /**
+   * D3 charts: `'editorial'` (default) sets the title in the theme's display
+   * face with a dek; `'deck'` is for consulting slides: plain action title,
+   * no dek, and "Note:" / "Source:" lines under the chart.
+   */
+  variant?: 'editorial' | 'deck'
 }
 
 /** Information about a field for chart building */
@@ -525,12 +558,50 @@ export interface ChartFieldInfo {
   max?: number
 }
 
+/** Which engine draws a chart type. D3 types load lazily on first use. */
+export type ChartRenderer = 'apex' | 'd3'
+
+/** ApexCharts chart kind behind an `'apex'` chart type. */
+export type ApexChartKind = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'radar' | 'scatter' | 'heatmap' | 'bubble'
+
+/** ChartConfig keys a drop zone can fill beyond the two axes. */
+export type ChartExtraSlot = 'seriesField' | 'colorField'
+export type ChartSizeSlot = 'sizeField' | 'targetField'
+
+/** Labels for the Chart Builder drop zones of one chart type. */
+export interface ChartZoneLabels {
+  xAxis: string
+  xAxisPlaceholder: string
+  yAxis: string
+  yAxisPlaceholder: string
+  /** Optional grouping / intensity zone */
+  extra?: { slot: ChartExtraSlot, label: string, placeholder: string }
+  /** Optional numeric zone (bubble size, bullet target) */
+  size?: { slot: ChartSizeSlot, label: string, placeholder: string }
+}
+
+/** How text-only hosts show a chart type they cannot draw. */
+export interface ChartTerminalFallback {
+  as: 'bar' | 'line'
+  note: string
+}
+
 /** Chart type metadata for UI */
 export interface ChartTypeInfo {
   type: ChartType
   label: string
   icon: string
   description: string
+  renderer: ChartRenderer
+  /** ApexCharts kind for `'apex'` types */
+  apexType?: ApexChartKind
+  /** Loose names accepted by `resolveChartType` (e.g. 'map' for choropleth) */
+  aliases: string[]
+  zones: ChartZoneLabels
+  /** Options applied when this type is chosen and the user has not set them */
+  defaults?: Partial<ChartOptions>
+  /** Set for types a terminal card cannot draw directly */
+  terminalFallback?: ChartTerminalFallback
   /** Required field roles */
   requiredFields: FieldRole[]
   /** Optional field roles */

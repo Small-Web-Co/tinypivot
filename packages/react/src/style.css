@@ -3379,6 +3379,148 @@
 .vpg-theme-dark .vpg-zone-remove-btn:hover { background: #312e81; }
 
 /* ==========================================================================
+   D3 Charts (map, bullet, radial, treemap, sunburst)
+   Colours come from the chart theme tokens drawn into the SVG; the host,
+   tooltip and notes use the grid theme's CSS tokens.
+   ========================================================================== */
+.vpg-d3-host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+}
+
+.vpg-d3-chart > svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: visible;
+}
+
+.vpg-d3-chart .vpg-d3-mark {
+  transition: opacity 0.2s ease, filter 0.15s ease;
+  outline: none;
+}
+
+.vpg-d3-chart .vpg-d3-mark:hover,
+.vpg-d3-chart .vpg-d3-mark:focus-visible {
+  filter: brightness(1.12);
+}
+
+.vpg-d3-chart .vpg-d3-mark:focus-visible {
+  stroke: var(--vpg-focus-ring, var(--vpg-accent));
+  stroke-width: 2px;
+}
+
+.vpg-d3-chart [tabindex]:focus-visible {
+  outline: none;
+}
+
+.vpg-d3-header {
+  flex: none;
+  max-width: 62ch;
+  padding: 0 0.25rem 0.625rem;
+}
+
+.vpg-d3-headline {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.vpg-d3-dek {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+:is(.vpg-theme-crt-amber, .vpg-theme-crt-green) .vpg-d3-headline {
+  text-shadow: 0 0 8px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+/* Focus + context: hovering a mark fades everything outside its group. */
+.vpg-d3-chart svg.vpg-d3-focus .vpg-d3-mark:not(.vpg-d3-on) {
+  opacity: 0.26;
+}
+
+.vpg-d3-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  max-width: 260px;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--vpg-border-strong, var(--vpg-border-default));
+  background: var(--vpg-surface-elevated, var(--vpg-surface-bg));
+  color: var(--vpg-text-primary);
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 6px 18px -10px rgb(0 0 0 / 0.45);
+}
+
+.vpg-d3-tooltip strong {
+  display: block;
+  margin-bottom: 0.125rem;
+  font-weight: 700;
+}
+
+/* Exhibit frame: kicker, action title, dek and key above; source and notes below. */
+.vpg-d3-kicker {
+  margin: 0 0 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vpg-d3-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.875rem;
+  margin: 0.375rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 0.6875rem;
+}
+
+.vpg-d3-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.vpg-d3-swatch {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+.vpg-d3-footer {
+  flex: none;
+  padding: 0.5rem 0.25rem 0;
+  border-top: 1px solid var(--vpg-border-subtle, var(--vpg-border-default));
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+.vpg-d3-footnote {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vpg-d3-chart .vpg-d3-mark {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
    ApexCharts Tooltip Overrides
    ========================================================================== */
 /* Light mode tooltip - ensure dark text for better contrast */

@@ -144,7 +144,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `query` | Runs one read-only DuckDB `SELECT` over local CSV, Parquet or JSON files and over loaded datasets (tables named by dataset id), then charts or pivots the result. Rows never enter the model's context. DuckDB (about 20 MB) downloads once, on first use, into `~/.cache/tinypivot`. |
 | `load_data` | Loads flat JSON rows already in memory (<500 rows) from any other MCP tool, API, or small SQL query without writing a temp CSV; renders chart + pivot in 1 call. |
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
-| `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, etc.). |
+| `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, maps (`choropleth`), `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`, etc.; loose names like `map` work too). |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
 | `profile` | Describes each column of a loaded dataset: empty share, number and date ranges, commonest values. |
