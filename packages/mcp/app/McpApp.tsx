@@ -171,6 +171,9 @@ export function McpApp() {
   const licenseAppliedRef = useRef(false)
   const userPickedThemeRef = useRef(false)
   const userPickedModeRef = useRef(false)
+  /** The pivot and chart as the user last arranged them in the grid, which may differ from the agent's. */
+  const livePivotConfig = useRef<Partial<PivotConfig> | undefined>(undefined)
+  const liveChartConfig = useRef<Partial<ChartConfig> | undefined>(undefined)
 
   const [transportMode, setTransportMode] = useState<'connecting' | 'mcp' | 'companion'>('connecting')
   const [loading, setLoading] = useState(true)
@@ -319,6 +322,8 @@ export function McpApp() {
     }
     setPivotConfig(payload.pivotConfig ?? undefined)
     setChartConfig(payload.chartConfig ?? undefined)
+    livePivotConfig.current = undefined
+    liveChartConfig.current = undefined
     if (payload.modelCatalog)
       setModelCatalog(payload.modelCatalog)
     if (payload.tokenStats) {
@@ -704,9 +709,13 @@ export function McpApp() {
   }, [datasetId, datasetName, trackLocalAction])
 
   const handleAttachView = useCallback(() => {
-    const view = viewMode === 'chart' ? `${chartConfig?.type ?? 'bar'} chart` : viewMode === 'pivot' ? 'pivot table' : 'table'
+    const view = {
+      mode: viewMode,
+      pivotConfig: livePivotConfig.current ?? pivotConfig,
+      chartConfig: liveChartConfig.current ?? chartConfig,
+    }
     setSelectedContext(viewAttachment(datasetName, datasetId, view, rows))
-  }, [chartConfig?.type, datasetId, datasetName, rows, viewMode])
+  }, [chartConfig, datasetId, datasetName, pivotConfig, rows, viewMode])
 
   const handleCopyMarkdown = useCallback(async () => {
     const container = mainRef.current
@@ -1191,6 +1200,8 @@ export function McpApp() {
                   initialHeight={440}
                   exportFilename={`${datasetId || 'tinypivot'}.csv`}
                   onViewModeChange={setViewMode}
+                  onPivotConfigChange={(config) => { livePivotConfig.current = config }}
+                  onChartConfigChange={(config) => { liveChartConfig.current = config }}
                   onChartThemeChange={preset => void handleVisualThemeChange(preset)}
                   onCellClick={handleCellClick}
                   onDrillThrough={handleDrillThrough}
