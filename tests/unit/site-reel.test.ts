@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { cameraFor, findCard, lastContentRow, wideShot } from '../../demo/site/reel/director'
 import { barCells, glyphRects, insetBar, sparklineCells, sparklineRect } from '../../demo/site/reel/glyphs'
 import { applyFrames, captionAt, createScreen, frameIndexAt } from '../../demo/site/reel/player'
+import { shotCaptions, shotIndexAt, shotsDuration } from '../../demo/site/reel/scenes'
 import { applySgr, indexedColor, parseScreen, phosphor, rowText, TERMINAL_THEME, themed } from '../../scripts/reel/ansi.mjs'
 
 const ESC = '\u001B'
@@ -190,5 +191,23 @@ describe('reel: camera', () => {
   it('respects the zoom cap and never zooms out below full width', () => {
     expect(cameraFor({ col: 40, row: 10, cols: 10, rows: 4 }, grid, 1.5).scale).toBe(1.5)
     expect(cameraFor({ col: 0, row: 0, cols: 96, rows: 40 }, grid, 2).scale).toBe(1)
+  })
+})
+
+describe('reel: screenshot scenes', () => {
+  const shot = (title: string, hold: number) => ({ src: `/${title}.jpg`, alt: title, title, body: '', hold })
+  const shots = [shot('chart', 4000), shot('pivot', 3000), shot('grid', 5000)]
+
+  it('adds up the running time and places each caption where its screenshot starts', () => {
+    expect(shotsDuration(shots)).toBe(12000)
+    expect(shotCaptions(shots).map(caption => [caption.t, caption.title])).toEqual([[0, 'chart'], [4000, 'pivot'], [7000, 'grid']])
+  })
+
+  it('shows the screenshot whose slot contains the time, and rests on the last one', () => {
+    expect(shotIndexAt(shots, 0)).toBe(0)
+    expect(shotIndexAt(shots, 3999)).toBe(0)
+    expect(shotIndexAt(shots, 4000)).toBe(1)
+    expect(shotIndexAt(shots, 11999)).toBe(2)
+    expect(shotIndexAt(shots, 99999)).toBe(2)
   })
 })

@@ -7,9 +7,10 @@
 import type { Recording } from '../site/reel/player'
 import { computed, onBeforeUnmount, onMounted, ref, shallowReactive } from 'vue'
 import { captionAt } from '../site/reel/player'
-import { formatClock, recordingUrl, reelScenes } from '../site/reel/scenes'
+import { formatClock, recordingUrl, reelScenes, shotCaptions, shotsDuration } from '../site/reel/scenes'
 import { usePlayback } from '../site/reel/usePlayback'
 import ReelCounter from './site/ReelCounter.vue'
+import ScreenReplay from './site/ScreenReplay.vue'
 import TerminalReplay from './site/TerminalReplay.vue'
 
 /** Stage proportions before a recording arrives, so the page does not jump when it does. */
@@ -29,13 +30,15 @@ const curtain = ref<Curtain>('open')
 const recordings = shallowReactive(new Map<string, Recording>())
 const scene = computed(() => reelScenes[activeIndex.value])
 const recording = computed(() => recordings.get(scene.value.id))
-const duration = computed(() => recording.value?.duration ?? 0)
+const shots = computed(() => scene.value.shots)
+const duration = computed(() => (shots.value ? shotsDuration(shots.value) : recording.value?.duration ?? 0))
+const ready = computed(() => Boolean(shots.value || recording.value))
 
 const { time, playing, play, pause, seek } = usePlayback(duration, playNextScene)
 const progress = computed(() => (duration.value ? time.value / duration.value : 0))
 
 /** The step being shown: a timed caption from the recording, or the scene's own summary. */
-const steps = computed(() => recording.value?.captions ?? [])
+const steps = computed(() => (shots.value ? shotCaptions(shots.value) : recording.value?.captions ?? []))
 const step = computed(() => captionAt(steps.value, time.value))
 const stepNumber = computed(() => (step.value ? steps.value.indexOf(step.value) + 1 : 0))
 const caption = computed(() => step.value ?? { title: scene.value.headline, body: scene.value.detail })
@@ -48,8 +51,9 @@ let sceneChange = 0
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+/** Fetches a terminal scene's recording. Screenshot scenes have nothing to fetch. */
 async function loadRecording(id: string) {
-  if (recordings.has(id))
+  if (recordings.has(id) || reelScenes.find(item => item.id === id)?.shots)
     return
   const response = await fetch(recordingUrl(id))
   if (response.ok)
@@ -118,7 +122,7 @@ function seekFromPointer(event: MouseEvent) {
 function onVisibility([entry]: IntersectionObserverEntry[]) {
   if (!entry.isIntersecting)
     pause()
-  else if (!visitorPaused && recording.value && curtain.value === 'open')
+  else if (!visitorPaused && ready.value && curtain.value === 'open')
     play()
 }
 
@@ -158,8 +162,9 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="reel-stage">
+      <ScreenReplay v-if="shots" :key="scene.id" :shots="shots" :time="time" />
       <TerminalReplay
-        v-if="recording"
+        v-else-if="recording"
         :recording="recording"
         :time="time"
         :label="`Recorded ${scene.harness} session. ${scene.headline}`"
@@ -194,7 +199,7 @@ onBeforeUnmount(() => {
     <div class="reel-info">
       <div class="reel-caption">
         <p class="label">
-          {{ scene.harness }} · real session, thinking time fast-forwarded
+          {{ scene.harness }} · {{ shots ? 'real screenshots, driven by the same tool calls' : 'real session, thinking time fast-forwarded' }}
         </p>
         <Transition name="reel-step" mode="out-in">
           <div :key="caption.title" class="reel-step">
