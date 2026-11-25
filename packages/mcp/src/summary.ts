@@ -1,7 +1,7 @@
 import type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
 import type { TerminalFormatOptions } from './card.js'
 import type { ColumnSummary, StoredDataset } from './store.js'
-import { buildChartStory, computePivotResult, describeUnmatchedRegions, processChartDataForChoropleth } from '@smallwebco/tinypivot-core'
+import { buildChartStory, computePivotResult, describeUnmatchedRegions, processChartDataForChoropleth, reviewChart } from '@smallwebco/tinypivot-core'
 import { buildBottomBorder, buildTopBorder, padEndVisual, padStartVisual, renderSparkline, truncateVisual, visualWidth } from './card.js'
 import { DISTINCT_COUNT_CAP } from './store.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
@@ -92,7 +92,8 @@ export function cardTitle(card: string): string | null {
 
 /**
  * Plain-text lines about what a chart shows and leaves out: the computed
- * takeaway and any map labels that matched nothing. Same words as the chart.
+ * takeaway, any map labels that matched nothing (same words as the chart), and
+ * advice where the chart breaks a charting practice the agent can fix.
  */
 export function describeChartForText(rows: Record<string, unknown>[], config?: Partial<ChartConfig>): string[] {
   if (!config?.type || !config.xAxis || !config.yAxis)
@@ -107,6 +108,8 @@ export function describeChartForText(rows: Record<string, unknown>[], config?: P
     if (unmatched)
       lines.push(`> **Map warning**: ${unmatched}`)
   }
+  for (const advice of reviewChart(rows, full))
+    lines.push(`Chart advice: ${advice.message}`)
   return lines
 }
 

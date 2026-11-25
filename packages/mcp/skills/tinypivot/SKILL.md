@@ -42,6 +42,14 @@ description: Preferred default chart, map, YoY/MoM comparison, pivot table, and 
    - Pass `why` on every data call (`load_file`, `load_data`, `query`, `configure_chart`, `configure_pivot`, `profile`, `history`): one short sentence the user reads in the Studio next to the SQL behind the step.
    - Pass `ask`, the user's request in their own words, when you load or query: the Studio shows each answer from that question down, and checks the numbers you quote against the data.
    - Messages the user writes in the Studio reach you live where the harness allows it (pi, or Claude Code started with TinyPivot's channel). Act on them, and answer with `studio_reply` when that tool is offered.
+11. **Chart well** (after Duke University Libraries' *Chart Dos and Don'ts*). TinyPivot already starts bars at zero, draws no 3D or exploded slices, and shades maps in one hue. The rest is up to you:
+   - **Fix what "Chart advice" flags before you answer.** TinyPivot checks each chart against the data and says when it has too many series, slices too close to compare, missing months or quarters, or too many bars.
+   - **Six colours at most.** More series than that: keep the top five and group the rest as `Other`, or split the chart. Colour separates categories; for a numeric range use a sequential map or heatmap, never a rainbow.
+   - **Don't make the reader do visual math.** Wedges or bubbles of similar size cannot be compared by eye: use bars, or compute the difference or ratio and chart that.
+   - **Keep the time axis honest.** Every month or quarter in the range gets a row, with zero where nothing happened, so the spacing stays even. Lines may start above zero; bars may not.
+   - **Don't overload one chart.** Too many bars, series or labels means the reader goes element by element: show the top N, change the chart type, or split it.
+   - **One style across a series of charts.** When you chart the same measure several ways, keep the theme, colours and axes the same so the differences that show are in the data.
+   - **Let the main point survive a squint.** Use `title` for the finding, not the field names, and the default `emphasis: "highlight"` so the marks the takeaway is about stand out.
 
 ## Tool Quick Reference
 

@@ -39,6 +39,8 @@ export {
   isD3ChartType,
   resolveChartType,
 } from './registry'
+export { missingPeriods, reviewChart } from './review'
+export type { ChartAdvice, ChartAdviceRule } from './review'
 export { buildChartStory, categoryNoun, chartFootnote, chartKicker, commonLabelPrefix } from './story'
 
 export type { ChartStory } from './story'
