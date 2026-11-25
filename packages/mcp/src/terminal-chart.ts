@@ -383,16 +383,34 @@ function stackedCard(ctx: ChartContext): string {
   return frame(ctx, totalBadge(ctx), body, 'Stacked Bar')
 }
 
+/**
+ * The header and footer for grouped bars, taken over the bars themselves: adding series together
+ * would double an average or a rate, and even for sums the per-series bars are what is compared.
+ */
+function groupedStats(ctx: ChartContext, bars: Array<{ label: string, value: number }>): { badge: string, stats: string } {
+  const values = bars.map(bar => bar.value)
+  const peak = bars.reduce((best, bar) => (bar.value > best.value ? bar : best), bars[0])
+  const low = bars.reduce((worst, bar) => (bar.value < worst.value ? bar : worst), bars[0])
+  const avg = values.reduce((sum, v) => sum + v, 0) / Math.max(1, values.length)
+  const badge = ctx.nonAdditive
+    ? `Range ${formatCompactNumber(Math.min(...values))}–${formatCompactNumber(Math.max(...values))} · ${bars.length} bars`
+    : `Total ${formatCompactNumber(ctx.grandTotal)}`
+  const stats = `▲ Peak: ${truncateVisual(peak.label, 20)} (${formatCompactNumber(peak.value)})`
+    + `  ·  ▼ Low: ${truncateVisual(low.label, 20)} (${formatCompactNumber(low.value)})`
+    + `  ·  ◆ Avg: ${formatCompactNumber(avg)}`
+  return { badge, stats }
+}
+
 const MAX_GROUPED_CATEGORIES = 8
 
 /** Grouped bars: under each category, one bar per series, so the series compare side by side. */
 function groupedCard(ctx: ChartContext): string {
   const series = ctx.processed.series.slice(0, SERIES_GLYPHS.length)
   const categories = ctx.processed.categories.slice(0, MAX_GROUPED_CATEGORIES)
-  const values = categories.flatMap((_, idx) => series.map(s => Math.abs(Number(s.data[idx]) || 0)))
-  const maxVal = Math.max(...values, 1)
+  const bars = categories.flatMap((cat, idx) => series.map(s => ({ label: `${cat} · ${s.name}`, value: Number(s.data[idx]) || 0 })))
+  const maxVal = Math.max(...bars.map(bar => Math.abs(bar.value)), 1)
   const labelWidth = Math.min(18, Math.max(...series.map(s => visualWidth(s.name)), 6))
-  const valWidth = Math.max(...values.map(v => visualWidth(formatCompactNumber(v))), 5)
+  const valWidth = Math.max(...bars.map(bar => visualWidth(formatCompactNumber(bar.value))), 5)
   const body = [seriesLegend(ctx), '']
   categories.forEach((cat, idx) => {
     body.push(paint(ctx, 'text', truncateVisual(String(cat), 40)))
@@ -403,7 +421,8 @@ function groupedCard(ctx: ChartContext): string {
     })
   })
   body.push(...moreCategoriesNote(ctx, categories.length))
-  return frame(ctx, totalBadge(ctx), body, 'Grouped Bar')
+  const { badge, stats } = groupedStats(ctx, bars)
+  return frame(ctx, badge, body, 'Grouped Bar', stats)
 }
 
 /** Plain bars: one per category, longest first by value. */
@@ -506,6 +525,8 @@ function scatterCard(ctx: ChartContext): string | null {
   return frame(ctx, `${points.length.toLocaleString()} pts`, body, ctx.config.type === 'bubble' ? 'Bubble' : 'Scatter', stats)
 }
 
+const UNSTACKABLE_AGGREGATIONS: ReadonlySet<string> = new Set(['avg', 'median', 'min', 'max', 'stdDev'])
+
 /** Picks the card for the chart type, falling back to bars where a kind cannot be drawn in text. */
 function chartCard(ctx: ChartContext): string {
   const type = ctx.config.type
@@ -515,10 +536,11 @@ function chartCard(ctx: ChartContext): string {
   if (type === 'pie' || type === 'donut')
     return shareCard(ctx)
   if (type === 'scatter' || type === 'bubble')
-    return scatterCard(ctx) ?? barCard(ctx)
+    return scatterCard(ctx) ?? barCard({ ...ctx, statsLine: `Scatter needs numbers on both axes; ${ctx.config.xAxis?.field} is not numeric, so it is shown as bars.` })
   if (type === 'heatmap' && multi)
     return heatmapCard(ctx)
-  if (type === 'bar' && multi)
+  // An average, minimum or maximum per series cannot be stacked: their sum means nothing.
+  if (multi && (type === 'bar' || UNSTACKABLE_AGGREGATIONS.has(ctx.config.yAxis?.aggregation ?? 'sum')))
     return groupedCard(ctx)
   return multi ? stackedCard(ctx) : barCard(ctx)
 }
