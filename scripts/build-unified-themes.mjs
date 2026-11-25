@@ -196,7 +196,7 @@ ${squareCorners(id)}
   {
     id: 'crt-amber',
     title: 'Amber CRT (glowing amber phosphor, dark)',
-    glow: 'rgb(255 176 0 / 0.38)',
+    glow: 'rgb(255 176 0 / 0.2)',
     tokens: {
       'surface-bg': '#140e06',
       'surface-panel': '#1c1408',
@@ -241,7 +241,7 @@ ${squareCorners(id)}
   {
     id: 'crt-green',
     title: 'Green CRT (glowing green phosphor, dark)',
-    glow: 'rgb(53 214 137 / 0.36)',
+    glow: 'rgb(53 214 137 / 0.2)',
     tokens: {
       'surface-bg': '#07110b',
       'surface-panel': '#0b1a11',
@@ -290,8 +290,8 @@ function crtExtra(id, glow) {
   return `
 .vpg-data-grid.vpg-theme-${id} {
   font-family: ${MONO};
-  text-shadow: 0 0 7px ${glow};
-  box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 34px -8px ${glow};
+  text-shadow: 0 0 4px ${glow};
+  box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 24px -12px ${glow};
 }
 
 ${squareCorners(id)}

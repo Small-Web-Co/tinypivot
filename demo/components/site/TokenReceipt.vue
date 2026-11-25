@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { estimateTokens } from '../../site/savings'
+import { estimateTokens, EXAMPLE_WORKLOAD as workload } from '../../site/savings'
 
-const workload = { rows: 2000, cols: 6, followUps: 5, cached: true }
 const e = estimateTokens(workload)
 const savedPct = Math.floor(e.savedShare * 1000) / 10
 const fmt = (n: number) => n.toLocaleString('en-US')

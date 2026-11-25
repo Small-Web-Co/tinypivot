@@ -20,6 +20,9 @@ export interface Workload {
   cached: boolean
 }
 
+/** The worked example used by the homepage hero, receipt and context meter. */
+export const EXAMPLE_WORKLOAD: Workload = { rows: 2000, cols: 6, followUps: 5, cached: true }
+
 export interface TokenEstimate {
   pasted: number
   rereads: number

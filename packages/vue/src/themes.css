@@ -1201,8 +1201,8 @@
 
 .vpg-data-grid.vpg-theme-crt-amber {
   font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
-  text-shadow: 0 0 7px rgb(255 176 0 / 0.38);
-  box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 34px -8px rgb(255 176 0 / 0.38);
+  text-shadow: 0 0 4px rgb(255 176 0 / 0.2);
+  box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 24px -12px rgb(255 176 0 / 0.2);
 }
 
 .vpg-theme-crt-amber,
@@ -1278,8 +1278,8 @@
 
 .vpg-data-grid.vpg-theme-crt-green {
   font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
-  text-shadow: 0 0 7px rgb(53 214 137 / 0.36);
-  box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 34px -8px rgb(53 214 137 / 0.36);
+  text-shadow: 0 0 4px rgb(53 214 137 / 0.2);
+  box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 24px -12px rgb(53 214 137 / 0.2);
 }
 
 .vpg-theme-crt-green,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { UnitSegment } from '../../site/charts'
 import { allocateCells } from '../../site/charts'
-import { estimateTokens } from '../../site/savings'
+import { estimateTokens, EXAMPLE_WORKLOAD as workload } from '../../site/savings'
 import UnitGrid from './UnitGrid.vue'
 
 /**
@@ -12,7 +12,6 @@ const COLS = 40
 const ROWS = 25
 const CELLS = COLS * ROWS
 
-const workload = { rows: 2000, cols: 6, followUps: 5, cached: true }
 const e = estimateTokens(workload)
 const withoutTotal = e.withoutInput + e.rewrites
 const tokensPerCell = withoutTotal / CELLS

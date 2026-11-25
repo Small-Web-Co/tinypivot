@@ -190,7 +190,7 @@ const CRT_STYLE: ChartStyle = {
   ...FLAT_STYLE,
   areaOpacityFrom: 0.5,
   gridDash: 2,
-  glow: { blur: 10, opacity: 0.55, lineOnly: false },
+  glow: { blur: 6, opacity: 0.28, lineOnly: false },
 }
 
 const UNIFIED_STYLE: Record<UnifiedThemeId, ChartStyle> = {
