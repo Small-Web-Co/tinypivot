@@ -105,15 +105,15 @@ jobs:
           set -euo pipefail
           pkg_version="$(node -p "require('./packages/mcp/package.json').version")"
           echo "Waiting for @smallwebco/tinypivot-mcp@${pkg_version} on npm..."
-          for attempt in $(seq 1 18); do
+          for attempt in $(seq 1 60); do
             published="$(npm view "@smallwebco/tinypivot-mcp@${pkg_version}" version 2>/dev/null || true)"
             if [ "${published}" = "${pkg_version}" ]; then
               echo "Confirmed @smallwebco/tinypivot-mcp@${pkg_version} on npm (attempt ${attempt}); pausing 10s for registry propagation."
               sleep 10
               exit 0
             fi
-            echo "Not visible yet (attempt ${attempt}/18); retrying in 5s..."
-            sleep 5
+            echo "Not visible yet (attempt ${attempt}/60); retrying in 10s..."
+            sleep 10
           done
           echo "Timed out waiting for @smallwebco/tinypivot-mcp@${pkg_version} to appear on npm." >&2
           exit 1
