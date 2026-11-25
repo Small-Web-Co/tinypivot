@@ -258,3 +258,28 @@ describe('the theme slash command', () => {
     expect(await textOf({ name: 'Paper' })).toContain('require TinyPivot Pro')
   })
 })
+
+describe('the Studio link in each reply', () => {
+  beforeEach(() => {
+    vi.stubEnv('TINYPIVOT_TELEMETRY', '0')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('is asked for on every reply, so a Studio that stopped starts again under its new address', async () => {
+    const links = ['http://127.0.0.1:47317/s/one', 'http://127.0.0.1:51000/s/one']
+    const ensureCompanion = vi.fn(async () => links.shift())
+    const { server } = createTinyPivotMcpServer({ ensureCompanion })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const client = new Client({ name: 'pi', version: '1.0.0' }, { capabilities: {} })
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+    const textOf = async () => ((await client.callTool({ name: 'load_data', arguments: LOAD_ARGS })).content as Array<{ text: string }>)[0].text
+
+    expect(await textOf()).toContain('http://127.0.0.1:47317/s/one')
+    expect(await textOf()).toContain('http://127.0.0.1:51000/s/one')
+    expect(ensureCompanion).toHaveBeenCalledTimes(2)
+  })
+})

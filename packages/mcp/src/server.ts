@@ -424,7 +424,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const store = options.store ?? new DatasetStore({
     maxRowsPerDataset: isPro ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
   })
-  let activeCompanionUrl = options.companionUrl
+  /** A widget host that asked for the Studio once (open_tinypivot) keeps getting its link. */
+  let studioRequested = false
   const notifyCompanion = () => {
     options.onStateChanged?.()
   }
@@ -464,15 +465,18 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     shownBy: clientRendersWidget() ? 'widget' : getClientName() === 'pi' ? 'pi' : undefined,
   })
 
+  /**
+   * The Studio's address for this reply, asked of the CLI every time rather than remembered: a
+   * Studio the user stopped, or that stopped with no tab open, starts again here, instead of the
+   * reply handing out a dead address that another session's Studio may since have taken.
+   */
   const resolveCompanionUrlForTool = async (forceCompanion = false): Promise<string | undefined> => {
-    if (activeCompanionUrl)
-      return activeCompanionUrl
     if (!options.ensureCompanion)
+      return options.companionUrl
+    studioRequested ||= forceCompanion
+    if (!studioRequested && clientRendersWidget())
       return undefined
-    if (!forceCompanion && clientRendersWidget())
-      return undefined
-    activeCompanionUrl = await options.ensureCompanion()
-    return activeCompanionUrl
+    return options.ensureCompanion()
   }
 
   /**

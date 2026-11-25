@@ -253,3 +253,29 @@ describe('files dropped into the Studio', () => {
     }
   })
 })
+
+describe('links that belong to one conversation', () => {
+  it('serves its own conversation, forwards another\'s to the server that has it, and says when one has stopped', async () => {
+    const mine = new Studio(new DatasetStore())
+    const theirs = new Studio(new DatasetStore())
+    const a = await startCompanionServer({ store: mine.store, studio: mine, loadHtml: async () => '<html><head></head><body>studio</body></html>' })
+    const b = await startCompanionServer({ store: theirs.store, studio: theirs, loadHtml: async () => '<html><head></head><body>studio</body></html>' })
+    try {
+      expect(a.link).toBe(`${a.url}/s/${mine.sessionId}`)
+      expect((await fetch(a.link)).status).toBe(200)
+
+      const forwarded = await fetch(`${a.url}/s/${theirs.sessionId}`, { redirect: 'manual' })
+      expect(forwarded.status).toBe(302)
+      expect(forwarded.headers.get('location')).toBe(b.link)
+
+      await b.close()
+      const stopped = await fetch(`${a.url}/s/${theirs.sessionId}`, { redirect: 'manual' })
+      expect(stopped.status).toBe(410)
+      expect(await stopped.text()).toContain('This TinyPivot Studio has stopped')
+    }
+    finally {
+      await a.close()
+      await b.close()
+    }
+  })
+})

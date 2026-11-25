@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import type { DatasetStore } from './store.js'
 import type { NoteAttachment, StudioNote } from './studio-protocol.js'
 import type { Studio } from './studio.js'
-import { unwatchFile, watchFile } from 'node:fs'
+import fsSync, { unwatchFile, watchFile } from 'node:fs'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
@@ -12,10 +12,13 @@ import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { getPreferencesPath } from './store.js'
 import { STUDIO_HEADER } from './studio-protocol.js'
 import { cardTitle, datasetCard } from './summary.js'
-import { getCompanionSessionFile } from './tui.js'
+import { getCompanionSessionFile, isProcessAlive } from './tui.js'
 
 export interface CompanionServerHandle {
+  /** The server's origin, for API calls. */
   url: string
+  /** The address to give the user: this conversation's Studio, wherever its server is running. */
+  link: string
   port: number
   broadcastUpdate: () => void
   /** Browser tabs connected to the live stream right now. */
@@ -41,6 +44,40 @@ export interface StartCompanionOptions {
   /** How often to look for a theme saved elsewhere (another Studio, pi, an agent), in ms. */
   themeWatchMs?: number
 }
+
+/** Where each running Studio records its address, by conversation, so links can find it. */
+function studiosDir(): string {
+  return path.join(path.dirname(getCompanionSessionFile()), 'studios')
+}
+
+/** Records this conversation's Studio address; returns the file to remove when it stops. */
+function registerStudio(sessionId: string, url: string): string | undefined {
+  const file = path.join(studiosDir(), `${sessionId}.json`)
+  try {
+    fsSync.mkdirSync(path.dirname(file), { recursive: true })
+    fsSync.writeFileSync(file, `${JSON.stringify({ url, pid: process.pid })}\n`)
+    return file
+  }
+  catch {
+    return undefined
+  }
+}
+
+/** The address of the running Studio for a conversation, or undefined when it has stopped. */
+export async function liveStudioUrl(sessionId: string): Promise<string | undefined> {
+  try {
+    const entry = JSON.parse(await fs.readFile(path.join(studiosDir(), `${sessionId}.json`), 'utf8')) as { url?: string, pid?: number }
+    return entry.url && typeof entry.pid === 'number' && isProcessAlive(entry.pid) ? entry.url : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+const STOPPED_STUDIO_PAGE = `<!doctype html><meta charset="utf-8"><title>TinyPivot Studio stopped</title>
+<body style="font:15px/1.55 system-ui,sans-serif;max-width:34rem;margin:20vh auto;padding:0 24px;color:#334155">
+<h1 style="font-size:16px">This TinyPivot Studio has stopped</h1>
+<p>The conversation this link belongs to is not running a Studio now. Ask your agent to open TinyPivot again; its reply has the new link.</p>`
 
 /** The license key when it is one for the MCP server (Pro or team), otherwise null. */
 function validMcpKey(licenseKey?: string): string | null {
@@ -341,7 +378,22 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     if (!allowed)
       return sendJson(res, 403, { error: 'Forbidden' })
 
-    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+    // A link names its conversation. Another conversation's link is forwarded to the server that
+    // has it, or answered with a page saying that Studio has stopped: never with this one's data.
+    const linkSession = /^\/s\/([\w-]+)\/?$/.exec(pathname)?.[1]
+    if (req.method === 'GET' && linkSession && linkSession !== studio?.sessionId) {
+      const target = await liveStudioUrl(linkSession)
+      if (target) {
+        res.writeHead(302, { Location: `${target}/s/${linkSession}` })
+        res.end()
+        return
+      }
+      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end(STOPPED_STUDIO_PAGE)
+      return
+    }
+
+    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html' || linkSession)) {
       const html = withThemeMeta(await options.loadHtml(), isProCompanion(options) ? options.store.getVisualTheme() : 'code')
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end(html)
@@ -385,7 +437,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     // The pi extension draws TinyPivot cards; this hands it a card in full colour, found by its title.
     if (req.method === 'GET' && pathname === '/api/studio/card') {
       const title = urlObj.searchParams.get('title') ?? ''
-      const ansi = colouredCard(options.store, title, `http://127.0.0.1:${listenPort}`, isProCompanion(options))
+      const ansi = colouredCard(options.store, title, studio ? `http://127.0.0.1:${listenPort}/s/${studio.sessionId}` : `http://127.0.0.1:${listenPort}`, isProCompanion(options))
       return ansi ? sendJson(res, 200, { ansi }) : sendJson(res, 404, { error: 'No card with that title.' })
     }
 
@@ -465,6 +517,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
   const address = server.address() as AddressInfo
   listenPort = address.port
   const url = `http://127.0.0.1:${address.port}`
+  const registration = studio ? registerStudio(studio.sessionId, url) : undefined
 
   // Record active localhost session so `tinypivot-mcp tui` auto-attaches in a Ghostty/tmux split pane
   const sessionFile = getCompanionSessionFile()
@@ -479,6 +532,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       return closePromise
     clearTimeout(idleTimer)
     unwatchFile(preferencesPath, followTheme)
+    if (registration)
+      void fs.rm(registration, { force: true })
     closePromise = (async () => {
       for (const client of sseClients) {
         try {
@@ -536,6 +591,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
 
   return {
     url,
+    link: studio ? `${url}/s/${studio.sessionId}` : url,
     port: address.port,
     broadcastUpdate,
     clientCount: () => sseClients.size,

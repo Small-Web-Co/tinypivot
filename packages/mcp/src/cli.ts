@@ -398,6 +398,8 @@ async function main() {
   const studio = new Studio(store)
   /** Once the user has stopped the Studio (or closed its tabs), later restarts do not open a tab. */
   let studioWasStopped = false
+  /** The port this process's Studio last had. */
+  let lastPort: number | undefined
   const startCompanion = (onPort: number) => startCompanionServer({
     store,
     studio,
@@ -418,7 +420,7 @@ async function main() {
   const openStudioIfNoTab = (handle: CompanionServerHandle) => {
     setTimeout(() => {
       if (handle.clientCount() === 0)
-        openInBrowser(handle.url)
+        openInBrowser(handle.link)
     }, STUDIO_RECONNECT_MS).unref()
   }
 
@@ -429,19 +431,22 @@ async function main() {
       return Promise.resolve(companion)
     if (companionPromise)
       return companionPromise
-    companionPromise = startCompanion(port)
+    // A restart asks for the port it had, so links already in the terminal keep working.
+    const wanted = lastPort ?? port
+    companionPromise = startCompanion(wanted)
       .catch((err) => {
         // Another session (or anything else) holds the port: a Studio elsewhere beats none.
-        console.error(`[tinypivot-mcp] Port ${port} is taken (${err instanceof Error ? err.message : err}); using a free port for the Studio.`)
+        console.error(`[tinypivot-mcp] Port ${wanted} is taken (${err instanceof Error ? err.message : err}); using a free port for the Studio.`)
         return startCompanion(0)
       })
       .then((handle) => {
         companion = handle
-        console.error(`[tinypivot-mcp] TinyPivot Studio ready at ${handle.url}`)
+        lastPort = handle.port
+        console.error(`[tinypivot-mcp] TinyPivot Studio ready at ${handle.link}`)
         if (studioWasStopped)
           return handle
         if (autoOpen)
-          openInBrowser(handle.url)
+          openInBrowser(handle.link)
         else if (openStudio)
           openStudioIfNoTab(handle)
         return handle
@@ -497,7 +502,7 @@ async function main() {
     let liveCompanionUrl: string | undefined
     if ((autoOpen || explicitPort) && !disableCompanion) {
       const handle = await ensureCompanionStarted()
-      liveCompanionUrl = handle?.url
+      liveCompanionUrl = handle?.link
     }
 
     const fmtOpts = {
@@ -562,11 +567,11 @@ async function main() {
     appHtmlPath,
     licenseKey,
     demoToken,
-    companionUrl: companion?.url,
+    companionUrl: companion?.link,
     ensureCompanion: disableCompanion
       ? undefined
       // A terminal agent's first data step opens the Studio, unless TINYPIVOT_OPEN_STUDIO=0.
-      : async () => (await ensureCompanionStarted(process.env.TINYPIVOT_OPEN_STUDIO !== '0'))?.url,
+      : async () => (await ensureCompanionStarted(process.env.TINYPIVOT_OPEN_STUDIO !== '0'))?.link,
     onStateChanged: () => companion?.broadcastUpdate(),
   })
 
