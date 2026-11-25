@@ -8,7 +8,7 @@ Everything below is ready in the repository unless a line says **You**.
 
 | Directory | Who can submit | Ready in the repo | You |
 |---|---|---|---|
-| Claude directory (claude.ai, Cowork, Claude Code) | Anyone on a paid Claude plan | Plugin bundle in `packages/mcp`, passes `claude plugin validate --strict` | Decide on npx pinning, then submit at claude.ai/directory/manage |
+| Claude directory (claude.ai, Cowork, Claude Code) | Anyone on a paid Claude plan | Plugin bundle in `packages/mcp`, passes `claude plugin validate --strict` | Submit at claude.ai/directory/manage |
 | Claude Code channel allowlist | Anthropic partners only | Channel declared in `plugin.json`; request drafted below | Find a partner contact, send the request |
 | Official MCP Registry | Already published | `packages/mcp/server.json`, published by CI | Nothing |
 | Claude Desktop extensions (.mcpb) | Closed to new local servers | Nothing needed: the plugin bundle replaces it | Nothing |
@@ -24,7 +24,7 @@ Everything below is ready in the repository unless a line says **You**.
 - **Privacy and terms pages.** `https://tiny-pivot.com/privacy` and `https://tiny-pivot.com/terms` are added in this branch (`demo/site/legal.ts`). They go live with the next site deploy. Claude's, Codex's and Cursor's forms ask for them. Have someone qualified read both: they describe what the code does, but they are not legal advice, and the terms leave out governing law and a refund policy.
 - **License.** The manifests' `license` field is `SEE LICENSE IN LICENSE.md`, matching `packages/mcp/package.json` and the dual-license `packages/mcp/LICENSE.md` (a test keeps them in step). Some forms ask for an SPDX identifier; where one does, answer with the license file instead of `MIT`.
 - **Icon.** `packages/mcp/assets/icon.png` (512×512, the site's pivot-grid mark). Antigravity asks for about 10% padding and legibility on light and dark backgrounds: the mark has a cream background, so it reads on both.
-- **Versions.** Every manifest carries the MCP package version (0.6.0). `tests/unit/mcp-init.test.ts` fails if one of them drifts, so a release has to bump all of them: `packages/mcp/package.json`, `server.json`, `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `plugin.json`, the root `.claude-plugin/marketplace.json` and `gemini-extension.json`.
+- **Versions.** Every manifest carries the MCP package version (0.6.0), and the Claude plugin's `.mcp.json` starts exactly that version. Release with `pnpm release:mcp <patch|minor|major|x.y.z>`: it bumps `packages/mcp/package.json`, `server.json`, `.mcp.json`, `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `plugin.json`, `src/server.ts`, `src/telemetry.ts`, the root `.claude-plugin/marketplace.json` and `gemini-extension.json`. `tests/unit/mcp-init.test.ts` fails if any of them drifts.
 
 ## Claude Code and the Claude directory
 
@@ -40,11 +40,7 @@ Ready:
 - `packages/mcp/.claude-plugin/plugin.json` now has `displayName`, `icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`, `termsOfServiceUrl`, `network.hosts` (registry.npmjs.org for npx and DuckDB, tiny-pivot.com for usage statistics) and the `channels` entry.
 - `claude plugin validate --strict packages/mcp` passes, including its directory checks.
 
-**Decision for you: pinning npx.** The directory's checklist says an `npx` launcher must be pinned to an exact version (`@smallwebco/tinypivot-mcp@0.6.0`) and that an unpinned one blocks submission. `claude plugin validate` did not flag `@latest`, but its directory checks are only a subset. TinyPivot deliberately uses `@latest` so a release reaches users on restart (see `MCP_NPX_SPEC` in `src/init.ts`). Options:
-1. Pin `.mcp.json` to the release version and have the release bump it. Plugin users then get each release when the directory picks up the new commit. `init`'s configs can keep `@latest`.
-2. Submit with `@latest` and see whether the reviewer accepts it.
-
-Option 1 is the safer route. It means changing `.mcp.json` and the test that expects `@latest` in it.
+**Pinned npx.** The directory's checklist says an `npx` launcher must be pinned to an exact version and that an unpinned one blocks submission. The plugin's `.mcp.json` therefore starts `@smallwebco/tinypivot-mcp@0.6.0`, and `pnpm release:mcp` moves the pin with each release. Plugin users get a release once the directory picks up the new commit. Everything else, including `init`'s configs and the Cursor, Antigravity and Gemini manifests, keeps `@latest` so a release reaches users on restart (see `MCP_NPX_SPEC` in `src/init.ts`).
 
 Pinned packages are always held for a human reviewer, so expect a manual review either way.
 
@@ -82,7 +78,7 @@ Draft request:
 >
 > We'd like TinyPivot's channel considered for the Claude Code channel allowlist, so users can start it with `claude --channels plugin:tinypivot@…` instead of `--dangerously-load-development-channels`.
 >
-> **What TinyPivot is.** An MIT-licensed local MCP server (`@smallwebco/tinypivot-mcp`, source at https://github.com/Small-Web-Co/tinypivot, plugin in `packages/mcp`) that turns CSV, JSON and SQL results into charts and pivot tables. It is in the Official MCP Registry as `io.github.Small-Web-Co/tinypivot` [and in the Claude directory as … — add once listed].
+> **What TinyPivot is.** A local MCP server (`@smallwebco/tinypivot-mcp`, source at https://github.com/Small-Web-Co/tinypivot, plugin in `packages/mcp`) that turns CSV, JSON and SQL results into charts and pivot tables. It is in the Official MCP Registry as `io.github.Small-Web-Co/tinypivot` [and in the Claude directory as … — add once listed].
 >
 > **What the channel does.** TinyPivot runs a local web page, TinyPivot Studio, at `http://127.0.0.1:<port>`, that shows each step Claude takes with the data: the reason, the SQL and the resulting chart. The user can write to Claude from that page, for example "split this by region" while looking at a chart. The channel delivers that message into the running Claude Code session as a `notifications/claude/channel` event, and Claude answers with the `studio_reply` tool so the answer appears in the Studio. Without the channel, the message waits until Claude next calls a TinyPivot tool.
 >

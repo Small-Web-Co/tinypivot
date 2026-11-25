@@ -80,6 +80,7 @@
     "release:patch": "node scripts/release.js patch",
     "release:minor": "node scripts/release.js minor",
     "release:major": "node scripts/release.js major",
+    "release:mcp": "node scripts/bump-mcp-version.mjs",
     "prepare": "husky"
   },
   "dependencies": {
