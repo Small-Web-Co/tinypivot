@@ -126,6 +126,12 @@ function colorizeSegments(text: string, pal: Palette): string {
   });
 }
 
+// Makes the Studio address in a card clickable, as an OSC 8 terminal hyperlink.
+const CARD_LINK = /http:[/][/]127[.]0[.]0[.]1:[0-9]+/;
+function hyperlink(text: string): string {
+  return text.replace(CARD_LINK, url => "\\x1b]8;;" + url + "\\x1b\\\\" + url + "\\x1b]8;;\\x1b\\\\");
+}
+
 function colorizeCardLine(line: string, pal: Palette): string {
   if (line.startsWith("╭─")) {
     const withBadge = line.replace(/^(╭─ )(.+?)( ─+ )(.+?)( ─╮)$/, (_m, a, b, c, d, e) =>
@@ -150,7 +156,7 @@ function colorizeCardLine(line: string, pal: Palette): string {
   const edge = fg(pal.border, "│");
 
   if (inner.includes("↗ Live:")) {
-    return \`\${edge}\${fgBold(pal.accent, inner)}\${edge}\`;
+    return \`\${edge}\${fgBold(pal.accent, hyperlink(inner))}\${edge}\`;
   }
   if (inner.includes("▲ ") && (inner.includes("Peak:") || inner.includes("peak:"))) {
     return \`\${edge}\${fg(pal.muted, inner)}\${edge}\`;
@@ -202,6 +208,8 @@ function isTinyPivotTool(toolName: string): boolean {
 interface TinyPivotCardEntryData {
   cards: string[];
   themeId: string;
+  /** The same cards in full colour from the Studio, where it could provide them. */
+  coloured?: Array<string | null>;
 }
 
 // TinyPivot Studio bridge: messages the user sends from the Studio arrive here, go into this
@@ -229,14 +237,15 @@ function lastAssistantText(messages: unknown): string {
 function createStudioBridge(pi: any) {
   let studioUrl: string | undefined;
   let stream: AbortController | undefined;
-  let awaiting: string | undefined;
+  /** Set while a turn that a Studio message started is running, so its answer goes back. */
+  let awaiting = false;
 
   function handleFrame(frame: string): void {
     if (!frame.startsWith("event: message")) return;
     const data = frame.split("\\n").find(line => line.startsWith("data: "));
     if (!data) return;
-    const message = JSON.parse(data.slice(6)) as { id: string; text: string };
-    awaiting = message.id;
+    const message = JSON.parse(data.slice(6)) as { text: string };
+    awaiting = true;
     pi.sendMessage(
       { customType: "tinypivot-studio", content: message.text, display: true },
       { triggerTurn: true, deliverAs: "steer" },
@@ -291,11 +300,25 @@ function createStudioBridge(pi: any) {
     },
     async onAgentEnd(messages: unknown): Promise<void> {
       if (!awaiting || !studioUrl) return;
-      const re = awaiting;
-      awaiting = undefined;
+      awaiting = false;
       const text = lastAssistantText(messages);
       if (!text) return;
-      await fetch(studioUrl + "/api/studio/reply", { method: "POST", headers: STUDIO_HEADERS, body: JSON.stringify({ re, text }) }).catch(() => {});
+      await fetch(studioUrl + "/api/studio/reply", { method: "POST", headers: STUDIO_HEADERS, body: JSON.stringify({ text }) }).catch(() => {});
+    },
+    /** Each card in full colour from the Studio (lines in each series' colour), or null. */
+    async colouredCards(cards: string[]): Promise<Array<string | null>> {
+      if (!studioUrl) return cards.map(() => null);
+      const url = studioUrl;
+      return Promise.all(cards.map(async (card) => {
+        const title = /╭─ (.+?) ─/.exec(card)?.[1];
+        if (!title) return null;
+        try {
+          const res = await fetch(url + "/api/studio/card?title=" + encodeURIComponent(title), { signal: AbortSignal.timeout(1500) });
+          return res.ok ? ((await res.json()) as { ansi?: string }).ansi ?? null : null;
+        } catch {
+          return null;
+        }
+      }));
     },
     stop(): void {
       stream?.abort();
@@ -319,10 +342,12 @@ export default function (pi: any) {
         render(_width: number): string[] {
           const themeId = data.themeId || readActiveThemeId();
           const out: string[] = [""];
-          for (const card of data.cards) {
-            out.push(...renderColoredCard(card, themeId).map(l => \`  \${l}\`));
+          data.cards.forEach((card, i) => {
+            const coloured = data.coloured?.[i];
+            const lines = coloured ? coloured.split("\\n").map(hyperlink) : renderColoredCard(card, themeId);
+            out.push(...lines.map(l => \`  \${l}\`));
             out.push("");
-          }
+          });
           return out;
         },
         invalidate() {},
@@ -330,19 +355,21 @@ export default function (pi: any) {
     });
   }
 
-  pi.on("tool_execution_end", (event: { toolName?: string; result?: unknown; isError?: boolean }, ctx: { hasUI?: boolean }) => {
+  pi.on("tool_execution_end", async (event: { toolName?: string; result?: unknown; isError?: boolean }, ctx: { hasUI?: boolean }) => {
     if (event?.isError) return;
     const text = extractResultText(event.result);
     if (!text) return;
     // TinyPivot calls made through codemode arrive under another tool's name, so look at the text.
     studio.noticeToolText(text);
-    if (!event?.toolName || !isTinyPivotTool(event.toolName) || ctx?.hasUI === false) return;
+    const fromTinyPivot = isTinyPivotTool(event?.toolName ?? "") || event?.toolName === "codemode";
+    if (!fromTinyPivot || ctx?.hasUI === false) return;
     const cards = extractTinyPivotCards(text);
     if (cards.length === 0) return;
 
     const themeId = readActiveThemeId();
+    const coloured = await studio.colouredCards(cards);
     if (typeof pi.appendEntry === "function") {
-      pi.appendEntry("tinypivot-card", { cards, themeId });
+      pi.appendEntry("tinypivot-card", { cards, themeId, coloured });
     }
   });
 

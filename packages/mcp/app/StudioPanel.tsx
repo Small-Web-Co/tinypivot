@@ -302,9 +302,7 @@ function AgentStatus({ agent }: { agent: StudioSnapshot['agent'] }) {
         <strong>{name}</strong>
         {agent.busy ? ' is working…' : live ? ' · live: messages start a turn now' : ' · messages go with its next TinyPivot reply'}
       </span>
-      {!live && name === 'Claude Code' && (
-        <code className="tp-studio-agent-tip" title="Start Claude Code with this to send live">--dangerously-load-development-channels server:tinypivot</code>
-      )}
+      {!live && agent.hint && <span className="tp-studio-agent-tip">{agent.hint}</span>}
     </div>
   )
 }
@@ -406,13 +404,14 @@ function NoteComposer({ notes, agent, aboutStep, attachment, onAttachView, onCle
       <textarea
         ref={inputRef}
         className="tp-studio-note-input"
-        placeholder="Tell the agent what to check, fix or try next…"
+        placeholder="Tell the agent what to check, fix or try next. Enter sends, Shift+Enter adds a line."
         value={text}
         rows={2}
         aria-label="Message for the agent"
         onChange={e => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          // Enter sends; Shift+Enter, and Enter while an IME is composing, stay in the text.
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault()
             void send()
           }

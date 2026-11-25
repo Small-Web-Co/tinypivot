@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { visualWidth } from '../../packages/mcp/src/card'
 import {
   clientSupportsMcpAppsUi,
   createTinyPivotMcpServer,
@@ -17,8 +18,8 @@ import {
 } from '../../packages/mcp/src/index'
 import { extractSessionKey, isMcpLicenseKey } from '../../packages/mcp/src/server'
 import { FREE_TIER_ROW_LIMIT, SAMPLE_DATASET_ID } from '../../packages/mcp/src/store'
-import { isNonAdditiveMeasure, visualWidth } from '../../packages/mcp/src/summary'
 import { bucketRowCount, isTelemetryEnabled } from '../../packages/mcp/src/telemetry'
+import { isNonAdditiveMeasure } from '../../packages/mcp/src/terminal-chart'
 import { getCompanionSessionFile, isProcessAlive, resolveCompanionUrl } from '../../packages/mcp/src/tui'
 
 function createMockMcpSession(server: ReturnType<typeof createTinyPivotMcpServer>['server']) {
@@ -464,6 +465,11 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     )
     expect(summary).toContain('Show the card above to the user verbatim.')
     expect(summary).toContain('↗ Live: http://127.0.0.1:51234')
+
+    // Beside the inline widget, the model is told not to repeat the card, even with the Studio running.
+    const besideWidget = formatDatasetSummary(ds, 'http://127.0.0.1:51234', { shownInWidget: true })
+    expect(besideWidget).toContain('do not repeat the card')
+    expect(besideWidget).not.toContain('Show the card above to the user verbatim.')
 
     // Direct TTY truecolor ANSI mode keeps uniform visual widths and embeds theme palette RGB
     const coloredStacked = formatTerminalChart(ds, {

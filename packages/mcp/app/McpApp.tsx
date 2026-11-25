@@ -1,5 +1,4 @@
 import type { ChartConfig, ChartSortOrder, ChartThemePreset, DataGridViewMode, DrillThroughResult, PivotConfig, Theme } from '@smallwebco/tinypivot-core'
-import type { AIAnalystConfig } from '@smallwebco/tinypivot-react'
 import type { NoteAttachment, StudioSnapshot } from '../src/studio-protocol'
 import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps'
 import {
@@ -310,9 +309,8 @@ export function McpApp() {
     setTier(nextTier)
     if (payload.datasets)
       setDatasets(payload.datasets)
-    // Someone talking to the AI Analyst stays there; the new view waits behind the other tabs.
     if (payload.viewMode)
-      setViewMode(current => (current === 'ai' ? current : payload.viewMode!))
+      setViewMode(payload.viewMode)
     if (nextTier === 'free') {
       setVisualTheme('code')
     }
@@ -710,11 +708,6 @@ export function McpApp() {
     setSelectedContext(viewAttachment(datasetName, datasetId, view, rows))
   }, [chartConfig?.type, datasetId, datasetName, rows, viewMode])
 
-  // The AI Analyst panel, answered by the user's own agent through the Studio.
-  const analystConfig = useMemo<AIAnalystConfig | undefined>(() => (studio
-    ? { enabled: true, endpoint: '/api/studio/analyst', aiModelName: studio.agent.name ?? 'Your agent', maxRows: 10_000 }
-    : undefined), [studio])
-
   const handleCopyMarkdown = useCallback(async () => {
     const container = mainRef.current
     if (!container)
@@ -810,18 +803,6 @@ export function McpApp() {
             >
               Data
             </button>
-            {analystConfig && (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'ai'}
-                className={`tp-mcp-seg-btn ${viewMode === 'ai' ? 'active' : ''}`}
-                title={`Ask questions about this data; ${analystConfig.aiModelName} answers`}
-                onClick={() => setViewMode('ai')}
-              >
-                Analyst
-              </button>
-            )}
           </div>
 
           {datasets.length > 1
@@ -1197,7 +1178,6 @@ export function McpApp() {
                   viewMode={viewMode}
                   pivotConfig={pivotConfig}
                   chartConfig={chartConfig}
-                  aiAnalyst={analystConfig}
                   showPivot={true}
                   enableExport={true}
                   enableSearch={true}

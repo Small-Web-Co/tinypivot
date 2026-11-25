@@ -91,3 +91,31 @@ describe('init writes configs that fetch the newest release', () => {
     expect(mcpPluginConfig.mcpServers.tinypivot.args).toEqual(['-y', MCP_NPX_SPEC])
   })
 })
+
+describe('refreshPiExtension', () => {
+  let dir: string
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-piext-'))
+  })
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  it('updates TinyPivot\'s own older extension and leaves everything else alone', async () => {
+    const { buildPiExtensionSource } = await import('../../packages/mcp/src/pi-extension')
+    const { refreshPiExtension } = await import('../../packages/mcp/src/init')
+    const file = path.join(dir, 'tinypivot.ts')
+
+    expect(await refreshPiExtension(file)).toBe('absent')
+    await expect(fs.access(file)).rejects.toThrow()
+
+    await fs.writeFile(file, '// Auto-installed by @smallwebco/tinypivot-mcp init — do not edit by hand.\n// an older version\n')
+    expect(await refreshPiExtension(file)).toBe('updated')
+    expect(await fs.readFile(file, 'utf8')).toBe(buildPiExtensionSource())
+    expect(await refreshPiExtension(file)).toBe('current')
+
+    await fs.writeFile(file, '// my own extension\n')
+    expect(await refreshPiExtension(file)).toBe('custom')
+    expect(await fs.readFile(file, 'utf8')).toBe('// my own extension\n')
+  })
+})

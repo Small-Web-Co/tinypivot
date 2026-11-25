@@ -11,15 +11,13 @@ In a terminal agent, the first TinyPivot step opens the Studio at `http://127.0.
 - **Trace:** every step, newest last, marked as the agent's or yours, with its reason (the `why` the agent passes), what it shows (for example `line chart: sum(mrr) by month`), the row count, and the SQL or file filter behind it. File loads are shown as the SQL that reproduces them.
 - **SQL editor:** edit a step's SQL, or write new SQL over local files and loaded tables, and run it with DuckDB, read-only. The result replaces the view, keeps the step's chart when its fields still exist, and joins the trace as your step.
 - **Messages to the agent, with data:** write what to check or change, optionally about one step, and attach data: click a row, drill into a pivot cell, or attach the current view. It goes to the agent with the dataset id, so the agent can query the rest itself.
-- **AI Analyst (Pro):** the Analyst tab answers questions about the loaded data. Your own agent answers, not a separate model or API key, and the SQL it suggests runs locally, read-only.
 
 How a message reaches your agent depends on the harness. The Studio shows which one applies:
 
 | Agent | How Studio messages arrive |
 |---|---|
-| pi | Live: TinyPivot's pi extension starts a turn, and the answer comes back to the Studio. Run `npx @smallwebco/tinypivot-mcp@latest init` once to install or update the extension. |
+| pi | Live: TinyPivot's pi extension starts a turn, and the answer comes back to the Studio's trace. `init` installs the extension, and TinyPivot keeps it up to date (restart pi after an update). Its cards are drawn in full colour, each series in its own. |
 | Claude Code | Live when started with `claude --dangerously-load-development-channels server:tinypivot` (Claude Code channels, a research preview). The agent answers with `studio_reply`. Otherwise, with its next TinyPivot reply. |
-| Hosts with MCP sampling | The Analyst answers with the host's own model, outside the conversation. |
 | Others | With the agent's next TinyPivot reply. **Copy as prompt** puts the message, the step, its SQL and the data on your clipboard to paste now. |
 
 In desktop and IDE hosts that show TinyPivot inline (Claude Desktop, VS Code, Cursor), click a row or drill into a pivot cell, then **Send to chat** to post it to the conversation with your comment.

@@ -1,5 +1,4 @@
 import type { ChartConfig, DataGridViewMode, PivotConfig } from '@smallwebco/tinypivot-core'
-import type { ChatTurn } from './agent-bridge.js'
 import type { HistoryEntry, RecordInput } from './history.js'
 import type { DatasetStore, RowFilter, StoredDataset } from './store.js'
 import type { NoteAttachment, StepActor, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
@@ -33,8 +32,6 @@ export interface StudioQueryInput {
 /** Steps kept in memory and shown in the Studio; the file keeps more. */
 const STEPS_IN_MEMORY = 300
 const HISTORY_IN_SNAPSHOT = 50
-/** How long an AI Analyst question waits for the agent's answer. */
-export const ANSWER_WAIT_MS = 4 * 60 * 1000
 const ATTACHMENT_MAX_CHARS = 6000
 
 /** Friendly names for MCP client names. */
@@ -130,10 +127,11 @@ export class Studio {
   private readonly pullsByDataset = new Map<string, HistoryEntry>()
   private readonly listeners = new Set<() => void>()
   private changeQueued = false
-  /** Ways to reach the user's agent: live channels, sampling, or nothing (queued notes). */
+  /** Ways to reach the user's agent live; without one, notes wait for its next TinyPivot reply. */
   readonly agent = new AgentBridge(() => this.changed())
   private agentName?: string
   private agentBusy = false
+  private agentHint?: string
 
   constructor(readonly store: DatasetStore, options: { history?: HistoryStore, duck?: DuckDbRunner } = {}) {
     this.history = options.history ?? new HistoryStore()
@@ -168,8 +166,14 @@ export class Studio {
       history: this.history.enabled ? this.history.list(HISTORY_IN_SNAPSHOT) : [],
       historyEnabled: this.history.enabled,
       loadedIds: this.store.listMetadata(sessionKey).map(meta => meta.id),
-      agent: { name: this.agentName ? agentLabel(this.agentName) : undefined, live: this.agent.live(), busy: this.agentBusy },
+      agent: { name: this.agentName ? agentLabel(this.agentName) : undefined, live: this.agent.live(), busy: this.agentBusy, ...(this.agentHint ? { hint: this.agentHint } : {}) },
     }
+  }
+
+  /** What would let this agent receive Studio messages live, shown while it cannot. */
+  setAgentHint(hint: string | undefined): void {
+    this.agentHint = hint
+    this.changed()
   }
 
   /** Whether the agent is in the middle of a turn, as its extension reports it. */
@@ -357,13 +361,12 @@ export class Studio {
    * Sends the user's message to the agent: straight into its conversation when a live connector
    * takes it, otherwise queued for its next TinyPivot reply.
    */
-  addNote(text: string, options: { stepId?: string, attachment?: NoteAttachment, kind?: StudioNote['kind'] } = {}): StudioNote {
+  addNote(text: string, options: { stepId?: string, attachment?: NoteAttachment } = {}): StudioNote {
     const attachment = options.attachment && { label: options.attachment.label.slice(0, 120), text: options.attachment.text.slice(0, ATTACHMENT_MAX_CHARS) }
     const note: StudioNote = {
-      id: nextId(options.kind === 'question' ? 'ask' : 'note'),
+      id: nextId('note'),
       at: new Date().toISOString(),
       text: text.trim(),
-      kind: options.kind ?? 'note',
       delivery: 'queued',
       ...(options.stepId ? { stepId: options.stepId } : {}),
       ...(attachment ? { attachment } : {}),
@@ -372,7 +375,7 @@ export class Studio {
       note.delivery = 'live'
     else
       this.notes.push(note)
-    this.record({ actor: 'user', tool: note.kind === 'question' ? 'ask' : 'note', why: note.text, ...(attachment ? { view: `with ${attachment.label}` } : {}) })
+    this.record({ actor: 'user', tool: 'note', why: note.text, ...(attachment ? { view: `with ${attachment.label}` } : {}) })
     return note
   }
 
@@ -382,7 +385,7 @@ export class Studio {
    */
   describeNote(note: StudioNote, { withSource = false } = {}): string {
     const step = note.stepId ? this.steps.find(s => s.id === note.stepId) : undefined
-    const source = withSource || note.kind === 'question' ? `${note.kind === 'question' ? 'Question' : 'Message'} from the user in TinyPivot Studio: ` : ''
+    const source = withSource ? 'Message from the user in TinyPivot Studio: ' : ''
     const lines = [`${source}${note.text}`]
     if (step)
       lines.push(`About the step "${step.why ?? step.view ?? step.tool}"${step.datasetId ? ` on dataset \`${step.datasetId}\`` : ''}${step.sql ? `, SQL: ${step.sql.replace(/\s+/g, ' ')}` : ''}`)
@@ -391,32 +394,9 @@ export class Studio {
     return lines.join('\n')
   }
 
-  /**
-   * Answers an AI Analyst question with the user's own agent: its model directly when the host
-   * offers sampling, otherwise through its conversation, waiting for the reply.
-   */
-  async ask(question: string, options: { turns?: ChatTurn[], attachment?: NoteAttachment, waitMs?: number } = {}): Promise<string> {
-    const complete = this.agent.completer()
-    if (complete) {
-      this.record({ actor: 'user', tool: 'ask', why: question })
-      const answer = await complete(options.turns?.length ? options.turns : [{ role: 'user', content: question }])
-      this.reply(answer)
-      return answer
-    }
-    const note = this.addNote(question, { kind: 'question', attachment: options.attachment })
-    const name = agentLabel(this.agentName)
-    if (note.delivery === 'queued')
-      return `${name} is not connected to the Studio live, so this question goes to it with its next TinyPivot reply. To ask now, use Copy as prompt in the Studio and paste it into ${name}.`
-    const answer = await this.agent.waitForReply(note.id, options.waitMs ?? ANSWER_WAIT_MS)
-    return answer ?? `${name} is still working on this. Its answer will appear in the Studio trace.`
-  }
-
-  /** The agent's answer to a Studio message: recorded in the trace and handed to whoever waits for it. */
-  reply(text: string, re?: string): TraceStep {
-    const answer = withoutCards(text)
-    const step = this.record({ actor: 'agent', tool: 'reply', why: answer })
-    this.agent.answer(answer, re)
-    return step
+  /** The agent's answer to a Studio message, recorded in the trace where the user reads it. */
+  reply(text: string): TraceStep {
+    return this.record({ actor: 'agent', tool: 'reply', why: withoutCards(text) })
   }
 
   /** Drops a queued note the user no longer wants sent. */

@@ -45,8 +45,6 @@ export interface StudioNote {
   id: string
   at: string
   text: string
-  /** A note asks the agent to do something; a question is from the AI Analyst and expects an answer. */
-  kind: 'note' | 'question'
   stepId?: string
   attachment?: NoteAttachment
   /** `live` when it went straight into the agent's conversation, `queued` when it waits for the next reply. */
@@ -63,5 +61,5 @@ export interface StudioSnapshot {
   /** Ids of the datasets loaded right now, so a step can open its dataset directly. */
   loadedIds: string[]
   /** The agent the Studio talks to, and the ways it reaches it live right now (empty when only queued). */
-  agent: { name?: string, live: string[], busy: boolean }
+  agent: { name?: string, live: string[], busy: boolean, hint?: string }
 }

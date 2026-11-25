@@ -34,7 +34,7 @@ const studioPoints = [
   {
     n: '03',
     title: 'Talk back, with the data',
-    body: 'Send a row, a pivot cell or the whole view with a comment, or ask the AI Analyst. Your own agent answers: pi and Claude Code start on it at once, others with their next TinyPivot reply.',
+    body: 'Send a row, a pivot cell or the whole view with a comment. Your own agent answers in the trace: pi and Claude Code start on it at once, others with their next TinyPivot reply.',
   },
 ] as const
 

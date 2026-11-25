@@ -10,7 +10,8 @@ import { runInitCommand } from './init.js'
 import { createTinyPivotMcpServer, isMcpLicenseKey, loadAppHtml, resolveLicenseKey } from './server.js'
 import { DatasetStore, FREE_TIER_ROW_LIMIT, getPreferencesPath, loadSavedVisualTheme, parseDelimitedText, saveVisualThemePreference } from './store.js'
 import { Studio } from './studio.js'
-import { formatDatasetSummary, formatPivotSummary, formatTerminalChart } from './summary.js'
+import { formatDatasetSummary, formatPivotSummary } from './summary.js'
+import { formatTerminalChart } from './terminal-chart.js'
 import { runTuiCommand } from './tui.js'
 
 function openInBrowser(url: string) {

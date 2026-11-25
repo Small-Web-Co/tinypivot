@@ -6,10 +6,9 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { handleAnalystAction } from '../../packages/mcp/src/analyst-endpoint'
 import { commandEnablesChannel } from '../../packages/mcp/src/claude-channel'
 import { startCompanionServer } from '../../packages/mcp/src/companion'
-import { DuckDbRunner, quoteLiteral } from '../../packages/mcp/src/duckdb'
+import { DuckDbRunner } from '../../packages/mcp/src/duckdb'
 import { HistoryStore } from '../../packages/mcp/src/history'
 import { buildPiExtensionSource } from '../../packages/mcp/src/pi-extension'
 import { DatasetStore } from '../../packages/mcp/src/store'
@@ -42,66 +41,6 @@ describe('sending to the agent', () => {
 
     disconnect()
     expect(studio.snapshot().agent.live).toEqual([])
-  })
-
-  it('answers an analyst question with the agent\'s reply, and records both in the trace', async () => {
-    studio.agent.connect({ name: 'pi', push: (note) => {
-      setTimeout(() => studio.reply('EMEA grew fastest.', note.id), 5)
-      return true
-    } })
-    expect(await studio.ask('Which region grew fastest?')).toBe('EMEA grew fastest.')
-    expect(studio.recentSteps().map(s => [s.actor, s.tool])).toEqual([['user', 'ask'], ['agent', 'reply']])
-  })
-
-  it('uses the host\'s own model when it offers sampling', async () => {
-    const complete = vi.fn(async () => 'Sampled answer')
-    studio.agent.connect({ name: 'sampling', complete })
-    expect(await studio.ask('Why did March drop?', { turns: [{ role: 'user', content: 'Why did March drop?' }] })).toBe('Sampled answer')
-    expect(complete).toHaveBeenCalledOnce()
-  })
-
-  it('says how to reach the agent when nothing connects live', async () => {
-    studio.setAgentName('opencode')
-    const answer = await studio.ask('Which plan churns most?')
-    expect(answer).toContain('OpenCode is not connected to the Studio live')
-    expect(studio.pendingNotes()[0]).toMatchObject({ kind: 'question', text: 'Which plan churns most?' })
-  })
-
-  it('gives up waiting after the limit', async () => {
-    studio.agent.connect({ name: 'pi', push: () => true })
-    expect(await studio.ask('Slow question', { waitMs: 10 })).toContain('still working on this')
-  })
-})
-
-describe('aI Analyst endpoint', () => {
-  it('lists loaded datasets as tables and runs SQL over them', async () => {
-    const csv = path.join(dir, 'orders.csv')
-    fs.writeFileSync(csv, 'region,mrr\nEMEA,10\nAPAC,5\nEMEA,7\n')
-    const { dataset } = await studio.runQuery({ sql: `SELECT * FROM ${quoteLiteral(csv)}`, name: 'Orders', actor: 'agent' })
-
-    const tables = await handleAnalystAction(studio, { action: 'list-tables' })
-    expect(tables.body).toEqual({ tables: [{ name: dataset.id, description: 'Orders: 3 rows' }] })
-    const schemas = await handleAnalystAction(studio, { action: 'get-schema', tables: [dataset.id] })
-    expect(schemas.body).toMatchObject({ schemas: [{ table: dataset.id, columns: [{ name: 'region', type: 'string' }, { name: 'mrr', type: 'number' }] }] })
-
-    const query = await handleAnalystAction(studio, { action: 'query', sql: `SELECT region, sum(mrr) AS mrr FROM ${dataset.id} GROUP BY 1 ORDER BY 2 DESC` })
-    expect(query.body).toMatchObject({ success: true, rowCount: 2, data: [{ region: 'EMEA', mrr: 17 }, { region: 'APAC', mrr: 5 }] })
-    expect((await handleAnalystAction(studio, { action: 'query', sql: 'DROP TABLE x' })).body).toMatchObject({ success: false })
-  }, 30_000)
-
-  it('sends chat to the agent with only the user\'s latest question', async () => {
-    const pushed: string[] = []
-    studio.agent.connect({ name: 'pi', push: (note, text) => {
-      pushed.push(text)
-      setTimeout(() => studio.reply('Sales.', note.id), 5)
-      return true
-    } })
-    const result = await handleAnalystAction(studio, {
-      action: 'chat',
-      messages: [{ role: 'user', content: 'You are a data analyst... (long prompt)' }, { role: 'assistant', content: 'Ready.' }, { role: 'user', content: 'Which channel is biggest?' }],
-    })
-    expect(result.body).toEqual({ content: 'Sales.' })
-    expect(pushed[0]).toBe('Question from the user in TinyPivot Studio: Which channel is biggest?')
   })
 })
 
@@ -144,13 +83,14 @@ describe('pi extension bridge', () => {
     await handlers.get('agent_settled')!({})
     expect(studio.snapshot().agent.busy).toBe(false)
 
-    const answer = studio.ask('Which region is biggest?')
+    expect(studio.addNote('Which region is biggest?').delivery).toBe('live')
     await vi.waitFor(() => expect(sent).toHaveLength(1), { timeout: 3000 })
-    expect(sent[0].content).toContain('Which region is biggest?')
+    expect(sent[0].content).toBe('Message from the user in TinyPivot Studio: Which region is biggest?')
     expect(sent[0].options).toEqual({ triggerTurn: true, deliverAs: 'steer' })
 
+    // The turn the message started ends; its answer lands in the trace.
     await handlers.get('agent_end')!({ messages: [{ role: 'user', content: 'x' }, { role: 'assistant', content: [{ type: 'text', text: 'North America, at 17.1M.' }] }] })
-    expect(await answer).toBe('North America, at 17.1M.')
+    await vi.waitFor(() => expect(studio.recentSteps().at(-1)).toMatchObject({ actor: 'agent', tool: 'reply', why: 'North America, at 17.1M.' }), { timeout: 3000 })
 
     handlers.get('session_shutdown')!({})
     await vi.waitFor(() => expect(studio.snapshot().agent.live).toEqual([]), { timeout: 3000 })
@@ -177,13 +117,13 @@ describe('claude Code channel server', () => {
     expect(client.getInstructions()).toContain('studio_reply')
     expect(studio.snapshot().agent).toEqual({ name: 'Claude Code', live: ['Claude Code channel'], busy: false })
 
-    const answer = studio.ask('Which region is biggest?')
+    studio.addNote('Which region is biggest?')
     await vi.waitFor(() => expect(events).toHaveLength(1))
-    expect(events[0].content).toContain('Question from the user in TinyPivot Studio: Which region is biggest?')
-    expect(events[0].meta.kind).toBe('question')
+    expect(events[0].content).toContain('Message from the user in TinyPivot Studio: Which region is biggest?')
+    expect(events[0].meta.message_id).toMatch(/^note-/)
 
-    await client.callTool({ name: 'studio_reply', arguments: { text: 'North America.', re: events[0].meta.message_id } })
-    expect(await answer).toBe('North America.')
+    await client.callTool({ name: 'studio_reply', arguments: { text: 'North America.' } })
+    expect(studio.recentSteps().at(-1)).toMatchObject({ actor: 'agent', tool: 'reply', why: 'North America.' })
   })
 
   it('offers no reply tool without a channel', async () => {
@@ -208,4 +148,68 @@ describe('agent answers', () => {
     expect(withoutCards(answer)).toBe('Yes, March.\n\nEvery region drops.')
     expect(withoutCards('```text\nplain block\n```')).toBe('```text\nplain block\n```')
   })
+})
+
+describe('pi extension cards', () => {
+  it('make the Studio address in a card a clickable terminal link', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tinypivot-pi-card-'))
+    const file = path.join(dir, 'tinypivot-pi.mjs')
+    fs.writeFileSync(file, ts.transpileModule(buildPiExtensionSource(), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
+    const extension = (await import(pathToFileURL(file).href)).default as (pi: unknown) => void
+    const handlers = new Map<string, (event: unknown, ctx?: unknown) => unknown>()
+    let renderer: ((entry: { data: unknown }) => { render: (width: number) => string[] } | undefined) | undefined
+    const entries: unknown[] = []
+    extension({
+      on: (name: string, fn: (event: unknown, ctx?: unknown) => unknown) => handlers.set(name, fn),
+      registerEntryRenderer: (_type: string, fn: typeof renderer) => { renderer = fn },
+      appendEntry: (_type: string, data: unknown) => entries.push(data),
+      registerCommand: () => {},
+    })
+    const card = ['```text', '╭─ MRR ─────────╮', '│ ↗ Live: http://127.0.0.1:47317 │', '╰───────────────╯', '```'].join('\n')
+    await handlers.get('tool_execution_end')!({ toolName: 'tinypivot_load_file', result: { content: [{ type: 'text', text: card }] } }, { hasUI: true })
+    handlers.get('session_shutdown')!({})
+    const lines = renderer!({ data: entries[0] })!.render(80)
+    expect(lines.join('\n')).toContain('\u001B]8;;http://127.0.0.1:47317\u001B\\http://127.0.0.1:47317\u001B]8;;\u001B\\')
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('pi extension coloured cards', () => {
+  let handle: CompanionServerHandle
+
+  afterEach(async () => {
+    await handle?.close()
+  })
+
+  it('draws cards from codemode in the Studio\'s full colour', async () => {
+    const { formatTerminalChart } = await import('../../packages/mcp/src/terminal-chart')
+    const rows = ['A', 'B'].flatMap(s => ['2026-01', '2026-02', '2026-03'].map((month, i) => ({ month, s, v: i + (s === 'A' ? 1 : 3) })))
+    const chartConfig = { type: 'line' as const, xAxis: { field: 'month', role: 'dimension' as const }, yAxis: { field: 'v', role: 'measure' as const, aggregation: 'sum' as const }, seriesField: { field: 's', role: 'dimension' as const } }
+    const dataset = studio.store.register({ name: 'Trend', source: 'test', rows, viewMode: 'chart', chartConfig })
+    studio.store.setVisualTheme('crt-amber')
+    handle = await startCompanionServer({ store: studio.store, studio, loadHtml: async () => '', licenseKey: 'TP-MCPP-TESTKEY1-20991231' })
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tinypivot-pi-colour-'))
+    const file = path.join(dir, 'tinypivot-pi.mjs')
+    fs.writeFileSync(file, ts.transpileModule(buildPiExtensionSource(), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText)
+    const extension = (await import(pathToFileURL(file).href)).default as (pi: unknown) => void
+    const handlers = new Map<string, (event: unknown, ctx?: unknown) => unknown>()
+    let renderer: ((entry: { data: unknown }) => { render: (width: number) => string[] } | undefined) | undefined
+    const entries: unknown[] = []
+    extension({
+      on: (name: string, fn: (event: unknown, ctx?: unknown) => unknown) => handlers.set(name, fn),
+      registerEntryRenderer: (_type: string, fn: typeof renderer) => { renderer = fn },
+      appendEntry: (_type: string, data: unknown) => entries.push(data),
+      sendMessage: () => {},
+      registerCommand: () => {},
+    })
+    const plainCard = formatTerminalChart(dataset, chartConfig, { companionUrl: handle.url, showBranding: false })
+    await handlers.get('tool_execution_end')!({ toolName: 'codemode', result: { content: [{ type: 'text', text: `Loaded.\n${plainCard}` }] } }, { hasUI: true })
+    handlers.get('session_shutdown')!({})
+
+    const lines = renderer!({ data: entries[0] })!.render(100).join('\n')
+    // The second amber series colour only appears when the Studio coloured the card by series.
+    expect(lines).toContain('\u001B[38;2;255;122;26m')
+    fs.rmSync(dir, { recursive: true, force: true })
+  }, 20_000)
 })

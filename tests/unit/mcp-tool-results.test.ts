@@ -71,6 +71,15 @@ describe('what a data tool hands back depends on whether the host renders the wi
       expect((result.content as Array<{ text: string }>)[0].text).toContain('acme-orders')
     })
 
+    it('tells the model the user already sees the view, so it does not repeat the card', async () => {
+      const client = await connectClient(uiCapabilities)
+      const result = await client.callTool({ name: 'load_data', arguments: LOAD_ARGS })
+      const text = (result.content as Array<{ text: string }>)[0].text
+
+      expect(text).toContain('do not repeat the card')
+      expect(text).not.toContain('Show the card above to the user verbatim.')
+    })
+
     it('keeps the widget-only tools available', async () => {
       const client = await connectClient(uiCapabilities)
       const names = (await client.listTools()).tools.map(tool => tool.name)

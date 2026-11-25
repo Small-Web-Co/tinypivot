@@ -6,10 +6,10 @@ import type { Studio } from './studio.js'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
-import { handleAnalystAction } from './analyst-endpoint.js'
 import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { STUDIO_HEADER } from './studio-protocol.js'
+import { cardTitle, datasetCard } from './summary.js'
 import { getCompanionSessionFile } from './tui.js'
 
 export interface CompanionServerHandle {
@@ -65,7 +65,7 @@ function openAgentStream(studio: Studio, agentName: string, req: http.IncomingMe
     push: (note: StudioNote, text: string) => {
       if (res.writableEnded)
         return false
-      res.write(`event: message\ndata: ${JSON.stringify({ id: note.id, kind: note.kind, text })}\n\n`)
+      res.write(`event: message\ndata: ${JSON.stringify({ id: note.id, text })}\n\n`)
       return true
     },
   })
@@ -75,6 +75,21 @@ function openAgentStream(studio: Studio, agentName: string, req: http.IncomingMe
     clearInterval(keepAlive)
     disconnect()
   })
+}
+
+/** The coloured card of the loaded dataset whose card carries `title`. */
+function colouredCard(store: DatasetStore, title: string, companionUrl: string, isPro: boolean): string | null {
+  if (!title)
+    return null
+  for (const meta of store.listMetadata()) {
+    const dataset = store.get(meta.id)
+    if (!dataset)
+      continue
+    const card = datasetCard(dataset, { colorTheme: store.getVisualTheme(), raw: true, companionUrl, showBranding: !isPro })
+    if (card && cardTitle(card) === title)
+      return card
+  }
+  return null
 }
 
 function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
@@ -229,16 +244,12 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       const text = typeof body.text === 'string' ? body.text.trim() : ''
       if (!text)
         return sendJson(res, 400, { error: 'Send the reply text.' })
-      studio.reply(text.slice(0, 20_000), typeof body.re === 'string' ? body.re : undefined)
+      studio.reply(text.slice(0, 20_000))
       return sendJson(res, 200, { ok: true })
     }
     if (pathname === '/api/studio/agent-status') {
       studio.setAgentBusy(body.busy === true)
       return sendJson(res, 200, { ok: true })
-    }
-    if (pathname === '/api/studio/analyst') {
-      const result = await handleAnalystAction(studio, body)
-      return sendJson(res, result.status, result.body)
     }
     if (pathname === '/api/studio/show') {
       try {
@@ -306,6 +317,13 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       const agentName = (urlObj.searchParams.get('agent') || 'agent').slice(0, 40)
       openAgentStream(studio, agentName, req, res)
       return
+    }
+
+    // The pi extension draws TinyPivot cards; this hands it a card in full colour, found by its title.
+    if (req.method === 'GET' && pathname === '/api/studio/card') {
+      const title = urlObj.searchParams.get('title') ?? ''
+      const ansi = colouredCard(options.store, title, `http://127.0.0.1:${port}`, Boolean(options.licenseKey || options.demoToken))
+      return ansi ? sendJson(res, 200, { ansi }) : sendJson(res, 404, { error: 'No card with that title.' })
     }
 
     if (req.method === 'GET' && pathname === '/api/studio') {

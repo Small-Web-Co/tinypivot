@@ -1,3 +1,4 @@
+export { type TerminalFormatOptions } from './card.js'
 export {
   type CompanionServerHandle,
   type StartCompanionOptions,
@@ -55,12 +56,8 @@ export {
   Studio,
   type StudioQueryInput,
 } from './studio.js'
-export {
-  formatDatasetSummary,
-  formatPivotSummary,
-  formatTerminalChart,
-  type TerminalFormatOptions,
-} from './summary.js'
+export { formatDatasetSummary, formatPivotSummary } from './summary.js'
+export { formatTerminalChart } from './terminal-chart.js'
 export {
   getCompanionSessionFile,
   isProcessAlive,

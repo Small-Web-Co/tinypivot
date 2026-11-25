@@ -1600,13 +1600,11 @@ body,
 
 .tp-studio-agent-tip {
   flex-basis: 100%;
-  overflow: hidden;
   padding: 3px 6px;
   border-radius: var(--tp-radius);
   background: var(--color-background-tertiary, rgba(148, 163, 184, 0.1));
-  font: 10.5px/1.4 var(--tp-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: 10.5px/1.45 var(--tp-mono);
+  overflow-wrap: anywhere;
 }
 
 .tp-studio-attachment .tp-studio-label {

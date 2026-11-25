@@ -447,13 +447,39 @@ async function upsertRuleFile(
   }
 }
 
+/** Where init installs TinyPivot's pi extension. */
+export function piExtensionPath(home = os.homedir()): string {
+  return path.join(home, '.pi', 'agent', 'extensions', 'tinypivot.ts')
+}
+
+const PI_EXTENSION_HEADER = '// Auto-installed by @smallwebco/tinypivot-mcp init'
+
+/**
+ * Brings an installed TinyPivot pi extension up to this version, so the Studio can reach pi
+ * without the user re-running init. Only TinyPivot's own file is touched, and only when it carries
+ * the header init writes; a missing file is left missing. pi loads extensions when a session
+ * starts, so an update takes effect in the next one.
+ */
+export async function refreshPiExtension(extPath = piExtensionPath()): Promise<'current' | 'updated' | 'absent' | 'custom'> {
+  const existing = await exists(extPath) ? await fs.readFile(extPath, 'utf8') : null
+  if (existing === null)
+    return 'absent'
+  if (!existing.startsWith(PI_EXTENSION_HEADER))
+    return 'custom'
+  const next = buildPiExtensionSource()
+  if (existing === next)
+    return 'current'
+  await fs.writeFile(extPath, next, 'utf8')
+  return 'updated'
+}
+
 async function upsertPiExtension(opts: InitOptions): Promise<TargetResult | null> {
   const targeting = opts.targets ? opts.targets.has('pi') : true
   if (!targeting)
     return null
   const home = os.homedir()
   const piDir = path.join(home, '.pi')
-  const extPath = path.join(piDir, 'agent', 'extensions', 'tinypivot.ts')
+  const extPath = piExtensionPath(home)
   const explicit = opts.targets?.has('pi') ?? false
   if (!opts.all && !explicit && !await exists(piDir))
     return null

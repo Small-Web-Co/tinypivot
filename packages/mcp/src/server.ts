@@ -18,14 +18,16 @@ import { z } from 'zod'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList } from './history.js'
+import { refreshPiExtension } from './init.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { Studio } from './studio.js'
-import { detectNonAdditiveSumWarning, formatDatasetSummary, formatPivotSummary, formatTerminalChart } from './summary.js'
+import { formatDatasetSummary, formatPivotSummary } from './summary.js'
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
+import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
 
 export const APP_RESOURCE_URI = 'ui://tinypivot/app.html'
 export const APP_MIME_TYPE = 'text/html;profile=mcp-app'
@@ -39,7 +41,7 @@ const LOAD_DATA_ROW_GUIDE = 50
  */
 export function buildInstructions({ reprintCards = true, claudeChannel = false }: { reprintCards?: boolean, claudeChannel?: boolean } = {}): string {
   const cards = reprintCards
-    ? 'In a terminal, show the returned ```text card verbatim with the Studio link in your reply, except in pi, whose TinyPivot extension already displays it.'
+    ? 'In a terminal, show the returned ```text card verbatim with the Studio link, except in pi, which already shows it. Where TinyPivot shows its view in the chat, never repeat the card.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
@@ -47,7 +49,7 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false }
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     'Pass why on every data call: one short sentence the user sees in the TinyPivot Studio trace. Replies may end with notes the user wrote in the Studio; act on them.',
-    ...(claudeChannel ? ['Messages from TinyPivot Studio arrive as <channel source="tinypivot"> events: do what they ask, then answer with studio_reply, passing the message id as re.'] : []),
+    ...(claudeChannel ? ['Messages from TinyPivot Studio arrive as <channel source="tinypivot"> events: do what they ask, then answer with studio_reply.'] : []),
     cards,
   ].join(' ')
 }
@@ -193,6 +195,14 @@ function normalizePivot(pivotConfig: z.infer<typeof pivotConfigSchema>): Partial
 }
 
 /** Every data tool takes a short reason, shown to the user in the Studio trace. */
+/** What the Studio tells a pi user, by the state of TinyPivot's pi extension. */
+const PI_HINTS: Record<Awaited<ReturnType<typeof refreshPiExtension>>, string | undefined> = {
+  current: undefined,
+  custom: undefined,
+  updated: 'TinyPivot\'s pi extension was just updated. Restart pi to send messages live.',
+  absent: 'Run npx @smallwebco/tinypivot-mcp@latest init --targets=pi, then restart pi, to send messages live.',
+}
+
 /** Explained once in the server instructions, so the schema stays bare. */
 const whyParam = z.string().max(240).optional()
 
@@ -354,7 +364,6 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   }
   const reprintCards = options.reprintCards ?? process.env.TINYPIVOT_REPRINT_CARDS !== '0'
   const claudeChannel = options.claudeChannel ?? claudeChannelEnabled()
-  const cardFormat = { showBranding: !isPro, reprintNote: reprintCards }
   const postgresConfig: PostgresConfig | undefined = options.postgres ?? (
     process.env.DATABASE_URL
       ? {
@@ -382,6 +391,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   )
 
   const clientRendersWidget = () => clientSupportsMcpAppsUi(server.server.getClientCapabilities())
+  /** How cards are written for this host: where it shows the widget, the card is not repeated. */
+  const cardFormat = () => ({ showBranding: !isPro, reprintNote: reprintCards, shownInWidget: clientRendersWidget() })
 
   const resolveCompanionUrlForTool = async (forceCompanion = false): Promise<string | undefined> => {
     if (activeCompanionUrl)
@@ -407,7 +418,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   /** The shared ending of every tool that loads a dataset: the card for the model, the payload for the widget. */
   const replyWithDataset = async (ds: StoredDataset, sessionKey: string, tool: string, note = '') => {
     const liveCompanionUrl = await resolveCompanionUrlForTool()
-    const summaryText = withNotes(`${formatDatasetSummary(ds, liveCompanionUrl, cardFormat)}${note}`)
+    const summaryText = withNotes(`${formatDatasetSummary(ds, liveCompanionUrl, cardFormat())}${note}`)
     const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
     recordTelemetry({
       event: 'tool_call',
@@ -433,30 +444,23 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
 
   /**
    * Lets the Studio reach this agent: into the Claude Code session through a channel when it was
-   * started with one, and with the host's own model when it offers MCP sampling.
+   * started with one.
    */
   const connectAgent = () => {
-    studio.setAgentName(server.server.getClientVersion()?.name)
+    const clientName = server.server.getClientVersion()?.name
+    studio.setAgentName(clientName)
+    if (clientName === 'pi')
+      void refreshPiExtension().then(status => studio.setAgentHint(PI_HINTS[status])).catch(() => {})
+    if (clientName === 'claude-code' && !claudeChannel)
+      studio.setAgentHint('Start Claude Code with --dangerously-load-development-channels server:tinypivot to send messages live.')
     if (claudeChannel) {
       studio.agent.connect({
         name: 'Claude Code channel',
         push: (note, text) => {
-          const content = `${text}\n\nAnswer with studio_reply (re: "${note.id}") so the user sees it in TinyPivot Studio.`
-          server.server.notification({ method: CHANNEL_NOTIFICATION, params: { content, meta: { message_id: note.id, kind: note.kind } } })
+          const content = `${text}\n\nAnswer with studio_reply so the user sees it in TinyPivot Studio.`
+          server.server.notification({ method: CHANNEL_NOTIFICATION, params: { content, meta: { message_id: note.id } } })
             .catch(error => console.error('[tinypivot-mcp] Could not reach the Claude Code channel:', error))
           return true
-        },
-      })
-    }
-    if (server.server.getClientCapabilities()?.sampling) {
-      studio.agent.connect({
-        name: 'sampling',
-        complete: async (turns) => {
-          const result = await server.server.createMessage({
-            messages: turns.map(turn => ({ role: turn.role, content: { type: 'text' as const, text: turn.content } })),
-            maxTokens: 2000,
-          })
-          return result.content.type === 'text' ? result.content.text : ''
         },
       })
     }
@@ -469,10 +473,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       {
         title: 'Reply in TinyPivot Studio',
         description: 'Answer a message from TinyPivot Studio. The user reads it there.',
-        inputSchema: { text: z.string().min(1).max(8000), re: z.string().max(80).optional() },
+        inputSchema: { text: z.string().min(1).max(8000) },
       },
-      async ({ text, re }) => {
-        studio.reply(text, re)
+      async ({ text }) => {
+        studio.reply(text)
         return { content: [{ type: 'text' as const, text: 'Shown in TinyPivot Studio.' }] }
       },
     )
@@ -611,7 +615,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       }
 
       const liveCompanionUrl = await resolveCompanionUrlForTool(Boolean(openBrowser))
-      const summaryText = formatDatasetSummary(ds, liveCompanionUrl, cardFormat)
+      const summaryText = formatDatasetSummary(ds, liveCompanionUrl, cardFormat())
       const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
       recordTelemetry({
         event: 'tool_call',
@@ -759,7 +763,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       }, sessionKey)
 
       const liveCompanionUrl = await resolveCompanionUrlForTool()
-      const summary = withNotes(formatPivotSummary(ds, fullPivotConfig, liveCompanionUrl, cardFormat))
+      const summary = withNotes(formatPivotSummary(ds, fullPivotConfig, liveCompanionUrl, cardFormat()))
       studio.recordDatasetStep(ds, { actor: 'agent', tool: 'configure_pivot', why })
       // Computing the pivot deterministically on the server avoids feeding raw rows back to the LLM
       const pivotTokensSaved = Math.max(0, ds.estimatedDatasetTokens - Math.round(Buffer.byteLength(summary, 'utf8') / 4))

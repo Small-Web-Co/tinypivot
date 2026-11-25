@@ -3,8 +3,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { CHART_THEME_IDS, computePivotResult, processChartData, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
+import { padEndVisual, padStartVisual, truncateVisual, visualWidth } from './card.js'
 import { saveVisualThemePreference } from './store.js'
-import { padEndVisual, padStartVisual, truncateVisual, visualWidth } from './summary.js'
 
 interface TuiPayload {
   datasetId: string
