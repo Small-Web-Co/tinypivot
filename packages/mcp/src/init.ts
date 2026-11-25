@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { EXTENSION_HEADER } from './agent-bridge.js'
 import { buildOpenCodePluginSource } from './opencode-plugin.js'
-import { buildPiExtensionSource } from './pi-extension.js'
+import { buildPiExtensionSource, PI_ENTRY_EXTRAS } from './pi-extension.js'
 import { saveVisualThemePreference } from './store.js'
 
 interface InitOptions {
@@ -42,22 +42,6 @@ const RULE_REPLACE_RE = /<!-- tinypivot(?:-mcp)?:start -->[\s\S]*?<!-- tinypivot
 // one behaviour the server's own instructions cannot guarantee, using TinyPivot at all.
 const RULE_HEADING = '## Charts & pivot tables (TinyPivot MCP)'
 const RULE_USE = 'Whenever an answer shows figures (a ranking, a breakdown by category, a comparison, a trend, a chart or a pivot), present them with the `tinypivot` MCP server instead of a Markdown table or a chart you draw yourself.'
-
-/**
- * pi hides MCP tools behind codemode unless told otherwise, so its model only sees a one-line
- * summary of each server. TinyPivot's data tools are declared directly, with a summary that says
- * when to use them, so tables of figures go through TinyPivot without the user asking.
- */
-export const PI_ENTRY_EXTRAS = {
-  description: 'Show any table of figures, ranking, breakdown, trend, chart or pivot to the user. Use it instead of Markdown tables.',
-  toolExposure: {
-    load_file: 'direct',
-    load_data: 'direct',
-    query: 'direct',
-    configure_chart: 'direct',
-    configure_pivot: 'direct',
-  },
-} as const
 
 export const TINYPIVOT_CLAUDE_RULE_BLOCK = `${RULE_START}
 ${RULE_HEADING}

@@ -32,7 +32,8 @@
     "mysql",
     "postgres",
     "excel",
-    "ai-workflows"
+    "ai-workflows",
+    "pi-package"
   ],
   "exports": {
     ".": {
@@ -42,6 +43,14 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "pi": {
+    "extensions": [
+      "./dist/pi/tinypivot.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
   "bin": {
     "tinypivot-mcp": "./dist/cli.js"
   },
