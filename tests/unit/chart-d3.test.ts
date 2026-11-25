@@ -5,6 +5,7 @@ import type { ChartConfig, ChartThemePreset } from '../../packages/core/src'
 import { describe, expect, it } from 'vitest'
 import {
   buildChartStory,
+  categoryNoun,
   CHART_THEME_IDS,
   CHART_TYPES,
   chartKicker,
@@ -33,6 +34,7 @@ import {
   resolveChartType,
   UNIFIED_THEME_IDS,
 } from '../../packages/core/src'
+import { footerLines } from '../../packages/core/src/d3/chrome'
 
 const measure = (field: string) => ({ field, role: 'measure' as const, aggregation: 'sum' as const })
 const dimension = (field: string) => ({ field, role: 'dimension' as const })
@@ -340,13 +342,13 @@ describe('d3 theme tokens', () => {
 
 describe('slope data and chart stories', () => {
   const rows = [
-    { product: 'Acme Anvil', year: 2025, bookings: 100 },
-    { product: 'Acme Anvil', year: 2026, bookings: 150 },
-    { product: 'Acme Magnet', year: 2025, bookings: 200 },
-    { product: 'Acme Magnet', year: 2026, bookings: 120 },
-    { product: 'Acme Skates', year: 2025, bookings: 0 },
-    { product: 'Acme Skates', year: 2026, bookings: 50 },
-    { product: 'Acme Skates', year: 2024, bookings: 10 },
+    { product: 'Acme Vault', year: 2025, bookings: 100 },
+    { product: 'Acme Vault', year: 2026, bookings: 150 },
+    { product: 'Acme Sync', year: 2025, bookings: 200 },
+    { product: 'Acme Sync', year: 2026, bookings: 120 },
+    { product: 'Acme Seats', year: 2025, bookings: 0 },
+    { product: 'Acme Seats', year: 2026, bookings: 50 },
+    { product: 'Acme Seats', year: 2024, bookings: 10 },
   ]
   const slopeConfig: ChartConfig = { type: 'slope', xAxis: dimension('product'), yAxis: measure('bookings'), seriesField: dimension('year') }
 
@@ -355,7 +357,7 @@ describe('slope data and chart stories', () => {
     expect(slope.from).toBe('2024')
     expect(slope.to).toBe('2026')
     expect(slope.skippedPeriods).toEqual(['2025'])
-    expect(slope.rows.find(r => r.label === 'Acme Skates')).toMatchObject({ start: 10, end: 50 })
+    expect(slope.rows.find(r => r.label === 'Acme Seats')).toMatchObject({ start: 10, end: 50 })
     expect(processChartDataForSlope(rows, { ...slopeConfig, seriesField: undefined })).toBeNull()
   })
 
@@ -366,8 +368,8 @@ describe('slope data and chart stories', () => {
 
   it('writes a slope story naming the biggest riser and faller', () => {
     const story = buildChartStory(rows.filter(r => r.year !== 2024), slopeConfig)!
-    expect(story.headline).toBe('2 of 3 grew from 2025 to 2026; Acme Anvil rose most (+50%), Acme Magnet fell most (-40%)')
-    expect(story.callouts).toEqual(['Acme Anvil', 'Acme Magnet'])
+    expect(story.headline).toBe('2 of 3 grew from 2025 to 2026; Acme Vault rose most (+50%), Acme Sync fell most (-40%)')
+    expect(story.callouts).toEqual(['Acme Vault', 'Acme Sync'])
   })
 
   it('writes map, bullet, radial and hierarchy stories from the same aggregates the charts draw', () => {
@@ -383,8 +385,8 @@ describe('slope data and chart stories', () => {
     const radial = buildChartStory(months, { type: 'radialArea', xAxis: dimension('m'), yAxis: measure('v') })!
     expect(radial.headline).toContain('peak in Feb and bottom out in Apr, 88% lower')
 
-    const tree = buildChartStory(geo, { type: 'treemap', xAxis: dimension('c'), yAxis: measure('v') })!
-    expect(tree.headline).toBe('The top 3 of 3 make up 100% of v')
+    const tree = buildChartStory(geo.map(g => ({ country: g.c, v: g.v })), { type: 'treemap', xAxis: dimension('country'), yAxis: measure('v') })!
+    expect(tree.headline).toBe('The top 3 of 3 countries make up 100% of v')
   })
 
   it('uses a user title as the headline and returns null without data', () => {
@@ -395,18 +397,40 @@ describe('slope data and chart stories', () => {
   })
 
   it('finds a shared word prefix to drop from tight labels', () => {
-    expect(commonLabelPrefix(['Acme Anvil', 'Acme Magnet', 'Acme Skates'])).toBe('Acme ')
-    expect(commonLabelPrefix(['Acme Anvil', 'Acme Magnet'])).toBe('')
-    expect(commonLabelPrefix(['Anvil', 'Magnet', 'Skates'])).toBe('')
-    expect(commonLabelPrefix(['Acme', 'Acme Magnet', 'Acme Skates'])).toBe('')
+    expect(commonLabelPrefix(['Acme Vault', 'Acme Sync', 'Acme Seats'])).toBe('Acme ')
+    expect(commonLabelPrefix(['Acme Vault', 'Acme Sync'])).toBe('')
+    expect(commonLabelPrefix(['Vault', 'Sync', 'Seats'])).toBe('')
+    expect(commonLabelPrefix(['Acme', 'Acme Sync', 'Acme Seats'])).toBe('')
+  })
+})
+
+describe('category nouns', () => {
+  it('pluralises the X field for counts in headlines', () => {
+    const noun = (field: string, n = 3) => categoryNoun({ type: 'bar', xAxis: dimension(field) }, n)
+    expect(noun('product')).toBe('products')
+    expect(noun('country')).toBe('countries')
+    expect(noun('sales')).toBe('sales')
+    expect(noun('box')).toBe('boxes')
+    expect(noun('product', 1)).toBe('product')
+  })
+})
+
+describe('deck footer', () => {
+  const story = { kicker: 'k', headline: 'h', dek: 'd', footnote: 'Bookings: sum of bookings', callouts: [] }
+  it('puts the note then the source with row count, consulting style', () => {
+    expect(footerLines({ story, source: 'acme.csv', rows: 1200, notes: [], variant: 'deck' })).toEqual(['Note: Bookings: sum of bookings', 'Source: acme.csv; 1,200 rows'])
+    expect(footerLines({ story, footnote: 'Excludes refunds', rows: 5, notes: ['1 label not found'], variant: 'deck' })).toEqual(['Note: Excludes refunds', 'Source: 5 rows', '1 label not found'])
+  })
+  it('keeps the editorial footer on one source line with an optional note', () => {
+    expect(footerLines({ story, source: 'acme.csv', footnote: 'Excludes refunds', rows: 5, notes: [] })).toEqual(['Source: acme.csv · Bookings: sum of bookings · 5 rows', 'Note: Excludes refunds'])
   })
 })
 
 describe('house style', () => {
   const rows = [
-    { product: 'Acme Anvil', bookings: 1_250_000 },
-    { product: 'Acme Magnet', bookings: 340_000 },
-    { product: 'Acme Skates', bookings: 90_000 },
+    { product: 'Acme Vault', bookings: 1_250_000 },
+    { product: 'Acme Sync', bookings: 340_000 },
+    { product: 'Acme Seats', bookings: 90_000 },
   ]
   const config: ChartConfig = {
     type: 'radialBar',
@@ -418,7 +442,7 @@ describe('house style', () => {
   it('adds a kicker naming the measure and a footnote saying how it was computed', () => {
     const story = buildChartStory(rows, config)!
     expect(story.kicker).toBe('Bookings by product')
-    expect(story.footnote).toBe('Bookings: sum of bookings · 3 rows')
+    expect(story.footnote).toBe('Bookings: sum of bookings')
   })
 
   it('names target and parent fields in the kicker', () => {
@@ -427,7 +451,7 @@ describe('house style', () => {
   })
 
   it('formats headline numbers in the chart value format', () => {
-    expect(buildChartStory(rows, config)!.headline).toBe('Acme Anvil leads: 74% of bookings across 3')
+    expect(buildChartStory(rows, config)!.headline).toBe('Acme Vault leads: 74% of bookings across 3 products')
     const bullet = buildChartStory(rows, { ...config, type: 'bullet' })!
     expect(bullet.headline).toContain('$1.3M')
   })

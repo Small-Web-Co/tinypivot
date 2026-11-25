@@ -20,7 +20,13 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
 const galleryData = { acme: generateAcmeBookings(), running: generateRunningLog() }
 const galleryChartId = ref(galleryCharts[0].id)
 const galleryTheme = ref(theme.value)
+const galleryVariant = ref<'editorial' | 'deck'>('editorial')
 const galleryChart = computed(() => galleryCharts.find(c => c.id === galleryChartId.value) ?? galleryCharts[0])
+// The chosen style goes into the chart options, as a host app would set it.
+const galleryConfig = computed(() => ({
+  ...galleryChart.value.config,
+  options: { ...galleryChart.value.config.options, variant: galleryVariant.value },
+}))
 </script>
 
 <template>
@@ -143,6 +149,13 @@ const galleryChart = computed(() => galleryCharts.find(c => c.id === galleryChar
             </button>
           </div>
           <label class="demo-select">
+            <span class="label">Style</span>
+            <select v-model="galleryVariant">
+              <option value="editorial">Editorial</option>
+              <option value="deck">Deck</option>
+            </select>
+          </label>
+          <label class="demo-select">
             <span class="label">Theme</span>
             <select v-model="galleryTheme">
               <option v-for="t in themeChoices" :key="t.value" :value="t.value">{{ t.label }}</option>
@@ -154,13 +167,13 @@ const galleryChart = computed(() => galleryCharts.find(c => c.id === galleryChar
           <div class="demo-frame gallery-frame" :data-gallery-chart="galleryChart.id">
             <DataGrid
               v-if="isMounted"
-              :key="galleryChart.id"
+              :key="`${galleryChart.id}-${galleryVariant}`"
               :data="galleryData[galleryChart.data]"
               :show-pivot="true"
               view-mode="chart"
               font-size="sm"
               :theme="galleryTheme"
-              :chart-config="galleryChart.config"
+              :chart-config="galleryConfig"
             />
           </div>
         </RetroWindow>

@@ -85,7 +85,7 @@ export function mountD3Chart(container: HTMLElement, initial: D3ChartSpec, onSta
   let story = storyFor(spec)
 
   function render(): void {
-    chrome.renderHeader(story, spec.theme)
+    chrome.renderHeader(story, spec.theme, spec.config.options?.variant)
     const width = svgNode.clientWidth || container.clientWidth
     const height = svgNode.clientHeight || container.clientHeight
     // A hidden or collapsed container keeps the last drawing; the resize observer redraws when it opens.
@@ -119,7 +119,8 @@ export function mountD3Chart(container: HTMLElement, initial: D3ChartSpec, onSta
       if (ctx.isStale())
         return
       chrome.renderKey(ctx.key, spec.theme)
-      chrome.renderFooter({ story, source: spec.config.options?.source, notes: ctx.notes }, spec.theme)
+      const options = spec.config.options ?? {}
+      chrome.renderFooter({ story, source: options.source, footnote: options.footnote, rows: spec.data.length, notes: ctx.notes, variant: options.variant }, spec.theme)
       onStatus?.({ notes: ctx.notes })
     }
     const drawer = DRAWERS[spec.config.type]

@@ -10,25 +10,39 @@ import { processChartDataForSlope } from '../chart/d3-data'
 import { applyGlow, bindTooltip, compact, formatValue, isCallout, labelTrimmer, styleText, TRANSITION_MS, truncate } from './context'
 
 const MARGIN = { top: 26, bottom: 12 }
-const MIN_LABEL_GAP = 13
+const MIN_LABEL_GAP = 15
 const MAX_LINES = 40
 
-/** Spread label y positions so none sit closer than `gap`, keeping their order. */
-export function spreadLabels(ys: number[], gap: number, min: number, max: number): number[] {
-  const order = ys.map((y, i) => ({ y, i })).sort((a, b) => a.y - b.y)
-  const placed = order.map(o => o.y)
-  for (let k = 1; k < placed.length; k++)
-    placed[k] = Math.max(placed[k], placed[k - 1] + gap)
-  const overflow = placed.length ? placed.at(-1)! - max : 0
-  if (overflow > 0) {
-    placed[placed.length - 1] -= overflow
-    for (let k = placed.length - 2; k >= 0; k--)
-      placed[k] = Math.min(placed[k], placed[k + 1] - gap)
+export interface LabelSlot {
+  /** Where the label wants to sit (its point) */
+  y: number
+  /** Higher places first; ties keep input order */
+  priority: number
+  /** How far the label may move off its point */
+  reach: number
+}
+
+/**
+ * Greedy label placement: the most important labels take their own spot
+ * first; each later label takes the nearest free spot within its reach, or is
+ * dropped (`null`) rather than crowding the others. The line stays, and its
+ * tooltip still names it.
+ */
+export function placeLabels(slots: LabelSlot[], gap: number, min: number, max: number): Array<number | null> {
+  const order = slots.map((slot, i) => ({ ...slot, i })).sort((a, b) => b.priority - a.priority || a.i - b.i)
+  const taken: number[] = []
+  const out: Array<number | null> = slots.map(() => null)
+  const free = (y: number): boolean => y >= min && y <= max && taken.every(t => Math.abs(t - y) >= gap)
+  for (const slot of order) {
+    for (let d = 0; d <= slot.reach; d += 1) {
+      const candidate = [slot.y + d, slot.y - d].find(free)
+      if (candidate !== undefined) {
+        taken.push(candidate)
+        out[slot.i] = candidate
+        break
+      }
+    }
   }
-  const out = ys.map(() => 0)
-  order.forEach((o, k) => {
-    out[o.i] = Math.max(min, placed[k])
-  })
   return out
 }
 
@@ -53,18 +67,34 @@ function lineColour(ctx: DrawContext, row: SlopeRow): string {
 
 function drawSide(ctx: DrawContext, g: Group, rows: SlopeRow[], side: 'left' | 'right', x: number, y: (v: number) => number, short: (l: string) => string, labelWidth: number): void {
   const values = rows.map(r => (side === 'left' ? r.start : r.end))
-  const ys = spreadLabels(values.map(y), MIN_LABEL_GAP, MARGIN.top, ctx.height - MARGIN.bottom)
+  // Called-out lines always get a label (and may move further); the rest by size, until space runs out.
+  const slots = rows.map((row, i) => isCallout(ctx, row.label)
+    ? { y: y(values[i]), priority: Number.MAX_SAFE_INTEGER, reach: MIN_LABEL_GAP * 4 }
+    : { y: y(values[i]), priority: values[i], reach: MIN_LABEL_GAP * 0.75 })
+  const ys = placeLabels(slots, MIN_LABEL_GAP, MARGIN.top, ctx.height - MARGIN.bottom)
+  const dir = side === 'left' ? -1 : 1
   rows.forEach((row, i) => {
+    const labelY = ys[i]
+    if (labelY === null)
+      return
     const called = isCallout(ctx, row.label)
+    const pointY = y(values[i])
+    // A leader from the point when the label had to move.
+    if (Math.abs(labelY - pointY) > 2) {
+      g.append('path')
+        .attr('d', `M${x + dir * 4},${pointY} L${x + dir * 10},${labelY}`)
+        .attr('fill', 'none')
+        .attr('stroke', ctx.theme.muted)
+        .attr('stroke-width', 0.75)
+    }
     const text = side === 'left'
       ? `${truncate(short(row.label), labelWidth)}  ${compact(ctx, row.start)}`
       : `${compact(ctx, row.end)}  ${truncate(short(row.label), labelWidth)}${called ? `  ${changeText(row)}` : ''}`
-    styleText(g.append('text'), ctx, { size: 11, color: called ? lineColour(ctx, row) : ctx.theme.ink, weight: called ? 700 : 400 })
-      .attr('x', side === 'left' ? x - 8 : x + 8)
-      .attr('y', ys[i])
+    styleText(g.append('text'), ctx, { size: called ? 12 : 11, color: called ? lineColour(ctx, row) : ctx.theme.ink, weight: called ? 700 : 400 })
+      .attr('x', x + dir * 12)
+      .attr('y', labelY)
       .attr('text-anchor', side === 'left' ? 'end' : 'start')
       .attr('dominant-baseline', 'central')
-      .attr('opacity', called || rows.length <= 12 ? 1 : 0.75)
       .text(text)
   })
 }

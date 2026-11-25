@@ -11,7 +11,6 @@ import { applyGlow, bindTooltip, compact, emphasisFill, formatValue, haloText, i
 
 /** Most categories a radial chart draws before labels collide. */
 export const RADIAL_MAX_CATEGORIES = 60
-const LABEL_SPACE = 76
 
 interface Layout {
   center: Group
@@ -19,13 +18,45 @@ interface Layout {
   inner: number
 }
 
-function layout(ctx: DrawContext, innerRatio: number): Layout {
-  const legendSpace = ctx.config.seriesField ? 22 : 0
-  const room = Math.min(ctx.width, ctx.height - legendSpace) / 2
-  // Short charts give labels less room so the rings stay readable.
-  const outer = Math.max(20, room - (room < 170 ? LABEL_SPACE / 3 : LABEL_SPACE / 2))
-  const center = ctx.svg.append('g').attr('transform', `translate(${ctx.width / 2}, ${(ctx.height + legendSpace) / 2})`)
+function layout(ctx: DrawContext, innerRatio: number, labelSpace: number): Layout {
+  const room = Math.min(ctx.width, ctx.height) / 2
+  // In short panels the rings keep at least 60% of the room; long labels then use the margin.
+  const outer = Math.max(20, room - labelSpace, room * 0.6)
+  const center = ctx.svg.append('g').attr('transform', `translate(${ctx.width / 2}, ${ctx.height / 2})`)
   return { center, outer, inner: outer * innerRatio }
+}
+
+/** Longest line a wrapped label may have, in characters. */
+const WRAP_CHARS = 11
+
+/** Split a label into at most two lines at a space; a single long word is truncated instead. */
+export function wrapLabel(label: string, maxChars = WRAP_CHARS): string[] {
+  if (label.length <= maxChars)
+    return [label]
+  const words = label.split(' ')
+  let first = ''
+  while (words.length > 1 && `${first} ${words[0]}`.trim().length <= maxChars)
+    first = `${first} ${words.shift()}`.trim()
+  if (!first)
+    return [truncate(label, maxChars * 6.6, 11)]
+  const rest = words.join(' ')
+  return [first, rest.length > maxChars ? `${rest.slice(0, maxChars - 1)}…` : rest]
+}
+
+interface AngleLabels {
+  lines: string[][]
+  size: number
+  /** Pixels the labels need outside the outermost ring */
+  space: number
+}
+
+/** Prepare category labels: drop a shared prefix, wrap long names, size down when crowded. */
+function angleLabels(labels: string[]): AngleLabels {
+  const short = labelTrimmer(labels)
+  const size = labels.length > 24 ? 9 : labels.length > 14 ? 10 : 11
+  const lines = labels.map(l => wrapLabel(short(l)))
+  const widest = Math.max(...lines.flat().map(l => l.length)) * size * 0.58
+  return { lines, size, space: Math.min(96, widest + 14) }
 }
 
 function limitCategories(ctx: DrawContext, chart: ChartData): ChartData {
@@ -54,21 +85,22 @@ function drawRings(ctx: DrawContext, g: Group, radius: (v: number) => number, ti
   }
 }
 
-/** Category labels around the circle, rotated to read outward. */
-function drawAngleLabels(ctx: DrawContext, g: Group, labels: string[], angleOf: (i: number) => number, radius: number, skip: ReadonlySet<string> = new Set()): void {
-  const size = labels.length > 24 ? 9 : 11
-  const short = labelTrimmer(labels)
+/** Category labels around the circle, rotated to read outward; long names wrap to two lines. */
+function drawAngleLabels(ctx: DrawContext, g: Group, labels: string[], prepared: AngleLabels, angleOf: (i: number) => number, radius: number): void {
   labels.forEach((label, i) => {
-    if (skip.has(label))
-      return
-    const angle = angleOf(i)
-    const deg = (angle * 180) / Math.PI - 90
+    const deg = (angleOf(i) * 180) / Math.PI - 90
     const flip = deg > 90 && deg < 270
-    styleText(g.append('text'), ctx, { size, color: ctx.theme.ink, weight: isCallout(ctx, label) ? 700 : 400 })
+    const lines = prepared.lines[i]
+    const text = styleText(g.append('text'), ctx, { size: prepared.size, color: ctx.theme.ink, weight: isCallout(ctx, label) ? 700 : 400 })
       .attr('transform', `rotate(${deg}) translate(${radius + 6}, 0)${flip ? ' rotate(180)' : ''}`)
       .attr('text-anchor', flip ? 'end' : 'start')
       .attr('dominant-baseline', 'central')
-      .text(truncate(short(label), LABEL_SPACE - 8, size))
+    lines.forEach((line, k) => {
+      text.append('tspan')
+        .attr('x', 0)
+        .attr('dy', k === 0 ? `${-(lines.length - 1) * 0.55}em` : '1.1em')
+        .text(line)
+    })
   })
 }
 
@@ -117,7 +149,8 @@ export function drawRadialBar(ctx: DrawContext): void {
   const chart = limitCategories(ctx, processChartData(ctx.data, ctx.config))
   if (chart.categories.length === 0)
     return
-  const { center, outer, inner } = layout(ctx, 0.28)
+  const prepared = angleLabels(chart.categories)
+  const { center, outer, inner } = layout(ctx, 0.28, prepared.space)
   const points = stackPoints(chart)
   const max = Math.max(1, ...points.map(p => p.y1))
   const angle = scaleBand().domain(chart.categories).range([0, 2 * Math.PI]).paddingInner(0.12)
@@ -151,7 +184,7 @@ export function drawRadialBar(ctx: DrawContext): void {
     haloText(center, ctx, Math.cos(mid) * r, Math.sin(mid) * r, compact(ctx, top), { anchor: 'middle', size: 11, mono: true, weight: 700 })
   }
 
-  drawAngleLabels(ctx, center, chart.categories, i => angle(chart.categories[i])! + angle.bandwidth() / 2, outer)
+  drawAngleLabels(ctx, center, chart.categories, prepared, i => angle(chart.categories[i])! + angle.bandwidth() / 2, outer)
   seriesKey(ctx, chart.series.map(s => s.name), i => emphasisFill(ctx, '', i))
 }
 
@@ -159,45 +192,67 @@ export function drawRadialBar(ctx: DrawContext): void {
  * Name a series on its own line instead of a legend: at the series' widest
  * point, nudged off the dot. Skipped for a single series (the kicker names it).
  */
-function labelSeries(ctx: DrawContext, g: Group, series: ChartData['series'][number], index: number, angleOf: (i: number) => number, radius: (v: number) => number, color: string): void {
-  if (!ctx.config.seriesField)
+/**
+ * Where to name each series: the spoke where the lines sit furthest apart,
+ * away from the peak callout. The larger series is named just outside its line,
+ * the others just inside, so the names never stack.
+ */
+export function seriesLabelSpoke(series: Array<{ data: number[] }>, avoid: number): number {
+  const n = series[0]?.data.length ?? 0
+  let best = 0
+  let bestGap = -1
+  for (let i = 0; i < n; i++) {
+    const values = series.map(s => s.data[i] ?? 0)
+    const gap = Math.max(...values) - Math.min(...values)
+    const near = Math.min(Math.abs(i - avoid), n - Math.abs(i - avoid)) <= 1
+    if (!near && gap > bestGap) {
+      best = i
+      bestGap = gap
+    }
+  }
+  return best
+}
+
+function labelSeries(ctx: DrawContext, g: Group, chart: ChartData, at: number, angleOf: (i: number) => number, radius: (v: number) => number, outer: number, colorOf: (si: number) => string): void {
+  if (!ctx.config.seriesField || chart.series.length < 2)
     return
-  const at = series.data.indexOf(Math.max(...series.data))
-  const a = angleOf(at) - Math.PI / 2 + (index % 2 ? -0.18 : 0.18)
-  const r = radius(Math.max(0, series.data[at])) - 14
-  haloText(g, ctx, Math.cos(a) * r, Math.sin(a) * r, series.name, { anchor: 'middle', size: 11, weight: 700, color })
+  const a = angleOf(at) - Math.PI / 2
+  const radii = chart.series.map(s => radius(Math.max(0, s.data[at] ?? 0)))
+  const big = Math.max(...radii)
+  const small = Math.min(...radii)
+  chart.series.forEach((series, si) => {
+    let r = radii[si] - 14
+    if (radii[si] === big && big !== small) {
+      // Between the lines when they are far enough apart, else outside if that clears the month labels.
+      if (big - small >= 26)
+        r = (big + small) / 2
+      else if (big + 16 < outer - 10)
+        r = big + 14
+      else
+        r = small - 30
+    }
+    haloText(g, ctx, Math.cos(a) * r, Math.sin(a) * r, series.name, { anchor: 'middle', size: 11, weight: 700, color: colorOf(si) })
+  })
 }
 
 /** Peak and trough callouts on the outermost series, pointing outward from the centre. */
-function annotatePeaks(ctx: DrawContext, g: Group, chart: ChartData, angleOf: (i: number) => number, radius: (v: number) => number): Set<string> {
+function annotatePeaks(ctx: DrawContext, g: Group, chart: ChartData, angleOf: (i: number) => number, radius: (v: number) => number): void {
   const [peak, trough] = ctx.story?.callouts ?? []
   // Position at the outermost series; label with the combined total, as the headline counts it.
   const outerMost = chart.categories.map((_, i) => Math.max(...chart.series.map(s => s.data[i] ?? 0)))
   const totals = chart.categories.map((_, i) => chart.series.reduce((sum, s) => sum + (s.data[i] ?? 0), 0))
   const notes: Array<[string | undefined, string]> = [[peak, 'Peak'], [trough, 'Low']]
-  const annotated = new Set<string>()
   for (const [label, word] of notes) {
     const i = label === undefined ? -1 : chart.categories.indexOf(label)
-    if (i < 0)
-      continue
-    const a = angleOf(i) - Math.PI / 2
-    const r0 = radius(Math.max(0, outerMost[i]))
+    const r0 = i < 0 ? 0 : radius(Math.max(0, outerMost[i]))
     // A low point near the centre has no room for a callout; the headline already names it.
     if (r0 < 60)
       continue
-    annotated.add(label!)
-    const r1 = r0 + 18
-    g.append('line')
-      .attr('x1', Math.cos(a) * (r0 + 4))
-      .attr('y1', Math.sin(a) * (r0 + 4))
-      .attr('x2', Math.cos(a) * r1)
-      .attr('y2', Math.sin(a) * r1)
-      .attr('stroke', ctx.theme.ink)
-      .attr('stroke-width', 1)
-    const right = Math.cos(a) >= 0
-    haloText(g, ctx, Math.cos(a) * (r1 + 3), Math.sin(a) * (r1 + 3), `${word} · ${label} · ${compact(ctx, totals[i])}`, { anchor: right ? 'start' : 'end', size: 11, weight: 700 })
+    const a = angleOf(i) - Math.PI / 2
+    const r = r0 - 22
+    haloText(g, ctx, Math.cos(a) * r, Math.sin(a) * r - 6, word, { anchor: 'middle', size: 10, weight: 700 })
+    haloText(g, ctx, Math.cos(a) * r, Math.sin(a) * r + 7, compact(ctx, totals[i]), { anchor: 'middle', size: 11, mono: true, weight: 700 })
   }
-  return annotated
 }
 
 export function drawRadialArea(ctx: DrawContext): void {
@@ -207,7 +262,8 @@ export function drawRadialArea(ctx: DrawContext): void {
     ctx.notes.push('A radial area needs at least 3 categories; try Bar or Line for fewer.')
     return
   }
-  const { center, outer, inner } = layout(ctx, 0.08)
+  const prepared = angleLabels(chart.categories)
+  const { center, outer, inner } = layout(ctx, 0.08, prepared.space)
   const max = Math.max(1, ...chart.series.flatMap(s => s.data))
   const radius = scaleLinear().domain([0, max]).range([inner, outer]).nice()
   const angleOf = (i: number): number => (i / n) * 2 * Math.PI
@@ -247,8 +303,10 @@ export function drawRadialArea(ctx: DrawContext): void {
       .attr('d', line(series.data))
     const dots = layer.append('g').selectAll('circle').data(series.data.map((value, i) => ({ value, i }))).join('circle').attr('class', 'vpg-d3-mark').attr('r', 3.5).attr('cx', d => Math.cos(angleOf(d.i) - Math.PI / 2) * radius(Math.max(0, d.value))).attr('cy', d => Math.sin(angleOf(d.i) - Math.PI / 2) * radius(Math.max(0, d.value))).attr('fill', stroke).attr('stroke', ctx.theme.surface).attr('stroke-width', 1.5)
     bindTooltip(dots, ctx, d => ({ title: chart.categories[d.i], lines: [`${series.name}: ${formatValue(ctx, d.value)}`] }))
-    labelSeries(ctx, center, series, si, angleOf, radius, isLit ? stroke : ctx.theme.muted)
   }
-  const annotated = annotatePeaks(ctx, center, chart, angleOf, radius)
-  drawAngleLabels(ctx, center, chart.categories, angleOf, outer, annotated)
+  annotatePeaks(ctx, center, chart, angleOf, radius)
+  const peakIndex = chart.categories.indexOf(ctx.story?.callouts[0] ?? '')
+  const seriesColour = (si: number): string => (ctx.theme.fillMode === 'pattern' || si === lit || !highlight ? ctx.theme.ink : ctx.theme.muted)
+  labelSeries(ctx, center, chart, seriesLabelSpoke(chart.series, peakIndex), angleOf, radius, outer, si => (si === lit && highlight && ctx.theme.fillMode !== 'pattern' ? ctx.theme.accent : seriesColour(si)))
+  drawAngleLabels(ctx, center, chart.categories, prepared, angleOf, outer)
 }

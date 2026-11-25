@@ -27,15 +27,15 @@ const COUNTRIES = [
 
 const STATES = ['CA', 'TX', 'NY', 'FL', 'WA', 'IL', 'MA', 'CO', 'GA', 'AZ', 'OR', 'NC', 'MN', 'OH', 'PA', 'UT']
 const PRODUCTS = [
-  ['Acme Rocket Skates', 'Hardware'],
-  ['Acme Anvil', 'Hardware'],
-  ['Acme Giant Magnet', 'Hardware'],
-  ['Acme Portable Hole', 'Software'],
-  ['Acme Earthquake Pills', 'Software'],
-  ['Acme Batman Outfit', 'Services'],
-  ['Acme Jet Bike', 'Services'],
-  ['Acme Bird Seed', 'Supplies'],
-  ['Acme Dehydrated Boulders', 'Supplies'],
+  ['Acme Analytics Pro', 'Platform'],
+  ['Acme Vault', 'Platform'],
+  ['Acme Sync', 'Platform'],
+  ['Acme Seats', 'Licences'],
+  ['Acme Forms', 'Licences'],
+  ['Acme Onboarding', 'Services'],
+  ['Acme Support Plus', 'Services'],
+  ['Acme Connect', 'Add-ons'],
+  ['Acme Ledger', 'Add-ons'],
 ] as const
 /** 2026 vs 2025 growth per product, so the slope chart has winners and losers. */
 const PRODUCT_GROWTH = [1.38, 0.82, 1.12, 1.05, 0.67, 1.24, 0.94, 1.51, 1.02]
@@ -130,7 +130,7 @@ export const galleryCharts: GalleryChart[] = [
   { id: 'world', label: 'World map', data: 'acme', config: { type: 'choropleth', xAxis: dim('country', 'Country'), yAxis: sum('bookings', 'Bookings'), options: ACME_SOURCE } },
   { id: 'regions', label: 'Sales regions', data: 'acme', config: { type: 'choropleth', xAxis: dim('salesRegion', 'Sales region'), yAxis: sum('bookings', 'Bookings'), options: ACME_SOURCE } },
   { id: 'states', label: 'US states', data: 'acme', config: { type: 'choropleth', xAxis: dim('state', 'State'), yAxis: sum('bookings', 'Bookings'), options: ACME_SOURCE } },
-  { id: 'bullet', label: 'Bullet', data: 'acme', config: { type: 'bullet', xAxis: dim('rep', 'Rep'), yAxis: sum('bookings', 'Bookings'), targetField: sum('quota', 'Quota'), options: ACME_SOURCE } },
+  { id: 'bullet', label: 'Bullet', data: 'acme', config: { type: 'bullet', xAxis: dim('rep', 'Rep'), yAxis: sum('bookings', 'Bookings'), targetField: sum('quota', 'Quota'), options: { ...ACME_SOURCE, footnote: 'Quota is each rep\'s booked-deal target; 2025 and 2026 combined.' } } },
   { id: 'radialBar', label: 'Radial bar', data: 'acme', config: { type: 'radialBar', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year'), options: ACME_SOURCE } },
   { id: 'radialArea', label: 'Radial area', data: 'acme', config: { type: 'radialArea', xAxis: dim('month', 'Month'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year'), options: ACME_SOURCE } },
   { id: 'slope', label: 'Slope', data: 'acme', config: { type: 'slope', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year'), options: ACME_SOURCE } },

@@ -523,6 +523,14 @@ export interface ChartOptions {
   emphasis?: 'highlight' | 'palette'
   /** Source line under D3 charts, e.g. a file or dataset name */
   source?: string
+  /** Optional note under D3 charts ("Note: …"), e.g. a definition or caveat */
+  footnote?: string
+  /**
+   * D3 charts: `'editorial'` (default) sets the title in the theme's display
+   * face with a dek; `'deck'` is for consulting slides: plain action title,
+   * no dek, and "Note:" / "Source:" lines under the chart.
+   */
+  variant?: 'editorial' | 'deck'
 }
 
 /** Information about a field for chart building */

@@ -15,7 +15,7 @@ export interface ChartStory {
   kicker: string
   headline: string
   dek: string
-  /** How the numbers were computed, for the footnote: "Bookings: sum of bookings · 1,200 rows" */
+  /** How the numbers were computed, for the footnote: "Bookings: sum of bookings" */
   footnote: string
   /** Category / region labels the chart should annotate, most important first */
   callouts: string[]
@@ -27,6 +27,17 @@ function measureNoun(config: ChartConfig): string {
   if (!field)
     return 'value'
   return (field.label || formatFieldLabel(field.field)).toLowerCase()
+}
+
+/** "products", "countries", "categories": the X field as a plural noun for counts in headlines. */
+export function categoryNoun(config: ChartConfig, count: number): string {
+  const field = config.xAxis
+  const word = field ? (field.label || formatFieldLabel(field.field)).toLowerCase() : 'item'
+  if (count === 1 || word.endsWith('s'))
+    return word
+  if (/[^aeiou]y$/.test(word))
+    return `${word.slice(0, -1)}ies`
+  return /(?:x|ch|sh)$/.test(word) ? `${word}es` : `${word}s`
 }
 
 function pct(part: number, whole: number): string {
@@ -126,7 +137,7 @@ function radialBarStory(data: Record<string, unknown>[], config: ChartConfig): S
   const total = ranked.reduce((sum, r) => sum + r.value, 0)
   const [top] = ranked
   return {
-    headline: `${top.label} leads: ${pct(top.value, total)} of ${measureNoun(config)} across ${ranked.length}`,
+    headline: `${top.label} leads: ${pct(top.value, total)} of ${measureNoun(config)} across ${ranked.length} ${categoryNoun(config, ranked.length)}`,
     dek: config.seriesField ? `Each bar stacks ${formatFieldLabel(config.seriesField.field).toLowerCase()}; longer is more.` : 'Longer bars are larger; sorted clockwise from the top.',
     callouts: [top.label],
   }
@@ -177,7 +188,7 @@ function hierarchyStory(data: Record<string, unknown>[], config: ChartConfig): S
   const topN = Math.min(3, ranked.length)
   const share = pct(ranked.slice(0, topN).reduce((s, b) => s + sizeOf(b), 0), total)
   return {
-    headline: `The top ${topN} of ${ranked.length} make up ${share} of ${noun}`,
+    headline: `The top ${topN} of ${ranked.length} ${categoryNoun(config, ranked.length)} make up ${share} of ${noun}`,
     dek: `Area is ${noun}.`,
     callouts: ranked.slice(0, topN).map(b => b.name),
   }
@@ -235,14 +246,13 @@ export function chartKicker(config: ChartConfig): string {
   return `${measure} by ${dimension}`
 }
 
-/** How the numbers were computed, in one line. */
-export function chartFootnote(data: Record<string, unknown>[], config: ChartConfig): string {
+/** How the numbers were computed, in one line: "Bookings: sum of bookings · Quota: sum of quota". */
+export function chartFootnote(config: ChartConfig): string {
   const parts: string[] = []
   const describe = (field: ChartConfig['yAxis']): string => `${fieldName(field)}: ${field!.aggregation ?? 'sum'} of ${field!.field}`
   parts.push(describe(config.yAxis))
   if (config.targetField)
     parts.push(describe(config.targetField))
-  parts.push(`${data.length.toLocaleString('en-US')} rows`)
   return parts.join(' · ')
 }
 
@@ -261,6 +271,6 @@ export function buildChartStory(data: Record<string, unknown>[], config: ChartCo
     ...body,
     headline: config.options?.title || body.headline,
     kicker: chartKicker(config),
-    footnote: chartFootnote(data, config),
+    footnote: chartFootnote(config),
   }
 }

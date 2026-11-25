@@ -7,7 +7,8 @@ import type { D3ChartSpec } from '../../packages/core/src/d3'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { getChartLook, getD3ChartTheme, UNIFIED_THEME_IDS } from '../../packages/core/src'
 import { loadMapShapes, mountD3Chart } from '../../packages/core/src/d3'
-import { spreadLabels } from '../../packages/core/src/d3/slope'
+import { seriesLabelSpoke, wrapLabel } from '../../packages/core/src/d3/radial'
+import { placeLabels } from '../../packages/core/src/d3/slope'
 
 const dim = (field: string) => ({ field, role: 'dimension' as const })
 const sum = (field: string) => ({ field, role: 'measure' as const, aggregation: 'sum' as const })
@@ -16,7 +17,7 @@ const ROWS = ['France', 'Germany', 'Brazil', 'Japan'].flatMap((country, i) =>
   ['Jan', 'Feb', 'Mar', 'Apr'].flatMap(month => [2025, 2026].map(year => ({
     country,
     rep: `Rep ${i}`,
-    product: `Acme Item ${i}`,
+    product: `Acme Plan ${i}`,
     category: i % 2 ? 'Hardware' : 'Software',
     month,
     year,
@@ -149,13 +150,38 @@ describe('d3 renderer', () => {
   })
 })
 
-describe('slope label spreading', () => {
-  it('keeps order and a minimum gap, and stays inside the plot', () => {
-    const ys = spreadLabels([100, 101, 102, 300], 12, 0, 400)
-    expect(ys[1] - ys[0]).toBeGreaterThanOrEqual(12)
-    expect(ys[2] - ys[1]).toBeGreaterThanOrEqual(12)
+describe('slope label placement', () => {
+  it('places important labels first and drops the rest when crowded', () => {
+    const ys = placeLabels([
+      { y: 100, priority: 1, reach: 5 },
+      { y: 102, priority: 9, reach: 5 },
+      { y: 104, priority: 5, reach: 40 },
+      { y: 300, priority: 0, reach: 5 },
+    ], 12, 0, 400)
+    expect(ys[1]).toBe(102)
+    expect(ys[0]).toBeNull()
+    expect(Math.abs(ys[2]! - 102)).toBeGreaterThanOrEqual(12)
     expect(ys[3]).toBe(300)
-    const packed = spreadLabels([395, 396, 397], 12, 0, 400)
-    expect(Math.max(...packed)).toBeLessThanOrEqual(400)
+  })
+
+  it('keeps labels inside the plot', () => {
+    const ys = placeLabels([{ y: 398, priority: 1, reach: 20 }, { y: 399, priority: 0, reach: 20 }], 12, 0, 400)
+    expect(ys.every(y => y === null || y <= 400)).toBe(true)
+  })
+})
+
+describe('radial series names', () => {
+  it('names series where the lines sit furthest apart, away from the peak', () => {
+    const series = [{ data: [10, 50, 30, 90, 20, 10] }, { data: [12, 20, 28, 40, 22, 11] }]
+    expect(seriesLabelSpoke(series, 0)).toBe(3)
+    expect(seriesLabelSpoke(series, 3)).toBe(1)
+  })
+})
+
+describe('radial label wrapping', () => {
+  it('wraps long names onto two lines at a space', () => {
+    expect(wrapLabel('Analytics Pro')).toEqual(['Analytics', 'Pro'])
+    expect(wrapLabel('Vault')).toEqual(['Vault'])
+    expect(wrapLabel('Supercalifragilistic')[0].endsWith('…')).toBe(true)
   })
 })

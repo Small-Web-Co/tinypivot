@@ -16,9 +16,43 @@ import type { KeyEntry } from './context'
 export interface ChartChrome {
   header: HTMLElement
   footer: HTMLElement
-  renderHeader: (story: ChartStory | null, theme: D3ChartTheme) => void
+  renderHeader: (story: ChartStory | null, theme: D3ChartTheme, variant?: ChartVariant) => void
   renderKey: (entries: KeyEntry[], theme: D3ChartTheme) => void
-  renderFooter: (parts: { story: ChartStory | null, source?: string, notes: string[] }, theme: D3ChartTheme) => void
+  renderFooter: (parts: FooterParts, theme: D3ChartTheme) => void
+}
+
+export type ChartVariant = 'editorial' | 'deck'
+
+export interface FooterParts {
+  story: ChartStory | null
+  source?: string
+  footnote?: string
+  /** Rows behind the chart, for the default deck source line */
+  rows: number
+  notes: string[]
+  variant?: ChartVariant
+}
+
+/**
+ * Footer text. Editorial: "Source: X · how it was computed", then notes.
+ * Deck: "Note: footnote (or how it was computed)" then "Source: X; N rows",
+ * the order consulting exhibits use; notes about left-out data follow.
+ */
+export function footerLines({ story, source, notes, footnote, rows, variant = 'editorial' }: FooterParts): string[] {
+  const method = story?.footnote ?? ''
+  const rowText = `${rows.toLocaleString('en-US')} rows`
+  if (variant === 'deck') {
+    return [
+      `Note: ${footnote || method}`.replace(/^Note: $/, ''),
+      `Source: ${source ? `${source}; ${rowText}` : rowText}`,
+      ...notes,
+    ].filter(Boolean)
+  }
+  return [
+    [source ? `Source: ${source}` : '', method, rowText].filter(Boolean).join(' · '),
+    footnote ? `Note: ${footnote}` : '',
+    ...notes,
+  ].filter(Boolean)
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] {
@@ -52,17 +86,20 @@ export function createChrome(): ChartChrome {
   return {
     header,
     footer,
-    renderHeader(story, theme) {
+    renderHeader(story, theme, variant = 'editorial') {
       header.hidden = !story
+      header.dataset.variant = variant
       if (!story)
         return
       kicker.textContent = story.kicker
       kicker.style.color = theme.muted
       headline.textContent = story.headline
-      headline.style.fontFamily = theme.fontDisplay
+      // Decks set the action title in the theme's working face; editorial pages use the display face.
+      headline.style.fontFamily = variant === 'deck' ? theme.fontLabel : theme.fontDisplay
       headline.style.color = theme.title
       dek.textContent = story.dek
       dek.style.color = theme.muted
+      dek.hidden = variant === 'deck'
     },
     renderKey(entries, theme) {
       key.replaceChildren()
@@ -74,11 +111,8 @@ export function createChrome(): ChartChrome {
         key.appendChild(item)
       }
     },
-    renderFooter({ story, source, notes }, theme) {
-      const lines = [
-        [source ? `Source: ${source}` : '', story?.footnote ?? ''].filter(Boolean).join(' · '),
-        ...notes,
-      ].filter(Boolean)
+    renderFooter({ story, source, notes, footnote, rows, variant = 'editorial' }, theme) {
+      const lines = footerLines({ story, source, notes, footnote, rows, variant })
       footer.replaceChildren(...lines.map((text) => {
         const line = el('p', 'vpg-d3-footnote')
         line.textContent = text
@@ -86,6 +120,8 @@ export function createChrome(): ChartChrome {
       }))
       footer.hidden = lines.length === 0
       footer.style.color = theme.muted
+      // The theme's small type: monospace on the terminal and ledger looks, its label face elsewhere.
+      footer.style.fontFamily = theme.fontLabel
     },
   }
 }

@@ -89,7 +89,9 @@ const chartFieldShape = {
   targetField: z.string().optional().describe('Bullet charts: numeric target column (e.g. quota) drawn as a tick against the actual'),
   geography: z.enum(GEOGRAPHY_VALUES).optional().describe('Choropleth map: auto (default, from the region names), world or us-states'),
   annotations: z.boolean().optional().describe('Map, bullet, radial, slope, treemap and sunburst charts: show the computed takeaway headline and callouts (default true)'),
-  title: z.string().optional().describe('Replaces the computed headline'),
+  title: z.string().optional().describe('Replaces the computed headline (an action title)'),
+  variant: z.enum(['editorial', 'deck']).optional().describe('D3 charts: editorial (default) or deck, for consulting slides: plain action title with "Note:" and "Source:" lines under the chart'),
+  footnote: z.string().optional().describe('D3 charts: a note under the chart, e.g. a definition or caveat'),
 }
 
 const chartConfigSchema = z.object(chartFieldShape)
@@ -166,6 +168,8 @@ function toCoreChartConfig(input: z.infer<typeof chartConfigSchema>, source?: st
       ...(input.geography ? { geography: input.geography } : {}),
       ...(input.annotations === undefined ? {} : { annotations: input.annotations }),
       ...(source ? { source } : {}),
+      ...(input.variant ? { variant: input.variant } : {}),
+      ...(input.footnote ? { footnote: input.footnote } : {}),
     },
   }
 }

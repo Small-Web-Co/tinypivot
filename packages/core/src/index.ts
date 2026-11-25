@@ -48,6 +48,7 @@ export {
   buildChartStory,
   BULLET_MAX_ROWS,
   BULLET_NEAR_RATIO,
+  categoryNoun,
   CHART_AGGREGATIONS,
   CHART_COLORS,
   CHART_FONT_MONO,
