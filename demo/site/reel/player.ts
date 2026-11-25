@@ -31,8 +31,8 @@ export interface Recording {
   rows: number
   /** Total running time in milliseconds. */
   duration: number
-  /** Default text and background colours of the terminal the session is shown in. */
-  theme: { fg: string, bg: string }
+  /** The TinyPivot theme the terminal is shown in, with its default text and background colours. */
+  theme: { id?: string, fg: string, bg: string }
   styles: RecordingStyle[]
   frames: RecordingFrame[]
   captions: RecordingCaption[]

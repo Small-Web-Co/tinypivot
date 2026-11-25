@@ -7,8 +7,8 @@
  *
  * record.mjs runs pi in tmux with this build of TinyPivot and its pi extension, and types the
  * opening prompt. Meanwhile this script plays the user's side in the Studio in a browser:
- * it follows the trace, sends the agent's pivot back with a comment, and asks the AI Analyst a
- * question, which pi answers. Every time the Studio changes it saves a screenshot with the time,
+ * it follows the trace, sends the agent's pivot back with a comment, then asks a follow-up
+ * question; pi answers both in the trace. Every time the Studio changes it saves a screenshot with the time,
  * so convert.mjs can line the Studio up with the terminal. Nothing is staged: pi does the work.
  * Build first (`pnpm build:mcp`) and run under `with-secrets` so the server gets a Pro key.
  */
@@ -200,22 +200,17 @@ async function playUser(page, camera) {
   await page.locator('.tp-studio-note-input').pressSequentially(NOTE, { delay: 18 })
   await camera.shoot()
   const repliesBefore = snapshot.steps.filter(step => step.tool === 'reply').length
-  await page.getByRole('button', { name: /^Send to/ }).click()
+  await page.keyboard.press('Enter')
   await waitFor(async () => (await studioSnapshot())?.steps.filter(step => step.tool === 'reply').length > repliesBefore, AGENT_TIMEOUT_MS, 'pi to answer the note')
   await waitForQuiet(2)
   await camera.shoot()
 
-  // Ask the AI Analyst, which pi answers.
-  await page.getByRole('tab', { name: 'Analyst' }).click()
-  await page.locator('.vpg-ai-datasource-card').first().click()
-  await sleep(800)
-  await page.locator('.vpg-ai-input').pressSequentially(QUESTION, { delay: 22 })
+  // A follow-up question, answered in the trace.
+  await page.locator('.tp-studio-note-input').pressSequentially(QUESTION, { delay: 22 })
   await camera.shoot()
-  await page.locator('.vpg-ai-input').press('Enter')
-  await sleep(1200)
-  await camera.shoot()
-  await waitFor(async () => (await page.locator('.vpg-ai-typing').count()) === 0, AGENT_TIMEOUT_MS, 'the analyst answer')
-  await sleep(1500)
+  await page.keyboard.press('Enter')
+  await waitFor(async () => (await studioSnapshot())?.steps.filter(step => step.tool === 'reply').length > repliesBefore + 1, AGENT_TIMEOUT_MS, 'pi to answer the question')
+  await waitForQuiet(2)
   await camera.shoot()
 }
 

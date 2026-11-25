@@ -7,7 +7,7 @@
 import type { Recording } from '../site/reel/player'
 import { computed, onBeforeUnmount, onMounted, ref, shallowReactive } from 'vue'
 import { captionAt } from '../site/reel/player'
-import { formatClock, recordingUrl, reelScenes, shotCaptions, shotsDuration } from '../site/reel/scenes'
+import { formatClock, recordingUrl, reelScenes, shotCaptions, shotsDuration, themeLabel } from '../site/reel/scenes'
 import { usePlayback } from '../site/reel/usePlayback'
 import ReelCounter from './site/ReelCounter.vue'
 import ScreenReplay from './site/ScreenReplay.vue'
@@ -36,6 +36,9 @@ const recording = computed(() => recordings.get(scene.value.id))
 const shots = computed(() => scene.value.shots)
 const duration = computed(() => (shots.value ? shotsDuration(shots.value) : recording.value?.duration ?? 0))
 const ready = computed(() => Boolean(shots.value || recording.value))
+const theme = computed(() => themeLabel(recording.value?.theme.id))
+/** The stage takes the recording's own background, so nothing flashes around it. */
+const stageStyle = computed(() => (recording.value ? { '--reel-bg': recording.value.theme.bg, '--reel-fg': recording.value.theme.fg } : {}))
 
 const { time, playing, play, pause, seek } = usePlayback(duration, playNextScene)
 const progress = computed(() => (duration.value ? time.value / duration.value : 0))
@@ -164,7 +167,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div class="reel-stage">
+    <div class="reel-stage" :style="stageStyle">
       <ScreenReplay v-if="shots" :key="scene.id" :shots="shots" :time="time" />
       <div v-else-if="recording?.studio" class="reel-split">
         <TerminalReplay
@@ -192,7 +195,7 @@ onBeforeUnmount(() => {
           <span class="reel-card">
             <span class="reel-card-count">{{ String(activeIndex + 1).padStart(2, '0') }} / {{ String(reelScenes.length).padStart(2, '0') }}</span>
             <span class="reel-card-name">{{ scene.harness }}</span>
-            <span class="reel-card-note">recorded session</span>
+            <span class="reel-card-note">recorded session<template v-if="theme"> · {{ theme }}</template></span>
           </span>
         </span>
       </div>
@@ -211,7 +214,9 @@ onBeforeUnmount(() => {
     <div class="reel-info">
       <div class="reel-caption">
         <p class="label">
-          {{ scene.harness }} · {{ shots ? 'real screenshots, driven by the same tool calls' : 'real session, thinking time fast-forwarded' }}
+          {{ scene.harness }} · {{ shots ? 'real screenshots, driven by the same tool calls' : 'real session, thinking time fast-forwarded' }}<template v-if="theme">
+            · {{ theme }}
+          </template>
         </p>
         <Transition name="reel-step" mode="out-in">
           <div :key="caption.title" class="reel-step">
@@ -298,8 +303,9 @@ onBeforeUnmount(() => {
 .reel-stage {
   position: relative;
   overflow: hidden;
-  /* Same surface as the amber terminal theme, so nothing flashes while a recording loads. */
-  background: #140e06;
+  /* The recording's own surface; amber until the first one loads. */
+  background: var(--reel-bg, #140e06);
+  transition: background 300ms ease;
 }
 
 /* The agent's terminal and the Studio side by side; stacked on narrow screens. */
@@ -315,7 +321,7 @@ onBeforeUnmount(() => {
   }
 
   .reel-split > :last-child {
-    border-left: 2px solid #2a1d0a;
+    border-left: 2px solid color-mix(in srgb, var(--reel-fg, #ffc457) 14%, var(--reel-bg, #140e06));
   }
 }
 

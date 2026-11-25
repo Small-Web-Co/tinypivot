@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { cameraFor, findCard, lastContentRow, wideShot } from '../../demo/site/reel/director'
 import { barCells, glyphRects, insetBar, sparklineCells, sparklineRect } from '../../demo/site/reel/glyphs'
 import { applyFrames, captionAt, createScreen, frameIndexAt } from '../../demo/site/reel/player'
-import { shotCaptions, shotIndexAt, shotsDuration } from '../../demo/site/reel/scenes'
-import { applySgr, indexedColor, parseScreen, phosphor, rowText, TERMINAL_THEME, themed } from '../../scripts/reel/ansi.mjs'
+import { shotCaptions, shotIndexAt, shotsDuration, themeLabel } from '../../demo/site/reel/scenes'
+import { createPalette, parseScreen, rowText, TERMINAL_THEMES } from '../../scripts/reel/ansi.mjs'
 
 const ESC = '\u001B'
 
@@ -30,17 +30,59 @@ describe('reel: reading captured terminal colours', () => {
   })
 
   it('understands resets for single attributes', () => {
-    const style = applySgr({ bold: true, dim: true, fg: '#fff', bg: '#000', inverse: true }, '22;39;27')
+    const style = createPalette().applySgr({ bold: true, dim: true, fg: '#fff', bg: '#000', inverse: true }, '22;39;27')
     expect(style).toEqual({ bg: '#000' })
   })
 
   it('shows greys as amber phosphor and keeps real colours', () => {
-    expect(indexedColor(16)).toBe(TERMINAL_THEME.bg)
-    expect(indexedColor(231)).toBe(TERMINAL_THEME.bright)
-    expect(indexedColor(244)).toBe(phosphor(128 / 255))
-    expect(themed(128, 128, 128)).not.toBe('#808080')
-    expect(indexedColor(196)).toBe('#ff0000')
-    expect(themed(151, 118, 229)).toBe('#9776e5')
+    const amber = createPalette('crt-amber')
+    expect(amber.indexedColor(16)).toBe(TERMINAL_THEMES['crt-amber'].bg)
+    expect(amber.indexedColor(231)).toBe(TERMINAL_THEMES['crt-amber'].bright)
+    expect(amber.indexedColor(244)).toBe(amber.ink(128 / 255))
+    expect(amber.color(128, 128, 128)).not.toBe('#808080')
+    expect(amber.indexedColor(196)).toBe('#ff0000')
+    expect(amber.color(151, 118, 229)).toBe('#9776e5')
+  })
+
+  it('moves amber card colours to a dark theme\'s own accent and keeps other hues', () => {
+    const green = createPalette('crt-green')
+    const [, row] = parseScreen(`x\n${ESC}[38;2;255;176;0mamber${ESC}[38;2;151;118;229mpurple`, green)
+    const [[, amberStyle], [, purpleStyle]] = row
+    const [r, g, b] = [1, 3, 5].map(at => Number.parseInt(amberStyle.fg.slice(at, at + 2), 16))
+    expect(g).toBeGreaterThan(r)
+    expect(g).toBeGreaterThan(b)
+    expect(purpleStyle.fg).toBe('#9776e5')
+  })
+
+  it('turns lightness around on light themes, so pale text reads on paper and dark fills turn pale', () => {
+    const paper = createPalette('paper')
+    const lightness = (hex: string) => [1, 3, 5].map(at => Number.parseInt(hex.slice(at, at + 2), 16)).reduce((sum, value) => sum + value, 0) / 3 / 255
+    expect(paper.indexedColor(16)).toBe(TERMINAL_THEMES.paper.bg)
+    expect(paper.indexedColor(231)).toBe(TERMINAL_THEMES.paper.bright)
+    expect(lightness(paper.color(255, 208, 117))).toBeLessThan(0.45)
+    expect(lightness(paper.color(84, 63, 28, true))).toBeGreaterThan(0.75)
+  })
+
+  it('keeps 1-bit to ink, muted ink, paper and one highlight', () => {
+    const onebit = createPalette('onebit')
+    const { bg, fg, muted, highlight } = TERMINAL_THEMES.onebit
+    const shades = new Set([bg, fg, muted, highlight, TERMINAL_THEMES.onebit.bright])
+    for (let index = 0; index < 256; index++) {
+      expect(shades).toContain(onebit.indexedColor(index))
+      expect(shades).toContain(onebit.indexedColor(index, true))
+    }
+    expect(onebit.color(105, 173, 208)).toBe(fg)
+    expect(onebit.color(84, 63, 28, true)).toBe(highlight)
+  })
+
+  it('refuses a theme it does not know', () => {
+    expect(() => createPalette('neon')).toThrow(/Unknown terminal theme "neon"/)
+  })
+
+  it('names every terminal theme on the site', () => {
+    for (const id of Object.keys(TERMINAL_THEMES))
+      expect(themeLabel(id)).toMatch(/ theme$/)
+    expect(themeLabel(undefined)).toBe('')
   })
 })
 

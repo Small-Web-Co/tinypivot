@@ -34,12 +34,26 @@ export interface ReelStat {
 
 const ROWS_ON_DISK = 44714
 
+/** Display names of the TinyPivot themes a recording can be shown in (scripts/reel/ansi.mjs). */
+const THEME_NAMES: Record<string, string> = {
+  'crt-amber': 'Amber CRT',
+  'crt-green': 'Green CRT',
+  'paper': 'Paper',
+  'greenbar': 'Greenbar',
+  'onebit': '1-Bit',
+}
+
+/** "Paper theme" for a recording's theme id; empty when the recording names none. */
+export function themeLabel(id: string | undefined): string {
+  return id && THEME_NAMES[id] ? `${THEME_NAMES[id]} theme` : ''
+}
+
 export const reelScenes: ReelScene[] = [
   {
     id: 'studio-pi',
     harness: 'pi + Studio',
     headline: 'The terminal and the Studio, talking to each other.',
-    detail: 'pi works the data in the terminal. Every step shows up in the Studio, where you send the data back with a comment or ask the AI Analyst, and pi answers.',
+    detail: 'pi works the data in the terminal. Every step shows up in the Studio, where you send the data back with a comment, and pi answers in the trace.',
     stats: [
       { value: 2, label: 'questions sent from the Studio, both answered by pi' },
       { value: ROWS_ON_DISK, label: 'rows queried on your machine' },

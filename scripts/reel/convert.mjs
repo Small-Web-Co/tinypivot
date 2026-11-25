@@ -16,7 +16,8 @@
  *     "busyWhen": "regex",             frames matching this play `busySpeed` times faster
  *     "busySpeed": 4, "maxHold": 2500, "endHold": 3500,
  *     "captions": [{ "when": "regex", "title": "...", "body": "..." }],
- *     "studio": "name.studio.json" }  Studio screenshots taken alongside (record-studio.mjs)
+ *     "studio": "name.studio.json",   Studio screenshots taken alongside (record-studio.mjs)
+ *     "theme": "paper" }               TinyPivot theme the terminal is shown in (ansi.mjs; default crt-amber)
  *
  * Text swaps that are specific to the machine a take was recorded on (the working folder, a
  * provider label) live outside the repository, in the optional redactions file:
@@ -26,9 +27,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { parseScreen, rowText, TERMINAL_THEME } from './ansi.mjs'
+import { createPalette, DEFAULT_TERMINAL_THEME, parseScreen, rowText } from './ansi.mjs'
 
-const DEFAULTS = { busySpeed: 4, maxHold: 2500, endHold: 3500, replace: [], captions: [] }
+const DEFAULTS = { busySpeed: 4, maxHold: 2500, endHold: 3500, replace: [], captions: [], theme: DEFAULT_TERMINAL_THEME }
 /** Screen time each Studio screenshot gets while the terminal sits idle (the user is busy in the Studio). */
 const STUDIO_FRAME_HOLD = 1700
 const LICENSE_KEY_RE = /TP-[A-Z]{3,5}-[A-Z0-9]{6,}/
@@ -87,9 +88,9 @@ function applyReplacements(screen, replacements) {
 }
 
 /** Parses every frame into exactly `rows` rows and keeps its plain text for pattern checks. */
-function parseFrames(frames, rows, replacements) {
+function parseFrames(frames, rows, replacements, palette) {
   return frames.map((frame) => {
-    const parsed = parseScreen(applyReplacements(frame.screen, replacements)).slice(0, rows)
+    const parsed = parseScreen(applyReplacements(frame.screen, replacements), palette).slice(0, rows)
     while (parsed.length < rows)
       parsed.push([])
     return { t: frame.t, rows: parsed, text: parsed.map(rowText).join('\n') }
@@ -243,7 +244,8 @@ function assertNothingPrivate(id, frames) {
 function convert(entry, takesDir) {
   const options = { ...DEFAULTS, ...entry }
   const { meta, frames: rawFrames } = readTake(join(takesDir, options.take))
-  let frames = parseFrames(rawFrames, meta.rows, options.replace)
+  const palette = createPalette(options.theme)
+  let frames = parseFrames(rawFrames, meta.rows, options.replace, palette)
   frames = frames.slice(firstFrameToKeep(frames, options))
   assertNothingPrivate(options.id, frames)
 
@@ -259,7 +261,7 @@ function convert(entry, takesDir) {
     cols: meta.cols,
     rows: meta.rows,
     duration,
-    theme: { fg: TERMINAL_THEME.fg, bg: TERMINAL_THEME.bg },
+    theme: { id: palette.id, fg: palette.theme.fg, bg: palette.theme.bg },
     styles: table.styles,
     frames: output,
     captions: placeCaptions(options.captions, frames, times),
