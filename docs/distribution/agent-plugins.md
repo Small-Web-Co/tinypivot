@@ -4,6 +4,12 @@ Where TinyPivot can be listed, what each directory needs, what this repository a
 
 Everything below is ready in the repository unless a line says **You**.
 
+## Where the plugin lives
+
+The listings point at **https://github.com/Small-Web-Co/tinypivot-plugin**, which holds only the plugin files at its root (Claude Code, Cursor, Codex and Antigravity manifests, the skill, the icon and the license). Claude's directory refuses any plugin folder inside this monorepo, because it flags the package-manager settings in `pnpm-workspace.yaml`. `packages/mcp` stays the source: after `pnpm release:mcp`, run `node scripts/sync-plugin-repo.mjs ../tinypivot-plugin` (or wherever that repository is checked out), then commit and push there. Gemini CLI stays here, at the root `gemini-extension.json`, with the `gemini-cli-extension` topic on this repository: its keychain setting reaches the server through a `${TINYPIVOT_LICENSE_KEY}` mapping, which Claude's directory treats as a credential leaving the machine when it shares a repository with the Claude plugin.
+
+The Claude plugin asks for the license key through a sensitive `license_key` option and hands it to the server as `CLAUDE_PLUGIN_OPTION_LICENSE_KEY`, the only name the directory accepts; the server reads it from 0.6.1 on.
+
 ## At a glance
 
 | Directory | Who can submit | Ready in the repo | You |
@@ -32,7 +38,7 @@ Everything below is ready in the repository unless a line says **You**.
 
 Requirements:
 - A paid plan (Pro, Max or Ultra; on Team or Enterprise, an Owner or a role with the Directory permission), with your GitHub account connected on claude.ai and push access to `Small-Web-Co/tinypivot`.
-- Repository `Small-Web-Co/tinypivot`, plugin path `packages/mcp`, branch `master` (or a release tag).
+- Repository `Small-Web-Co/tinypivot-plugin`, plugin at the root, branch `main`. Local MCP servers and extra manifest fields such as `network` are accepted only from Verified organizations: request Verified under Help and appeals (it needs a proven domain; tiny-pivot.com is proven with a DNS TXT record that must stay in place).
 - Form steps: validation, listing details (read from `plugin.json` and the README), data handling questions, compliance (a contact email and four acknowledgements).
 - Everything the plugin runs must be inside `packages/mcp`. It is: the plugin only starts `npx`.
 

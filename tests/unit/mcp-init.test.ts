@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import mcpPluginConfig from '../../packages/mcp/.mcp.json'
 import { MCP_NPX_SPEC, PI_ENTRY_EXTRAS, runInitCommand, TINYPIVOT_CLAUDE_RULE_BLOCK, TINYPIVOT_PI_RULE_BLOCK } from '../../packages/mcp/src/init'
 import { bumpMcpVersion, nextVersion } from '../../scripts/bump-mcp-version.mjs'
+import { PLUGIN_FILES, syncPluginRepo } from '../../scripts/sync-plugin-repo.mjs'
 
 describe('init writes configs that fetch the newest release', () => {
   let home: string
@@ -121,7 +122,14 @@ describe('plugin manifests for each agent marketplace', () => {
   // exact release it was listed with; scripts/bump-mcp-version.mjs moves the pin with each release.
   it('pin the Claude Code plugin to the package version', async () => {
     const { version } = await read('packages/mcp/package.json')
-    expect(mcpPluginConfig.mcpServers.tinypivot).toEqual({ command: 'npx', args: ['-y', `@smallwebco/tinypivot-mcp@${version}`] })
+    expect(mcpPluginConfig.mcpServers.tinypivot).toMatchObject({ command: 'npx', args: ['-y', `@smallwebco/tinypivot-mcp@${version}`] })
+  })
+
+  // The directory only accepts a user option handed over as CLAUDE_PLUGIN_OPTION_<KEY>.
+  it('hand the Claude plugin\'s license_key option to the server under the directory\'s name', async () => {
+    const plugin = await read('packages/mcp/.claude-plugin/plugin.json')
+    expect(plugin.userConfig.license_key).toMatchObject({ type: 'string', sensitive: true })
+    expect(mcpPluginConfig.mcpServers.tinypivot.env).toEqual({ CLAUDE_PLUGIN_OPTION_LICENSE_KEY: ['$', '{user_config.license_key}'].join('') })
   })
 
   it('carry the MCP package version, so a release updates every listing', async () => {
@@ -193,6 +201,39 @@ describe('bump-mcp-version', () => {
     expect(JSON.parse(await read('packages/mcp/.mcp.json')).mcpServers.tinypivot.args).toEqual(['-y', '@smallwebco/tinypivot-mcp@9.8.7'])
     expect(await read('packages/mcp/src/server.ts')).toMatch(/name: 'tinypivot',\s*version: '9\.8\.7'/)
     expect(await read('packages/mcp/src/telemetry.ts')).toContain(`const PACKAGE_VERSION = '9.8.7'`)
+  })
+})
+
+describe('sync-plugin-repo', () => {
+  const repo = path.join(__dirname, '../..')
+  let target: string
+
+  beforeEach(async () => {
+    target = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-plugin-repo-'))
+  })
+
+  afterEach(async () => {
+    await fs.rm(target, { recursive: true, force: true })
+  })
+
+  it('copies every plugin file from packages/mcp unchanged', async () => {
+    syncPluginRepo(repo, target)
+    for (const file of PLUGIN_FILES) {
+      const [copied, source] = await Promise.all([fs.readFile(path.join(target, file)), fs.readFile(path.join(repo, 'packages/mcp', file))])
+      expect({ file, same: copied.equals(source) }).toEqual({ file, same: true })
+    }
+  })
+
+  it('points the marketplaces at the plugin repository root and leaves Gemini out', async () => {
+    syncPluginRepo(repo, target)
+    const read = async (file: string) => JSON.parse(await fs.readFile(path.join(target, file), 'utf8'))
+    expect((await read('.claude-plugin/marketplace.json')).plugins[0].source).toBe('./')
+    expect((await read('.agents/plugins/marketplace.json')).plugins[0].source.path).toBe('./')
+    await expect(fs.access(path.join(target, 'gemini-extension.json'))).rejects.toThrow()
+  })
+
+  it('refuses a target that does not exist', () => {
+    expect(() => syncPluginRepo(repo, path.join(target, 'missing'))).toThrow(/No plugin repository checkout/)
   })
 })
 

@@ -7,7 +7,8 @@
 #
 # To release: `pnpm release:mcp <patch|minor|major|x.y.z>` bumps the version in the package, the
 # MCP Registry entry, every agent plugin manifest and the Claude plugin's pinned npx version;
-# commit, then push a tag `mcp-v<version>`.
+# commit, then push a tag `mcp-v<version>`. Afterwards copy the plugin files to
+# Small-Web-Co/tinypivot-plugin with scripts/sync-plugin-repo.mjs and push there.
 # Keep this workflow tag-only, like publish.yml.
 name: Publish MCP to npm & MCP Registry
 
