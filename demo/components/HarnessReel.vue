@@ -7,7 +7,7 @@
 import type { Recording } from '../site/reel/player'
 import { computed, onBeforeUnmount, onMounted, ref, shallowReactive } from 'vue'
 import { captionAt } from '../site/reel/player'
-import { formatClock, recordingUrl, reelScenes, themeLabel } from '../site/reel/scenes'
+import { formatClock, recordingUrl, reelGroups, reelScenes, themeLabel, themeName } from '../site/reel/scenes'
 import { usePlayback } from '../site/reel/usePlayback'
 import ReelCounter from './site/ReelCounter.vue'
 import StudioReplay from './site/StudioReplay.vue'
@@ -150,19 +150,25 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="root" class="reel">
-    <div class="reel-tabs" role="tablist" aria-label="Harness">
-      <button
-        v-for="(item, index) in reelScenes"
-        :key="item.id"
-        type="button"
-        role="tab"
-        class="reel-tab"
-        :aria-selected="index === activeIndex"
-        @click="chooseScene(index)"
-      >
-        <span class="reel-tab-fill" :style="{ transform: `scaleX(${tabFill(index)})` }" aria-hidden="true" />
-        <span class="reel-tab-label">{{ item.harness }}</span>
-      </button>
+    <div class="reel-tabs">
+      <div v-for="group in reelGroups()" :key="group.label" class="reel-tab-group" :style="{ flexGrow: group.scenes.length }">
+        <span class="reel-tab-group-label">{{ group.label }}</span>
+        <div class="reel-tab-row" role="tablist" :aria-label="`${group.label} sessions`">
+          <button
+            v-for="{ scene: item, index } in group.scenes"
+            :key="item.id"
+            type="button"
+            role="tab"
+            class="reel-tab"
+            :aria-selected="index === activeIndex"
+            @click="chooseScene(index)"
+          >
+            <span class="reel-tab-fill" :style="{ transform: `scaleX(${tabFill(index)})` }" aria-hidden="true" />
+            <span class="reel-tab-label">{{ item.harness }}</span>
+            <span class="reel-tab-theme">{{ themeName(item.theme) }}</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="reel-stage" :style="stageStyle">
@@ -249,15 +255,48 @@ onBeforeUnmount(() => {
   border-bottom: var(--line);
 }
 
+/* Tabs grouped by where the agent runs: a small label over each group's tabs. */
+.reel-tab-group {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 0;
+  min-width: max-content;
+  border-right: var(--line);
+}
+
+.reel-tab-group:last-child {
+  border-right: 0;
+}
+
+.reel-tab-group-label {
+  padding: 6px 16px 5px;
+  border-bottom: var(--line);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.reel-tab-row {
+  display: flex;
+  flex: 1;
+}
+
 .reel-tabs::-webkit-scrollbar {
   display: none;
 }
 
 .reel-tab {
   position: relative;
+  display: flex;
   flex: 1 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   min-height: var(--tap);
-  padding: 0 16px;
+  padding: 8px 16px 10px;
   border: 0;
   border-right: var(--line);
   background: transparent;
@@ -293,8 +332,16 @@ onBeforeUnmount(() => {
   transform-origin: 0 50%;
 }
 
-.reel-tab-label {
+.reel-tab-label,
+.reel-tab-theme {
   position: relative;
+}
+
+.reel-tab-theme {
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
 }
 
 .reel-stage {

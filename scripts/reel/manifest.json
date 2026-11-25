@@ -44,7 +44,7 @@
     {
       "id": "claude-code",
       "take": "claude-7.jsonl",
-      "theme": "paper",
+      "theme": "crt-amber",
       "startWhen": "❯",
       "busyWhen": "esc to interrupt",
       "busySpeed": 4,

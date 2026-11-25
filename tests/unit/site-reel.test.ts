@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { cameraFor, findCard, lastContentRow, wideShot } from '../../demo/site/reel/director'
 import { barCells, glyphRects, insetBar, sparklineCells, sparklineRect } from '../../demo/site/reel/glyphs'
 import { applyFrames, captionAt, createScreen, frameIndexAt } from '../../demo/site/reel/player'
-import { themeLabel } from '../../demo/site/reel/scenes'
+import { reelGroups, reelScenes, themeLabel } from '../../demo/site/reel/scenes'
 import { createPalette, parseScreen, rowText, TERMINAL_THEMES } from '../../scripts/reel/ansi.mjs'
+import manifest from '../../scripts/reel/manifest.json'
 
 const ESC = '\u001B'
 
@@ -238,5 +239,22 @@ describe('reel: camera', () => {
   it('respects the zoom cap and never zooms out below full width', () => {
     expect(cameraFor({ col: 40, row: 10, cols: 10, rows: 4 }, grid, 1.5).scale).toBe(1.5)
     expect(cameraFor({ col: 0, row: 0, cols: 96, rows: 40 }, grid, 2).scale).toBe(1)
+  })
+})
+
+describe('reel: tabs', () => {
+  it('shows each scene in the theme its recording was converted in', () => {
+    expect(reelScenes.map(scene => [scene.id, scene.theme])).toEqual(manifest.recordings.map(recording => [recording.id, recording.theme]))
+    // No two scenes share a theme, so the reel shows them all off.
+    expect(new Set(reelScenes.map(scene => scene.theme)).size).toBe(reelScenes.length)
+  })
+
+  it('groups the tabs by where the agent runs, keeping the order they play in', () => {
+    const groups = reelGroups()
+    expect(groups.map(group => [group.label, group.scenes.map(({ scene }) => scene.harness)])).toEqual([
+      ['Terminal', ['pi + Studio', 'Claude Code', 'pi', 'OpenCode']],
+      ['Editor', ['Antigravity']],
+    ])
+    expect(groups.flatMap(group => group.scenes.map(({ index }) => index))).toEqual(reelScenes.map((_, index) => index))
   })
 })
