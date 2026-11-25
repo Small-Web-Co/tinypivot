@@ -172,3 +172,46 @@ describe('stopping the Studio server', () => {
     expect(await stopped).toBe('idle')
   })
 })
+
+describe('one theme everywhere', () => {
+  it('follows the theme saved by any TinyPivot process, unless one is pinned for this process', async () => {
+    const { DatasetStore: Store } = await import('../../packages/mcp/src/store')
+    const here = new Store()
+    const elsewhere = new Store()
+    elsewhere.setVisualTheme('paper')
+    expect(here.getVisualTheme()).toBe('paper')
+
+    process.env.TINYPIVOT_THEME = 'crt-green'
+    const pinned = new Store()
+    delete process.env.TINYPIVOT_THEME
+    expect(pinned.getVisualTheme()).toBe('crt-green')
+    pinned.setVisualTheme('onebit')
+    expect([pinned.getVisualTheme(), here.getVisualTheme()]).toEqual(['onebit', 'onebit'])
+  })
+
+  it('serves the page in the saved theme and repaints open tabs when it changes elsewhere', async () => {
+    const store = new DatasetStore()
+    store.setVisualTheme('paper')
+    const handle = await startCompanionServer({ store, loadHtml: async () => '<html><head></head><body></body></html>', licenseKey: 'TP-MCPP-TESTKEY1-20991231', themeWatchMs: 50 })
+    try {
+      expect(await (await fetch(handle.url)).text()).toContain('<meta name="tinypivot-theme" content="paper">')
+
+      const controller = new AbortController()
+      const res = await fetch(`${handle.url}/api/events`, { signal: controller.signal })
+      const reader = res.body!.getReader()
+      new DatasetStore().setVisualTheme('greenbar')
+      let text = ''
+      while (!text.includes('"chartTheme":"greenbar"')) {
+        const { value, done } = await reader.read()
+        if (done)
+          break
+        text += new TextDecoder().decode(value)
+      }
+      expect(text).toContain('"chartTheme":"greenbar"')
+      controller.abort()
+    }
+    finally {
+      await handle.close()
+    }
+  }, 15_000)
+})

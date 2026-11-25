@@ -130,16 +130,10 @@ const VISUAL_THEMES = (Object.entries(CHART_THEME_PRESETS) as Array<[ChartThemeP
     swatches: [meta.colors[0], meta.colors[1]] as [string, string],
   }))
 
-const THEME_STORAGE_KEY = 'tinypivot:visual-theme'
-
-function readSavedVisualTheme(): ChartThemePreset | null {
-  try {
-    const saved = window.localStorage?.getItem(THEME_STORAGE_KEY) as ChartThemePreset | null
-    return saved && saved in CHART_THEME_PRESETS ? saved : null
-  }
-  catch {
-    return null
-  }
+/** The saved theme the Studio server put in the page, so the first paint is already in it. */
+function readServedTheme(): ChartThemePreset {
+  const served = document.querySelector('meta[name="tinypivot-theme"]')?.getAttribute('content')
+  return served && served in CHART_THEME_PRESETS ? served as ChartThemePreset : 'code'
 }
 
 function formatCompactTokens(tokens: number): string {
@@ -169,7 +163,6 @@ export function McpApp() {
   const appRef = useRef<App | null>(null)
   const mainRef = useRef<HTMLElement | null>(null)
   const licenseAppliedRef = useRef(false)
-  const userPickedThemeRef = useRef(false)
   const userPickedModeRef = useRef(false)
   /** The live stream from the local Studio server, closed when the user stops the Studio. */
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -188,7 +181,8 @@ export function McpApp() {
       ? 'dark'
       : 'light'
   })
-  const [visualTheme, setVisualTheme] = useState<ChartThemePreset>(() => readSavedVisualTheme() ?? 'code')
+  // The server's saved theme is the one source: it follows picks made in any Studio, in pi or by an agent.
+  const [visualTheme, setVisualTheme] = useState<ChartThemePreset>(readServedTheme)
 
   const [datasetId, setDatasetId] = useState<string>('')
   const [datasetName, setDatasetName] = useState<string>('TinyPivot')
@@ -319,7 +313,7 @@ export function McpApp() {
     if (nextTier === 'free') {
       setVisualTheme('code')
     }
-    else if (payload.chartTheme && !userPickedThemeRef.current) {
+    else if (payload.chartTheme) {
       setVisualTheme(payload.chartTheme)
     }
     setPivotConfig(payload.pivotConfig ?? undefined)
@@ -476,12 +470,7 @@ export function McpApp() {
       showToast(`${themeLabel} is a Pro theme`, { upgradeCta: true, durationMs: 5000 })
       return
     }
-    userPickedThemeRef.current = true
     setVisualTheme(nextTheme)
-    try {
-      window.localStorage?.setItem(THEME_STORAGE_KEY, nextTheme)
-    }
-    catch {}
     if (transportMode === 'companion') {
       void postToStudio('/api/theme', { theme: nextTheme }).catch(() => {})
       return

@@ -3,11 +3,13 @@ import type { AddressInfo } from 'node:net'
 import type { DatasetStore } from './store.js'
 import type { NoteAttachment, StudioNote } from './studio-protocol.js'
 import type { Studio } from './studio.js'
+import { unwatchFile, watchFile } from 'node:fs'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
 import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
+import { getPreferencesPath } from './store.js'
 import { STUDIO_HEADER } from './studio-protocol.js'
 import { cardTitle, datasetCard } from './summary.js'
 import { getCompanionSessionFile } from './tui.js'
@@ -36,7 +38,27 @@ export interface StartCompanionOptions {
   idleStopMs?: number
   /** Called once the server has closed itself: the user pressed Stop, or every tab stayed closed. */
   onStopped?: (reason: 'stopped' | 'idle') => void
+  /** How often to look for a theme saved elsewhere (another Studio, pi, an agent), in ms. */
+  themeWatchMs?: number
 }
+
+/** The license key when it is one for the MCP server (Pro or team), otherwise null. */
+function validMcpKey(licenseKey?: string): string | null {
+  return licenseKey && (licenseKey.startsWith('TP-MCPP-') || licenseKey.startsWith('TP-MCPT-')) ? licenseKey : null
+}
+
+/** Whether this Studio may use the Pro features, such as the extra themes. */
+function isProCompanion(options: { licenseKey?: string, demoToken?: string }): boolean {
+  return Boolean(validMcpKey(options.licenseKey) || options.demoToken)
+}
+
+/** The page with the saved theme in a meta tag, so its first paint is already in that theme. */
+export function withThemeMeta(html: string, theme: ChartThemePreset): string {
+  return html.replace('<head>', `<head><meta name="tinypivot-theme" content="${theme}">`)
+}
+
+/** A theme saved by another Studio, pi or an agent shows up in open tabs within this long. */
+const THEME_WATCH_MS = 1000
 
 /** Long enough to reload the page or reopen a tab without losing the Studio. */
 export const STUDIO_IDLE_STOP_MS = 2 * 60 * 1000
@@ -154,10 +176,7 @@ function buildFullCompanionPayload(
   const turnTokensSaved = ds.ingestionMode === 'direct'
     ? Math.max(0, ds.estimatedDatasetTokens - 150)
     : 0
-  const validMcpKey = opts.licenseKey && (opts.licenseKey.startsWith('TP-MCPP-') || opts.licenseKey.startsWith('TP-MCPT-'))
-    ? opts.licenseKey
-    : null
-  const isPro = Boolean(validMcpKey || opts.demoToken)
+  const isPro = isProCompanion(opts)
   return {
     datasetId: ds.id,
     name: ds.name,
@@ -174,7 +193,7 @@ function buildFullCompanionPayload(
     chartConfig: ds.chartConfig ?? null,
     chartTheme: isPro ? store.getVisualTheme() : 'code',
     datasets: store.listMetadata(),
-    licenseKey: validMcpKey,
+    licenseKey: validMcpKey(opts.licenseKey),
     demoToken: opts.demoToken ?? null,
     modelCatalog: MODEL_CATALOG,
     tokenStats: {
@@ -299,6 +318,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
   let listenPort = 0
   let closePromise: Promise<void> | null = null
   let idleTimer: ReturnType<typeof setTimeout> | undefined
+  const preferencesPath = getPreferencesPath()
+  let shownTheme = options.store.getVisualTheme()
   const server = http.createServer(async (req, res) => {
     const urlObj = new URL(req.url || '/', 'http://127.0.0.1')
     const pathname = urlObj.pathname
@@ -314,7 +335,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       return sendJson(res, 403, { error: 'Forbidden' })
 
     if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
-      const html = await options.loadHtml()
+      const html = withThemeMeta(await options.loadHtml(), isProCompanion(options) ? options.store.getVisualTheme() : 'code')
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end(html)
       return
@@ -357,7 +378,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     // The pi extension draws TinyPivot cards; this hands it a card in full colour, found by its title.
     if (req.method === 'GET' && pathname === '/api/studio/card') {
       const title = urlObj.searchParams.get('title') ?? ''
-      const ansi = colouredCard(options.store, title, `http://127.0.0.1:${listenPort}`, Boolean(options.licenseKey || options.demoToken))
+      const ansi = colouredCard(options.store, title, `http://127.0.0.1:${listenPort}`, isProCompanion(options))
       return ansi ? sendJson(res, 200, { ansi }) : sendJson(res, 404, { error: 'No card with that title.' })
     }
 
@@ -395,14 +416,12 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
 
     if (req.method === 'POST' && pathname === '/api/theme') {
       const body = await readJsonBody(req)
-      const isPro = Boolean(
-        (options.licenseKey && (options.licenseKey.startsWith('TP-MCPP-') || options.licenseKey.startsWith('TP-MCPT-')))
-        || options.demoToken,
-      )
+      const isPro = isProCompanion(options)
       if (typeof body.theme === 'string') {
         const requested = body.theme as ChartThemePreset
         if (isPro || requested === 'code') {
           options.store.setVisualTheme(requested)
+          followTheme()
         }
       }
       sendJson(res, 200, { chartTheme: isPro ? options.store.getVisualTheme() : 'code' })
@@ -441,6 +460,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     if (closePromise)
       return closePromise
     clearTimeout(idleTimer)
+    unwatchFile(preferencesPath, followTheme)
     closePromise = (async () => {
       for (const client of sseClients) {
         try {
@@ -476,6 +496,15 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     options.onStopped?.(reason)
   }
 
+  /** Repaints open tabs when the saved theme changes, wherever it was picked. */
+  function followTheme() {
+    const theme = options.store.getVisualTheme()
+    if (theme === shownTheme)
+      return
+    shownTheme = theme
+    broadcastUpdate()
+  }
+
   /** After the last tab closes, stop unless one comes back within the grace period. */
   function armIdleStop() {
     clearTimeout(idleTimer)
@@ -484,6 +513,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     idleTimer = setTimeout(() => void stopSelf('idle'), options.idleStopMs)
     idleTimer.unref()
   }
+
+  watchFile(preferencesPath, { interval: options.themeWatchMs ?? THEME_WATCH_MS, persistent: false }, followTheme)
 
   return {
     url,

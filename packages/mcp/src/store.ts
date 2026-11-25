@@ -31,7 +31,8 @@ export function loadSavedVisualTheme(): ChartThemePreset | undefined {
   }
 }
 
-export function saveVisualThemePreference(theme: ChartThemePreset): void {
+/** Saves the theme for every TinyPivot process on the machine. Returns false when the file cannot be written. */
+export function saveVisualThemePreference(theme: ChartThemePreset): boolean {
   try {
     const prefPath = getPreferencesPath()
     fsSync.mkdirSync(path.dirname(prefPath), { recursive: true })
@@ -41,9 +42,10 @@ export function saveVisualThemePreference(theme: ChartThemePreset): void {
     }
     catch {}
     fsSync.writeFileSync(prefPath, `${JSON.stringify({ ...existing, visualTheme: theme }, null, 2)}\n`, 'utf8')
+    return true
   }
   catch {
-    // Best-effort persistence (ignore read-only environments)
+    return false
   }
 }
 
@@ -469,9 +471,8 @@ export class DatasetStore {
   private sessionActiveId = new Map<string, string>()
   private activeId: string | null = null
   private activeModel: ModelPricing = resolveModelPricing(process.env.TINYPIVOT_LLM_MODEL)
-  private visualTheme: ChartThemePreset = process.env.TINYPIVOT_THEME
-    ? parseVisualTheme(process.env.TINYPIVOT_THEME)
-    : (loadSavedVisualTheme() ?? 'code')
+  /** TINYPIVOT_THEME pins this process's theme until the user picks one; otherwise the saved preference rules. */
+  private pinnedTheme: ChartThemePreset | undefined = process.env.TINYPIVOT_THEME ? parseVisualTheme(process.env.TINYPIVOT_THEME) : undefined
 
   private sessionTurns = 0
   private sessionLocalActions = 0
@@ -783,14 +784,19 @@ export class DatasetStore {
     return this.activeModel
   }
 
+  /**
+   * The theme as saved in the shared preferences file, read each time: a theme picked in any Studio,
+   * in pi or by any agent reaches every TinyPivot process on the machine without a restart.
+   */
   getVisualTheme(): ChartThemePreset {
-    return this.visualTheme
+    return this.pinnedTheme ?? loadSavedVisualTheme() ?? 'code'
   }
 
   setVisualTheme(theme: string): ChartThemePreset {
-    this.visualTheme = parseVisualTheme(theme)
-    saveVisualThemePreference(this.visualTheme)
-    return this.visualTheme
+    const chosen = parseVisualTheme(theme)
+    // Where the preference cannot be saved (a read-only home), the choice still holds in this process.
+    this.pinnedTheme = saveVisualThemePreference(chosen) ? undefined : chosen
+    return chosen
   }
 
   setActiveModel(modelInput?: string, customRatePerMillion?: number): ModelPricing {
