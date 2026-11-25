@@ -36,18 +36,19 @@ const RULE_END = '<!-- tinypivot:end -->'
 const RULE_TEST_RE = /<!-- tinypivot(?:-mcp)?:start -->[\s\S]*?<!-- tinypivot(?:-mcp)?:end -->/
 const RULE_REPLACE_RE = /<!-- tinypivot(?:-mcp)?:start -->[\s\S]*?<!-- tinypivot(?:-mcp)?:end -->/g
 
+// The rule blocks are read on every request in every session, charting or not: keep them to the
+// one behaviour the server's own instructions cannot guarantee, using TinyPivot at all.
+const RULE_HEADING = '## Charts & pivot tables (TinyPivot MCP)'
+const RULE_USE = 'Use the `tinypivot` MCP server for charts, pivot tables and data exploration instead of drawing them yourself.'
+
 export const TINYPIVOT_CLAUDE_RULE_BLOCK = `${RULE_START}
-## Default Charts & Pivot Tables (TinyPivot MCP)
-Whenever the user asks for a chart (line, bar, stacked bar, area, pie, scatter), a YoY/MoM comparison, a pivot table, or interactive tabular data exploration, ALWAYS use \`tinypivot\` (\`load_data\` for in-memory rows or \`load_file\` for CSV/TSV/JSON files, passing \`chartConfig\` or \`pivotConfig\` in a single call) INSTEAD of built-in visualization widgets, HTML/SVG/Chart.js/Recharts artifacts, matplotlib scripts, or large Markdown tables. Do not create temp CSVs for <500 in-memory rows.
-TinyPivot is a deterministic presentation & additive-rollup layer: for non-additive shares, rates, margins, or ratios over time (e.g. monthly share %, conversion rate, YoY %), pre-compute exact \`numerator / denominator\` ratios at the target chart grain (1 row per X × series) in SQL/Python before passing rows to TinyPivot—never sum \`%\` columns across sub-segments and never use \`percentOfTotal\` for within-period share. Pass \`keepExisting: true\` only when comparing multiple datasets in the SAME conversation; use \`clear_datasets\` to reset.
-In terminal harnesses (pi, Claude Code, OpenCode, Codex CLI), there is NO inline GUI widget: ALWAYS include the returned fenced \`text\` TinyPivot chart/table card verbatim AND the localhost Companion IDE URL in your VERY FIRST reply—never say "it is open in TinyPivot" without printing the card.
+${RULE_HEADING}
+${RULE_USE} In a terminal, show its \`text\` card verbatim with the Data IDE link.
 ${RULE_END}`
 
 export const TINYPIVOT_PI_RULE_BLOCK = `${RULE_START}
-## Default Charts & Pivot Tables (TinyPivot MCP)
-Whenever the user asks for a chart (line, bar, stacked bar, area, pie, scatter), a YoY/MoM comparison, a pivot table, or interactive tabular data exploration, ALWAYS use \`tinypivot\` (\`load_data\` for in-memory rows or \`load_file\` for CSV/TSV/JSON files, passing \`chartConfig\` or \`pivotConfig\` in a single call) INSTEAD of built-in visualization widgets, HTML/SVG/Chart.js/Recharts artifacts, matplotlib scripts, or large Markdown tables. Do not create temp CSVs for <500 in-memory rows.
-TinyPivot is a deterministic presentation & additive-rollup layer: for non-additive shares, rates, margins, or ratios over time (e.g. monthly share %, conversion rate, YoY %), pre-compute exact \`numerator / denominator\` ratios at the target chart grain (1 row per X × series) in SQL/Python before passing rows to TinyPivot—never sum \`%\` columns across sub-segments and never use \`percentOfTotal\` for within-period share. Pass \`keepExisting: true\` only when comparing multiple datasets in the SAME conversation; use \`clear_datasets\` to reset.
-The TinyPivot pi extension automatically renders every TinyPivot chart/pivot card in full 24-bit color right in the terminal UI after the tool call—follow up with 2–3 concise analytical takeaways and the live Companion IDE URL (no need to repeat a plain monochrome ASCII box unless the user asks). Users can switch themes anytime with \`/tinypivot-theme\` or \`set_visual_theme\`.
+${RULE_HEADING}
+${RULE_USE} The TinyPivot pi extension already shows each card, so reply with the takeaways and the Data IDE link. \`/tinypivot-theme\` switches themes.
 ${RULE_END}`
 
 export function upsertTinyPivotRuleBlock(existing: string, block = TINYPIVOT_CLAUDE_RULE_BLOCK): string {

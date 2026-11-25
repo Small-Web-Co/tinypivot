@@ -156,3 +156,46 @@ describe('paging a large dataset into the widget', () => {
     expect(INTERACTIVE_ROW_LIMIT).toBeGreaterThanOrEqual(ROW_PAGE_SIZE)
   })
 })
+
+describe('what TinyPivot costs on every request', () => {
+  /** Characters over 4: close enough to compare sizes, which is all these tests do. */
+  const roughTokens = (value: unknown) => Math.round(JSON.stringify(value).length / 4)
+
+  beforeEach(() => {
+    vi.stubEnv('TINYPIVOT_TELEMETRY', '0')
+    vi.stubEnv('DATABASE_URL', '')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('keeps tool definitions and instructions small', async () => {
+    const client = await connectClient({})
+    const { tools } = await client.listTools()
+    const definitions = tools.map(tool => ({ name: tool.name, description: tool.description, input_schema: tool.inputSchema }))
+
+    expect(roughTokens(definitions) + roughTokens(client.getInstructions())).toBeLessThan(2_500)
+  })
+
+  it('lists the Postgres tool only when a database is configured', async () => {
+    const names = async () => (await (await connectClient({})).listTools()).tools.map(tool => tool.name)
+    expect(await names()).not.toContain('query_postgres')
+
+    vi.stubEnv('DATABASE_URL', 'postgres://reader@localhost:5432/analytics')
+    expect(await names()).toContain('query_postgres')
+  })
+
+  it('does not ask the model for its own name on every call', async () => {
+    const { tools } = await (await connectClient({})).listTools()
+    for (const tool of tools)
+      expect(Object.keys(tool.inputSchema.properties ?? {}), tool.name).not.toContain('model')
+  })
+
+  it('tells the model not to reprint cards when that setting is off', async () => {
+    vi.stubEnv('TINYPIVOT_REPRINT_CARDS', '0')
+    const client = await connectClient({})
+    expect(client.getInstructions()).toContain('Do not reprint')
+    expect(client.getInstructions()).not.toContain('show the returned')
+  })
+})

@@ -96,7 +96,7 @@ describe('mCP Free-Tier Row Gating & High-Trust Truncation', () => {
     expect(ds.truncatedForFreeTier).toBe(true)
 
     const summary = formatDatasetSummary(ds)
-    expect(summary).toContain('Free tier row limit')
+    expect(summary).toContain('**Free tier:** showing the first')
     expect(summary).toContain('2,500')
     expect(summary).toContain('3,200')
 
@@ -127,7 +127,7 @@ describe('mCP Free-Tier Row Gating & High-Trust Truncation', () => {
     expect(ds.rows.length).toBe(3200)
     expect(ds.sourceTotalRows).toBe(3200)
     expect(ds.truncatedForFreeTier).toBe(false)
-    expect(formatDatasetSummary(ds)).not.toContain('Free tier row limit')
+    expect(formatDatasetSummary(ds)).not.toContain('Free tier')
   })
 })
 
@@ -392,8 +392,9 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('load_data')
     expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('load_file')
     expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('chartConfig')
-    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('YoY/MoM')
-    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('INSTEAD of built-in visualization widgets')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('period comparisons')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('instead of drawing them yourself')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('verbatim')
 
     const { server } = createTinyPivotMcpServer()
     // Underlying MCP SDK Server stores serverOptions.instructions on _instructions
@@ -407,7 +408,7 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(once).toContain('Always use pnpm.')
     expect(once).toContain('<!-- tinypivot:start -->')
     expect(once).toContain('<!-- tinypivot:end -->')
-    expect(once).toContain('INSTEAD of built-in visualization widgets')
+    expect(once).toContain('instead of drawing them yourself')
 
     // Re-running must be 100% idempotent with zero duplication
     const twice = upsertTinyPivotRuleBlock(once)
@@ -422,8 +423,7 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(upgraded).toContain(TINYPIVOT_CLAUDE_RULE_BLOCK)
     expect(upgraded).not.toContain('old block')
     expect(upgraded.match(/<!-- tinypivot:start -->/g)?.length).toBe(1)
-    expect(upgraded).toContain('pi')
-    expect(upgraded).toContain('VERY FIRST reply')
+    expect(upgraded).toContain('verbatim')
   })
 
   it('plots multi-series YoY Braille line charts independently without summing series or dropping missing months to zero', () => {
@@ -462,7 +462,7 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
       { ...ds, chartConfig: { type: 'line', xAxis: { field: 'month', role: 'dimension' }, yAxis: { field: 'revenue', role: 'measure', aggregation: 'sum' }, seriesField: { field: 'year', role: 'dimension' } } },
       'http://127.0.0.1:51234',
     )
-    expect(summary).toContain('ACTION REQUIRED (Terminal Host — No Inline GUI)')
+    expect(summary).toContain('Show the card above to the user verbatim.')
     expect(summary).toContain('↗ Live: http://127.0.0.1:51234')
 
     // Direct TTY truecolor ANSI mode keeps uniform visual widths and embeds theme palette RGB

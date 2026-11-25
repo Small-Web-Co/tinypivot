@@ -33,8 +33,9 @@ describe('column summaries describe the whole dataset', () => {
 
     const dataset = new DatasetStore().register({ name: 'orders', source: 'test', rows })
     const summary = formatDatasetSummary(dataset)
-    expect(summary).toContain('`order_id` (string, 1,000+ distinct')
-    expect(summary).toContain('`year` (number, 2 distinct')
+    expect(summary).toContain('`order_id` string (1,000+ values)')
+    // Few enough values to list, so the model can filter on them exactly.
+    expect(summary).toContain('`year` number: 2025, 2026')
   })
 })
 

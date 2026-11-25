@@ -1,5 +1,5 @@
 import type { ChartConfig, ChartThemePreset, PivotConfig, TerminalPalette } from '@smallwebco/tinypivot-core'
-import type { StoredDataset } from './store.js'
+import type { ColumnSummary, StoredDataset } from './store.js'
 import { computePivotResult, processChartData, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { DISTINCT_COUNT_CAP } from './store.js'
 
@@ -39,6 +39,8 @@ export interface TerminalFormatOptions {
   colorTheme?: ChartThemePreset
   /** Omit Markdown ```text fences (for direct TTY CLI output) */
   raw?: boolean
+  /** Remind the model, in a terminal, to show the card to the user. Off when cards are not reprinted. */
+  reprintNote?: boolean
 }
 
 function codePointDisplayWidth(cp: number): number {
@@ -713,15 +715,27 @@ function formatDistinctCount(count: number): string {
   return count >= DISTINCT_COUNT_CAP ? `${DISTINCT_COUNT_CAP.toLocaleString('en-US')}+` : String(count)
 }
 
+/** Columns with this many values or fewer list them all, so the model can filter by exact value. */
+const LISTED_VALUES_MAX = 5
+
+/** Every column on one line: name, type, and either its values or how many there are. */
+export function formatColumnNotes(columns: ColumnSummary[]): string {
+  const notes = columns.map((column) => {
+    const values = column.distinctCount <= LISTED_VALUES_MAX
+      ? `: ${column.sampleValues.join(', ')}`
+      : ` (${formatDistinctCount(column.distinctCount)} values)`
+    return `\`${column.name}\` ${column.type}${values}`
+  })
+  return `Columns: ${notes.join(' · ') || 'none'}`
+}
+
+const REPRINT_NOTE = 'Show the card above to the user verbatim.'
+
 export function formatDatasetSummary(
   dataset: StoredDataset,
   companionUrl?: string,
   options: TerminalFormatOptions = {},
 ): string {
-  const cols = dataset.columns
-    .map(c => `- \`${c.name}\` (${c.type}, ${formatDistinctCount(c.distinctCount)} distinct; e.g. ${c.sampleValues.slice(0, 3).join(', ')})`)
-    .join('\n')
-
   const cardOptions = { ...options, companionUrl: options.companionUrl ?? companionUrl }
   // A dataset opened in pivot view answers with the pivot table; anything else gets its chart.
   const chartBlock = pivotTableCard(dataset, cardOptions) ?? formatTerminalChart(dataset, dataset.chartConfig, cardOptions)
@@ -729,14 +743,13 @@ export function formatDatasetSummary(
     ? `**${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows (Free tier limit)**`
     : `**${dataset.rows.length.toLocaleString()} rows**`
   const parts = [
-    `Loaded dataset **${dataset.name}** (\`${dataset.id}\`) — ${rowHeadline}, ${dataset.columns.length} columns.`,
-    `Source: ${dataset.source}`,
+    `Loaded **${dataset.name}** (\`${dataset.id}\`): ${rowHeadline}, ${dataset.columns.length} columns.`,
   ]
 
   if (dataset.truncatedForFreeTier) {
     parts.push(
       '',
-      `> **Notice (Free tier row limit):** Showing the first **${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows**. Charts, pivots, and totals reflect this ${dataset.rows.length.toLocaleString()}-row subset only. Set \`TINYPIVOT_LICENSE_KEY\` for full unlimited rows: https://tiny-pivot.com/pricing`,
+      `> **Free tier:** showing the first ${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows, so totals cover only those. A license key unlocks every row: https://tiny-pivot.com/pricing`,
     )
   }
 
@@ -746,22 +759,16 @@ export function formatDatasetSummary(
   }
 
   if (chartBlock) {
-    const echoNote = companionUrl
-      ? '> **ACTION REQUIRED (Terminal Host — No Inline GUI):** The user cannot see this chart unless you include the fenced `text` TinyPivot card above **verbatim** in your reply along with the Interactive Data IDE link below. Do not say "it is open in TinyPivot" without printing the card.'
-      : '_Display the fenced TinyPivot card above verbatim when replying in a terminal harness._'
-    parts.push(
-      '',
-      chartBlock,
-      '',
-      echoNote,
-    )
+    parts.push('', chartBlock)
+    if (companionUrl && options.reprintNote !== false)
+      parts.push(REPRINT_NOTE)
   }
 
-  parts.push('', 'Columns:', cols || '(no columns)')
+  parts.push('', formatColumnNotes(dataset.columns))
 
-  if (companionUrl) {
-    parts.push('', `Interactive Data IDE (live-updating): ${companionUrl}`)
-  }
+  // The card's footer already carries the Data IDE link; state it separately only without a card.
+  if (companionUrl && !chartBlock)
+    parts.push(`Data IDE: ${companionUrl}`)
 
   return parts.join('\n')
 }
@@ -916,24 +923,10 @@ export function formatPivotSummary(
     ? `Pivot on **${dataset.name}** (**first ${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows — Free tier subset**):`
     : `Pivot on **${dataset.name}** (${dataset.rows.length.toLocaleString()} source rows):`
 
-  const echoNote = companionUrl
-    ? '> **ACTION REQUIRED (Terminal Host — No Inline GUI):** The user cannot see this pivot table unless you include the fenced `text` TinyPivot card above **verbatim** in your reply along with the Interactive Data IDE link below. Do not say "it is open in TinyPivot" without printing the card.'
-    : '_Display the fenced TinyPivot table above verbatim when replying in a terminal harness._'
-
-  const out = [
-    headline,
-    '',
-    tableLines.join('\n'),
-    '',
-    echoNote,
-  ]
-
-  if (result.rowHeaders.length > maxRows) {
-    out.push(`_…and ${result.rowHeaders.length - maxRows} more rows visible interactively in TinyPivot._`)
-  }
-  if (companionUrl) {
-    out.push('', `Interactive Data IDE (live-updating): ${companionUrl}`)
-  }
+  // The card itself notes clipped rows and carries the Data IDE link in its footer.
+  const out = [headline, '', tableLines.join('\n')]
+  if (companionUrl && options.reprintNote !== false)
+    out.push(REPRINT_NOTE)
 
   return out.join('\n')
 }
