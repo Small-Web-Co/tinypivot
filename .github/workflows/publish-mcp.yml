@@ -1,0 +1,92 @@
+# Publish @smallwebco/tinypivot-mcp to npm using Trusted Publishing (OIDC).
+# No npm token and no two-factor prompt: npm trusts this workflow directly.
+#
+# One-time setup on npmjs.com (package settings for @smallwebco/tinypivot-mcp):
+#   Trusted Publisher → GitHub Actions
+#   Organization: Small-Web-Co · Repository: tinypivot · Workflow: publish-mcp.yml
+#
+# To release: bump the version in packages/mcp (package.json, server.json,
+# src/server.ts, src/telemetry.ts), commit, then push a tag `mcp-v<version>`.
+# Keep this workflow tag-only, like publish.yml.
+name: Publish MCP to npm
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Tag matches package version
+        run: |
+          tag_version="${GITHUB_REF_NAME#mcp-v}"
+          package_version="$(node -p "require('./packages/mcp/package.json').version")"
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match packages/mcp version $package_version" >&2
+            exit 1
+          fi
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Run tests
+        run: pnpm test:unit
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: [quality]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # npm trusted publishing requires Node 22.14+ and npm 11.5.1+
+          node-version: 24
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages the MCP bundles, then the MCP itself
+        run: |
+          pnpm build
+          pnpm build:mcp
+
+      - name: Pack publish artifact
+        run: |
+          mkdir -p "${RUNNER_TEMP}/npm-packages"
+          cd packages/mcp
+          pnpm pack --pack-destination "${RUNNER_TEMP}/npm-packages"
+          ls -1 "${RUNNER_TEMP}/npm-packages"
+
+      - name: Publish @smallwebco/tinypivot-mcp with OIDC
+        run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-mcp-*.tgz --access public
