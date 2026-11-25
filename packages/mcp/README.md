@@ -118,7 +118,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | Tool | Purpose |
 |---|---|
 | `open_tinypivot` | Opens TinyPivot (side pane, sidebar, or inline). Works with `{}` using the built-in sample dataset. |
-| `load_file` | Loads a local `.csv`, `.tsv`, `.json`, or `.jsonl` file (including SQL CLI exports from any database) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call. |
+| `load_file` | Loads a local `.csv`, `.tsv`, `.json`, or `.jsonl` file (including SQL CLI exports from any database) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call. Pass `where` (for example `[{"field":"year","equals":[2026]}]`) to load only the rows a question is about; filtering runs on disk. |
 | `load_data` | Loads flat JSON rows already in memory (<500 rows) from any other MCP tool, API, or small SQL query without writing a temp CSV; renders chart + pivot in 1 call. |
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
 | `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, etc.). |

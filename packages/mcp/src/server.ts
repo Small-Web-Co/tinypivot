@@ -65,6 +65,7 @@ const CHART_TYPE_VALUES = [
 const CHART_AGG_VALUES = ['sum', 'avg', 'count', 'min', 'max'] as const
 
 const VIEW_MODE_VALUES = ['grid', 'pivot', 'chart'] as const
+type ViewMode = typeof VIEW_MODE_VALUES[number]
 // z.enum needs a non-empty tuple; the ids come from the shared theme list in core.
 const VISUAL_THEME_VALUES = CHART_THEME_IDS as [ChartThemePreset, ...ChartThemePreset[]]
 const VISUAL_THEME_LIST = CHART_THEME_IDS.join(', ')
@@ -72,6 +73,11 @@ const VISUAL_THEME_LIST = CHART_THEME_IDS.join(', ')
 const pivotValueSchema = z.object({
   field: z.string().describe('Numeric or countable column name to aggregate'),
   aggregation: z.enum(AGGREGATION_VALUES).default('sum'),
+})
+
+const rowFilterSchema = z.object({
+  field: z.string().describe('Column to filter on'),
+  equals: z.array(z.union([z.string(), z.number(), z.boolean()])).min(1).describe('Keep rows whose value is any of these'),
 })
 
 const pivotConfigSchema = z.object({
@@ -141,6 +147,11 @@ export function clientSupportsMcpAppsUi(
     || capabilities.experimental?.['com.google.antigravity/ui']
     || (capabilities.ui && typeof capabilities.ui === 'object'),
   )
+}
+
+/** A load that asks for a pivot and no chart opens in pivot view; everything else opens on its chart. */
+function initialViewMode(requested: ViewMode | undefined, hasPivot: boolean, hasChart: boolean): ViewMode {
+  return requested ?? (hasPivot && !hasChart ? 'pivot' : 'chart')
 }
 
 function toCoreChartConfig(input: z.infer<typeof chartConfigSchema>): Partial<ChartConfig> {
@@ -311,7 +322,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.2.6',
+      version: '0.2.7',
     },
     {
       capabilities: {
@@ -497,6 +508,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       inputSchema: {
         filePath: z.string().describe('Absolute or relative path to a .csv, .tsv, .json, or .jsonl file'),
         name: z.string().optional().describe('Optional display name for the dataset'),
+        where: z.array(rowFilterSchema).optional().describe('Keep only rows that match every filter, e.g. [{"field":"year","equals":[2026]},{"field":"channel","equals":["Partner"]}]. Use this to chart or pivot one segment or period. Filtering runs on disk, so the rows still never enter context.'),
         viewMode: z.enum(VIEW_MODE_VALUES).optional().describe('Initial view mode (default: chart)'),
         pivotConfig: pivotConfigSchema.optional().describe('Optional initial pivot configuration (also derives a matching chart if chartConfig is omitted)'),
         chartConfig: chartConfigSchema.optional().describe('Optional explicit chart configuration (lets you load + configure a specific chart type in one single call)'),
@@ -505,10 +517,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
       _meta: INLINE_UI_META,
     },
-    async ({ filePath, name, viewMode, pivotConfig, chartConfig, model, keepExisting }, extra) => {
+    async ({ filePath, name, where, viewMode, pivotConfig, chartConfig, model, keepExisting }, extra) => {
       try {
         const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
-        const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep })
+        const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep, where })
         const explicitChart = chartConfig ? toCoreChartConfig(chartConfig) : undefined
         if (pivotConfig) {
           const normalizedPivot: Partial<PivotConfig> = {
@@ -519,7 +531,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             })),
           }
           store.updateView(ds.id, {
-            viewMode: viewMode ?? 'chart',
+            viewMode: initialViewMode(viewMode, true, Boolean(explicitChart)),
             pivotConfig: normalizedPivot,
             chartConfig: explicitChart ?? chartConfigFromPivot(normalizedPivot, ds.name) ?? ds.chartConfig,
           }, sessionKey)
@@ -589,7 +601,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         source: source ?? 'inline JSON',
         ingestionMode: 'inline',
         rows,
-        viewMode: viewMode ?? 'chart',
+        viewMode: initialViewMode(viewMode, Boolean(pivotConfig), Boolean(chartConfig)),
         pivotConfig: normalizedPivot,
         chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
         sessionKey,
@@ -805,7 +817,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           source: 'postgresql',
           ingestionMode: 'direct',
           rows: res.rows,
-          viewMode: viewMode ?? 'chart',
+          viewMode: initialViewMode(viewMode, Boolean(pivotConfig), false),
           pivotConfig: pivotConfig
             ? {
                 ...pivotConfig,

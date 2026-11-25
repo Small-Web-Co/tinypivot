@@ -322,3 +322,33 @@ describe('processChartData stackedBar multi-series alignment & zero-filling', ()
     expect(resolveChartSortOrder({ type: 'stackedBar', options: { sortOrder: 'data' } }, ['West', 'East'])).toBe('data')
   })
 })
+
+describe('counting a column that holds text', () => {
+  const orders = [
+    { month: 'Jan', channel: 'Partner', order_id: 'ORD-1' },
+    { month: 'Jan', channel: 'Sales', order_id: 'ORD-2' },
+    { month: 'Feb', channel: 'Partner', order_id: 'ORD-3' },
+    { month: 'Feb', channel: 'Partner', order_id: 'ORD-3' },
+    { month: 'Feb', channel: 'Sales', order_id: '' },
+  ]
+  const config = (aggregation: 'count' | 'countDistinct' | 'sum') => ({
+    type: 'bar' as const,
+    xAxis: { field: 'month', role: 'dimension' as const },
+    yAxis: { field: 'order_id', role: 'measure' as const, aggregation },
+  })
+
+  it('counts rows per category, skipping blanks', () => {
+    const res = processChartData(orders, config('count'))
+    expect(res.categories).toEqual(['Jan', 'Feb'])
+    expect(res.series[0].data).toEqual([2, 2])
+  })
+
+  it('counts distinct text values', () => {
+    const res = processChartData(orders, config('countDistinct'))
+    expect(res.series[0].data).toEqual([2, 1])
+  })
+
+  it('still leaves text out of numeric aggregations', () => {
+    expect(processChartData(orders, config('sum')).categories).toEqual([])
+  })
+})

@@ -78,3 +78,45 @@ describe('what a data tool hands back depends on whether the host renders the wi
     })
   })
 })
+
+describe('the card a load answers with', () => {
+  const textOf = (result: unknown) => ((result as { content: Array<{ text: string }> }).content[0].text)
+
+  beforeEach(() => {
+    vi.stubEnv('TINYPIVOT_TELEMETRY', '0')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('is the pivot table when the load asks for a pivot and no chart', async () => {
+    const client = await connectClient({})
+    const result = await client.callTool({
+      name: 'load_data',
+      arguments: {
+        name: 'acme-orders',
+        rows: ROWS,
+        pivotConfig: { rowFields: ['region'], columnFields: ['month'], valueFields: [{ field: 'mrr', aggregation: 'sum' }] },
+      },
+    })
+
+    expect(textOf(result)).toContain('│ region')
+    expect(textOf(result)).toContain('Trend')
+    expect(textOf(result)).toContain('Columns:')
+  })
+
+  it('is the chart when a chart is asked for, even alongside a pivot', async () => {
+    const client = await connectClient({})
+    const result = await client.callTool({
+      name: 'load_data',
+      arguments: {
+        ...LOAD_ARGS,
+        pivotConfig: { rowFields: ['region'], columnFields: ['month'], valueFields: [{ field: 'mrr', aggregation: 'sum' }] },
+      },
+    })
+
+    expect(textOf(result)).toContain('· Bar')
+    expect(textOf(result)).not.toContain('Trend')
+  })
+})

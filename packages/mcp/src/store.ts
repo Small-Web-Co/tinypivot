@@ -212,6 +212,26 @@ function flattenRow(input: unknown): Record<string, unknown> {
   return out
 }
 
+/** Keeps rows whose `field` equals any of the listed values. */
+export interface RowFilter {
+  field: string
+  equals: Array<string | number | boolean>
+}
+
+/**
+ * Rows that satisfy every filter. Values are compared as text, so 2026 matches "2026":
+ * CSV cells and the numbers a model passes do not always agree on type.
+ */
+export function filterRows(rows: Record<string, unknown>[], filters: RowFilter[]): Record<string, unknown>[] {
+  const wanted = filters.map(filter => ({ field: filter.field, values: new Set(filter.equals.map(String)) }))
+  return rows.filter(row => wanted.every(({ field, values }) => values.has(String(row[field]))))
+}
+
+/** `[{ field: 'year', equals: [2026] }]` → `year = 2026` */
+export function describeFilters(filters: RowFilter[]): string {
+  return filters.map(filter => `${filter.field} = ${filter.equals.join(' or ')}`).join(', ')
+}
+
 /** Distinct values are counted across every row, up to this many per column. */
 export const DISTINCT_COUNT_CAP = 1000
 
@@ -605,15 +625,18 @@ export class DatasetStore {
     return dataset
   }
 
+  /** Reads a data file from disk. With `where`, only the matching rows become the dataset. */
   async loadFromFile(
     filePath: string,
     name?: string,
-    options?: { sessionKey?: string, keepExisting?: boolean },
+    options?: { sessionKey?: string, keepExisting?: boolean, where?: RowFilter[] },
   ): Promise<StoredDataset> {
+    const where = options?.where ?? []
     const resolved = path.resolve(filePath)
     const ext = path.extname(resolved).toLowerCase()
     const raw = await fs.readFile(resolved, 'utf8')
-    const displayName = name || path.basename(resolved)
+    const baseName = name || path.basename(resolved)
+    const displayName = where.length > 0 && !name ? `${baseName} (${describeFilters(where)})` : baseName
 
     let rows: Record<string, unknown>[]
     if (ext === '.json') {
@@ -648,7 +671,7 @@ export class DatasetStore {
     return this.register({
       name: displayName,
       source: resolved,
-      rows,
+      rows: filterRows(rows, where),
       sessionKey: options?.sessionKey,
       keepExisting: options?.keepExisting,
     })

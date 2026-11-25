@@ -474,6 +474,26 @@ export function getChartGuidance(config: ChartConfig): string {
 }
 
 /**
+ * Reads the number a row contributes to a measure. Counting works on any column, so text is
+ * kept: a plain count only needs a placeholder, and a distinct count gets one id per value.
+ * Every other aggregation needs a real number, and text reads as NaN so the row is skipped.
+ */
+export function createMeasureReader(aggregation: ChartAggregation): (raw: unknown) => number {
+  if (aggregation === 'count')
+    return () => 1
+  if (aggregation === 'countDistinct') {
+    const ids = new Map<string, number>()
+    return (raw) => {
+      const key = String(raw)
+      if (!ids.has(key))
+        ids.set(key, ids.size)
+      return ids.get(key) as number
+    }
+  }
+  return raw => Number(raw)
+}
+
+/**
  * Apply aggregation to values
  */
 export function aggregateValues(values: number[], aggregation: ChartAggregation): number {
@@ -608,6 +628,7 @@ export function processChartData(
   const xField = config.xAxis.field
   const yField = config.yAxis.field
   const yAggregation = config.yAxis.aggregation || 'sum'
+  const readMeasure = createMeasureReader(yAggregation)
   const seriesField = config.seriesField?.field
 
   // Group data by x-axis values (preserving Map insertion order for 'data' sort mode)
@@ -619,7 +640,7 @@ export function processChartData(
       continue
 
     const xValue = String(row[xField] ?? '(blank)')
-    const yValue = Number(rawY)
+    const yValue = readMeasure(rawY)
     const seriesValue = seriesField ? String(row[seriesField] ?? '(blank)') : '_default'
 
     if (Number.isNaN(yValue))
@@ -711,6 +732,7 @@ export function processChartDataForPie(
   const xField = config.xAxis.field
   const yField = config.yAxis.field
   const yAggregation = config.yAxis.aggregation || 'sum'
+  const readMeasure = createMeasureReader(yAggregation)
 
   // Group by category
   const grouped = new Map<string, number[]>()
@@ -721,7 +743,7 @@ export function processChartDataForPie(
       continue
 
     const xValue = String(row[xField] ?? '(blank)')
-    const yValue = Number(rawY)
+    const yValue = readMeasure(rawY)
 
     if (Number.isNaN(yValue))
       continue

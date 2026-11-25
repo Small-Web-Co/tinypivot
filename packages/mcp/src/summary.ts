@@ -717,6 +717,22 @@ export function detectNonAdditiveSumWarning(
   return `> **Data Integrity Warning:** \`${yField}\` appears to be a non-additive percentage/ratio, and **${collisions}** ${grain} bucket${collisions === 1 ? '' : 's'} contain multiple rows that were summed (\`aggregation: "sum"\`). Re-aggregate in SQL or Python to strictly 1 row per ${grain} using \`SUM(numerator) / SUM(denominator)\` before passing to TinyPivot.`
 }
 
+/** The fenced pivot table for a dataset that is in pivot view with a value to aggregate. */
+function pivotTableCard(dataset: StoredDataset, options: TerminalFormatOptions): string | null {
+  const pivot = dataset.pivotConfig
+  if (dataset.viewMode !== 'pivot' || !pivot?.valueFields?.length)
+    return null
+  const config: PivotConfig = {
+    rowFields: [],
+    columnFields: [],
+    showRowTotals: true,
+    showColumnTotals: true,
+    ...pivot,
+    valueFields: pivot.valueFields,
+  }
+  return formatPivotSummary(dataset, config, options.companionUrl, options).match(/```text[\s\S]*?```/)?.[0] ?? null
+}
+
 /** A column at the cap has at least that many values, so it reads as "1,000+". */
 function formatDistinctCount(count: number): string {
   return count >= DISTINCT_COUNT_CAP ? `${DISTINCT_COUNT_CAP.toLocaleString('en-US')}+` : String(count)
@@ -731,10 +747,9 @@ export function formatDatasetSummary(
     .map(c => `- \`${c.name}\` (${c.type}, ${formatDistinctCount(c.distinctCount)} distinct; e.g. ${c.sampleValues.slice(0, 3).join(', ')})`)
     .join('\n')
 
-  const chartBlock = formatTerminalChart(dataset, dataset.chartConfig, {
-    ...options,
-    companionUrl: options.companionUrl ?? companionUrl,
-  })
+  const cardOptions = { ...options, companionUrl: options.companionUrl ?? companionUrl }
+  // A dataset opened in pivot view answers with the pivot table; anything else gets its chart.
+  const chartBlock = pivotTableCard(dataset, cardOptions) ?? formatTerminalChart(dataset, dataset.chartConfig, cardOptions)
   const rowHeadline = dataset.truncatedForFreeTier
     ? `**${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows (Free tier limit)**`
     : `**${dataset.rows.length.toLocaleString()} rows**`
