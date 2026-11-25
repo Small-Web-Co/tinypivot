@@ -30,6 +30,8 @@ const columns = [
       { href: 'https://www.npmjs.com/package/@smallwebco/tinypivot-mcp', label: 'npm' },
       { href: '/llms.txt', label: 'llms.txt' },
       { href: `${GITHUB}/blob/master/LICENSE.md`, label: 'License' },
+      { to: '/privacy', label: 'Privacy' },
+      { to: '/terms', label: 'Terms' },
     ],
   },
 ] as const

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "tinypivot": {
-      "command": "node",
-      "args": ["${PLUGIN_ROOT}/dist/cli.js"]
+      "command": "npx",
+      "args": ["-y", "@smallwebco/tinypivot-mcp@latest"]
     }
   }
 }

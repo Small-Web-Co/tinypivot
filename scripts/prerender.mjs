@@ -85,6 +85,8 @@ const PAGE_FILES = {
   '/docs': ['demo/pages/Docs.vue', 'demo/site/docs.ts'],
   '/pricing': ['demo/pages/Pricing.vue', 'demo/site/pricing.ts'],
   '/vs-ag-grid': ['demo/pages/VsAgGrid.vue'],
+  '/privacy': ['demo/pages/Legal.vue', 'demo/site/legal.ts'],
+  '/terms': ['demo/pages/Legal.vue', 'demo/site/legal.ts'],
 }
 
 function routeContentFiles(route, guideSlugSet) {
