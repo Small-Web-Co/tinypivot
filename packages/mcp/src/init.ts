@@ -4,6 +4,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
+import { EXTENSION_HEADER } from './agent-bridge.js'
+import { buildOpenCodePluginSource } from './opencode-plugin.js'
 import { buildPiExtensionSource } from './pi-extension.js'
 import { saveVisualThemePreference } from './store.js'
 
@@ -447,75 +449,73 @@ async function upsertRuleFile(
   }
 }
 
-/** Where init installs TinyPivot's pi extension. */
-export function piExtensionPath(home = os.homedir()): string {
-  return path.join(home, '.pi', 'agent', 'extensions', 'tinypivot.ts')
-}
+/** The agent extensions init writes: each connects its agent to TinyPivot Studio. */
+export const AGENT_EXTENSIONS = {
+  pi: {
+    label: 'pi Studio & UI',
+    path: (home = os.homedir()) => path.join(home, '.pi', 'agent', 'extensions', 'tinypivot.ts'),
+    detectDir: (home = os.homedir()) => path.join(home, '.pi'),
+    build: buildPiExtensionSource,
+    installs: 'Studio messages, 24-bit cards & /tinypivot-theme',
+  },
+  opencode: {
+    label: 'OpenCode Studio',
+    path: (home = os.homedir()) => path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'opencode', 'plugins', 'tinypivot.js'),
+    detectDir: (home = os.homedir()) => path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'opencode'),
+    build: buildOpenCodePluginSource,
+    installs: 'live Studio messages plugin',
+  },
+} as const
 
-const PI_EXTENSION_HEADER = '// Auto-installed by @smallwebco/tinypivot-mcp init'
+export type AgentExtension = keyof typeof AGENT_EXTENSIONS
 
 /**
- * Brings an installed TinyPivot pi extension up to this version, so the Studio can reach pi
- * without the user re-running init. Only TinyPivot's own file is touched, and only when it carries
- * the header init writes; a missing file is left missing. pi loads extensions when a session
- * starts, so an update takes effect in the next one.
+ * Brings an installed TinyPivot agent extension up to this version, so the Studio can reach the
+ * agent without the user re-running init. Only TinyPivot's own file is touched, and only when it
+ * carries the header init writes; a missing file is left missing. Agents load extensions when a
+ * session starts, so an update takes effect in the next one.
  */
-export async function refreshPiExtension(extPath = piExtensionPath()): Promise<'current' | 'updated' | 'absent' | 'custom'> {
-  const existing = await exists(extPath) ? await fs.readFile(extPath, 'utf8') : null
+export async function refreshAgentExtension(
+  agent: AgentExtension,
+  filePath: string = AGENT_EXTENSIONS[agent].path(),
+): Promise<'current' | 'updated' | 'absent' | 'custom'> {
+  const existing = await exists(filePath) ? await fs.readFile(filePath, 'utf8') : null
   if (existing === null)
     return 'absent'
-  if (!existing.startsWith(PI_EXTENSION_HEADER))
+  if (!existing.startsWith(EXTENSION_HEADER))
     return 'custom'
-  const next = buildPiExtensionSource()
+  const next = AGENT_EXTENSIONS[agent].build()
   if (existing === next)
     return 'current'
-  await fs.writeFile(extPath, next, 'utf8')
+  await fs.writeFile(filePath, next, 'utf8')
   return 'updated'
 }
 
-async function upsertPiExtension(opts: InitOptions): Promise<TargetResult | null> {
-  const targeting = opts.targets ? opts.targets.has('pi') : true
-  if (!targeting)
+async function upsertAgentExtension(agent: AgentExtension, opts: InitOptions): Promise<TargetResult | null> {
+  const spec = AGENT_EXTENSIONS[agent]
+  const explicit = opts.targets?.has(agent) ?? false
+  if (opts.targets && !explicit)
     return null
   const home = os.homedir()
-  const piDir = path.join(home, '.pi')
-  const extPath = piExtensionPath(home)
-  const explicit = opts.targets?.has('pi') ?? false
-  if (!opts.all && !explicit && !await exists(piDir))
+  const filePath = spec.path(home)
+  if (!opts.all && !explicit && !await exists(spec.detectDir(home)))
     return null
 
+  const result = (status: TargetResult['status'], detail: string): TargetResult =>
+    ({ id: `${agent}-extension`, label: spec.label, configPath: filePath, status, detail })
   try {
-    const next = buildPiExtensionSource()
-    const existing = await exists(extPath) ? await fs.readFile(extPath, 'utf8') : ''
-    if (existing === next) {
-      return {
-        id: 'pi-extension',
-        label: 'pi Truecolor UI',
-        configPath: extPath,
-        status: 'unchanged',
-        detail: '24-bit theme renderer & /tinypivot-theme already installed',
-      }
-    }
+    const next = spec.build()
+    const existing = await exists(filePath) ? await fs.readFile(filePath, 'utf8') : ''
+    if (existing === next)
+      return result('unchanged', `${spec.installs} already installed`)
     if (!opts.dryRun) {
-      await fs.mkdir(path.dirname(extPath), { recursive: true })
-      await fs.writeFile(extPath, next, 'utf8')
+      await fs.mkdir(path.dirname(filePath), { recursive: true })
+      await fs.writeFile(filePath, next, 'utf8')
     }
-    return {
-      id: 'pi-extension',
-      label: 'pi Truecolor UI',
-      configPath: extPath,
-      status: 'updated',
-      detail: opts.dryRun ? 'would install 24-bit theme renderer & /tinypivot-theme' : 'installed 24-bit theme renderer & /tinypivot-theme',
-    }
+    return result('updated', `${opts.dryRun ? 'would install' : 'installed'} ${spec.installs}`)
   }
   catch (err) {
-    return {
-      id: 'pi-extension',
-      label: 'pi Truecolor UI',
-      configPath: extPath,
-      status: 'error',
-      detail: err instanceof Error ? err.message : String(err),
-    }
+    return result('error', err instanceof Error ? err.message : String(err))
   }
 }
 
@@ -525,9 +525,10 @@ async function upsertAllAgentRules(opts: InitOptions): Promise<TargetResult[]> {
   const candidates = await Promise.all([
     upsertRuleFile('claude', 'claude-rules', 'Claude Code Rules', path.join(home, '.claude'), path.join(home, '.claude', 'CLAUDE.md'), opts),
     upsertRuleFile('pi', 'pi-rules', 'pi Rules', path.join(home, '.pi'), path.join(home, '.pi', 'agent', 'AGENTS.md'), opts, TINYPIVOT_PI_RULE_BLOCK),
-    upsertPiExtension(opts),
+    upsertAgentExtension('pi', opts),
     upsertRuleFile('codex', 'codex-rules', 'Codex Rules', path.join(home, '.codex'), path.join(home, '.codex', 'AGENTS.md'), opts),
     upsertRuleFile('opencode', 'opencode-rules', 'OpenCode Rules', path.join(xdg, 'opencode'), path.join(xdg, 'opencode', 'AGENTS.md'), opts),
+    upsertAgentExtension('opencode', opts),
   ])
   return candidates.filter((r): r is TargetResult => r !== null)
 }

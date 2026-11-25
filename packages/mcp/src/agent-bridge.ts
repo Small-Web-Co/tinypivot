@@ -6,6 +6,9 @@ import type { StudioNote } from './studio-protocol.js'
  * next TinyPivot reply. The bridge keeps whichever ways are connected right now.
  */
 
+/** First line of each agent extension init writes (pi, OpenCode), so TinyPivot only ever replaces its own files. */
+export const EXTENSION_HEADER = '// Auto-installed by @smallwebco/tinypivot-mcp init'
+
 export interface AgentConnector {
   /** Shown to the user, e.g. "pi" or "Claude Code channel". */
   name: string

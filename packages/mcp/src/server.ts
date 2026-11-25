@@ -6,6 +6,7 @@ import type {
   ChartType,
   PivotConfig,
 } from '@smallwebco/tinypivot-core'
+import type { AgentExtension } from './init.js'
 import type { PostgresConfig } from './postgres.js'
 import type { StoredDataset } from './store.js'
 import fsSync from 'node:fs'
@@ -18,13 +19,13 @@ import { z } from 'zod'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList } from './history.js'
-import { refreshPiExtension } from './init.js'
+import { refreshAgentExtension } from './init.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
-import { Studio } from './studio.js'
+import { agentLabel, Studio } from './studio.js'
 import { formatDatasetSummary, formatPivotSummary } from './summary.js'
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
@@ -194,15 +195,17 @@ function normalizePivot(pivotConfig: z.infer<typeof pivotConfigSchema>): Partial
   }
 }
 
-/** Every data tool takes a short reason, shown to the user in the Studio trace. */
-/** What the Studio tells a pi user, by the state of TinyPivot's pi extension. */
-const PI_HINTS: Record<Awaited<ReturnType<typeof refreshPiExtension>>, string | undefined> = {
-  current: undefined,
-  custom: undefined,
-  updated: 'TinyPivot\'s pi extension was just updated. Restart pi to send messages live.',
-  absent: 'Run npx @smallwebco/tinypivot-mcp@latest init --targets=pi, then restart pi, to send messages live.',
+/** What the Studio tells a pi or OpenCode user, by the state of TinyPivot's extension for it. */
+function extensionHint(agent: AgentExtension, status: Awaited<ReturnType<typeof refreshAgentExtension>>): string | undefined {
+  const name = agentLabel(agent)
+  if (status === 'updated')
+    return `TinyPivot's ${name} extension was just updated. Restart ${name} to send messages live.`
+  if (status === 'absent')
+    return `Run npx @smallwebco/tinypivot-mcp@latest init --targets=${agent}, then restart ${name}, to send messages live.`
+  return undefined
 }
 
+/** Every data tool takes a short reason, shown to the user in the Studio trace. */
 /** Explained once in the server instructions, so the schema stays bare. */
 const whyParam = z.string().max(240).optional()
 
@@ -449,8 +452,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const connectAgent = () => {
     const clientName = server.server.getClientVersion()?.name
     studio.setAgentName(clientName)
-    if (clientName === 'pi')
-      void refreshPiExtension().then(status => studio.setAgentHint(PI_HINTS[status])).catch(() => {})
+    if (clientName === 'pi' || clientName === 'opencode')
+      void refreshAgentExtension(clientName).then(status => studio.setAgentHint(extensionHint(clientName, status))).catch(() => {})
     if (clientName === 'claude-code' && !claudeChannel)
       studio.setAgentHint('Start Claude Code with --dangerously-load-development-channels server:tinypivot to send messages live.')
     if (claudeChannel) {
