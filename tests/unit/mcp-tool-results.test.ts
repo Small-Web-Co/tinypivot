@@ -16,10 +16,10 @@ const LOAD_ARGS = {
   chartConfig: { type: 'bar', xAxisField: 'month', yAxisField: 'mrr', aggregation: 'sum' },
 }
 
-async function connectClient(capabilities: Record<string, unknown>) {
+async function connectClient(capabilities: Record<string, unknown>, name = 'test-host') {
   const { server } = createTinyPivotMcpServer()
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
-  const client = new Client({ name: 'test-host', version: '1.0.0' }, { capabilities })
+  const client = new Client({ name, version: '1.0.0' }, { capabilities })
   await server.connect(serverTransport)
   await client.connect(clientTransport)
   return client
@@ -77,6 +77,15 @@ describe('what a data tool hands back depends on whether the host renders the wi
       const text = (result.content as Array<{ text: string }>)[0].text
 
       expect(text).toContain('do not repeat the card')
+      expect(text).not.toContain('Show the card above to the user verbatim.')
+    })
+
+    it('tells pi not to repeat the card its TinyPivot extension already draws', async () => {
+      const client = await connectClient({}, 'pi')
+      const result = await client.callTool({ name: 'load_data', arguments: LOAD_ARGS })
+      const text = (result.content as Array<{ text: string }>)[0].text
+
+      expect(text).toContain('pi extension already shows the user this card')
       expect(text).not.toContain('Show the card above to the user verbatim.')
     })
 

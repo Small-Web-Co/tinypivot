@@ -67,12 +67,15 @@ export function formatColumnNotes(columns: ColumnSummary[]): string {
 }
 
 const REPRINT_NOTE = 'Show the card above to the user verbatim.'
-const WIDGET_NOTE = 'The user already sees this in the TinyPivot view in the chat: do not repeat the card or a table of it. Reply with the takeaways.'
+const SHOWN_NOTES = {
+  widget: 'The user already sees this in the TinyPivot view in the chat: do not repeat the card or a table of it. Reply with the takeaways.',
+  pi: 'TinyPivot\'s pi extension already shows the user this card: do not repeat it or a table of it. Reply with the takeaways and the Studio link.',
+}
 
 /** What to tell the model about the card: repeat it in a terminal, leave it alone beside the widget. */
 function cardNote(companionUrl: string | undefined, options: TerminalFormatOptions): string | null {
-  if (options.shownInWidget)
-    return WIDGET_NOTE
+  if (options.shownBy)
+    return SHOWN_NOTES[options.shownBy]
   return companionUrl && options.reprintNote !== false ? REPRINT_NOTE : null
 }
 

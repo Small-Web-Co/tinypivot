@@ -43,8 +43,11 @@ export interface TerminalFormatOptions {
   raw?: boolean
   /** Remind the model, in a terminal, to show the card to the user. Off when cards are not reprinted. */
   reprintNote?: boolean
-  /** The host shows TinyPivot's own view in the chat, so the model is told not to repeat the card. */
-  shownInWidget?: boolean
+  /**
+   * Who already shows the user this card, so the model is told not to repeat it: the host's
+   * TinyPivot view in the chat (`widget`), or TinyPivot's pi extension (`pi`).
+   */
+  shownBy?: 'widget' | 'pi'
 }
 
 function codePointDisplayWidth(cp: number): number {

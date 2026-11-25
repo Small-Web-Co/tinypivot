@@ -467,9 +467,14 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(summary).toContain('↗ Live: http://127.0.0.1:51234')
 
     // Beside the inline widget, the model is told not to repeat the card, even with the Studio running.
-    const besideWidget = formatDatasetSummary(ds, 'http://127.0.0.1:51234', { shownInWidget: true })
+    const besideWidget = formatDatasetSummary(ds, 'http://127.0.0.1:51234', { shownBy: 'widget' })
     expect(besideWidget).toContain('do not repeat the card')
     expect(besideWidget).not.toContain('Show the card above to the user verbatim.')
+
+    // In pi, TinyPivot's extension draws the card, so the model is told not to print it again.
+    const inPi = formatDatasetSummary(ds, 'http://127.0.0.1:51234', { shownBy: 'pi' })
+    expect(inPi).toContain('pi extension already shows the user this card')
+    expect(inPi).not.toContain('Show the card above to the user verbatim.')
 
     // Direct TTY truecolor ANSI mode keeps uniform visual widths and embeds theme palette RGB
     const coloredStacked = formatTerminalChart(ds, {

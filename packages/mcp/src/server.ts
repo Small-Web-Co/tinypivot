@@ -5,6 +5,7 @@ import type {
   ChartThemePreset,
   PivotConfig,
 } from '@smallwebco/tinypivot-core'
+import type { TerminalFormatOptions } from './card.js'
 import type { AgentExtension } from './init.js'
 import type { PostgresConfig } from './postgres.js'
 import type { StoredDataset } from './store.js'
@@ -456,8 +457,12 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   )
 
   const clientRendersWidget = () => clientSupportsMcpAppsUi(server.server.getClientCapabilities())
-  /** How cards are written for this host: where it shows the widget, the card is not repeated. */
-  const cardFormat = () => ({ showBranding: !isPro, reprintNote: reprintCards, shownInWidget: clientRendersWidget() })
+  /** How cards are written for this host: where the widget or pi's extension shows the card, the model does not repeat it. */
+  const cardFormat = (): TerminalFormatOptions => ({
+    showBranding: !isPro,
+    reprintNote: reprintCards,
+    shownBy: clientRendersWidget() ? 'widget' : getClientName() === 'pi' ? 'pi' : undefined,
+  })
 
   const resolveCompanionUrlForTool = async (forceCompanion = false): Promise<string | undefined> => {
     if (activeCompanionUrl)
