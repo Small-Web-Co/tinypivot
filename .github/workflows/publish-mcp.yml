@@ -1,5 +1,5 @@
-# Publish @smallwebco/tinypivot-mcp to npm using Trusted Publishing (OIDC).
-# No npm token and no two-factor prompt: npm trusts this workflow directly.
+# Publish @smallwebco/tinypivot-mcp to npm and the Official MCP Registry using OIDC.
+# No npm token, no MCP Registry PAT, and no two-factor prompt: both trust this workflow directly.
 #
 # One-time setup on npmjs.com (package settings for @smallwebco/tinypivot-mcp):
 #   Trusted Publisher → GitHub Actions
@@ -8,7 +8,7 @@
 # To release: bump the version in packages/mcp (package.json, server.json,
 # src/server.ts, src/telemetry.ts), commit, then push a tag `mcp-v<version>`.
 # Keep this workflow tag-only, like publish.yml.
-name: Publish MCP to npm
+name: Publish MCP to npm & MCP Registry
 
 on:
   push:
@@ -90,3 +90,37 @@ jobs:
 
       - name: Publish @smallwebco/tinypivot-mcp with OIDC
         run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-mcp-*.tgz --access public
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}/bin" mcp-publisher
+          chmod +x "${RUNNER_TEMP}/bin/mcp-publisher"
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+
+      - name: Wait for npm version to propagate
+        run: |
+          set -euo pipefail
+          pkg_version="$(node -p "require('./packages/mcp/package.json').version")"
+          echo "Waiting for @smallwebco/tinypivot-mcp@${pkg_version} on npm..."
+          for attempt in $(seq 1 18); do
+            published="$(npm view "@smallwebco/tinypivot-mcp@${pkg_version}" version 2>/dev/null || true)"
+            if [ "${published}" = "${pkg_version}" ]; then
+              echo "Confirmed @smallwebco/tinypivot-mcp@${pkg_version} on npm (attempt ${attempt}); pausing 10s for registry propagation."
+              sleep 10
+              exit 0
+            fi
+            echo "Not visible yet (attempt ${attempt}/18); retrying in 5s..."
+            sleep 5
+          done
+          echo "Timed out waiting for @smallwebco/tinypivot-mcp@${pkg_version} to appear on npm." >&2
+          exit 1
+
+      - name: Publish to Official MCP Registry via GitHub OIDC
+        run: |
+          set -euo pipefail
+          cd packages/mcp
+          mcp-publisher login github-oidc
+          mcp-publisher publish

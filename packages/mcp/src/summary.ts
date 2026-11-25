@@ -271,6 +271,24 @@ function computeBrailleYBounds(values: number[]): { minVal: number, maxVal: numb
 }
 
 const LINE_SERIES_STYLES = ['━━', '┄┄', '··', '──'] as const
+const NON_ADDITIVE_FIELD_RE = /(?:^|[^a-z])(?:share|pct|percent|percentage|rate|margin|ratio|bps|yield|arpu|aov|ltv|cac|roas|ctr|cvr|nps|avg|mean|median|index)(?:$|[^a-z])|%/i
+
+export function isNonAdditiveMeasure(field?: string, aggregation?: string): boolean {
+  if (
+    aggregation === 'avg'
+    || aggregation === 'median'
+    || aggregation === 'min'
+    || aggregation === 'max'
+    || aggregation === 'stdDev'
+    || aggregation === 'percentOfTotal'
+  ) {
+    return true
+  }
+  if (!field)
+    return false
+  const normalized = field.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ')
+  return NON_ADDITIVE_FIELD_RE.test(normalized)
+}
 
 interface BrailleSeries {
   name: string
@@ -281,6 +299,7 @@ function renderBrailleLineBody(
   categories: string[],
   seriesList: BrailleSeries[],
   filledArea = false,
+  nonAdditive = false,
 ): string[] {
   const chartCols = 58
   const chartRows = 8
@@ -371,8 +390,12 @@ function renderBrailleLineBody(
   const lines: string[] = []
   if (seriesList.length > 1) {
     const legendItems = seriesList.slice(0, LINE_SERIES_STYLES.length).map((s, idx) => {
-      const seriesSum = s.values.reduce<number>((acc, v) => acc + (v ?? 0), 0)
-      return `${LINE_SERIES_STYLES[idx]} ${truncateVisual(s.name, 14)} (${formatCompactNumber(seriesSum)})`
+      const finite = s.values.filter((v): v is number => v !== null && Number.isFinite(v))
+      const seriesSum = finite.reduce<number>((acc, v) => acc + v, 0)
+      const statLabel = nonAdditive && finite.length > 0
+        ? `avg ${formatCompactNumber(seriesSum / finite.length)}`
+        : formatCompactNumber(seriesSum)
+      return `${LINE_SERIES_STYLES[idx]} ${truncateVisual(s.name, 14)} (${statLabel})`
     })
     if (seriesList.length > LINE_SERIES_STYLES.length)
       legendItems.push(`+${seriesList.length - LINE_SERIES_STYLES.length} more`)
@@ -482,6 +505,7 @@ export function formatTerminalChart(
     return ''
 
   const title = chartConfig.options?.title || `${dataset.name} · ${chartConfig.yAxis.field} by ${chartConfig.xAxis.field}`
+  const nonAdditive = isNonAdditiveMeasure(chartConfig.yAxis.field, chartConfig.yAxis.aggregation)
   const totalsPerCat = processed.categories.map((_, idx) =>
     processed.series.reduce((sum, s) => sum + (Number(s.data[idx]) || 0), 0),
   )
@@ -523,7 +547,7 @@ export function formatTerminalChart(
         return Number.isFinite(val) ? val : null
       }),
     }))
-    const body = renderBrailleLineBody(categoriesStr, brailleSeries, fullConfig.type === 'area').map((row, rIdx) => {
+    const body = renderBrailleLineBody(categoriesStr, brailleSeries, fullConfig.type === 'area', nonAdditive).map((row, rIdx) => {
       if (!pal)
         return row
       if (brailleSeries.length > 1 && rIdx === 0)
@@ -539,11 +563,24 @@ export function formatTerminalChart(
 
     let lineStats = statsLine
     let badge = `Total ${formatCompactNumber(grandTotal)}`
-    if (brailleSeries.length === 1) {
+    if (nonAdditive) {
+      const allPts = brailleSeries.flatMap(s => s.values.filter((v): v is number => v !== null && Number.isFinite(v)))
+      if (brailleSeries.length === 1) {
+        const ptAvg = allPts.length > 0 ? allPts.reduce((a, b) => a + b, 0) / allPts.length : avgVal
+        badge = `Avg ${formatCompactNumber(ptAvg)} · ${categoriesStr.length} pts`
+      }
+      else {
+        const ptMin = allPts.length > 0 ? Math.min(...allPts) : 0
+        const ptMax = allPts.length > 0 ? Math.max(...allPts) : 0
+        badge = `Range ${formatCompactNumber(ptMin)}–${formatCompactNumber(ptMax)} · ${categoriesStr.length} pts`
+      }
+    }
+    else if (brailleSeries.length === 1) {
       const delta = formatTrendDelta(totalsPerCat)
       badge = delta ? `Total ${formatCompactNumber(grandTotal)} · ${delta}` : badge
     }
-    else {
+
+    if (brailleSeries.length > 1) {
       const perSeriesPeaks = brailleSeries.slice(0, 3).map((s) => {
         let bestIdx = -1
         for (let i = 0; i < s.values.length; i++) {
@@ -623,7 +660,7 @@ export function formatTerminalChart(
       bar = `${coloredBar}${' '.repeat(Math.max(0, barWidth - visualWidth(rawBar)))}`
     }
     const valStr = padStartVisual(formatCompactNumber(entry.total), valWidth)
-    const pctStr = grandTotal > 0 ? `${((entry.total / grandTotal) * 100).toFixed(1).padStart(5)}%` : ''
+    const pctStr = !nonAdditive && grandTotal > 0 ? `${((entry.total / grandTotal) * 100).toFixed(1).padStart(5)}%` : ''
     const sep = pal ? ansiFg(pal.border, '│') : '│'
     const valOut = pal ? ansiFgBold(pal.text, valStr) : valStr
     const pctOut = pctStr ? (pal ? ansiFg(pal.muted, pctStr) : pctStr) : ''
@@ -642,8 +679,42 @@ export function formatTerminalChart(
   const footerLeft = showBranding ? 'tiny-pivot.com' : ''
   const chartKind = isMultiSeries ? 'Stacked Bar' : 'Bar'
   const footerRight = `${dataset.rows.length.toLocaleString()} rows · ${chartKind}`
+  const barBadge = nonAdditive
+    ? `Avg ${formatCompactNumber(avgVal)} · ${processed.categories.length} pts`
+    : `Total ${formatCompactNumber(grandTotal)}`
 
-  return wrapInCard(title, `Total ${formatCompactNumber(grandTotal)}`, body, footerLeft, footerRight, 66, { palette: pal, raw: options.raw })
+  return wrapInCard(title, barBadge, body, footerLeft, footerRight, 66, { palette: pal, raw: options.raw })
+}
+
+export function detectNonAdditiveSumWarning(
+  dataset: StoredDataset,
+  chartConfig?: Partial<ChartConfig>,
+): string | null {
+  const xField = chartConfig?.xAxis?.field
+  const yField = chartConfig?.yAxis?.field
+  if (!xField || !yField || dataset.rows.length < 2)
+    return null
+  const agg = chartConfig?.yAxis?.aggregation ?? 'sum'
+  if (agg !== 'sum' || !isNonAdditiveMeasure(yField))
+    return null
+
+  const sField = chartConfig?.seriesField?.field
+  const counts = new Map<string, number>()
+  let collisions = 0
+  for (const row of dataset.rows) {
+    const xKey = row[xField] === null || row[xField] === undefined ? '(blank)' : String(row[xField])
+    const sKey = sField ? (row[sField] === null || row[sField] === undefined ? '(blank)' : String(row[sField])) : ''
+    const key = sField ? `${xKey}\u0000${sKey}` : xKey
+    const next = (counts.get(key) ?? 0) + 1
+    counts.set(key, next)
+    if (next === 2)
+      collisions++
+  }
+  if (collisions === 0)
+    return null
+
+  const grain = sField ? `\`(${xField}, ${sField})\`` : `\`${xField}\``
+  return `> **Data Integrity Warning:** \`${yField}\` appears to be a non-additive percentage/ratio, and **${collisions}** ${grain} bucket${collisions === 1 ? '' : 's'} contain multiple rows that were summed (\`aggregation: "sum"\`). Re-aggregate in SQL or Python to strictly 1 row per ${grain} using \`SUM(numerator) / SUM(denominator)\` before passing to TinyPivot.`
 }
 
 /** A column at the cap has at least that many values, so it reads as "1,000+". */
@@ -677,6 +748,11 @@ export function formatDatasetSummary(
       '',
       `> **Notice (Free tier row limit):** Showing the first **${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows**. Charts, pivots, and totals reflect this ${dataset.rows.length.toLocaleString()}-row subset only. Set \`TINYPIVOT_LICENSE_KEY\` for full unlimited rows: https://tiny-pivot.com/pricing`,
     )
+  }
+
+  const integrityWarning = detectNonAdditiveSumWarning(dataset, dataset.chartConfig)
+  if (integrityWarning) {
+    parts.push('', integrityWarning)
   }
 
   if (chartBlock) {

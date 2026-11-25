@@ -63,6 +63,9 @@ export interface ColumnSummary {
 }
 
 export const FREE_TIER_ROW_LIMIT = 2500
+export const SAMPLE_DATASET_ID = 'sample_sales'
+export const DEFAULT_SESSION_KEY = 'default'
+const MAX_STORED_DATASETS = 24
 
 export interface StoredDataset {
   id: string
@@ -442,6 +445,8 @@ export function generateSampleSalesData(count = 400): Record<string, unknown>[] 
 
 export class DatasetStore {
   private datasets = new Map<string, StoredDataset>()
+  private sessionDatasetIds = new Map<string, string[]>()
+  private sessionActiveId = new Map<string, string>()
   private activeId: string | null = null
   private activeModel: ModelPricing = resolveModelPricing(process.env.TINYPIVOT_LLM_MODEL)
   private visualTheme: ChartThemePreset = process.env.TINYPIVOT_THEME
@@ -456,7 +461,7 @@ export class DatasetStore {
   constructor(options: { maxRowsPerDataset?: number } = {}) {
     this.maxRowsPerDataset = options.maxRowsPerDataset ?? Number.POSITIVE_INFINITY
     this.register({
-      id: 'sample_sales',
+      id: SAMPLE_DATASET_ID,
       name: 'Sample SaaS Sales (2026)',
       source: 'built-in sample',
       rows: generateSampleSalesData(400),
@@ -484,6 +489,46 @@ export class DatasetStore {
     })
   }
 
+  private normalizeSessionKey(sessionKey?: string): string {
+    const trimmed = sessionKey?.trim()
+    return trimmed && trimmed.length > 0 ? trimmed : DEFAULT_SESSION_KEY
+  }
+
+  private touchLru(id: string, dataset: StoredDataset): void {
+    this.datasets.delete(id)
+    this.datasets.set(id, dataset)
+  }
+
+  private enforceLruCap(): void {
+    while (this.datasets.size > MAX_STORED_DATASETS) {
+      let evictId: string | undefined
+      for (const candidateId of this.datasets.keys()) {
+        if (candidateId !== SAMPLE_DATASET_ID) {
+          evictId = candidateId
+          break
+        }
+      }
+      if (!evictId)
+        break
+      this.datasets.delete(evictId)
+      for (const [key, ids] of this.sessionDatasetIds.entries()) {
+        const filtered = ids.filter(x => x !== evictId)
+        if (filtered.length !== ids.length)
+          this.sessionDatasetIds.set(key, filtered)
+      }
+      for (const [key, active] of this.sessionActiveId.entries()) {
+        if (active === evictId) {
+          const remaining = this.sessionDatasetIds.get(key) ?? []
+          const next = remaining[remaining.length - 1]
+          if (next)
+            this.sessionActiveId.set(key, next)
+          else
+            this.sessionActiveId.delete(key)
+        }
+      }
+    }
+  }
+
   private slugify(name: string): string {
     const base = name
       .toLowerCase()
@@ -506,6 +551,8 @@ export class DatasetStore {
     viewMode?: DataGridViewMode
     pivotConfig?: Partial<PivotConfig>
     chartConfig?: Partial<ChartConfig>
+    sessionKey?: string
+    keepExisting?: boolean
   }): StoredDataset {
     const id = input.id ?? this.slugify(input.name)
     const allNormalized = input.rows.map(flattenRow)
@@ -541,12 +588,28 @@ export class DatasetStore {
       pivotConfig: resolvedPivot,
       chartConfig: resolvedChart,
     }
-    this.datasets.set(id, dataset)
+    this.touchLru(id, dataset)
+    this.enforceLruCap()
+
+    if (id !== SAMPLE_DATASET_ID) {
+      const key = this.normalizeSessionKey(input.sessionKey)
+      const keep = input.keepExisting !== false
+      const existing = keep
+        ? (this.sessionDatasetIds.get(key) ?? []).filter(x => x !== SAMPLE_DATASET_ID && x !== id && this.datasets.has(x))
+        : []
+      this.sessionDatasetIds.set(key, [...existing, id])
+      this.sessionActiveId.set(key, id)
+    }
+
     this.activeId = id
     return dataset
   }
 
-  async loadFromFile(filePath: string, name?: string): Promise<StoredDataset> {
+  async loadFromFile(
+    filePath: string,
+    name?: string,
+    options?: { sessionKey?: string, keepExisting?: boolean },
+  ): Promise<StoredDataset> {
     const resolved = path.resolve(filePath)
     const ext = path.extname(resolved).toLowerCase()
     const raw = await fs.readFile(resolved, 'utf8')
@@ -586,21 +649,34 @@ export class DatasetStore {
       name: displayName,
       source: resolved,
       rows,
+      sessionKey: options?.sessionKey,
+      keepExisting: options?.keepExisting,
     })
   }
 
-  get(id?: string): StoredDataset | undefined {
-    if (id)
-      return this.datasets.get(id)
-    if (this.activeId)
-      return this.datasets.get(this.activeId)
+  get(id?: string, sessionKey?: string): StoredDataset | undefined {
+    if (id) {
+      const found = this.datasets.get(id)
+      if (found)
+        this.touchLru(id, found)
+      return found
+    }
+    const active = this.getActiveId(sessionKey)
+    if (active)
+      return this.datasets.get(active)
     return undefined
   }
 
-  setActive(id: string): StoredDataset | undefined {
+  setActive(id: string, sessionKey?: string): StoredDataset | undefined {
     const ds = this.datasets.get(id)
-    if (ds)
+    if (ds) {
+      this.touchLru(id, ds)
       this.activeId = id
+      if (id !== SAMPLE_DATASET_ID) {
+        const key = this.normalizeSessionKey(sessionKey)
+        this.sessionActiveId.set(key, id)
+      }
+    }
     return ds
   }
 
@@ -611,8 +687,9 @@ export class DatasetStore {
       pivotConfig?: Partial<PivotConfig>
       chartConfig?: Partial<ChartConfig>
     },
+    sessionKey?: string,
   ): StoredDataset | undefined {
-    const ds = this.get(id)
+    const ds = this.get(id, sessionKey)
     if (!ds)
       return undefined
     if (patch.viewMode !== undefined)
@@ -622,11 +699,30 @@ export class DatasetStore {
     if (patch.chartConfig !== undefined)
       ds.chartConfig = { ...ds.chartConfig, ...patch.chartConfig }
     this.activeId = ds.id
+    if (ds.id !== SAMPLE_DATASET_ID) {
+      const key = this.normalizeSessionKey(sessionKey)
+      this.sessionActiveId.set(key, ds.id)
+    }
     return ds
   }
 
-  listMetadata(): DatasetMetadata[] {
-    return Array.from(this.datasets.values()).map(d => ({
+  clearSession(sessionKey?: string): number {
+    const key = this.normalizeSessionKey(sessionKey)
+    const prevIds = (this.sessionDatasetIds.get(key) ?? []).filter(id => id !== SAMPLE_DATASET_ID && this.datasets.has(id))
+    this.sessionDatasetIds.delete(key)
+    this.sessionActiveId.delete(key)
+    if (key === DEFAULT_SESSION_KEY || (this.activeId && prevIds.includes(this.activeId))) {
+      this.activeId = this.datasets.has(SAMPLE_DATASET_ID) ? SAMPLE_DATASET_ID : null
+    }
+    return prevIds.length
+  }
+
+  listMetadata(sessionKey?: string): DatasetMetadata[] {
+    const key = this.normalizeSessionKey(sessionKey)
+    const realIds = (this.sessionDatasetIds.get(key) ?? [])
+      .filter(id => id !== SAMPLE_DATASET_ID && this.datasets.has(id))
+
+    const toMeta = (d: StoredDataset): DatasetMetadata => ({
       id: d.id,
       name: d.name,
       source: d.source,
@@ -634,11 +730,30 @@ export class DatasetStore {
       columns: d.columns,
       loadedAt: d.loadedAt,
       viewMode: d.viewMode,
-    }))
+    })
+
+    if (realIds.length > 0) {
+      return realIds
+        .map(id => this.datasets.get(id))
+        .filter((d): d is StoredDataset => Boolean(d))
+        .map(toMeta)
+    }
+
+    const sample = this.datasets.get(SAMPLE_DATASET_ID)
+    return sample ? [toMeta(sample)] : []
   }
 
-  getActiveId(): string | null {
-    return this.activeId
+  getActiveId(sessionKey?: string): string | null {
+    const key = this.normalizeSessionKey(sessionKey)
+    const sessionActive = this.sessionActiveId.get(key)
+    if (sessionActive && this.datasets.has(sessionActive))
+      return sessionActive
+    const sessionIds = (this.sessionDatasetIds.get(key) ?? []).filter(id => this.datasets.has(id))
+    if (sessionIds.length > 0)
+      return sessionIds[sessionIds.length - 1]
+    if (this.datasets.has(SAMPLE_DATASET_ID))
+      return SAMPLE_DATASET_ID
+    return this.activeId && this.datasets.has(this.activeId) ? this.activeId : null
   }
 
   getActiveModel(): ModelPricing {

@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   clientSupportsMcpAppsUi,
   createTinyPivotMcpServer,
@@ -15,11 +15,45 @@ import {
   TINYPIVOT_MCP_INSTRUCTIONS,
   upsertTinyPivotRuleBlock,
 } from '../../packages/mcp/src/index'
-import { isMcpLicenseKey } from '../../packages/mcp/src/server'
-import { FREE_TIER_ROW_LIMIT } from '../../packages/mcp/src/store'
-import { visualWidth } from '../../packages/mcp/src/summary'
+import { extractSessionKey, isMcpLicenseKey } from '../../packages/mcp/src/server'
+import { FREE_TIER_ROW_LIMIT, SAMPLE_DATASET_ID } from '../../packages/mcp/src/store'
+import { isNonAdditiveMeasure, visualWidth } from '../../packages/mcp/src/summary'
 import { bucketRowCount, isTelemetryEnabled } from '../../packages/mcp/src/telemetry'
 import { getCompanionSessionFile, isProcessAlive, resolveCompanionUrl } from '../../packages/mcp/src/tui'
+
+function createMockMcpSession(server: ReturnType<typeof createTinyPivotMcpServer>['server']) {
+  const pending = new Map<number, (msg: Record<string, unknown>) => void>()
+  let nextId = 1
+  const transport = {
+    onmessage: undefined as ((msg: unknown, extra?: unknown) => void) | undefined,
+    onerror: undefined as ((err: Error) => void) | undefined,
+    onclose: undefined as (() => void) | undefined,
+    async start() {},
+    async close() {},
+    async send(msg: Record<string, unknown>) {
+      if (typeof msg.id === 'number' && pending.has(msg.id)) {
+        const resolve = pending.get(msg.id)!
+        pending.delete(msg.id)
+        resolve(msg)
+      }
+    },
+  }
+  const request = (method: string, params: Record<string, unknown>) =>
+    new Promise<Record<string, unknown>>((resolve) => {
+      const id = nextId++
+      pending.set(id, resolve)
+      transport.onmessage?.({ jsonrpc: '2.0', id, method, params })
+    })
+  return {
+    connect: () => server.connect(transport as never),
+    initialize: (capabilities: Record<string, unknown>) =>
+      request('initialize', { protocolVersion: '2024-11-05', capabilities, clientInfo: { name: 'test', version: '1.0.0' } }),
+    callTool: async (name: string, args: Record<string, unknown>, meta?: Record<string, unknown>) => {
+      const res = await request('tools/call', { name, arguments: args, ...(meta ? { _meta: meta } : {}) })
+      return res.result as { structuredContent?: Record<string, unknown>, content?: Array<{ text: string }> }
+    },
+  }
+}
 
 function extractFencedCardLines(markdown: string): string[] {
   const match = markdown.match(/```text\n([\s\S]*?)\n```/)
@@ -468,5 +502,290 @@ describe('mCP default-chart routing instructions & idempotent CLAUDE.md rule inj
     expect(src).toContain('"greenbar"')
     expect(src).toContain('"crt-green"')
     expect(src).toContain('255,')
+  })
+})
+
+describe('per-session dataset isolation & zero cross-chat leakage (v0.2.3)', () => {
+  const originalTelemetry = process.env.TINYPIVOT_TELEMETRY
+
+  beforeEach(() => {
+    process.env.TINYPIVOT_TELEMETRY = '0'
+  })
+
+  afterEach(() => {
+    if (originalTelemetry === undefined)
+      delete process.env.TINYPIVOT_TELEMETRY
+    else
+      process.env.TINYPIVOT_TELEMETRY = originalTelemetry
+  })
+
+  it('auto-hides sample_sales once any real dataset is loaded and isolates explicit sessionKeys', () => {
+    const store = new DatasetStore()
+
+    // Fresh session sees sample_sales only
+    expect(store.listMetadata().map(d => d.id)).toEqual([SAMPLE_DATASET_ID])
+
+    // Session A loads Edgeworth -> sample_sales auto-hidden in Session A
+    const dsA = store.register({
+      name: 'Edgeworth Revenue',
+      source: 'edgeworth.csv',
+      rows: [{ month: '2026-01', revenue: 500 }],
+      sessionKey: 'chat-a',
+    })
+    expect(store.listMetadata('chat-a').map(d => d.id)).toEqual([dsA.id])
+
+    // Brand-new Session B does NOT see Session A's dataset
+    expect(store.listMetadata('chat-b').map(d => d.id)).toEqual([SAMPLE_DATASET_ID])
+    expect(store.get(undefined, 'chat-b')?.id).toBe(SAMPLE_DATASET_ID)
+
+    // Session B loads Asthma TRx share -> isolated to Session B only
+    const dsB = store.register({
+      name: 'Asthma TRx Share',
+      source: 'asthma.csv',
+      rows: [{ month: '2026-01', share_pct: 48.2 }],
+      sessionKey: 'chat-b',
+    })
+    expect(store.listMetadata('chat-b').map(d => d.id)).toEqual([dsB.id])
+    expect(store.listMetadata('chat-a').map(d => d.id)).toEqual([dsA.id])
+
+    // Clearing Session A restores sample_sales for A without touching B, while exact ID lookup still works
+    expect(store.clearSession('chat-a')).toBe(1)
+    expect(store.listMetadata('chat-a').map(d => d.id)).toEqual([SAMPLE_DATASET_ID])
+    expect(store.listMetadata('chat-b').map(d => d.id)).toEqual([dsB.id])
+    expect(store.get(dsA.id)?.name).toBe('Edgeworth Revenue')
+  })
+
+  it('extracts session keys from MCP request extra fields and _meta keys', () => {
+    expect(extractSessionKey(undefined)).toBeUndefined()
+    expect(extractSessionKey({})).toBeUndefined()
+    expect(extractSessionKey({ sessionId: 'sess-1' })).toBe('sess-1')
+    expect(extractSessionKey({ _meta: { conversationId: 'conv-42' } })).toBe('conv-42')
+    expect(extractSessionKey({ _meta: { chatId: 'chat-9' } })).toBe('chat-9')
+    expect(extractSessionKey({ _meta: { threadId: 'thr-7' } })).toBe('thr-7')
+    expect(extractSessionKey({ _meta: { sessionId: 'meta-sess' } })).toBe('meta-sess')
+  })
+
+  it('enforces bounded LRU lookup cap (max 24) while preserving sample_sales', () => {
+    const store = new DatasetStore()
+    const ids: string[] = []
+    for (let i = 1; i <= 28; i++) {
+      const ds = store.register({
+        name: `Dataset ${i}`,
+        source: `d${i}.csv`,
+        rows: [{ x: 'A', y: i }],
+      })
+      ids.push(ds.id)
+    }
+    expect(store.get(SAMPLE_DATASET_ID)).toBeDefined()
+    expect(store.get(ids[0])).toBeUndefined()
+    expect(store.get(ids[ids.length - 1])).toBeDefined()
+  })
+
+  it('isolates shared-process MCP Apps hosts by default (keepExisting=false) while supporting keepExisting=true, old widget fetches, and clear_datasets', async () => {
+    let companionNotifies = 0
+    const { server, store } = createTinyPivotMcpServer({
+      onStateChanged: () => companionNotifies++,
+    })
+    const session = createMockMcpSession(server)
+    await session.connect()
+    await session.initialize({
+      extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } },
+    })
+
+    try {
+      // Chat 1 loads Edgeworth
+      const r1 = await session.callTool('load_data', {
+        name: 'Edgeworth Revenue',
+        rows: [{ month: '2026-01', revenue: 4200000 }],
+      })
+      const sc1 = r1.structuredContent as { datasetId: string, datasets: Array<{ id: string }> }
+      expect(sc1.datasets.map(d => d.id)).toEqual([sc1.datasetId])
+      expect(sc1.datasets.map(d => d.id)).not.toContain(SAMPLE_DATASET_ID)
+
+      // Chat 2 loads Asthma TRx share (no keepExisting -> replaces switcher, zero leakage!)
+      const r2 = await session.callTool('load_data', {
+        name: 'Asthma TRx Share',
+        rows: [{ month: '2026-01', share_pct: 52.4 }],
+      })
+      const sc2 = r2.structuredContent as { datasetId: string, datasets: Array<{ id: string }> }
+      expect(sc2.datasets.map(d => d.id)).toEqual([sc2.datasetId])
+      expect(sc2.datasets.map(d => d.id)).not.toContain(sc1.datasetId)
+
+      // Already-rendered Chat 1 widget can still fetch its rows by exact ID!
+      expect(store.get(sc1.datasetId)?.name).toBe('Edgeworth Revenue')
+      const oldFetch = await session.callTool('fetch_dataset_rows', { datasetId: sc1.datasetId })
+      const oldFetchSc = oldFetch.structuredContent as { datasetId: string, rows: Array<{ revenue: number }> }
+      expect(oldFetchSc.datasetId).toBe(sc1.datasetId)
+      expect(oldFetchSc.rows[0].revenue).toBe(4200000)
+
+      // Same chat loads a second dataset with keepExisting: true -> both remain in switcher
+      const r3 = await session.callTool('load_data', {
+        name: 'Asthma NRx Share',
+        rows: [{ month: '2026-01', share_pct: 49.1 }],
+        keepExisting: true,
+      })
+      const sc3 = r3.structuredContent as { datasetId: string, datasets: Array<{ id: string }> }
+      expect(sc3.datasets.map(d => d.id)).toEqual([sc2.datasetId, sc3.datasetId])
+
+      // clear_datasets resets switcher to sample_sales and notifies Companion
+      const notifiesBefore = companionNotifies
+      const clearRes = await session.callTool('clear_datasets', {})
+      const clearSc = clearRes.structuredContent as { cleared: number, datasets: Array<{ id: string }> }
+      expect(clearSc.cleared).toBe(2)
+      expect(clearSc.datasets.map(d => d.id)).toEqual([SAMPLE_DATASET_ID])
+      expect(companionNotifies).toBeGreaterThan(notifiesBefore)
+    }
+    finally {
+      await server.close()
+    }
+  })
+
+  it('keeps datasets within a dedicated terminal process (non-MCP-Apps) while auto-hiding sample_sales', async () => {
+    const { server } = createTinyPivotMcpServer()
+    const session = createMockMcpSession(server)
+    await session.connect()
+    await session.initialize({})
+
+    try {
+      await session.callTool('load_data', { name: 'Q1 Sales', rows: [{ month: '2026-01', revenue: 100 }] })
+      await session.callTool('load_data', { name: 'Q2 Sales', rows: [{ month: '2026-04', revenue: 200 }] })
+      const listed = await session.callTool('list_datasets', {})
+      const sc = listed.structuredContent as { datasets: Array<{ id: string, name: string }> }
+      expect(sc.datasets.map(d => d.name)).toEqual(['Q1 Sales', 'Q2 Sales'])
+      expect(sc.datasets.map(d => d.id)).not.toContain(SAMPLE_DATASET_ID)
+    }
+    finally {
+      await server.close()
+    }
+  })
+
+  it('automatically isolates conversations when host provides _meta.conversationId', async () => {
+    const { server } = createTinyPivotMcpServer()
+    const session = createMockMcpSession(server)
+    await session.connect()
+    await session.initialize({
+      extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] } },
+    })
+
+    try {
+      const c1a = await session.callTool('load_data', { name: 'Chat1 A', rows: [{ x: 'a', y: 1 }] }, { conversationId: 'conv-1' })
+      const c1b = await session.callTool('load_data', { name: 'Chat1 B', rows: [{ x: 'b', y: 2 }] }, { conversationId: 'conv-1' })
+      const c2a = await session.callTool('load_data', { name: 'Chat2 A', rows: [{ x: 'c', y: 3 }] }, { conversationId: 'conv-2' })
+
+      const sc1a = c1a.structuredContent as { datasetId: string }
+      const sc1b = c1b.structuredContent as { datasetId: string, datasets: Array<{ id: string }> }
+      const sc2a = c2a.structuredContent as { datasetId: string, datasets: Array<{ id: string }> }
+
+      // Same conversation keeps its datasets automatically
+      expect(sc1b.datasets.map(d => d.id)).toEqual([sc1a.datasetId, sc1b.datasetId])
+      // Separate conversation is completely isolated
+      expect(sc2a.datasets.map(d => d.id)).toEqual([sc2a.datasetId])
+    }
+    finally {
+      await server.close()
+    }
+  })
+})
+
+describe('presentation-only non-additive measure guardrails (share/rate/ratio)', () => {
+  it('classifies non-additive measures accurately without false positives on revenue or corporate_sales', () => {
+    expect(isNonAdditiveMeasure('share_pct', 'sum')).toBe(true)
+    expect(isNonAdditiveMeasure('trx_share', 'sum')).toBe(true)
+    expect(isNonAdditiveMeasure('conversionRate', 'sum')).toBe(true)
+    expect(isNonAdditiveMeasure('margin_pct', 'sum')).toBe(true)
+    expect(isNonAdditiveMeasure('Share (%)', 'sum')).toBe(true)
+    expect(isNonAdditiveMeasure('revenue', 'avg')).toBe(true)
+    expect(isNonAdditiveMeasure('revenue', 'sum')).toBe(false)
+    expect(isNonAdditiveMeasure('corporate_sales', 'sum')).toBe(false)
+    expect(isNonAdditiveMeasure('units', 'sum')).toBe(false)
+  })
+
+  it('never prints a misleading summed Total badge on share_pct line or bar charts', () => {
+    const store = new DatasetStore()
+    const rows: Array<{ month: string, drug: string, share_pct: number }> = []
+    for (let i = 1; i <= 12; i++) {
+      const month = `2025-${String(i).padStart(2, '0')}`
+      rows.push({ month, drug: 'Dupixent', share_pct: 55 + (i % 4) })
+      rows.push({ month, drug: 'Fasenra', share_pct: 25 })
+      rows.push({ month, drug: 'Nucala', share_pct: 20 - (i % 4) })
+    }
+
+    const ds = store.register({
+      name: 'Asthma Biologic TRx Share',
+      source: 'trx.csv',
+      rows,
+    })
+
+    const multiLine = formatTerminalChart(ds, {
+      type: 'line',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'share_pct', role: 'measure', aggregation: 'sum' },
+      seriesField: { field: 'drug', role: 'dimension' },
+      options: { title: 'Asthma Biologic Monthly TRx Share (%)' },
+    })
+    assertUniformCardBorderWidth(multiLine)
+    expect(multiLine).not.toContain('Total ')
+    expect(multiLine).toContain('Range ')
+    expect(multiLine).toContain('12 pts')
+    expect(multiLine).toContain('avg ')
+
+    const singleLine = formatTerminalChart(ds, {
+      type: 'line',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'share_pct', role: 'measure', aggregation: 'avg' },
+      options: { title: 'Average Share (%)' },
+    })
+    assertUniformCardBorderWidth(singleLine)
+    expect(singleLine).not.toContain('Total ')
+    expect(singleLine).toContain('Avg ')
+    expect(singleLine).toContain('12 pts')
+
+    const stackedShareBar = formatTerminalChart(ds, {
+      type: 'stackedBar',
+      xAxis: { field: 'month', role: 'dimension' },
+      yAxis: { field: 'share_pct', role: 'measure', aggregation: 'sum' },
+      seriesField: { field: 'drug', role: 'dimension' },
+    })
+    assertUniformCardBorderWidth(stackedShareBar)
+    expect(stackedShareBar).not.toContain('Total ')
+    expect(stackedShareBar).toContain('Avg ')
+    expect(stackedShareBar).toContain('12 pts')
+
+    // Instructions document the presentation-only ratio guardrail and keepExisting guidance
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('numerator / denominator')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('percentOfTotal')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('keepExisting: true')
+    expect(TINYPIVOT_MCP_INSTRUCTIONS).toContain('clear_datasets')
+
+    // Emits a Data Integrity Warning when sub-segment rows collide under sum(share_pct), and stays silent on 1-row-per-bucket data
+    const multiGrain = store.register({
+      name: 'Sub-segment Share Collision',
+      source: 'test',
+      rows: [
+        { month: '2025-01', drug: 'Dupixent', channel: 'Commercial', share_pct: 42 },
+        { month: '2025-01', drug: 'Dupixent', channel: 'Medicare', share_pct: 38 },
+        { month: '2025-02', drug: 'Dupixent', channel: 'Commercial', share_pct: 44 },
+      ],
+      chartConfig: {
+        type: 'line',
+        xAxis: { field: 'month', role: 'dimension' },
+        yAxis: { field: 'share_pct', role: 'measure', aggregation: 'sum' },
+        seriesField: { field: 'drug', role: 'dimension' },
+      },
+    })
+    const warnedSummary = formatDatasetSummary(multiGrain)
+    expect(warnedSummary).toContain('Data Integrity Warning')
+    expect(warnedSummary).toContain('SUM(numerator) / SUM(denominator)')
+
+    const cleanSummary = formatDatasetSummary({
+      ...ds,
+      chartConfig: {
+        type: 'line',
+        xAxis: { field: 'month', role: 'dimension' },
+        yAxis: { field: 'share_pct', role: 'measure', aggregation: 'sum' },
+        seriesField: { field: 'drug', role: 'dimension' },
+      },
+    })
+    expect(cleanSummary).not.toContain('Data Integrity Warning')
   })
 })

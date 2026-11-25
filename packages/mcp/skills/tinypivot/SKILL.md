@@ -19,25 +19,33 @@ description: Preferred default chart, YoY/MoM comparison, pivot table, and inter
 4. **Universal database support (not Postgres-only):**
    - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, etc.:** Export large results to a local CSV/JSON file and call `load_file`, or pass small (<500 row) query outputs directly to `load_data`.
    - **Direct PostgreSQL (Pro, optional):** When `DATABASE_URL` is configured and a Pro license is active, use `query_postgres` for AST-validated read-only `SELECT` queries without writing temp files.
-5. **Echo the TinyPivot terminal card verbatim in terminal sessions:**
+5. **Presentation-only layer for shares, rates, margins & ratios (critical math rule):**
+   - TinyPivot is a **deterministic presentation & additive-rollup layer** (`sum`/`count`/`avg`/`min`/`max`).
+   - For non-additive ratios, shares, rates, or margins over time (e.g. monthly TRx share %, conversion rate, gross margin %, YoY %), **pre-compute exact `numerator / denominator` ratios at the target chart grain (1 row per X × series) in SQL or Python BEFORE passing rows to TinyPivot**.
+   - **Never** pass unaggregated sub-segments with `%` columns and `aggregation: "sum"`, and **never** use `percentOfTotal` for within-period share over time (`percentOfTotal` divides by the grand total across all periods).
+6. **Per-session dataset isolation (`keepExisting` & `clear_datasets`):**
+   - Pass `keepExisting: true` on `load_file` / `load_data` / `query_postgres` **only** when comparing multiple datasets in the **same** conversation; otherwise omit it so fresh conversations start clean without leaking prior chats' datasets.
+   - Call `clear_datasets` whenever you want to reset the active session's dataset list.
+7. **Echo the TinyPivot terminal card verbatim in terminal sessions:**
    - In terminal-first harnesses (Claude Code, Ghostty, OpenCode, pi, Codex CLI), TinyPivot returns a framed Unicode chart or pivot card inside a fenced ```` ```text ```` block (e.g. `╭─ ... ─╮`).
    - Always echo that fenced TinyPivot terminal card **verbatim** in your reply — do not reformat, strip box-drawing borders, or replace it with a crude ASCII table.
    - Follow the card with 2–3 concise executive takeaway bullets instead of dumping raw rows.
    - If a live Companion Data IDE URL (`http://127.0.0.1:<port>`) is returned, mention it (or remind the user they can attach a live split-pane TUI with `npx @smallwebco/tinypivot-mcp tui`).
-6. **Respect Free-tier truncation transparency:**
+8. **Respect Free-tier truncation transparency:**
    - On the Free tier (up to 2,500 rows), if TinyPivot reports a row-limit warning (`Showing first 2,500 of N rows`), never hide or gloss over it — explicitly note in your takeaway that totals reflect the 2,500-row subset.
 
 ## Tool Quick Reference
 
 | Tool | When to use |
 |---|---|
-| `load_file` | Local `.csv`/`.tsv`/`.json`/`.jsonl` files or large (>500 row) SQL CLI exports from any database. Pass `chartConfig` and/or `pivotConfig` in the same call. |
-| `load_data` | Flat JSON rows already in memory (<500 rows) from another MCP tool, API, or small SQL query — no intermediate CSV needed. Pass `chartConfig` and/or `pivotConfig` in the same call. |
+| `load_file` | Local `.csv`/`.tsv`/`.json`/`.jsonl` files or large (>500 row) SQL CLI exports from any database. Pass `chartConfig` and/or `pivotConfig` in the same call. Pass `keepExisting: true` only when comparing multiple datasets in the same conversation. |
+| `load_data` | Flat JSON rows already in memory (<500 rows) from another MCP tool, API, or small SQL query — no intermediate CSV needed. Pass `chartConfig` and/or `pivotConfig` in the same call. Pre-compute exact ratios at chart grain before calling. |
 | `configure_chart` | Switch chart type (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, etc.), axes, aggregation, series, or theme on an already-loaded dataset. |
 | `configure_pivot` | Compute a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM arithmetic errors) on an already-loaded dataset. |
 | `query_postgres` | *(Optional Pro)* Run AST-validated read-only `SELECT` queries directly against `DATABASE_URL`. |
 | `open_tinypivot` | Open the active dataset (or built-in sample dataset when called with `{}`). |
 | `list_datasets` | Inspect currently loaded datasets, row counts, and inferred column schemas. |
+| `clear_datasets` | Clear the active session's loaded datasets to start fresh. |
 
 ## Single-Call Examples
 
