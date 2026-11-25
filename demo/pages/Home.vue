@@ -5,6 +5,7 @@ import BenchmarkTable from '../components/site/BenchmarkTable.vue'
 import HeroCharts from '../components/site/HeroCharts.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
+import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
 import { benchmarkHeadline } from '../site/benchmark'
 
@@ -54,15 +55,17 @@ const capabilities = [
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
-                Local data studio for AI agents
+                Your Agentic IDE for Data Work.
               </p>
-              <h1 class="display">
-                Interactive BI inside <em>your AI agent.</em>
+              <h1 class="display hero-title">
+                Interactive Data Analysis inside <em>your favorite Harness / Agent.</em>
               </h1>
               <p class="lede">
-                Built for Claude Code, Cursor, pi, OpenCode, Antigravity and Claude Desktop.
-                Explore 50k+ rows locally in milliseconds—pivot, drill through and export .xlsx at $0 tokens,
-                with every figure checked and zero raw rows sent to the model.
+                Built for the tools you already work in — Claude, Cursor, Antigravity and pi.
+                Trusted across 53,000+ npm downloads for interactive pivoting and D3.js charting, it gives you
+                <mark class="hl">local privacy</mark>, <mark class="hl">millisecond speed</mark>,
+                <mark class="hl">verified accuracy</mark>, and <mark class="hl">$0 exploration cost</mark>.
+                Spar with your data and save money by letting TinyPivot do the dirty work.
               </p>
               <ul class="hero-points">
                 <li v-for="point in heroPoints" :key="point">
@@ -100,6 +103,8 @@ const capabilities = [
         </RetroWindow>
       </div>
     </section>
+
+    <TestimonialCarousel />
 
     <section id="studio" class="block reel" aria-labelledby="reel-title">
       <div class="wrap">
@@ -245,8 +250,31 @@ const capabilities = [
   align-content: start;
 }
 
+.hero-title {
+  font-size: clamp(2.15rem, 6.2vw, 3.25rem);
+  line-height: 1.04;
+}
+
 .hero .lede {
-  font-size: 1.06rem;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.hl {
+  padding: 0 3px;
+  margin: 0 -1px;
+  border-radius: 2px;
+  background: linear-gradient(
+    104deg,
+    transparent 0.8%,
+    rgba(255, 214, 70, 0.78) 2.6%,
+    rgba(255, 226, 106, 0.68) 94%,
+    transparent 98.5%
+  );
+  color: var(--ink);
+  font-weight: 500;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .hero-points {

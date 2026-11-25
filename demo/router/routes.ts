@@ -98,8 +98,8 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot — Interactive BI inside your AI agent.',
-      description: 'Local data studio for Claude Code, Cursor, pi, OpenCode, Antigravity & Claude Desktop. Explore 50k+ rows locally in milliseconds—pivot, drill through & export .xlsx at $0 tokens, with every figure checked and zero raw rows sent to the model.',
+      title: 'TinyPivot — Interactive Data Analysis inside your favorite Harness / Agent.',
+      description: 'Your Agentic IDE for Data Work. Built for Claude, Cursor, Antigravity & pi. Trusted across 53,000+ npm downloads for local privacy, millisecond speed, verified accuracy, D3.js charting and $0 exploration cost.',
     },
   },
   {
