@@ -7,7 +7,7 @@
         "@smallwebco/tinypivot-mcp@0.6.0"
       ],
       "env": {
-        "TINYPIVOT_LICENSE_KEY": "${user_config.license_key}"
+        "CLAUDE_PLUGIN_OPTION_LICENSE_KEY": "${user_config.license_key}"
       }
     }
   }

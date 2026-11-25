@@ -325,11 +325,29 @@ export function isMcpLicenseKey(key?: string | null): boolean {
   return key.startsWith('TP-MCPP-') || key.startsWith('TP-MCPT-')
 }
 
+/**
+ * Where a key can come from: TINYPIVOT_LICENSE_KEY (set by init and hand-written configs), then
+ * the Claude plugin's license_key option, which Claude Code hands over as
+ * CLAUDE_PLUGIN_OPTION_LICENSE_KEY. An option left empty can arrive as the unexpanded
+ * `${user_config.license_key}`, which counts as no key.
+ */
+const LICENSE_KEY_ENV_VARS = ['TINYPIVOT_LICENSE_KEY', 'CLAUDE_PLUGIN_OPTION_LICENSE_KEY']
+
+function licenseKeyFromEnv(): string | undefined {
+  for (const name of LICENSE_KEY_ENV_VARS) {
+    const value = process.env[name]?.trim()
+    if (value && !value.startsWith('${'))
+      return value
+  }
+  return undefined
+}
+
 export function resolveLicenseKey(explicit?: string): string | undefined {
   if (explicit?.trim())
     return explicit.trim()
-  if (process.env.TINYPIVOT_LICENSE_KEY?.trim())
-    return process.env.TINYPIVOT_LICENSE_KEY.trim()
+  const fromEnv = licenseKeyFromEnv()
+  if (fromEnv)
+    return fromEnv
 
   const here = path.dirname(fileURLToPath(import.meta.url))
   const candidates = [
