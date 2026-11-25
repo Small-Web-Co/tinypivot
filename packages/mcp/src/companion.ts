@@ -274,18 +274,19 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     return sendJson(res, 404, { error: 'Not found' })
   }
 
+  /** Set once listening; read from here because server.address() is null once closing starts. */
+  let listenPort = 0
   const server = http.createServer(async (req, res) => {
     const urlObj = new URL(req.url || '/', 'http://127.0.0.1')
     const pathname = urlObj.pathname
 
     res.setHeader('Cache-Control', 'no-store')
-    const port = (server.address() as AddressInfo).port
     const allowed = isAllowedRequest({
       method: req.method,
       host: req.headers.host,
       origin: req.headers.origin,
       studioHeader: req.headers[STUDIO_HEADER] as string | undefined,
-    }, port)
+    }, listenPort)
     if (!allowed)
       return sendJson(res, 403, { error: 'Forbidden' })
 
@@ -322,7 +323,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     // The pi extension draws TinyPivot cards; this hands it a card in full colour, found by its title.
     if (req.method === 'GET' && pathname === '/api/studio/card') {
       const title = urlObj.searchParams.get('title') ?? ''
-      const ansi = colouredCard(options.store, title, `http://127.0.0.1:${port}`, Boolean(options.licenseKey || options.demoToken))
+      const ansi = colouredCard(options.store, title, `http://127.0.0.1:${listenPort}`, Boolean(options.licenseKey || options.demoToken))
       return ansi ? sendJson(res, 200, { ansi }) : sendJson(res, 404, { error: 'No card with that title.' })
     }
 
@@ -391,6 +392,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
   })
 
   const address = server.address() as AddressInfo
+  listenPort = address.port
   const url = `http://127.0.0.1:${address.port}`
 
   // Record active localhost session so `tinypivot-mcp tui` auto-attaches in a Ghostty/tmux split pane
@@ -420,8 +422,10 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
         }
         sseClients.clear()
 
+        // Agent streams and keep-alive sockets stay open on their own; close them so this resolves.
         await new Promise<void>((resolve) => {
           server.close(() => resolve())
+          server.closeAllConnections()
         })
 
         // Clean up companion.json only if this process still owns it
