@@ -98,8 +98,8 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot — Real pivots in any agent. Zero rows to the LLM.',
-      description: 'Local data studio for Claude Code, Cursor, pi, OpenCode, Antigravity & Claude Desktop. Stream 50k+ rows locally in milliseconds, pivot, drill through & export .xlsx at $0 tokens—every figure checked.',
+      title: 'TinyPivot — Interactive BI inside your AI agent.',
+      description: 'Local data studio for Claude Code, Cursor, pi, OpenCode, Antigravity & Claude Desktop. Explore 50k+ rows locally in milliseconds—pivot, drill through & export .xlsx at $0 tokens, with every figure checked and zero raw rows sent to the model.',
     },
   },
   {

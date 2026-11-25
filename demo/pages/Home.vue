@@ -22,9 +22,9 @@ const facts = ['free', 'runs locally', 'no signup', 'no API key']
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  '50k–500k rows locally in ~200ms — 0 raw rows to the LLM',
-  'Drag-and-drop pivots, drill-through & .xlsx ($0 tokens)',
-  'Every answer figure checked, with saved SQL in Studio',
+  'Raw rows stay on your machine — 50k+ rows in ~200ms',
+  'Pivot, filter, drill through & .xlsx at $0 tokens',
+  'Every figure checked against the data, with its SQL',
 ] as const
 
 const capabilities = [
@@ -54,15 +54,15 @@ const capabilities = [
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
-                Local data studio for agents · Not a chat artifact
+                Local data studio for AI agents
               </p>
               <h1 class="display">
-                Real pivots in any agent. <em>Zero rows to the LLM.</em>
+                Interactive BI inside <em>your AI agent.</em>
               </h1>
               <p class="lede">
-                Chat artifacts don't exist in Claude Code, Cursor, pi or OpenCode—and choke past a few hundred rows.
-                TinyPivot streams 50k+ rows locally in milliseconds, lets you pivot, drill through and export .xlsx at $0 tokens,
-                and checks every figure against the data.
+                Built for Claude Code, Cursor, pi, OpenCode, Antigravity and Claude Desktop.
+                Explore 50k+ rows locally in milliseconds—pivot, drill through and export .xlsx at $0 tokens,
+                with every figure checked and zero raw rows sent to the model.
               </p>
               <ul class="hero-points">
                 <li v-for="point in heroPoints" :key="point">
@@ -76,7 +76,7 @@ const capabilities = [
                   Benchmark ↓
                 </a>
                 <router-link to="/docs#why" class="hero-why-link">
-                  Why TinyPivot, not a chat artifact →
+                  Why TinyPivot vs. chat artifacts →
                 </router-link>
               </div>
             </div>
