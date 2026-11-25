@@ -37,8 +37,15 @@ function setup(id: BenchmarkSetup['id']): BenchmarkSetup {
   return found
 }
 
-/** Within this share either way of the Python setup's cost counts as "about the same". */
-const ABOUT_THE_SAME = 0.15
+/** A whole-percent saving, rounded down so it never overstates. */
+function savedPct(ours: number, theirs: number): number {
+  return Math.floor((1 - ours / theirs) * 100)
+}
+
+/** Cost per question in cents, from a session's cost. */
+export function centsPerQuestion(sessionCost: number): string {
+  return `${((sessionCost / BENCHMARK.questions) * 100).toFixed(1)}¢`
+}
 
 /** The headline comparisons, rounded so they never overstate. */
 export function benchmarkHeadline() {
@@ -46,11 +53,15 @@ export function benchmarkHeadline() {
   const python = setup('python')
   const tinypivot = setup('tinypivot')
   return {
-    /** How much less TinyPivot cost than reading the rows, rounded down to a whole percent. */
-    cheaperThanPastingPct: Math.floor((1 - tinypivot.smallCost / paste.smallCost) * 100),
+    /** Against an agent writing Python on the large file: the alternative people actually use. */
+    cheaperThanPythonPct: savedPct(tinypivot.largeCost!, python.largeCost!),
+    /** The same on the small file, where the gap is narrower. */
+    cheaperThanPythonSmallPct: savedPct(tinypivot.smallCost, python.smallCost),
+    cheaperThanPastingPct: savedPct(tinypivot.smallCost, paste.smallCost),
     correct: tinypivot.correct,
+    pythonCorrect: python.correct,
     pastedCorrect: paste.correct,
     questions: BENCHMARK.questions,
-    aboutSameAsPython: Math.abs(tinypivot.smallCost / python.smallCost - 1) <= ABOUT_THE_SAME,
+    largeRows: BENCHMARK.largeRows,
   }
 }

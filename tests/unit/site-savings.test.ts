@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { benchmarkHeadline, benchmarkSetups } from '../../demo/site/benchmark'
+import { benchmarkHeadline, benchmarkSetups, centsPerQuestion } from '../../demo/site/benchmark'
 import {
   estimateTokens,
   formatTokens,
@@ -63,18 +63,17 @@ describe('formatters', () => {
 })
 
 describe('measured benchmark headline', () => {
-  it('rounds the comparison with pasting down, and reports right answers as measured', () => {
+  it('rounds every comparison down, and reports right answers as measured', () => {
     const headline = benchmarkHeadline()
-    // 0.162 against 0.320 is 49.4% cheaper.
+    // 0.167 against 0.197 is 15.2% cheaper; 0.162 against 0.181 is 10.5%; 0.162 against 0.320 is 49.4%.
+    expect(headline.cheaperThanPythonPct).toBe(15)
+    expect(headline.cheaperThanPythonSmallPct).toBe(10)
     expect(headline.cheaperThanPastingPct).toBe(49)
-    expect(headline.correct).toBe(3)
-    expect(headline.pastedCorrect).toBe(1)
+    expect([headline.correct, headline.pythonCorrect, headline.pastedCorrect]).toEqual([3, 3, 1])
   })
 
-  it('only claims parity with an agent writing Python when the costs really are close', () => {
-    expect(benchmarkHeadline().aboutSameAsPython).toBe(true)
+  it('shows cost per question in cents', () => {
     const tinypivot = benchmarkSetups.find(s => s.id === 'tinypivot')!
-    const python = benchmarkSetups.find(s => s.id === 'python')!
-    expect(Math.abs(tinypivot.smallCost / python.smallCost - 1)).toBeLessThan(0.15)
+    expect(centsPerQuestion(tinypivot.largeCost!)).toBe('5.6¢')
   })
 })

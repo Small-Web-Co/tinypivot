@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { BENCHMARK, benchmarkSetups } from '../../site/benchmark'
+import { BENCHMARK, benchmarkSetups, centsPerQuestion } from '../../site/benchmark'
 
 const fmt = (n: number) => n.toLocaleString('en-US')
-const usd = (n: number | null) => (n === null ? 'too big' : `$${n.toFixed(2)}`)
+const perQuestion = (n: number | null) => (n === null ? 'too big' : centsPerQuestion(n))
 </script>
 
 <template>
@@ -10,7 +10,7 @@ const usd = (n: number | null) => (n === null ? 'too big' : `$${n.toFixed(2)}`)
     <div class="bench-scroll">
       <table>
         <caption class="label">
-          Cost of {{ BENCHMARK.questions }} questions · {{ BENCHMARK.harness }}, {{ BENCHMARK.model }}
+          Cost per question · {{ BENCHMARK.harness }}, {{ BENCHMARK.model }}
         </caption>
         <thead>
           <tr>
@@ -33,15 +33,15 @@ const usd = (n: number | null) => (n === null ? 'too big' : `$${n.toFixed(2)}`)
             <th scope="row">
               {{ item.label }}
             </th>
-            <td>{{ usd(item.smallCost) }}</td>
-            <td>{{ usd(item.largeCost) }}</td>
+            <td>{{ perQuestion(item.smallCost) }}</td>
+            <td>{{ perQuestion(item.largeCost) }}</td>
             <td>{{ item.correct }}/{{ BENCHMARK.questions }}</td>
           </tr>
         </tbody>
       </table>
     </div>
     <figcaption class="bench-note">
-      Average of two runs, cost from Claude Code's own accounting. Reading the rows: the model declined to add up
+      Average of two runs of {{ BENCHMARK.questions }} questions, cost from Claude Code's own accounting, per question. Reading the rows: the model declined to add up
       {{ fmt(BENCHMARK.smallRows) }} rows by hand for two of the three questions. The {{ fmt(BENCHMARK.largeRows) }}-row file
       is about a million tokens and does not fit in context.
     </figcaption>

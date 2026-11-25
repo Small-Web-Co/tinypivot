@@ -65,8 +65,8 @@ const capabilities = [
                 </li>
               </ul>
               <a href="#savings" class="hero-fine">
-                Measured in Claude Code: {{ headline.cheaperThanPastingPct }}% cheaper than pasting rows into chat,
-                {{ headline.correct }}/{{ headline.questions }} exact answers<template v-if="headline.aboutSameAsPython">, about the same cost as an agent writing Python</template>.
+                Measured in Claude Code: {{ headline.cheaperThanPythonPct }}% cheaper than an agent writing Python
+                on a {{ headline.largeRows.toLocaleString('en-US') }}-row file, with {{ headline.correct }}/{{ headline.questions }} exact answers.
                 Benchmark ↓
               </a>
             </div>
@@ -130,12 +130,14 @@ const capabilities = [
             Measured, not modelled
           </p>
           <h2 id="savings-title" class="heading">
-            What three questions <em>actually cost.</em>
+            What a question <em>actually costs.</em>
           </h2>
           <p class="lede">
-            The same three questions about the same data, asked in each setup. Against reading the rows,
-            TinyPivot costs about half and gets every figure right. Against an agent that writes Python the cost
-            is about even: you skip the code, not the tokens.
+            The same three questions about the same data, asked in each setup. Most agents answer data questions by
+            writing Python; TinyPivot did the same work for {{ headline.cheaperThanPythonPct }}% less on the
+            {{ headline.largeRows.toLocaleString('en-US') }}-row file ({{ headline.cheaperThanPythonSmallPct }}% less on the small one),
+            with every figure right, and you get the chart and the SQL instead of a script to read.
+            Reading the rows into the chat costs about twice as much and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
           </p>
           <router-link to="/docs#savings" class="text-link">
             Run the numbers for your own workload →
