@@ -250,7 +250,7 @@ describe('reel: tabs', () => {
     // No two terminal scenes share a theme, so the reel shows them all off.
     expect(new Set(terminal.map(scene => scene.theme)).size).toBe(terminal.length)
     // A desktop app's scene names the theme TinyPivot drew in, as its scene file records it.
-    for (const scene of reelScenes.filter(scene => scene.surface === 'editor'))
+    for (const scene of reelScenes.filter(scene => scene.surface === 'desktop'))
       expect(JSON.parse(readFileSync(`scripts/reel/screens/${scene.id}.json`, 'utf8')).theme.id).toBe(scene.theme)
   })
 
@@ -258,7 +258,7 @@ describe('reel: tabs', () => {
     const groups = reelGroups()
     expect(groups.map(group => [group.label, group.scenes.map(({ scene }) => scene.harness)])).toEqual([
       ['Terminal', ['pi + Studio', 'Claude Code', 'pi', 'OpenCode', 'Antigravity CLI']],
-      ['Editor', ['Antigravity']],
+      ['Desktop apps', ['Antigravity', 'Claude app']],
     ])
     expect(groups.flatMap(group => group.scenes.map(({ index }) => index))).toEqual(reelScenes.map((_, index) => index))
   })

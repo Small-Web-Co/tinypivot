@@ -2,8 +2,8 @@
  * The scenes shown in the homepage reel. Each replays a real session recorded from
  * /reel/<id>.json, some with the TinyPivot Studio beside the terminal.
  */
-/** Where the agent runs: a terminal (TUI), or an editor with its own chat panel. */
-export type ReelSurface = 'terminal' | 'editor'
+/** Where the agent runs: a terminal (TUI), or a desktop app (an editor's agent panel, the Claude app). */
+export type ReelSurface = 'terminal' | 'desktop'
 
 export interface ReelScene {
   id: string
@@ -110,7 +110,7 @@ export const reelScenes: ReelScene[] = [
   {
     id: 'antigravity-ide',
     harness: 'Antigravity',
-    surface: 'editor',
+    surface: 'desktop',
     theme: 'onebit',
     headline: 'In an editor, the chart opens in the agent panel.',
     detail: 'Antigravity\'s agent calls TinyPivot and the live map, with its pivot and rows, appears right in the chat.',
@@ -119,9 +119,21 @@ export const reelScenes: ReelScene[] = [
       { value: 0, label: 'raw rows sent to the model' },
     ],
   },
+  {
+    id: 'claude-desktop',
+    harness: 'Claude app',
+    surface: 'desktop',
+    theme: 'onebit',
+    headline: 'In the Claude app, the chart opens in the conversation.',
+    detail: 'Claude Code in the Claude desktop app calls TinyPivot, and the live chart, with its pivot and rows, appears in the chat.',
+    stats: [
+      { value: 4, label: 'regions, each checked against 2025' },
+      { value: 0, label: 'raw rows sent to the model' },
+    ],
+  },
 ]
 
-const SURFACE_LABELS: Record<ReelSurface, string> = { terminal: 'Terminal', editor: 'Editor' }
+const SURFACE_LABELS: Record<ReelSurface, string> = { terminal: 'Terminal', desktop: 'Desktop apps' }
 
 export interface ReelGroup {
   label: string

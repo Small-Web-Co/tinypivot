@@ -1,0 +1,36 @@
+{
+  "id": "claude-desktop",
+  "take": "claude-desktop-2",
+  "first": 1795638917367,
+  "last": 1795638928633,
+  "crop": [
+    0,
+    389,
+    2300,
+    1437
+  ],
+  "label": "Claude desktop app · Claude Code",
+  "theme": {
+    "id": "onebit",
+    "fg": "#1f1f1e",
+    "bg": "#ffffff"
+  },
+  "captions": [
+    {
+      "frame": 1,
+      "title": "A follow-up in the same session",
+      "body": "Right after a slope of plans: each region's 2026 MRR against 2025, Jan–Oct like-for-like."
+    },
+    {
+      "frame": 2,
+      "title": "The bullet chart opens in the chat",
+      "body": "TinyPivot draws it in the Claude app itself, from the file on your machine, ready to pivot or open as rows."
+    },
+    {
+      "frame": 3,
+      "title": "Every region beat its target",
+      "body": "APAC grew fastest at +43.4%; EMEA added the most, +$3.85M. The totals match the plan chart above."
+    }
+  ],
+  "transcript": "now compare each region's 2026 MRR with 2025, Jan–Oct like-for-like, as a bullet chart with 2025 as the target. All four regions beat their 2025 target: APAC +43.4%, EMEA +34.6%, LATAM +24.1%, North America +16.1%."
+}

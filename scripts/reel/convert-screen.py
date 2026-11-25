@@ -7,6 +7,7 @@ folder) into a reel scene for the site: a desktop app's window played frame by f
 <scene.json> names the take and how to cut it:
   { "id": "antigravity-ide", "take": "antigravity-ide-2", "first": 1795635206865,
     "label": "Antigravity · editor", "theme": { "id": "onebit", "fg": "#e8e6e1", "bg": "#181818" },
+    "crop": [x, y, width, height],   (optional, in capture pixels: keeps a sidebar out of frame)
     "captions": [{ "frame": 1, "title": "…", "body": "…" }], "transcript": "…" }
 
 `first` is the first capture published: nothing before the question (such as the app greeting the
@@ -37,7 +38,7 @@ def same(a, b):
     return changed < MIN_CHANGE * small[0] * small[1]
 
 
-def frames_of(take, first, last, out_dir, public_dir):
+def frames_of(take, first, last, out_dir, public_dir, crop=None):
     """The take's distinct frames from `first` on, written as JPEGs, with fast-forwarded times."""
     stamps = sorted(int(os.path.basename(p)[:-4]) for p in glob.glob(os.path.join(take, '*.png')))
     stamps = [s for s in stamps if s >= first and (last is None or s <= last)]
@@ -47,6 +48,8 @@ def frames_of(take, first, last, out_dir, public_dir):
     frames, previous, kept_stamp, clock = [], None, None, 0
     for stamp in stamps:
         image = Image.open(os.path.join(take, f'{stamp}.png')).convert('RGB')
+        if crop:
+            image = image.crop((crop[0], crop[1], crop[0] + crop[2], crop[1] + crop[3]))
         if previous is not None and same(previous, image):
             continue
         if kept_stamp is not None:
@@ -66,7 +69,7 @@ def main():
     args = parser.parse_args()
 
     scene = json.load(open(args.scene))
-    frames, duration = frames_of(os.path.join(args.takes, scene['take']), scene['first'], scene.get('last'), os.path.join(args.out, scene['id']), f"/reel/{scene['id']}")
+    frames, duration = frames_of(os.path.join(args.takes, scene['take']), scene['first'], scene.get('last'), os.path.join(args.out, scene['id']), f"/reel/{scene['id']}", scene.get('crop'))
     captions = [{'t': frames[c['frame'] - 1]['t'], 'title': c['title'], 'body': c['body']} for c in scene['captions']]
     recording = {
         'id': scene['id'], 'cols': 0, 'rows': 0, 'duration': duration, 'theme': scene['theme'],
