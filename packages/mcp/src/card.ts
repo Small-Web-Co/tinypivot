@@ -156,6 +156,15 @@ export function renderPreciseBar(ratio: number, width: number): string {
   return `${'█'.repeat(full)}${SUB_BLOCKS[rem]}`
 }
 
+/** The bar glyph for a single series: ¾ of the row high, so neighbouring bars have a gap between them in a terminal. */
+export const SPACED_BAR = '▆'
+
+/** A bar in whole cells of {@link SPACED_BAR}; any non-zero value gets at least one cell. */
+export function renderSpacedBar(ratio: number, width: number): string {
+  const clamped = Math.max(0, Math.min(1, ratio))
+  return clamped > 0 ? SPACED_BAR.repeat(Math.max(1, Math.round(clamped * width))) : ''
+}
+
 export function renderSparkline(values: number[]): string {
   if (values.length === 0)
     return ''

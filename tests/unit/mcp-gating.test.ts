@@ -284,7 +284,7 @@ describe('shareable terminal chart and pivot cards', () => {
     }, { showBranding: false })
 
     assertUniformCardBorderWidth(barCard)
-    expect(/[█▉▊▋▌▍▎▏]/.test(barCard)).toBe(true)
+    expect(barCard).toContain('▆')
     expect(barCard).not.toContain('tiny-pivot.com')
   })
 

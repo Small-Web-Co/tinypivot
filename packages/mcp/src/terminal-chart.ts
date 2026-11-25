@@ -2,7 +2,7 @@ import type { ChartConfig, TerminalPalette } from '@smallwebco/tinypivot-core'
 import type { TerminalFormatOptions } from './card.js'
 import type { StoredDataset } from './store.js'
 import { processChartData, processChartDataForScatter } from '@smallwebco/tinypivot-core'
-import { ansiFg, ansiFgBold, BRAILLE_BITS, CARD_DIVIDER, formatCompactNumber, padEndVisual, padStartVisual, renderPreciseBar, resolveTerminalPalette, SERIES_GLYPHS, truncateVisual, visualWidth, wrapInCard } from './card.js'
+import { ansiFg, ansiFgBold, BRAILLE_BITS, CARD_DIVIDER, formatCompactNumber, padEndVisual, padStartVisual, renderPreciseBar, renderSpacedBar, resolveTerminalPalette, SERIES_GLYPHS, truncateVisual, visualWidth, wrapInCard } from './card.js'
 
 /**
  * Charts drawn in text for terminals: braille lines and areas, bars, and the other chart kinds,
@@ -432,7 +432,7 @@ function barCard(ctx: ChartContext): string {
   const labelWidth = Math.min(20, Math.max(...entries.map(e => visualWidth(e.label)), 6))
   const valWidth = Math.max(...entries.map(e => visualWidth(formatCompactNumber(e.total))), 5)
   const body = entries.map((entry) => {
-    const plain = renderPreciseBar(Math.abs(entry.total) / maxVal, BAR_WIDTH)
+    const plain = renderSpacedBar(Math.abs(entry.total) / maxVal, BAR_WIDTH)
     const pct = !ctx.nonAdditive && ctx.grandTotal > 0 ? (entry.total / ctx.grandTotal) * 100 : undefined
     return barRow(ctx, entry.label, labelWidth, paint(ctx, 'accent', plain), visualWidth(plain), entry.total, valWidth, pct)
   })
@@ -455,7 +455,7 @@ function shareCard(ctx: ChartContext): string {
   const labelWidth = Math.min(20, Math.max(...shown.map(s => visualWidth(s.label)), 6))
   const valWidth = Math.max(...shown.map(s => visualWidth(formatCompactNumber(s.value))), 5)
   const body = shown.map((slice, i) => {
-    const plain = renderPreciseBar(slice.value / total, BAR_WIDTH)
+    const plain = renderSpacedBar(slice.value / total, BAR_WIDTH)
     return barRow(ctx, slice.label, labelWidth, paintSeries(ctx, i, plain), visualWidth(plain), slice.value, valWidth, (slice.value / total) * 100)
   })
   const top = shown[0]

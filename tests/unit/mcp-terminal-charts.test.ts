@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { visualWidth } from '../../packages/mcp/src/card'
+import { renderSpacedBar, visualWidth } from '../../packages/mcp/src/card'
 import { DatasetStore } from '../../packages/mcp/src/store'
 import { formatTerminalChart } from '../../packages/mcp/src/terminal-chart'
 
@@ -17,6 +17,13 @@ function expectSquare(card: string) {
 }
 
 describe('terminal chart kinds', () => {
+  it('draws single-series bars ¾ high in whole cells, so neighbouring bars have a gap', () => {
+    expect(renderSpacedBar(0.5, 10)).toBe('▆▆▆▆▆')
+    expect(renderSpacedBar(0.01, 10)).toBe('▆')
+    expect(renderSpacedBar(0, 10)).toBe('')
+    expect(formatTerminalChart(ds, { type: 'bar', xAxis: plan, yAxis: mrr }, { raw: true })).not.toMatch(/[█▉▊▋▌▍▎▏]/)
+  })
+
   it('draws a pie as shares of the whole, largest first', () => {
     const card = formatTerminalChart(ds, { type: 'pie', xAxis: plan, yAxis: mrr }, { raw: true })
     expect(card).toContain('rows · Pie')
