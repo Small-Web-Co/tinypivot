@@ -85,23 +85,57 @@ export function generateAcmeBookings(count = 1200): Record<string, unknown>[] {
   })
 }
 
+const MONTH_KM_GOAL = [80, 80, 100, 110, 120, 130, 130, 130, 120, 110, 90, 80]
+
+/**
+ * A made-up personal running log: one row per run over two years. Shows the
+ * same charts working for personal stats, not only company data.
+ */
+export function generateRunningLog(): Record<string, unknown>[] {
+  const rand = seeded(7)
+  const rows: Record<string, unknown>[] = []
+  for (const year of [2025, 2026]) {
+    MONTHS.forEach((month, m) => {
+      // Fewer runs in winter, more in summer; 2026 is the more consistent year.
+      const runs = Math.round((year === 2026 ? 12 : 9) + 6 * Math.sin(((m - 3) / 12) * 2 * Math.PI))
+      for (let r = 0; r < runs; r++) {
+        rows.push({
+          year,
+          month,
+          weekday: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][Math.floor(rand() * 7)],
+          km: Math.round((4 + rand() * 9) * 10) / 10,
+          goalKm: Math.round((MONTH_KM_GOAL[m] / runs) * 10) / 10,
+        })
+      }
+    })
+  }
+  return rows
+}
+
 const dim = (field: string, label: string): ChartField => ({ field, label, role: 'dimension' })
 const sum = (field: string, label: string): ChartField => ({ field, label, role: 'measure', aggregation: 'sum' })
 
 export interface GalleryChart {
   id: string
   label: string
+  /** Which fake dataset the chart reads */
+  data: 'acme' | 'running'
   config: Partial<ChartConfig>
 }
 
+const ACME_SOURCE = { source: 'acme-bookings.csv (fictional data)', valueFormat: 'currency' as const }
+const RUN_SOURCE = { source: 'running-log.csv (fictional data)' }
+
 export const galleryCharts: GalleryChart[] = [
-  { id: 'world', label: 'World map', config: { type: 'choropleth', xAxis: dim('country', 'Country'), yAxis: sum('bookings', 'Bookings') } },
-  { id: 'regions', label: 'Sales regions', config: { type: 'choropleth', xAxis: dim('salesRegion', 'Sales region'), yAxis: sum('bookings', 'Bookings') } },
-  { id: 'states', label: 'US states', config: { type: 'choropleth', xAxis: dim('state', 'State'), yAxis: sum('bookings', 'Bookings') } },
-  { id: 'bullet', label: 'Bullet', config: { type: 'bullet', xAxis: dim('rep', 'Rep'), yAxis: sum('bookings', 'Bookings'), targetField: sum('quota', 'Quota') } },
-  { id: 'radialBar', label: 'Radial bar', config: { type: 'radialBar', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year') } },
-  { id: 'radialArea', label: 'Radial area', config: { type: 'radialArea', xAxis: dim('month', 'Month'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year') } },
-  { id: 'slope', label: 'Slope', config: { type: 'slope', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year') } },
-  { id: 'treemap', label: 'Treemap', config: { type: 'treemap', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('category', 'Category') } },
-  { id: 'sunburst', label: 'Sunburst', config: { type: 'sunburst', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('category', 'Category') } },
+  { id: 'world', label: 'World map', data: 'acme', config: { type: 'choropleth', xAxis: dim('country', 'Country'), yAxis: sum('bookings', 'Bookings'), options: ACME_SOURCE } },
+  { id: 'regions', label: 'Sales regions', data: 'acme', config: { type: 'choropleth', xAxis: dim('salesRegion', 'Sales region'), yAxis: sum('bookings', 'Bookings'), options: ACME_SOURCE } },
+  { id: 'states', label: 'US states', data: 'acme', config: { type: 'choropleth', xAxis: dim('state', 'State'), yAxis: sum('bookings', 'Bookings'), options: ACME_SOURCE } },
+  { id: 'bullet', label: 'Bullet', data: 'acme', config: { type: 'bullet', xAxis: dim('rep', 'Rep'), yAxis: sum('bookings', 'Bookings'), targetField: sum('quota', 'Quota'), options: ACME_SOURCE } },
+  { id: 'radialBar', label: 'Radial bar', data: 'acme', config: { type: 'radialBar', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year'), options: ACME_SOURCE } },
+  { id: 'radialArea', label: 'Radial area', data: 'acme', config: { type: 'radialArea', xAxis: dim('month', 'Month'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year'), options: ACME_SOURCE } },
+  { id: 'slope', label: 'Slope', data: 'acme', config: { type: 'slope', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('year', 'Year'), options: ACME_SOURCE } },
+  { id: 'treemap', label: 'Treemap', data: 'acme', config: { type: 'treemap', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('category', 'Category'), options: ACME_SOURCE } },
+  { id: 'sunburst', label: 'Sunburst', data: 'acme', config: { type: 'sunburst', xAxis: dim('product', 'Product'), yAxis: sum('bookings', 'Bookings'), seriesField: dim('category', 'Category'), options: ACME_SOURCE } },
+  { id: 'runGoal', label: 'Running vs goal', data: 'running', config: { type: 'bullet', xAxis: dim('month', 'Month'), yAxis: sum('km', 'Distance (km)'), targetField: sum('goalKm', 'Goal'), options: { ...RUN_SOURCE, sortOrder: 'label-asc' } } },
+  { id: 'runYear', label: 'Running year', data: 'running', config: { type: 'radialArea', xAxis: dim('month', 'Month'), yAxis: sum('km', 'Distance (km)'), seriesField: dim('year', 'Year'), options: RUN_SOURCE } },
 ]

@@ -7,7 +7,7 @@ import type { D3ChartTheme } from '../chart/d3-theme'
 import type { ChartStory } from '../chart/story'
 import type { ChartPatternStyle } from '../theme'
 import type { ChartConfig } from '../types'
-import { formatChartValue, mixColor } from '../chart/d3-theme'
+import { formatChartValue, formatCompactChartValue, mixColor } from '../chart/d3-theme'
 import { formatFieldLabel } from '../chart/index'
 import { commonLabelPrefix } from '../chart/story'
 
@@ -32,6 +32,41 @@ export interface DrawContext {
   isStale: () => boolean
   /** Computed takeaway; `null` when annotations are off */
   story: ChartStory | null
+  /** Series key, rendered in the header (direct labels are preferred; this is for stacks) */
+  key: KeyEntry[]
+}
+
+/** Whether the chart uses the house highlight style (accent for the story, muted for the rest). */
+export function usesHighlight(ctx: DrawContext): boolean {
+  return (ctx.config.options?.emphasis ?? 'highlight') === 'highlight' && Boolean(ctx.story?.callouts.length)
+}
+
+/**
+ * Fill for a mark in the house style: the story's marks take the accent (solid
+ * ink on 1-bit), the rest a muted step. `step` separates stacked series or
+ * nested children. With `emphasis: 'palette'` every series gets its own colour.
+ */
+export function emphasisFill(ctx: DrawContext, label: string, step = 0): string {
+  if (!usesHighlight(ctx))
+    return seriesFill(ctx, step)
+  const { theme } = ctx
+  const lit = isCallout(ctx, label)
+  if (theme.fillMode === 'pattern')
+    return lit ? (step === 0 ? theme.ink : `url(#${ctx.uid}-d3)`) : `url(#${ctx.uid}-d${Math.min(1, step)})`
+  if (lit)
+    return step === 0 ? theme.accent : mixColor(theme.accent, theme.surface, Math.min(0.6, step * 0.3))
+  return theme.quiet[Math.min(step, theme.quiet.length - 1)]
+}
+
+/** Text colour for a label next to a mark: accent for the highlight, ink otherwise. */
+export function emphasisInk(ctx: DrawContext, label: string): string {
+  return usesHighlight(ctx) && isCallout(ctx, label) && ctx.theme.fillMode !== 'pattern' ? ctx.theme.accent : ctx.theme.ink
+}
+
+/** One entry of the key shown in the header instead of an in-chart legend. */
+export interface KeyEntry {
+  label: string
+  fill: string
 }
 
 /** Whether a label is one the story calls out. */
@@ -147,11 +182,6 @@ export function labelColorOn(ctx: DrawContext, fill: string): string {
   return Math.abs(l - luminance(ink)) >= Math.abs(l - luminance(surface)) ? ink : surface
 }
 
-/** A lighter or darker step of `color` toward the surface, for nested marks. */
-export function shade(ctx: DrawContext, color: string, t: number): string {
-  return color.startsWith('url(') ? color : mixColor(color, ctx.theme.surface, t)
-}
-
 // ---------------------------------------------------------------------------
 // Text
 // ---------------------------------------------------------------------------
@@ -257,6 +287,11 @@ export function bindTooltip<D>(
       ctx.tooltip.hide()
       focus(null)
     })
+}
+
+/** A tight label value in the chart's format: "$1.2M", "34K", "12.5%". */
+export function compact(ctx: DrawContext, value: number): string {
+  return formatCompactChartValue(value, ctx.config.options?.valueFormat)
 }
 
 /** A value formatted with the chart's number format options. */

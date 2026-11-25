@@ -92,7 +92,7 @@ describe('d3 renderer', () => {
   it('reports unmatched map labels as a note', async () => {
     const { host, statuses, handle } = await mount({ ...specFor(CONFIGS[0], 'paper'), data: [...ROWS, { country: 'Atlantis', bookings: 5 }] })
     expect(statuses.at(-1)?.join(' ')).toContain('"Atlantis"')
-    expect(host.querySelector('.vpg-d3-notes')?.textContent).toContain('not found on the world map')
+    expect(host.querySelector('.vpg-d3-footer')?.textContent).toContain('not found on the world map')
     handle.destroy()
   })
 
@@ -112,6 +112,32 @@ describe('d3 renderer', () => {
     expect(matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)')
     handle.destroy()
     vi.unstubAllGlobals()
+  })
+
+  it('lights the story marks in the accent and mutes the rest (house style)', async () => {
+    const spec = specFor(CONFIGS[2], 'paper')
+    const { host, handle } = await mount(spec)
+    const fills = new Set(Array.from(host.querySelectorAll('path.vpg-d3-mark'), m => m.getAttribute('fill')))
+    expect(fills.has(spec.theme.accent)).toBe(true)
+    expect(fills.has(spec.theme.quiet[0])).toBe(true)
+    expect(host.querySelector('.vpg-d3-kicker')?.textContent).toBe('Bookings by product')
+    expect(host.querySelectorAll('.vpg-d3-key-item').length).toBe(2)
+    handle.destroy()
+  })
+
+  it('gives each series its palette colour with emphasis: palette', async () => {
+    const spec = specFor({ ...CONFIGS[2], options: { emphasis: 'palette' } }, 'paper')
+    const { host, handle } = await mount(spec)
+    const fills = new Set(Array.from(host.querySelectorAll('path.vpg-d3-mark'), m => m.getAttribute('fill')))
+    expect(fills.has(spec.theme.palette[1])).toBe(true)
+    expect(fills.has(spec.theme.quiet[0])).toBe(false)
+    handle.destroy()
+  })
+
+  it('writes the source and footnote under the chart', async () => {
+    const { host, handle } = await mount(specFor({ ...CONFIGS[1], options: { source: 'acme-bookings.csv' } }, 'paper'))
+    expect(host.querySelector('.vpg-d3-footer')?.textContent).toContain('Source: acme-bookings.csv · Bookings: sum of bookings')
+    handle.destroy()
   })
 
   it('redraws when the spec changes', async () => {

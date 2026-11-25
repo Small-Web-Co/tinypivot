@@ -6,9 +6,8 @@ import type { ChartData } from '../types'
 import type { DrawContext, Group } from './context'
 import { scaleBand, scaleLinear, scaleRadial } from 'd3-scale'
 import { arc, areaRadial, curveCatmullRomClosed, curveLinearClosed, lineRadial, stack } from 'd3-shape'
-import { formatCompactChartValue } from '../chart/d3-theme'
-import { processChartData } from '../chart/index'
-import { applyGlow, bindTooltip, formatValue, haloText, isCallout, labelTrimmer, seriesFill, styleText, TRANSITION_MS, truncate } from './context'
+import { compareLabels, processChartData } from '../chart/index'
+import { applyGlow, bindTooltip, compact, emphasisFill, formatValue, haloText, isCallout, labelTrimmer, seriesFill, styleText, TRANSITION_MS, truncate } from './context'
 
 /** Most categories a radial chart draws before labels collide. */
 export const RADIAL_MAX_CATEGORIES = 60
@@ -51,7 +50,7 @@ function drawRings(ctx: DrawContext, g: Group, radius: (v: number) => number, ti
       .attr('stroke', ctx.theme.grid)
       .attr('stroke-dasharray', ctx.theme.gridDash)
     const a = labelAngle - Math.PI / 2
-    haloText(rings, ctx, Math.cos(a) * radius(tick) + 2, Math.sin(a) * radius(tick) - 5, formatCompactChartValue(tick), { size: 9, mono: true, weight: 400, color: ctx.theme.muted })
+    haloText(rings, ctx, Math.cos(a) * radius(tick) + 2, Math.sin(a) * radius(tick) - 5, compact(ctx, tick), { size: 9, mono: true, weight: 400, color: ctx.theme.muted })
   }
 }
 
@@ -73,17 +72,17 @@ function drawAngleLabels(ctx: DrawContext, g: Group, labels: string[], angleOf: 
   })
 }
 
-function drawSeriesLegend(ctx: DrawContext, names: string[]): void {
+/** Series swatches for the header key; only stacked bars need one. */
+function seriesKey(ctx: DrawContext, names: string[], fillFor: (i: number) => string): void {
   if (names.length < 2)
     return
-  const legend = ctx.svg.append('g').attr('transform', 'translate(8, 12)')
-  let x = 0
-  names.slice(0, 8).forEach((name, i) => {
-    legend.append('rect').attr('x', x).attr('y', -5).attr('width', 10).attr('height', 10).attr('fill', seriesFill(ctx, i)).attr('stroke', ctx.theme.ink).attr('stroke-width', ctx.theme.fillMode === 'pattern' ? 1 : 0)
-    const label = truncate(name, 110)
-    styleText(legend.append('text'), ctx, { mono: true, size: 11, color: ctx.theme.ink }).attr('x', x + 14).attr('y', 0).attr('dominant-baseline', 'central').text(label)
-    x += 26 + label.length * 6.6
-  })
+  ctx.key.push(...names.slice(0, 8).map((label, i) => ({ label, fill: fillFor(i) })))
+}
+
+/** In the house style the latest period (last in label order) is lit; the others are context. */
+function litSeriesIndex(names: string[]): number {
+  const latest = [...names].sort(compareLabels).at(-1)
+  return Math.max(0, names.indexOf(latest ?? ''))
 }
 
 interface StackPoint {
@@ -123,7 +122,7 @@ export function drawRadialBar(ctx: DrawContext): void {
   const max = Math.max(1, ...points.map(p => p.y1))
   const angle = scaleBand().domain(chart.categories).range([0, 2 * Math.PI]).paddingInner(0.12)
   const radius = scaleRadial().domain([0, max]).range([inner, outer]).nice()
-  drawRings(ctx, center, radius, radius.ticks(4).filter(t => t > 0))
+  drawRings(ctx, center, radius, radius.ticks(3).filter(t => t > 0))
 
   const shape = arc<StackPoint>()
     .startAngle(d => angle(d.category)!)
@@ -133,7 +132,7 @@ export function drawRadialBar(ctx: DrawContext): void {
     .padRadius(inner)
     .cornerRadius(ctx.theme.radius)
   const final = (d: StackPoint): string => shape.outerRadius(radius(d.y1))(d) ?? ''
-  const marks = applyGlow(ctx, center.append('g')).selectAll('path').data(points).join('path').attr('class', 'vpg-d3-mark').attr('fill', d => seriesFill(ctx, d.seriesIndex)).attr('stroke', ctx.theme.markStrokeWidth > 0 ? ctx.theme.ink : ctx.theme.surface).attr('stroke-width', Math.max(0.5, ctx.theme.markStrokeWidth)).attr('d', final)
+  const marks = applyGlow(ctx, center.append('g')).selectAll('path').data(points).join('path').attr('class', 'vpg-d3-mark').attr('fill', d => emphasisFill(ctx, d.category, d.seriesIndex)).attr('stroke', ctx.theme.markStrokeWidth > 0 ? ctx.theme.ink : ctx.theme.surface).attr('stroke-width', Math.max(0.5, ctx.theme.markStrokeWidth)).attr('d', final)
   if (ctx.animate) {
     // Grow each bar outward by tweening its radius; interpolating path strings breaks on corner arcs.
     marks.transition().duration(TRANSITION_MS).delay((_, i) => Math.min(i, 40) * 10).attrTween('d', (d) => {
@@ -149,26 +148,44 @@ export function drawRadialBar(ctx: DrawContext): void {
     const top = Math.max(...points.filter(p => p.category === category).map(p => p.y1))
     const mid = angle(category)! + angle.bandwidth() / 2 - Math.PI / 2
     const r = radius(top) - 14
-    haloText(center, ctx, Math.cos(mid) * r, Math.sin(mid) * r, formatCompactChartValue(top), { anchor: 'middle', size: 11, mono: true, weight: 700 })
+    haloText(center, ctx, Math.cos(mid) * r, Math.sin(mid) * r, compact(ctx, top), { anchor: 'middle', size: 11, mono: true, weight: 700 })
   }
 
   drawAngleLabels(ctx, center, chart.categories, i => angle(chart.categories[i])! + angle.bandwidth() / 2, outer)
-  drawSeriesLegend(ctx, chart.series.map(s => s.name))
+  seriesKey(ctx, chart.series.map(s => s.name), i => emphasisFill(ctx, '', i))
+}
+
+/**
+ * Name a series on its own line instead of a legend: at the series' widest
+ * point, nudged off the dot. Skipped for a single series (the kicker names it).
+ */
+function labelSeries(ctx: DrawContext, g: Group, series: ChartData['series'][number], index: number, angleOf: (i: number) => number, radius: (v: number) => number, color: string): void {
+  if (!ctx.config.seriesField)
+    return
+  const at = series.data.indexOf(Math.max(...series.data))
+  const a = angleOf(at) - Math.PI / 2 + (index % 2 ? -0.18 : 0.18)
+  const r = radius(Math.max(0, series.data[at])) - 14
+  haloText(g, ctx, Math.cos(a) * r, Math.sin(a) * r, series.name, { anchor: 'middle', size: 11, weight: 700, color })
 }
 
 /** Peak and trough callouts on the outermost series, pointing outward from the centre. */
-function annotatePeaks(ctx: DrawContext, g: Group, chart: ChartData, angleOf: (i: number) => number, radius: (v: number) => number): void {
+function annotatePeaks(ctx: DrawContext, g: Group, chart: ChartData, angleOf: (i: number) => number, radius: (v: number) => number): Set<string> {
   const [peak, trough] = ctx.story?.callouts ?? []
   // Position at the outermost series; label with the combined total, as the headline counts it.
   const outerMost = chart.categories.map((_, i) => Math.max(...chart.series.map(s => s.data[i] ?? 0)))
   const totals = chart.categories.map((_, i) => chart.series.reduce((sum, s) => sum + (s.data[i] ?? 0), 0))
   const notes: Array<[string | undefined, string]> = [[peak, 'Peak'], [trough, 'Low']]
+  const annotated = new Set<string>()
   for (const [label, word] of notes) {
     const i = label === undefined ? -1 : chart.categories.indexOf(label)
     if (i < 0)
       continue
     const a = angleOf(i) - Math.PI / 2
     const r0 = radius(Math.max(0, outerMost[i]))
+    // A low point near the centre has no room for a callout; the headline already names it.
+    if (r0 < 60)
+      continue
+    annotated.add(label!)
     const r1 = r0 + 18
     g.append('line')
       .attr('x1', Math.cos(a) * (r0 + 4))
@@ -178,8 +195,9 @@ function annotatePeaks(ctx: DrawContext, g: Group, chart: ChartData, angleOf: (i
       .attr('stroke', ctx.theme.ink)
       .attr('stroke-width', 1)
     const right = Math.cos(a) >= 0
-    haloText(g, ctx, Math.cos(a) * (r1 + 3), Math.sin(a) * (r1 + 3), `${word} · ${label} · ${formatCompactChartValue(totals[i])}`, { anchor: right ? 'start' : 'end', size: 11, weight: 700 })
+    haloText(g, ctx, Math.cos(a) * (r1 + 3), Math.sin(a) * (r1 + 3), `${word} · ${label} · ${compact(ctx, totals[i])}`, { anchor: right ? 'start' : 'end', size: 11, weight: 700 })
   }
+  return annotated
 }
 
 export function drawRadialArea(ctx: DrawContext): void {
@@ -193,7 +211,7 @@ export function drawRadialArea(ctx: DrawContext): void {
   const max = Math.max(1, ...chart.series.flatMap(s => s.data))
   const radius = scaleLinear().domain([0, max]).range([inner, outer]).nice()
   const angleOf = (i: number): number => (i / n) * 2 * Math.PI
-  drawRings(ctx, center, radius, radius.ticks(4).filter(t => t > 0), Math.PI / n)
+  drawRings(ctx, center, radius, radius.ticks(3).filter(t => t > 0), Math.PI / n)
   const spokes = center.append('g')
   for (let i = 0; i < n; i++) {
     const a = angleOf(i) - Math.PI / 2
@@ -205,12 +223,18 @@ export function drawRadialArea(ctx: DrawContext): void {
   const line = lineRadial<number>().angle((_, i) => angleOf(i)).radius(v => radius(Math.max(0, v))).curve(curve)
   const flat = areaRadial<number>().angle((_, i) => angleOf(i)).innerRadius(inner).outerRadius(inner).curve(curve)
   const layer = applyGlow(ctx, center.append('g'))
-  chart.series.forEach((series, si) => {
-    const fill = seriesFill(ctx, si)
-    const stroke = ctx.theme.fillMode === 'pattern' ? ctx.theme.ink : ctx.theme.palette[si % ctx.theme.palette.length]
+  const highlight = (ctx.config.options?.emphasis ?? 'highlight') === 'highlight'
+  const lit = litSeriesIndex(chart.series.map(s => s.name))
+  // Context series first, so the lit one draws on top.
+  const order = chart.series.map((_, i) => i).sort((a, b) => Number(a === lit) - Number(b === lit))
+  for (const si of order) {
+    const series = chart.series[si]
+    const isLit = !highlight || si === lit
+    const fill = highlight ? (isLit ? seriesFill(ctx, 0) : ctx.theme.fillMode === 'pattern' ? `url(#${ctx.uid}-d0)` : ctx.theme.quiet[2]) : seriesFill(ctx, si)
+    const stroke = ctx.theme.fillMode === 'pattern' ? ctx.theme.ink : highlight ? (isLit ? ctx.theme.accent : ctx.theme.quiet[0]) : ctx.theme.palette[si % ctx.theme.palette.length]
     const path = layer.append('path')
       .attr('fill', fill)
-      .attr('fill-opacity', si === 0 || ctx.theme.fillMode === 'pattern' ? ctx.theme.areaOpacity : ctx.theme.areaOpacity * 0.7)
+      .attr('fill-opacity', isLit || ctx.theme.fillMode === 'pattern' ? ctx.theme.areaOpacity : ctx.theme.areaOpacity * 0.7)
       .attr('d', ctx.animate ? flat(series.data) : area(series.data))
     if (ctx.animate)
       path.transition().duration(TRANSITION_MS).attr('d', area(series.data))
@@ -223,8 +247,8 @@ export function drawRadialArea(ctx: DrawContext): void {
       .attr('d', line(series.data))
     const dots = layer.append('g').selectAll('circle').data(series.data.map((value, i) => ({ value, i }))).join('circle').attr('class', 'vpg-d3-mark').attr('r', 3.5).attr('cx', d => Math.cos(angleOf(d.i) - Math.PI / 2) * radius(Math.max(0, d.value))).attr('cy', d => Math.sin(angleOf(d.i) - Math.PI / 2) * radius(Math.max(0, d.value))).attr('fill', stroke).attr('stroke', ctx.theme.surface).attr('stroke-width', 1.5)
     bindTooltip(dots, ctx, d => ({ title: chart.categories[d.i], lines: [`${series.name}: ${formatValue(ctx, d.value)}`] }))
-  })
-  annotatePeaks(ctx, center, chart, angleOf, radius)
-  drawAngleLabels(ctx, center, chart.categories, angleOf, outer, new Set(ctx.story?.callouts ?? []))
-  drawSeriesLegend(ctx, chart.series.map(s => s.name))
+    labelSeries(ctx, center, series, si, angleOf, radius, isLit ? stroke : ctx.theme.muted)
+  }
+  const annotated = annotatePeaks(ctx, center, chart, angleOf, radius)
+  drawAngleLabels(ctx, center, chart.categories, angleOf, outer, annotated)
 }

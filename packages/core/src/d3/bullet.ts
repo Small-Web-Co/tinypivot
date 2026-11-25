@@ -6,8 +6,7 @@ import type { BulletRow } from '../chart/d3-data'
 import type { DrawContext, Group } from './context'
 import { scaleLinear } from 'd3-scale'
 import { processChartDataForBullet } from '../chart/d3-data'
-import { formatCompactChartValue } from '../chart/d3-theme'
-import { applyGlow, bindTooltip, formatValue, isCallout, labelTrimmer, measureLabel, seriesFill, styleText, TRANSITION_MS, truncate } from './context'
+import { applyGlow, bindTooltip, compact, emphasisFill, emphasisInk, formatValue, isCallout, labelTrimmer, measureLabel, styleText, TRANSITION_MS, truncate } from './context'
 
 const MARGIN = { top: 8, right: 92, bottom: 26, left: 12 }
 const MAX_ROW_HEIGHT = 44
@@ -28,7 +27,7 @@ function rowLines(ctx: DrawContext, row: BulletRow): string[] {
 
 function drawAxis(ctx: DrawContext, x: ReturnType<typeof scaleLinear<number, number>>, top: number, bottom: number): void {
   const axis = ctx.svg.append('g').attr('class', 'vpg-d3-axis')
-  for (const tick of x.ticks(5)) {
+  for (const tick of x.ticks(4)) {
     axis.append('line')
       .attr('x1', x(tick))
       .attr('x2', x(tick))
@@ -40,7 +39,7 @@ function drawAxis(ctx: DrawContext, x: ReturnType<typeof scaleLinear<number, num
       .attr('x', x(tick))
       .attr('y', bottom + 14)
       .attr('text-anchor', 'middle')
-      .text(formatCompactChartValue(tick))
+      .text(compact(ctx, tick))
   }
 }
 
@@ -58,7 +57,7 @@ function drawRow(ctx: DrawContext, g: Group, row: BulletRow, x: (v: number) => n
       .attr('fill', theme.bands[i])
   }
   const barHeight = bandHeight / 3
-  const bar = applyGlow(ctx, g.append('g')).append('rect').attr('class', 'vpg-d3-mark').attr('x', x(0)).attr('y', (rowHeight - barHeight) / 2).attr('height', barHeight).attr('fill', seriesFill(ctx, 0)).attr('stroke', theme.markStrokeWidth > 0 ? theme.ink : 'none').attr('stroke-width', theme.markStrokeWidth).attr('width', ctx.animate ? 0 : Math.max(0, x(row.value) - x(0)))
+  const bar = applyGlow(ctx, g.append('g')).append('rect').attr('class', 'vpg-d3-mark').attr('x', x(0)).attr('y', (rowHeight - barHeight) / 2).attr('height', barHeight).attr('fill', emphasisFill(ctx, row.label)).attr('stroke', theme.markStrokeWidth > 0 ? theme.ink : 'none').attr('stroke-width', theme.markStrokeWidth).attr('width', ctx.animate ? 0 : Math.max(0, x(row.value) - x(0)))
   if (ctx.animate)
     bar.transition().duration(TRANSITION_MS).attr('width', Math.max(0, x(row.value) - x(0)))
   if (row.target !== null) {
@@ -75,10 +74,10 @@ function drawRow(ctx: DrawContext, g: Group, row: BulletRow, x: (v: number) => n
     .attr('x', x(row.bands[2]) + 6)
     .attr('y', rowHeight / 2)
     .attr('dominant-baseline', 'central')
-    .text(formatCompactChartValue(row.value))
+    .text(compact(ctx, row.value))
   if (row.target !== null && row.target > 0) {
     value.append('tspan')
-      .attr('fill', row.status === 'met' ? theme.accent : theme.muted)
+      .attr('fill', isCallout(ctx, row.label) ? emphasisInk(ctx, row.label) : theme.muted)
       .attr('font-weight', row.status === 'met' ? 700 : 400)
       .text(` ${Math.round((row.value / row.target) * 100)}%`)
   }

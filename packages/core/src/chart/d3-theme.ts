@@ -33,6 +33,8 @@ export interface D3ChartTheme {
   surface: string
   palette: string[]
   accent: string
+  /** Muted fills for marks outside the highlight, strongest first */
+  quiet: [string, string, string]
   /** Five steps, light to strong, for sequential colour scales */
   sequential: string[]
   /** Fill for shapes with no data */
@@ -94,6 +96,8 @@ export function getD3ChartTheme(look: ChartLook, preset: ChartThemePreset, color
     surface,
     palette,
     accent,
+    // Muted series sit between the surface and the ink, so they read as context on any theme.
+    quiet: [mixColor(surface, ink, 0.42), mixColor(surface, ink, 0.3), mixColor(surface, ink, 0.2)],
     sequential: SEQUENTIAL_STEPS.map(t => mixColor(surface, accent, t)),
     noData: mixColor(surface, ink, 0.08),
     bands: [mixColor(surface, ink, 0.22), mixColor(surface, ink, 0.13), mixColor(surface, ink, 0.06)],
@@ -130,14 +134,23 @@ export function formatChartValue(val: unknown, format?: 'number' | 'percent' | '
   return val.toFixed(dec)
 }
 
-/** Compact value for tight labels: 1.2M, 34K, 950. */
-export function formatCompactChartValue(val: number): string {
+/**
+ * Compact value for tight labels: 1.2M, 34K, 950. Honours the chart's value
+ * format so a deck reads "$1.2M" or "12.5%" everywhere, not just in tooltips.
+ */
+export function formatCompactChartValue(val: number, format?: 'number' | 'percent' | 'currency'): string {
+  if (format === 'percent')
+    return `${Number.isInteger(val) ? val : val.toFixed(1)}%`
   const abs = Math.abs(val)
+  let text: string
   if (abs >= 1e9)
-    return `${(val / 1e9).toFixed(1)}B`
-  if (abs >= 1e6)
-    return `${(val / 1e6).toFixed(1)}M`
-  if (abs >= 1e3)
-    return `${(val / 1e3).toFixed(abs >= 1e4 ? 0 : 1)}K`
-  return Number.isInteger(val) ? String(val) : val.toFixed(1)
+    text = `${(abs / 1e9).toFixed(1)}B`
+  else if (abs >= 1e6)
+    text = `${(abs / 1e6).toFixed(1)}M`
+  else if (abs >= 1e3)
+    text = `${(abs / 1e3).toFixed(abs >= 1e4 ? 0 : 1)}K`
+  else
+    text = Number.isInteger(abs) ? String(abs) : abs.toFixed(1)
+  const sign = val < 0 ? '-' : ''
+  return format === 'currency' ? `${sign}$${text}` : `${sign}${text}`
 }

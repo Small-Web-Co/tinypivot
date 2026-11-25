@@ -36,7 +36,7 @@ export {
   isD3ChartType,
   resolveChartType,
 } from './registry'
-export { buildChartStory, commonLabelPrefix } from './story'
+export { buildChartStory, chartFootnote, chartKicker, commonLabelPrefix } from './story'
 
 export type { ChartStory } from './story'
 

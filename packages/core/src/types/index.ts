@@ -515,6 +515,14 @@ export interface ChartOptions {
   geography?: ChartGeography
   /** D3 charts: show the computed takeaway headline and callouts (default `true`) */
   annotations?: boolean
+  /**
+   * D3 charts: `'highlight'` (default, the house style) draws the marks the
+   * takeaway is about in the accent and everything else muted; `'palette'`
+   * gives every series its own palette colour.
+   */
+  emphasis?: 'highlight' | 'palette'
+  /** Source line under D3 charts, e.g. a file or dataset name */
+  source?: string
 }
 
 /** Information about a field for chart building */

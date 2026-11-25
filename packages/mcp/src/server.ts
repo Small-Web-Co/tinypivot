@@ -146,7 +146,8 @@ export function clientSupportsMcpAppsUi(
   )
 }
 
-function toCoreChartConfig(input: z.infer<typeof chartConfigSchema>): Partial<ChartConfig> {
+/** `source` names the dataset in the footnote under D3 charts, so a pasted chart says where it came from. */
+function toCoreChartConfig(input: z.infer<typeof chartConfigSchema>, source?: string): Partial<ChartConfig> {
   // The schema already rejected unknown names, so this always resolves.
   const type = resolveChartType(input.type) ?? 'bar'
   const aggregation = input.aggregation as ChartAggregation
@@ -164,6 +165,7 @@ function toCoreChartConfig(input: z.infer<typeof chartConfigSchema>): Partial<Ch
       stacked: type === 'stackedBar',
       ...(input.geography ? { geography: input.geography } : {}),
       ...(input.annotations === undefined ? {} : { annotations: input.annotations }),
+      ...(source ? { source } : {}),
     },
   }
 }
@@ -514,7 +516,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       try {
         const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
         const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep })
-        const explicitChart = chartConfig ? toCoreChartConfig(chartConfig) : undefined
+        const explicitChart = chartConfig ? toCoreChartConfig(chartConfig, ds.name) : undefined
         if (pivotConfig) {
           const normalizedPivot: Partial<PivotConfig> = {
             ...pivotConfig,
@@ -596,7 +598,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         rows,
         viewMode: viewMode ?? 'chart',
         pivotConfig: normalizedPivot,
-        chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
+        chartConfig: chartConfig ? toCoreChartConfig(chartConfig, source ? `${name} (${source})` : name) : undefined,
         sessionKey,
         keepExisting: shouldKeep,
       })
@@ -715,7 +717,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       if (chartTheme && (isPro || chartTheme === 'code')) {
         store.setVisualTheme(chartTheme as ChartThemePreset)
       }
-      const chartConfig = toCoreChartConfig(chartInput)
+      const chartConfig = toCoreChartConfig(chartInput, ds.name)
       const type = chartConfig.type!
       store.updateView(ds.id, {
         viewMode: 'chart',

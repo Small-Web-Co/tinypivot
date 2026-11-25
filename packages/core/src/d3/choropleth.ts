@@ -12,9 +12,9 @@ import { geoEqualEarth, geoIdentity, geoPath } from 'd3-geo'
 import { scaleQuantize } from 'd3-scale'
 import { feature, mesh } from 'topojson-client'
 import { describeUnmatchedRegions, processChartDataForChoropleth } from '../chart/d3-data'
-import { formatCompactChartValue, mixColor } from '../chart/d3-theme'
+import { mixColor } from '../chart/d3-theme'
 import { regionDisplayName, usStateShapeCode, worldShapeCode } from '../chart/geo'
-import { applyGlow, bindTooltip, formatValue, haloText, measureLabel, sequentialFill, styleText, TRANSITION_MS } from './context'
+import { applyGlow, bindTooltip, compact, formatValue, haloText, measureLabel, sequentialFill, styleText, TRANSITION_MS } from './context'
 
 interface MapShapes {
   topology: Topology
@@ -83,7 +83,7 @@ function drawLegend(ctx: DrawContext, data: ChoroplethData, scale: ReturnType<ty
   if (options.showLegend === false)
     return
   const legend = ctx.svg.append('g').attr('transform', `translate(8, ${ctx.height - LEGEND_HEIGHT + 6})`)
-  const swatch = 30
+  const swatch = 42
   const edges = [scale.diverging ? -Math.max(Math.abs(data.min), data.max) : Math.min(0, data.min), ...scale.thresholds]
   edges.forEach((edge, i) => {
     legend.append('rect')
@@ -95,7 +95,7 @@ function drawLegend(ctx: DrawContext, data: ChoroplethData, scale: ReturnType<ty
     styleText(legend.append('text'), ctx, { mono: true, size: 9 })
       .attr('x', i * swatch)
       .attr('y', 20)
-      .text(formatCompactChartValue(edge))
+      .text(compact(ctx, edge))
   })
   const noDataX = edges.length * swatch + 12
   legend.append('rect').attr('x', noDataX).attr('width', 14).attr('height', 9).attr('fill', ctx.theme.noData).attr('stroke', ctx.theme.grid)
@@ -167,7 +167,7 @@ function drawCallouts(ctx: DrawContext, items: Array<{ feature: Feature, region?
     placed.push(box)
     layer.append('circle').attr('cx', x).attr('cy', y).attr('r', 3).attr('fill', ctx.theme.ink).attr('stroke', ctx.theme.surface).attr('stroke-width', 1.5)
     haloText(layer, ctx, x + 6, y - 7, name, { size: 11, weight: 700 })
-    haloText(layer, ctx, x + 6, y + 6, formatCompactChartValue(largest.region!.value), { size: 10, mono: true, weight: 500 })
+    haloText(layer, ctx, x + 6, y + 6, compact(ctx, largest.region!.value), { size: 10, mono: true, weight: 500 })
   })
 }
 

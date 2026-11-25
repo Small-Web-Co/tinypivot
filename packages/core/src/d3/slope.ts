@@ -7,8 +7,7 @@ import type { SlopeRow } from '../chart/d3-data'
 import type { DrawContext, Group } from './context'
 import { scaleLinear } from 'd3-scale'
 import { processChartDataForSlope } from '../chart/d3-data'
-import { formatCompactChartValue } from '../chart/d3-theme'
-import { applyGlow, bindTooltip, formatValue, isCallout, labelTrimmer, styleText, TRANSITION_MS, truncate } from './context'
+import { applyGlow, bindTooltip, compact, formatValue, isCallout, labelTrimmer, styleText, TRANSITION_MS, truncate } from './context'
 
 const MARGIN = { top: 26, bottom: 12 }
 const MIN_LABEL_GAP = 13
@@ -26,7 +25,7 @@ export function spreadLabels(ys: number[], gap: number, min: number, max: number
     for (let k = placed.length - 2; k >= 0; k--)
       placed[k] = Math.min(placed[k], placed[k + 1] - gap)
   }
-  const out = Array.from({ length: ys.length })
+  const out = ys.map(() => 0)
   order.forEach((o, k) => {
     out[o.i] = Math.max(min, placed[k])
   })
@@ -43,10 +42,13 @@ function changeText(row: SlopeRow): string {
 function lineColour(ctx: DrawContext, row: SlopeRow): string {
   if (ctx.theme.fillMode === 'pattern')
     return ctx.theme.ink
+  const called = isCallout(ctx, row.label)
+  // House style: only the story's riser (accent) and faller (ink) carry colour; the rest is context.
+  if ((ctx.config.options?.emphasis ?? 'highlight') === 'highlight')
+    return called ? (row.end >= row.start ? ctx.theme.accent : ctx.theme.ink) : ctx.theme.quiet[1]
   if (row.end >= row.start)
     return ctx.theme.accent
-  // The called-out faller is drawn in ink so it reads as a finding, not background.
-  return isCallout(ctx, row.label) ? ctx.theme.ink : ctx.theme.muted
+  return called ? ctx.theme.ink : ctx.theme.muted
 }
 
 function drawSide(ctx: DrawContext, g: Group, rows: SlopeRow[], side: 'left' | 'right', x: number, y: (v: number) => number, short: (l: string) => string, labelWidth: number): void {
@@ -55,8 +57,8 @@ function drawSide(ctx: DrawContext, g: Group, rows: SlopeRow[], side: 'left' | '
   rows.forEach((row, i) => {
     const called = isCallout(ctx, row.label)
     const text = side === 'left'
-      ? `${truncate(short(row.label), labelWidth)}  ${formatCompactChartValue(row.start)}`
-      : `${formatCompactChartValue(row.end)}  ${truncate(short(row.label), labelWidth)}${called ? `  ${changeText(row)}` : ''}`
+      ? `${truncate(short(row.label), labelWidth)}  ${compact(ctx, row.start)}`
+      : `${compact(ctx, row.end)}  ${truncate(short(row.label), labelWidth)}${called ? `  ${changeText(row)}` : ''}`
     styleText(g.append('text'), ctx, { size: 11, color: called ? lineColour(ctx, row) : ctx.theme.ink, weight: called ? 700 : 400 })
       .attr('x', side === 'left' ? x - 8 : x + 8)
       .attr('y', ys[i])

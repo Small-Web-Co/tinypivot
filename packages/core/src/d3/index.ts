@@ -13,6 +13,7 @@ import { select } from 'd3-selection'
 import { buildChartStory } from '../chart/story'
 import { drawBullet } from './bullet'
 import { drawChoropleth } from './choropleth'
+import { createChrome } from './chrome'
 import { createTooltip, writeDefs } from './context'
 import { drawSunburst, drawTreemap } from './hierarchy'
 import { drawRadialArea, drawRadialBar } from './radial'
@@ -69,34 +70,14 @@ let instanceCount = 0
 export function mountD3Chart(container: HTMLElement, initial: D3ChartSpec, onStatus?: (status: D3ChartStatus) => void): D3ChartHandle {
   const uid = `vpg-d3-${++instanceCount}`
   container.classList.add('vpg-d3-chart')
-  const header = document.createElement('header')
-  header.className = 'vpg-d3-header'
-  const headline = document.createElement('h3')
-  headline.className = 'vpg-d3-headline'
-  const dek = document.createElement('p')
-  dek.className = 'vpg-d3-dek'
-  header.append(headline, dek)
+  const chrome = createChrome()
   const svgNode = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  const notesEl = document.createElement('div')
-  notesEl.className = 'vpg-d3-notes'
-  container.append(header, svgNode, notesEl)
+  container.append(chrome.header, svgNode, chrome.footer)
   const tooltip = createTooltip(container)
   const svg = select(svgNode)
   let spec = initial
   let generation = 0
   let hasDrawn = false
-
-  /** Headline and dek above the chart, set in the theme's display face. */
-  function renderHeader(story: ChartStory | null): void {
-    header.hidden = !story
-    if (!story)
-      return
-    headline.textContent = story.headline
-    headline.style.fontFamily = spec.theme.fontDisplay
-    headline.style.color = spec.theme.title
-    dek.textContent = story.dek
-    dek.style.color = spec.theme.muted
-  }
 
   const storyFor = (next: D3ChartSpec): ChartStory | null =>
     next.config.options?.annotations === false ? null : buildChartStory(next.data, next.config)
@@ -104,7 +85,7 @@ export function mountD3Chart(container: HTMLElement, initial: D3ChartSpec, onSta
   let story = storyFor(spec)
 
   function render(): void {
-    renderHeader(story)
+    chrome.renderHeader(story, spec.theme)
     const width = svgNode.clientWidth || container.clientWidth
     const height = svgNode.clientHeight || container.clientHeight
     // A hidden or collapsed container keeps the last drawing; the resize observer redraws when it opens.
@@ -130,14 +111,15 @@ export function mountD3Chart(container: HTMLElement, initial: D3ChartSpec, onSta
       notes: [],
       isStale: () => current !== generation,
       story,
+      key: [],
     }
     hasDrawn = true
     writeDefs(ctx)
     const finish = (): void => {
       if (ctx.isStale())
         return
-      notesEl.textContent = ctx.notes.join(' ')
-      notesEl.hidden = ctx.notes.length === 0
+      chrome.renderKey(ctx.key, spec.theme)
+      chrome.renderFooter({ story, source: spec.config.options?.source, notes: ctx.notes }, spec.theme)
       onStatus?.({ notes: ctx.notes })
     }
     const drawer = DRAWERS[spec.config.type]
@@ -175,9 +157,9 @@ export function mountD3Chart(container: HTMLElement, initial: D3ChartSpec, onSta
       generation++
       cancelAnimationFrame(frame)
       observer?.disconnect()
-      header.remove()
+      chrome.header.remove()
       svgNode.remove()
-      notesEl.remove()
+      chrome.footer.remove()
       container.querySelector('.vpg-d3-tooltip')?.remove()
       container.classList.remove('vpg-d3-chart')
     },

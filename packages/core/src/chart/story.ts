@@ -11,8 +11,12 @@ import { regionDisplayName } from './geo'
 import { formatFieldLabel, processChartData } from './index'
 
 export interface ChartStory {
+  /** Small label above the headline naming what is measured: "Bookings by country" */
+  kicker: string
   headline: string
   dek: string
+  /** How the numbers were computed, for the footnote: "Bookings: sum of bookings · 1,200 rows" */
+  footnote: string
   /** Category / region labels the chart should annotate, most important first */
   callouts: string[]
 }
@@ -29,7 +33,10 @@ function pct(part: number, whole: number): string {
   return whole > 0 ? `${Math.round((part / whole) * 100)}%` : '0%'
 }
 
-const compact = formatCompactChartValue
+/** Compact numbers in the chart's own value format, so the headline matches the labels. */
+function compact(config: ChartConfig, value: number): string {
+  return formatCompactChartValue(value, config.options?.valueFormat)
+}
 
 /**
  * A shared leading word ("Acme ") that every label repeats, so charts can drop it
@@ -58,7 +65,7 @@ function rankedTotals(data: Record<string, unknown>[], config: ChartConfig): Arr
     .sort((a, b) => b.value - a.value)
 }
 
-function choroplethStory(data: Record<string, unknown>[], config: ChartConfig): ChartStory | null {
+function choroplethStory(data: Record<string, unknown>[], config: ChartConfig): StoryBody | null {
   const map = processChartDataForChoropleth(data, config)
   const ranked = [...map.regions].sort((a, b) => b.value - a.value)
   if (ranked.length === 0)
@@ -69,10 +76,10 @@ function choroplethStory(data: Record<string, unknown>[], config: ChartConfig): 
   const topName = regionDisplayName(top)
   const total = ranked.reduce((sum, r) => sum + r.value, 0)
   const headline = ranked.length === 1
-    ? `${topName}: ${compact(top.value)} ${noun}`
+    ? `${topName}: ${compact(config, top.value)} ${noun}`
     : low.value > 0 && top.value / low.value >= 1.5
-      ? `${topName} leads with ${compact(top.value)} ${noun}, ${(top.value / low.value).toFixed(1)}× ${regionDisplayName(low)}`
-      : `${topName} leads with ${compact(top.value)} ${noun}, ${pct(top.value, total)} of the total`
+      ? `${topName} leads with ${compact(config, top.value)} ${noun}, ${(top.value / low.value).toFixed(1)}× ${regionDisplayName(low)}`
+      : `${topName} leads with ${compact(config, top.value)} ${noun}, ${pct(top.value, total)} of the total`
   const place = map.geography === 'us-states' ? 'states' : ranked.some(r => r.kind === 'region') ? 'regions' : 'countries'
   return {
     headline,
@@ -81,7 +88,7 @@ function choroplethStory(data: Record<string, unknown>[], config: ChartConfig): 
   }
 }
 
-function bulletStory(data: Record<string, unknown>[], config: ChartConfig): ChartStory | null {
+function bulletStory(data: Record<string, unknown>[], config: ChartConfig): StoryBody | null {
   const bullet = processChartDataForBullet(data, config)
   if (bullet.rows.length === 0)
     return null
@@ -90,7 +97,7 @@ function bulletStory(data: Record<string, unknown>[], config: ChartConfig): Char
   if (withTarget.length === 0) {
     const [top] = bullet.rows
     return {
-      headline: `${top.label} leads with ${compact(top.value)} ${noun}`,
+      headline: `${top.label} leads with ${compact(config, top.value)} ${noun}`,
       dek: 'Bands mark the bottom, middle and top thirds of all rows.',
       callouts: [top.label],
     }
@@ -112,7 +119,7 @@ function bulletStory(data: Record<string, unknown>[], config: ChartConfig): Char
   }
 }
 
-function radialBarStory(data: Record<string, unknown>[], config: ChartConfig): ChartStory | null {
+function radialBarStory(data: Record<string, unknown>[], config: ChartConfig): StoryBody | null {
   const ranked = rankedTotals(data, config)
   if (ranked.length === 0)
     return null
@@ -125,7 +132,7 @@ function radialBarStory(data: Record<string, unknown>[], config: ChartConfig): C
   }
 }
 
-function radialAreaStory(data: Record<string, unknown>[], config: ChartConfig): ChartStory | null {
+function radialAreaStory(data: Record<string, unknown>[], config: ChartConfig): StoryBody | null {
   const chart = processChartData(data, config)
   if (chart.categories.length < 3)
     return null
@@ -149,7 +156,7 @@ function radialAreaStory(data: Record<string, unknown>[], config: ChartConfig): 
   }
 }
 
-function hierarchyStory(data: Record<string, unknown>[], config: ChartConfig): ChartStory | null {
+function hierarchyStory(data: Record<string, unknown>[], config: ChartConfig): StoryBody | null {
   const { root } = processChartDataForHierarchy(data, config)
   const branches = root.children ?? []
   if (branches.length === 0)
@@ -181,7 +188,7 @@ function signedPct(change: number): string {
   return `${rounded >= 0 ? '+' : ''}${rounded}%`
 }
 
-function slopeStory(data: Record<string, unknown>[], config: ChartConfig): ChartStory | null {
+function slopeStory(data: Record<string, unknown>[], config: ChartConfig): StoryBody | null {
   const slope = processChartDataForSlope(data, config)
   if (!slope || slope.rows.length === 0)
     return null
@@ -203,7 +210,7 @@ function slopeStory(data: Record<string, unknown>[], config: ChartConfig): Chart
   }
 }
 
-const STORIES: Partial<Record<ChartConfig['type'], (data: Record<string, unknown>[], config: ChartConfig) => ChartStory | null>> = {
+const STORIES: Partial<Record<ChartConfig['type'], (data: Record<string, unknown>[], config: ChartConfig) => StoryBody | null>> = {
   choropleth: choroplethStory,
   bullet: bulletStory,
   radialBar: radialBarStory,
@@ -213,15 +220,47 @@ const STORIES: Partial<Record<ChartConfig['type'], (data: Record<string, unknown
   slope: slopeStory,
 }
 
+type StoryBody = Omit<ChartStory, 'kicker' | 'footnote'>
+
+const fieldName = (field: ChartConfig['xAxis']): string => (field ? field.label || formatFieldLabel(field.field) : '')
+
+/** "Bookings by product", "Bookings vs quota by rep", "Bookings by category and product". */
+export function chartKicker(config: ChartConfig): string {
+  const measure = fieldName(config.yAxis)
+  const dimension = fieldName(config.xAxis).toLowerCase()
+  if (config.type === 'bullet' && config.targetField)
+    return `${measure} vs ${fieldName(config.targetField).toLowerCase()} by ${dimension}`
+  if ((config.type === 'treemap' || config.type === 'sunburst') && config.seriesField)
+    return `${measure} by ${fieldName(config.seriesField).toLowerCase()} and ${dimension}`
+  return `${measure} by ${dimension}`
+}
+
+/** How the numbers were computed, in one line. */
+export function chartFootnote(data: Record<string, unknown>[], config: ChartConfig): string {
+  const parts: string[] = []
+  const describe = (field: ChartConfig['yAxis']): string => `${fieldName(field)}: ${field!.aggregation ?? 'sum'} of ${field!.field}`
+  parts.push(describe(config.yAxis))
+  if (config.targetField)
+    parts.push(describe(config.targetField))
+  parts.push(`${data.length.toLocaleString('en-US')} rows`)
+  return parts.join(' · ')
+}
+
 /**
  * The takeaway for a chart, or `null` when the type has no story or there is
- * nothing to say. A user-set title replaces the computed headline.
+ * nothing to say. A user-set title replaces the computed headline (an action
+ * title in deck terms); the kicker and footnote stay computed.
  */
 export function buildChartStory(data: Record<string, unknown>[], config: ChartConfig): ChartStory | null {
   if (!config.xAxis || !config.yAxis || data.length === 0)
     return null
-  const story = STORIES[config.type]?.(data, config) ?? null
-  if (story && config.options?.title)
-    return { ...story, headline: config.options.title }
-  return story
+  const body = STORIES[config.type]?.(data, config) ?? null
+  if (!body)
+    return null
+  return {
+    ...body,
+    headline: config.options?.title || body.headline,
+    kicker: chartKicker(config),
+    footnote: chartFootnote(data, config),
+  }
 }

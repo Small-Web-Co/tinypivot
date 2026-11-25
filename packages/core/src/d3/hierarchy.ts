@@ -8,8 +8,7 @@ import type { DrawContext } from './context'
 import { hierarchy, partition, treemap, treemapSquarify } from 'd3-hierarchy'
 import { arc } from 'd3-shape'
 import { processChartDataForHierarchy } from '../chart/d3-data'
-import { formatCompactChartValue } from '../chart/d3-theme'
-import { applyGlow, bindTooltip, formatValue, labelColorOn, labelTrimmer, measureLabel, sequentialFill, seriesFill, shade, styleText, TRANSITION_MS, truncate } from './context'
+import { applyGlow, bindTooltip, compact, emphasisFill, formatValue, labelColorOn, labelTrimmer, measureLabel, styleText, TRANSITION_MS, truncate } from './context'
 
 type Node = HierarchyRectangularNode<DataNode>
 
@@ -31,17 +30,19 @@ function branchIndex(node: Node): number {
 }
 
 /** Fill: nested trees colour by branch, shading leaves; flat trees shade by value. */
-function nodeFill(ctx: DrawContext, node: Node, nested: boolean, maxLeaf: number): string {
-  if (nested) {
-    const base = seriesFill(ctx, branchIndex(node))
-    if (node.depth === 1)
-      return base
-    const siblings = node.parent?.children?.length ?? 1
-    const rank = node.parent?.children?.indexOf(node) ?? 0
-    return shade(ctx, base, siblings > 1 ? (rank / siblings) * 0.45 : 0)
-  }
-  const step = maxLeaf > 0 ? Math.round(((node.value ?? 0) / maxLeaf) * 4) : 4
-  return sequentialFill(ctx, Math.max(1, step))
+/**
+ * House style: the story's branch (or top tiles, when flat) in the accent,
+ * the rest muted; children step lighter by rank. Palette style colours each branch.
+ */
+function nodeFill(ctx: DrawContext, node: Node, nested: boolean): string {
+  const rank = node.parent?.children?.indexOf(node) ?? 0
+  if (!nested)
+    return emphasisFill(ctx, node.data.name, ctx.story?.callouts.includes(node.data.name) ? 0 : Math.min(2, Math.floor(rank / 4)))
+  const branch = branchKey(node)
+  const step = node.depth === 1 ? 0 : 1 + Math.min(1, Math.floor((rank * 2) / Math.max(1, node.parent?.children?.length ?? 1)))
+  return (ctx.config.options?.emphasis ?? 'highlight') === 'highlight'
+    ? emphasisFill(ctx, branch, step)
+    : emphasisFill(ctx, branch, branchIndex(node))
 }
 
 function shareLine(node: Node): string {
@@ -75,7 +76,6 @@ export function drawTreemap(ctx: DrawContext): void {
     .round(true)(root)
   const leaves = laid.leaves()
   const short = labelTrimmer(leaves.map(l => l.data.name))
-  const maxLeaf = Math.max(...leaves.map(l => l.value ?? 0))
 
   if (nested) {
     const parents = ctx.svg.append('g').selectAll('g').data(laid.children ?? []).join('g')
@@ -84,8 +84,8 @@ export function drawTreemap(ctx: DrawContext): void {
       .attr('y', d => d.y0)
       .attr('width', d => d.x1 - d.x0)
       .attr('height', d => d.y1 - d.y0)
-      .attr('fill', d => shade(ctx, nodeFill(ctx, d, true, maxLeaf), 0.6))
-    parents.filter(d => d.x1 - d.x0 > 40).append('text').call(sel => styleText(sel, ctx, { size: 11, color: ctx.theme.ink, weight: 600 })).attr('x', d => d.x0 + 4).attr('y', d => d.y0 + 13).text(d => truncate(`${d.data.name} · ${formatCompactChartValue(d.value ?? 0)}`, d.x1 - d.x0 - 8))
+      .attr('fill', ctx.theme.surface)
+    parents.filter(d => d.x1 - d.x0 > 40).append('text').call(sel => styleText(sel, ctx, { size: 11, color: ctx.theme.ink, weight: 600 })).attr('x', d => d.x0 + 4).attr('y', d => d.y0 + 13).text(d => truncate(`${d.data.name} · ${compact(ctx, d.value ?? 0)}`, d.x1 - d.x0 - 8))
   }
 
   const tiles = applyGlow(ctx, ctx.svg.append('g')).selectAll('g').data(leaves).join('g').attr('transform', d => `translate(${d.x0}, ${d.y0})`)
@@ -93,7 +93,7 @@ export function drawTreemap(ctx: DrawContext): void {
     .attr('class', 'vpg-d3-mark')
     .attr('width', d => d.x1 - d.x0)
     .attr('height', d => d.y1 - d.y0)
-    .attr('fill', d => nodeFill(ctx, d, nested, maxLeaf))
+    .attr('fill', d => nodeFill(ctx, d, nested))
     .attr('stroke', ctx.theme.markStrokeWidth > 0 ? ctx.theme.ink : 'none')
     .attr('stroke-width', ctx.theme.markStrokeWidth)
   if (ctx.animate)
@@ -105,7 +105,7 @@ export function drawTreemap(ctx: DrawContext): void {
   const halo = ctx.theme.fillMode === 'pattern' ? ctx.theme.surface : 'none'
   labelled.append('text')
     .call(sel => styleText(sel, ctx, { size: 11, weight: 600 }))
-    .attr('fill', d => labelColorOn(ctx, nodeFill(ctx, d, nested, maxLeaf)))
+    .attr('fill', d => labelColorOn(ctx, nodeFill(ctx, d, nested)))
     .attr('x', 5)
     .attr('y', 15)
     .attr('stroke', halo)
@@ -113,7 +113,7 @@ export function drawTreemap(ctx: DrawContext): void {
     .attr('paint-order', 'stroke')
     .attr('pointer-events', 'none')
     .text(d => truncate(short(d.data.name), d.x1 - d.x0 - 10))
-  labelled.filter(d => d.y1 - d.y0 > 40).append('text').call(sel => styleText(sel, ctx, { mono: true, size: 10 })).attr('fill', d => labelColorOn(ctx, nodeFill(ctx, d, nested, maxLeaf))).attr('x', 5).attr('y', 29).attr('stroke', halo).attr('stroke-width', 3).attr('paint-order', 'stroke').attr('pointer-events', 'none').text(d => formatCompactChartValue(d.value ?? 0))
+  labelled.filter(d => d.y1 - d.y0 > 40).append('text').call(sel => styleText(sel, ctx, { mono: true, size: 10 })).attr('fill', d => labelColorOn(ctx, nodeFill(ctx, d, nested))).attr('x', 5).attr('y', 29).attr('stroke', halo).attr('stroke-width', 3).attr('paint-order', 'stroke').attr('pointer-events', 'none').text(d => compact(ctx, d.value ?? 0))
 }
 
 export function drawSunburst(ctx: DrawContext): void {
@@ -135,8 +135,7 @@ export function drawSunburst(ctx: DrawContext): void {
     .outerRadius(d => d.y1 * ring - 1)
   const nodes = laid.descendants().filter(d => d.depth > 0)
   const short = labelTrimmer(laid.leaves().map(l => l.data.name))
-  const maxLeaf = Math.max(...laid.leaves().map(l => l.value ?? 0))
-  const fillOf = (d: Node): string => (nested ? nodeFill(ctx, d, true, maxLeaf) : seriesFill(ctx, d.parent?.children?.indexOf(d) ?? 0))
+  const fillOf = (d: Node): string => nodeFill(ctx, d, nested)
   const marks = applyGlow(ctx, center.append('g')).selectAll('path').data(nodes).join('path').attr('class', 'vpg-d3-mark').attr('d', shape).attr('fill', fillOf).attr('stroke', ctx.theme.markStrokeWidth > 0 ? ctx.theme.ink : ctx.theme.surface).attr('stroke-width', Math.max(1, ctx.theme.markStrokeWidth))
   if (ctx.animate)
     marks.attr('opacity', 0).transition().duration(TRANSITION_MS).delay(d => d.depth * 120).attr('opacity', 1)
@@ -152,9 +151,9 @@ export function drawSunburst(ctx: DrawContext): void {
   styleText(center.append('text'), ctx, { mono: true, size: 15, color: ctx.theme.title, weight: 700 })
     .attr('text-anchor', 'middle')
     .attr('dy', '-0.1em')
-    .text(formatCompactChartValue(root.value ?? 0))
+    .text(compact(ctx, root.value ?? 0))
   styleText(center.append('text'), ctx, { size: 10 })
     .attr('text-anchor', 'middle')
     .attr('dy', '1.4em')
-    .text(truncate(measureLabel(ctx.config.yAxis), ring * 1.6, 10))
+    .text(truncate(ctx.config.yAxis?.label || measureLabel(ctx.config.yAxis), ring * 2 - 12, 10))
 }

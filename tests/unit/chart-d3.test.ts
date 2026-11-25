@@ -7,6 +7,7 @@ import {
   buildChartStory,
   CHART_THEME_IDS,
   CHART_TYPES,
+  chartKicker,
   commonLabelPrefix,
   describeUnmatchedRegions,
   detectGeography,
@@ -398,5 +399,51 @@ describe('slope data and chart stories', () => {
     expect(commonLabelPrefix(['Acme Anvil', 'Acme Magnet'])).toBe('')
     expect(commonLabelPrefix(['Anvil', 'Magnet', 'Skates'])).toBe('')
     expect(commonLabelPrefix(['Acme', 'Acme Magnet', 'Acme Skates'])).toBe('')
+  })
+})
+
+describe('house style', () => {
+  const rows = [
+    { product: 'Acme Anvil', bookings: 1_250_000 },
+    { product: 'Acme Magnet', bookings: 340_000 },
+    { product: 'Acme Skates', bookings: 90_000 },
+  ]
+  const config: ChartConfig = {
+    type: 'radialBar',
+    xAxis: { field: 'product', label: 'Product', role: 'dimension' },
+    yAxis: { field: 'bookings', label: 'Bookings', role: 'measure', aggregation: 'sum' },
+    options: { valueFormat: 'currency' },
+  }
+
+  it('adds a kicker naming the measure and a footnote saying how it was computed', () => {
+    const story = buildChartStory(rows, config)!
+    expect(story.kicker).toBe('Bookings by product')
+    expect(story.footnote).toBe('Bookings: sum of bookings · 3 rows')
+  })
+
+  it('names target and parent fields in the kicker', () => {
+    expect(chartKicker({ type: 'bullet', xAxis: dimension('rep'), yAxis: measure('bookings'), targetField: measure('quota') })).toBe('Bookings vs quota by rep')
+    expect(chartKicker({ type: 'treemap', xAxis: dimension('product'), yAxis: measure('bookings'), seriesField: dimension('category') })).toBe('Bookings by category and product')
+  })
+
+  it('formats headline numbers in the chart value format', () => {
+    expect(buildChartStory(rows, config)!.headline).toBe('Acme Anvil leads: 74% of bookings across 3')
+    const bullet = buildChartStory(rows, { ...config, type: 'bullet' })!
+    expect(bullet.headline).toContain('$1.3M')
+  })
+
+  it('formats compact values with currency, percent and sign', () => {
+    expect(formatCompactChartValue(1_250_000, 'currency')).toBe('$1.3M')
+    expect(formatCompactChartValue(-4200, 'currency')).toBe('-$4.2K')
+    expect(formatCompactChartValue(12.5, 'percent')).toBe('12.5%')
+  })
+
+  it('gives every theme muted context colours between surface and ink', () => {
+    for (const id of UNIFIED_THEME_IDS) {
+      const theme = getD3ChartTheme(getChartLook(id, id), id)
+      expect(theme.quiet).toHaveLength(3)
+      expect(new Set(theme.quiet).size).toBe(3)
+      expect(theme.quiet).not.toContain(theme.accent)
+    }
   })
 })

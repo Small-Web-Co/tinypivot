@@ -57,6 +57,8 @@ export {
   CHART_THEME_PRESETS,
   CHART_TYPE_IDS,
   CHART_TYPES,
+  chartFootnote,
+  chartKicker,
   commonLabelPrefix,
   compareLabels,
   createDefaultChartConfig,
