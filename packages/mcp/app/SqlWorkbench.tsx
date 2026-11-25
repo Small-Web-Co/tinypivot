@@ -1,0 +1,225 @@
+import { sql as sqlLanguage, StandardSQL } from '@codemirror/lang-sql'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { Prec } from '@codemirror/state'
+import { keymap } from '@codemirror/view'
+import { tags } from '@lezer/highlight'
+import { basicSetup, EditorView } from 'codemirror'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { postToStudio } from './companionApi'
+import { formatSql } from './sqlFormat'
+
+/**
+ * The SQL workbench: a full-size editor over the loaded tables. The user reads a step's query
+ * formatted, changes it, and runs it with DuckDB on their machine; the result opens in the Studio
+ * as their own step and is previewed here, so they can keep exploring without closing it.
+ */
+
+export interface WorkbenchTable {
+  /** What SQL calls the table: the dataset id. */
+  id: string
+  name: string
+  columns: string[]
+}
+
+interface SqlWorkbenchProps {
+  initialSql: string
+  /** The step being edited: its chart or pivot carries over to the result when it fits. */
+  fromStepId?: string
+  tables: WorkbenchTable[]
+  onClose: () => void
+  notify: (message: string) => void
+}
+
+type Row = Record<string, unknown>
+
+const PREVIEW_ROWS = 50
+
+/** Editor colours from the Studio's theme variables, so the workbench follows the chosen theme. */
+const editorTheme = EditorView.theme({
+  '&': { height: '100%', backgroundColor: 'var(--color-background-primary, #0b101b)', color: 'var(--color-text-primary, #e2e8f0)' },
+  '.cm-content': { fontFamily: 'var(--tp-mono)', fontSize: '13px', caretColor: 'var(--tp-accent)' },
+  '.cm-gutters': { backgroundColor: 'var(--color-background-secondary, #111827)', color: 'var(--color-text-tertiary, #64748b)', border: 'none' },
+  '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'var(--tp-accent-soft)' },
+  '&.cm-focused': { outline: 'none' },
+  '.cm-tooltip-autocomplete': { fontFamily: 'var(--tp-mono)' },
+})
+
+/** SQL colours from the theme, matching how the Studio colours SQL in each step. */
+const sqlHighlight = syntaxHighlighting(HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--tp-accent)', fontWeight: '600' },
+  { tag: [tags.string, tags.special(tags.string)], color: 'var(--tp-accent-2)' },
+  { tag: [tags.number, tags.bool, tags.null], color: 'var(--tp-accent-2)' },
+  { tag: tags.comment, color: 'var(--color-text-tertiary, #64748b)', fontStyle: 'italic' },
+  { tag: [tags.operator, tags.punctuation], color: 'var(--color-text-secondary, #94a3b8)' },
+]))
+
+/** A CodeMirror editor that knows the loaded tables, for autocomplete; Mod-Enter runs the query. */
+function useSqlEditor(initialSql: string, tables: WorkbenchTable[], onRun: () => void) {
+  const host = useRef<HTMLDivElement | null>(null)
+  const view = useRef<EditorView | null>(null)
+  const run = useRef(onRun)
+  run.current = onRun
+
+  useEffect(() => {
+    if (!host.current)
+      return
+    const schema = Object.fromEntries(tables.map(table => [table.id, table.columns]))
+    view.current = new EditorView({
+      doc: formatSql(initialSql),
+      parent: host.current,
+      extensions: [
+        basicSetup,
+        sqlLanguage({ dialect: StandardSQL, schema, upperCaseKeywords: true }),
+        Prec.high(sqlHighlight),
+        editorTheme,
+        // Above the default keymap, which would otherwise take Mod-Enter for a blank line.
+        Prec.highest(keymap.of([{ key: 'Mod-Enter', run: () => {
+          run.current()
+          return true
+        } }])),
+      ],
+    })
+    view.current.focus()
+    return () => view.current?.destroy()
+  // The editor is created once per opening; later table changes do not reset what the user typed.
+  }, [])
+
+  const getSql = () => view.current?.state.doc.toString() ?? ''
+  const setSql = (text: string) => view.current?.dispatch({ changes: { from: 0, to: view.current.state.doc.length, insert: text } })
+  const insert = (text: string) => {
+    const current = view.current
+    if (!current)
+      return
+    current.dispatch(current.state.replaceSelection(text))
+    current.focus()
+  }
+  return { host, getSql, setSql, insert }
+}
+
+/** The result's first rows, fetched from the Studio once the query has run. */
+async function previewOf(datasetId: string): Promise<Row[]> {
+  const res = await fetch(`/api/state?datasetId=${encodeURIComponent(datasetId)}`)
+  const payload = await res.json().catch(() => ({})) as { rows?: Row[] }
+  return (payload.rows ?? []).slice(0, PREVIEW_ROWS)
+}
+
+function TableList({ tables, onInsert }: { tables: WorkbenchTable[], onInsert: (text: string) => void }) {
+  const [open, setOpen] = useState<string | null>(tables[0]?.id ?? null)
+  if (tables.length === 0)
+    return <p className="tp-wb-empty">No tables loaded yet. Query a file directly: FROM &apos;/path/to/file.csv&apos;.</p>
+  return (
+    <ul className="tp-wb-tables">
+      {tables.map(table => (
+        <li key={table.id}>
+          <div className="tp-wb-table">
+            <button type="button" className="tp-wb-toggle" aria-expanded={open === table.id} onClick={() => setOpen(prev => (prev === table.id ? null : table.id))}>
+              {open === table.id ? '▾' : '▸'}
+            </button>
+            <button type="button" className="tp-wb-name" title={`Insert ${table.id}`} onClick={() => onInsert(table.id)}>{table.name}</button>
+          </div>
+          {open === table.id && (
+            <ul className="tp-wb-columns">
+              {table.columns.map(column => (
+                <li key={column}>
+                  <button type="button" onClick={() => onInsert(column)}>{column}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Preview({ rows, summary }: { rows: Row[], summary: string }) {
+  const columns = Object.keys(rows[0] ?? {})
+  return (
+    <div className="tp-wb-preview">
+      <p className="tp-studio-label">{summary}</p>
+      {rows.length > 0 && (
+        <div className="tp-wb-preview-scroll">
+          <table>
+            <thead>
+              <tr>{columns.map(column => <th key={column}>{column}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                // Preview rows have no id; their order is fixed for the life of this table.
+                <tr key={index}>{columns.map(column => <td key={column}>{String(row[column] ?? '')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function SqlWorkbench({ initialSql, fromStepId, tables, onClose, notify }: SqlWorkbenchProps) {
+  const [name, setName] = useState('')
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ rows: Row[], summary: string } | null>(null)
+  // The editor's Mod-Enter calls whatever run is current.
+  const runRef = useRef<() => void>(() => {})
+  const editor = useSqlEditor(initialSql, tables, () => runRef.current())
+
+  const run = useCallback(async () => {
+    const query = editor.getSql().trim()
+    if (!query || running)
+      return
+    setRunning(true)
+    setError(null)
+    try {
+      const out = await postToStudio<{ datasetId: string, rows: number, truncated: boolean }>('/api/studio/query', { sql: query, name: name || undefined, fromStepId })
+      const summary = `${out.rows.toLocaleString()} rows${out.truncated ? ', cut at the row limit' : ''} · open in the Studio as your step`
+      setResult({ rows: await previewOf(out.datasetId), summary })
+      notify(`${out.rows.toLocaleString()} rows`)
+    }
+    catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+    finally {
+      setRunning(false)
+    }
+  // The editor reads its text at run time; `editor` is stable for the life of the modal.
+  }, [fromStepId, name, notify, running])
+  runRef.current = () => void run()
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape')
+        onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="tp-wb-overlay" role="dialog" aria-modal="true" aria-label="SQL workbench" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+      <div className="tp-wb">
+        <header className="tp-wb-head">
+          <span className="tp-studio-label">SQL · DuckDB · read-only · runs on this machine</span>
+          <button type="button" className="tp-studio-icon-btn" aria-label="Close the SQL workbench" onClick={onClose}>×</button>
+        </header>
+        <aside className="tp-wb-side">
+          <p className="tp-studio-label">Tables</p>
+          <TableList tables={tables} onInsert={editor.insert} />
+        </aside>
+        <div className="tp-wb-main">
+          <div className="tp-wb-editor" ref={editor.host} />
+          {error && <div className="tp-studio-error" role="alert">{error}</div>}
+          <div className="tp-studio-actions">
+            <button type="button" className="tp-studio-btn tp-studio-btn-ghost" onClick={() => editor.setSql(formatSql(editor.getSql()))}>Format</button>
+            <input className="tp-studio-name" placeholder="Name the result (optional)" value={name} onChange={e => setName(e.target.value)} aria-label="Result name" />
+            <button type="button" className="tp-studio-btn tp-studio-btn-primary" disabled={running} onClick={() => void run()}>
+              {running ? 'Running…' : 'Run ⌘↵'}
+            </button>
+          </div>
+          {result && <Preview rows={result.rows} summary={result.summary} />}
+        </div>
+      </div>
+    </div>
+  )
+}

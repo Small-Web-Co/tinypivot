@@ -4,6 +4,8 @@ import type { Run, StudioStep } from './runs'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { postToStudio, uploadToStudio } from './companionApi'
 import { checkReport, claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from './runs'
+import { formatSql, sqlOneLine } from './sqlFormat'
+import { SqlWorkbench } from './SqlWorkbench'
 
 /**
  * The Studio side panel reads the trace as questions. Each one shows what was asked, then how the
@@ -267,8 +269,8 @@ function Stage({ step, index, active, canOpen, checks, onOpen, onEdit }: StagePr
         {stage === 'answer' ? <AnswerText step={step} /> : step.why && <p className="tp-run-why">{renderInline(step.why)}</p>}
         {sql && stage !== 'view' && (
           showSql
-            ? <pre className="tp-studio-sql"><code>{highlightSql(sql)}</code></pre>
-            : <button type="button" className="tp-run-sql-line" onClick={() => setShowSql(true)} title="Show the SQL">{sql.replace(/\s+/g, ' ')}</button>
+            ? <pre className="tp-studio-sql"><code>{highlightSql(formatSql(sql))}</code></pre>
+            : <button type="button" className="tp-run-sql-line" onClick={() => setShowSql(true)} title="Show the SQL">{sqlOneLine(sql)}</button>
         )}
         {(result || canOpen) && stage !== 'answer' && (
           <div className="tp-run-result">
@@ -376,88 +378,6 @@ function RunCard({ run, open, activeDatasetId, loaded, checks, checkTimes, check
         </div>
       )}
     </li>
-  )
-}
-
-interface SqlEditorProps {
-  initialSql: string
-  /** The step being edited: its chart or pivot carries over to the result when it fits. */
-  fromStepId?: string
-  tables: Array<{ id: string, name: string }>
-  onClose: () => void
-  notify: (message: string) => void
-}
-
-function SqlEditor({ initialSql, fromStepId, tables, onClose, notify }: SqlEditorProps) {
-  const [sql, setSql] = useState(initialSql)
-  const [name, setName] = useState('')
-  const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const inputRef = useRef<HTMLTextAreaElement | null>(null)
-
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
-
-  const run = useCallback(async () => {
-    if (!sql.trim() || running)
-      return
-    setRunning(true)
-    setError(null)
-    try {
-      const result = await postToStudio<{ rows: number, truncated: boolean }>('/api/studio/query', { sql, name: name || undefined, fromStepId })
-      notify(`${result.rows.toLocaleString()} rows${result.truncated ? ' (cut at the row limit)' : ''}`)
-      onClose()
-    }
-    catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    }
-    finally {
-      setRunning(false)
-    }
-  }, [fromStepId, name, notify, onClose, running, sql])
-
-  const insertTable = (id: string) => setSql(prev => `${prev}${prev && !/\s$/.test(prev) ? ' ' : ''}${id}`)
-
-  return (
-    <div className="tp-studio-editor">
-      <div className="tp-studio-editor-head">
-        <span className="tp-studio-label">SQL · DuckDB · read-only</span>
-        <button type="button" className="tp-studio-icon-btn" aria-label="Close editor" onClick={onClose}>×</button>
-      </div>
-      <textarea
-        ref={inputRef}
-        className="tp-studio-sql-input"
-        value={sql}
-        spellCheck={false}
-        rows={8}
-        aria-label="SQL"
-        onChange={e => setSql(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault()
-            void run()
-          }
-        }}
-      />
-      {tables.length > 0 && (
-        <div className="tp-studio-tables">
-          <span className="tp-studio-label">tables</span>
-          {tables.map(table => (
-            <button key={table.id} type="button" className="tp-studio-chip" title={`Insert ${table.id}`} onClick={() => insertTable(table.id)}>
-              {table.name}
-            </button>
-          ))}
-        </div>
-      )}
-      {error && <div className="tp-studio-error" role="alert">{error}</div>}
-      <div className="tp-studio-actions">
-        <input className="tp-studio-name" placeholder="Name (optional)" value={name} onChange={e => setName(e.target.value)} aria-label="Result name" />
-        <button type="button" className="tp-studio-btn tp-studio-btn-primary" disabled={running || !sql.trim()} onClick={() => void run()}>
-          {running ? 'Running…' : 'Run ⌘↵'}
-        </button>
-      </div>
-    </div>
   )
 }
 
@@ -722,6 +642,11 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
   const { checks, checkTimes, checking, check } = useChecks(notify)
 
   const loaded = useMemo(() => new Set(snapshot.loadedIds), [snapshot.loadedIds])
+  // Each loaded table with the columns its latest step recorded, for the workbench's list and autocomplete.
+  const workbenchTables = useMemo(() => tables.map((table) => {
+    const step = [...snapshot.steps].reverse().find(s => s.datasetId === table.id && s.columns?.length)
+    return { ...table, columns: step?.columns ?? [] }
+  }), [snapshot.steps, tables])
   const live = snapshot.agent.live.length > 0
   // The newest question stays open until the user picks another.
   const shownId = openId ?? runs.at(-1)?.id
@@ -753,11 +678,11 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
       </div>
 
       {editor && (
-        <SqlEditor
+        <SqlWorkbench
           key={editor.fromStepId ?? 'new'}
           initialSql={editor.sql}
           fromStepId={editor.fromStepId}
-          tables={tables}
+          tables={workbenchTables}
           onClose={() => setEditor(null)}
           notify={notify}
         />
