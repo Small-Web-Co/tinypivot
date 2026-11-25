@@ -24,8 +24,9 @@ export interface ClaimSource {
 }
 
 /** `$1.20M`, `48,189,470`, `28.6%`, `-3.5K`, `-$9.9M`. Dates, quarters and ids are skipped by the checks below. */
-const NUMBER_RE = /(?<![\w.-])(-?)([$€£]?)(-?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s?([KMB])?(%)?(?![\w-])/g
-const SCALE: Record<string, number> = { K: 1e3, M: 1e6, B: 1e9 }
+const NUMBER_RE = /(?<![\w.-])(-?)([$€£]?)(-?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s?([KMBk]|mn|bn)?(%)?(?![\w-])/g
+/** Thousands, millions and billions; `m` alone is left out, as it is as often minutes or metres. */
+const SCALE: Record<string, number> = { K: 1e3, k: 1e3, M: 1e6, mn: 1e6, B: 1e9, bn: 1e9 }
 /** Years and tiny counts ("4 regions") are not worth checking. */
 const MIN_PLAIN_VALUE = 10
 /**

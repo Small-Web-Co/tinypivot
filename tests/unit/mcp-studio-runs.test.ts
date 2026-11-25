@@ -21,6 +21,14 @@ describe('reading the numbers in an answer', () => {
     ])
   })
 
+  it('reads thousands, millions and billions however the agent abbreviates them', () => {
+    expect(extractNumbers('$327.1k, 4.2mn and 1.5bn, but not 12m or 3 km').map(n => [n.text, n.value])).toEqual([
+      ['$327.1k', 327_100],
+      ['4.2mn', 4_200_000],
+      ['1.5bn', 1_500_000_000],
+    ])
+  })
+
   it('allows for the rounding the agent wrote', () => {
     const [compact] = extractNumbers('1.20M')
     expect(compact.tolerance).toBe(5_000)
