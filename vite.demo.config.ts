@@ -247,6 +247,8 @@ export default defineConfig(({ mode }) => {
         '@': resolve(__dirname, 'packages/vue/src'),
         'tinypivot/style.css': resolve(__dirname, 'packages/vue/src/style.css'),
         'tinypivot': resolve(__dirname, 'packages/vue/src/index.ts'),
+        // Subpath first: the bare-package entry below would otherwise swallow '/d3'.
+        '@smallwebco/tinypivot-core/d3': resolve(__dirname, 'packages/core/src/d3/index.ts'),
         '@smallwebco/tinypivot-core': resolve(__dirname, 'packages/core/src/index.ts'),
       },
     },

@@ -6,6 +6,7 @@ import ChartGlyphs from '../components/site/ChartGlyphs.vue'
 import CodeBlock from '../components/site/CodeBlock.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import SegmentedControl from '../components/site/SegmentedControl.vue'
+import { galleryCharts, generateAcmeBookings } from '../site/chartGallery'
 import { aiAnalystCode, analystPoints, features, frameworks, quickstartCode, testimonials } from '../site/ui'
 import { aiAnalystConfig, dateFormats, demoChartConfig, numberFormats, themeChoices, useLiveDemo } from '../site/useLiveDemo'
 
@@ -14,6 +15,12 @@ const quickstart = computed(() => quickstartCode(framework.value))
 const analyst = computed(() => aiAnalystCode(framework.value))
 
 const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDemo()
+
+// D3 chart gallery: fake Acme bookings, one chart at a time, any theme.
+const galleryRows = generateAcmeBookings()
+const galleryChartId = ref(galleryCharts[0].id)
+const galleryTheme = ref(theme.value)
+const galleryChart = computed(() => galleryCharts.find(c => c.id === galleryChartId.value) ?? galleryCharts[0])
 </script>
 
 <template>
@@ -105,6 +112,56 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
             <p v-else class="demo-loading mono">
               Loading 10,000 rows…
             </p>
+          </div>
+        </RetroWindow>
+      </div>
+    </section>
+
+    <section id="d3-charts" class="block demo" aria-labelledby="d3-title">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            Chart gallery · fake Acme Corp bookings
+          </p>
+          <h2 id="d3-title" class="heading">
+            Maps, bullets, radials and treemaps. <em>Every theme, same data.</em>
+          </h2>
+        </header>
+
+        <div class="demo-controls">
+          <div class="gallery-tabs" role="tablist" aria-label="Chart type">
+            <button
+              v-for="chart in galleryCharts"
+              :key="chart.id"
+              type="button"
+              role="tab"
+              class="btn btn-ghost gallery-tab"
+              :aria-selected="chart.id === galleryChartId"
+              @click="galleryChartId = chart.id"
+            >
+              {{ chart.label }}
+            </button>
+          </div>
+          <label class="demo-select">
+            <span class="label">Theme</span>
+            <select v-model="galleryTheme">
+              <option v-for="t in themeChoices" :key="t.value" :value="t.value">{{ t.label }}</option>
+            </select>
+          </label>
+        </div>
+
+        <RetroWindow :title="`acme-bookings.csv — ${galleryChart.label}`" flush>
+          <div class="demo-frame gallery-frame" :data-gallery-chart="galleryChart.id">
+            <DataGrid
+              v-if="isMounted"
+              :key="galleryChart.id"
+              :data="galleryRows"
+              :show-pivot="true"
+              view-mode="chart"
+              font-size="sm"
+              :theme="galleryTheme"
+              :chart-config="galleryChart.config"
+            />
           </div>
         </RetroWindow>
       </div>
@@ -277,6 +334,17 @@ const { isMounted, rows, pageSize, theme, numberFormat, dateFormat } = useLiveDe
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: 0.8rem;
+}
+
+.gallery-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gallery-tab[aria-selected='true'] {
+  background: var(--ink, currentColor);
+  color: var(--paper, #fff);
 }
 
 .demo-frame {

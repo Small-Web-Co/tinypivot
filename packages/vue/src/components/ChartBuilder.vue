@@ -2,12 +2,14 @@
 import type {
   ChartAggregation,
   ChartConfig,
+  ChartField,
   ChartFieldInfo,
   ChartSortOrder,
   ChartThemePreset,
   ChartType,
   ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
+import type { D3ChartSpec } from '@smallwebco/tinypivot-core/d3'
 /**
  * TinyPivot - Chart Builder Component
  * Drag-and-drop chart configuration with ApexCharts rendering
@@ -21,10 +23,16 @@ import {
   chartGlowApplies,
   chartPatternFill,
   createDefaultChartConfig,
+  formatChartValue,
+  formatFieldLabel,
   getChartGuidance,
   getChartLook,
   getChartThemeColors,
+  getChartTypeInfo,
+  getChartZoneLabels,
+  getD3ChartTheme,
   isChartConfigValid,
+  isD3ChartType,
   processChartData,
   processChartDataForHeatmap,
   processChartDataForPie,
@@ -33,6 +41,7 @@ import {
   resolveChartTheme,
 } from '@smallwebco/tinypivot-core'
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import D3Chart from './D3Chart.vue'
 
 const props = defineProps<{
   data: Record<string, unknown>[]
@@ -63,6 +72,9 @@ const SORT_CYCLE: Array<{ value: ChartSortOrder, label: string, title: string }>
 const VueApexCharts = defineAsyncComponent(() =>
   import('vue3-apexcharts').then(m => m.default),
 )
+
+/** ChartConfig keys a drop zone can hold. */
+type ZoneKey = 'xAxis' | 'yAxis' | 'seriesField' | 'colorField' | 'sizeField' | 'targetField'
 
 function mergeChartConfig(partial?: Partial<ChartConfig>): ChartConfig {
   const defaults = createDefaultChartConfig()
@@ -130,7 +142,7 @@ const measures = computed(() => fieldInfos.value.filter(f => f.role === 'measure
 
 // Drag state
 const draggingField = ref<ChartFieldInfo | null>(null)
-const dragOverZone = ref<string | null>(null)
+const dragOverZone = ref<ZoneKey | null>(null)
 
 // UI state
 const showChartTypeSelector = ref(false)
@@ -146,84 +158,24 @@ const selectedChartType = computed(() =>
   CHART_TYPES.find(ct => ct.type === chartConfig.value.type),
 )
 
-// Dynamic zone labels based on chart type
-const zoneLabels = computed(() => {
-  const type = chartConfig.value.type
-  switch (type) {
-    case 'scatter':
-    case 'bubble':
-      return {
-        xAxis: 'X-Axis (measure)',
-        xAxisPlaceholder: 'Drop a measure',
-        yAxis: 'Y-Axis (measure)',
-        yAxisPlaceholder: 'Drop a measure',
-        series: 'Color by (optional)',
-        seriesPlaceholder: 'Group points by dimension',
-        showSize: type === 'bubble',
-        showSeries: true,
-      }
-    case 'heatmap':
-      return {
-        xAxis: 'X-Axis (dimension)',
-        xAxisPlaceholder: 'Drop a dimension',
-        yAxis: 'Y-Axis (dimension)',
-        yAxisPlaceholder: 'Drop a dimension',
-        series: 'Value / Intensity',
-        seriesPlaceholder: 'Drop a measure for color intensity',
-        showSize: false,
-        showSeries: true,
-      }
-    case 'pie':
-    case 'donut':
-      return {
-        xAxis: 'Slices (dimension)',
-        xAxisPlaceholder: 'Drop a dimension',
-        yAxis: 'Values (measure)',
-        yAxisPlaceholder: 'Drop a measure',
-        series: '',
-        seriesPlaceholder: '',
-        showSize: false,
-        showSeries: false,
-      }
-    case 'radar':
-      return {
-        xAxis: 'Axes (dimension)',
-        xAxisPlaceholder: 'Drop a dimension',
-        yAxis: 'Values (measure)',
-        yAxisPlaceholder: 'Drop a measure',
-        series: 'Compare by (optional)',
-        seriesPlaceholder: 'Group by dimension',
-        showSize: false,
-        showSeries: true,
-      }
-    case 'stackedBar':
-      return {
-        xAxis: 'X-Axis (dimension)',
-        xAxisPlaceholder: 'Drop a dimension',
-        yAxis: 'Y-Axis (measure)',
-        yAxisPlaceholder: 'Drop a measure',
-        series: 'Series (stacking field)',
-        seriesPlaceholder: 'Drop a dimension to stack by',
-        showSize: false,
-        showSeries: true,
-      }
-    default: // bar, line, area
-      return {
-        xAxis: 'X-Axis (dimension)',
-        xAxisPlaceholder: 'Drop a dimension',
-        yAxis: 'Y-Axis (measure)',
-        yAxisPlaceholder: 'Drop a measure',
-        series: 'Color / Series (optional)',
-        seriesPlaceholder: 'Group by dimension',
-        showSize: false,
-        showSeries: true,
-      }
-  }
-})
+// Drop-zone labels and slots come from the chart type registry
+const zoneLabels = computed(() => getChartZoneLabels(chartConfig.value.type))
+const isScatterType = computed(() => chartConfig.value.type === 'scatter' || chartConfig.value.type === 'bubble')
+const isD3Type = computed(() => isD3ChartType(chartConfig.value.type))
 
-// Check if scatter/bubble needs numeric fields
-const isScatterType = computed(() => ['scatter', 'bubble'].includes(chartConfig.value.type))
-const isHeatmapType = computed(() => chartConfig.value.type === 'heatmap')
+// X and Y always; then the type's optional grouping and numeric zones
+const dropZones = computed(() => {
+  const labels = zoneLabels.value
+  const zones: Array<{ key: ZoneKey, label: string, placeholder: string, optional: boolean, showAggregation: boolean }> = [
+    { key: 'xAxis', label: labels.xAxis, placeholder: labels.xAxisPlaceholder, optional: false, showAggregation: isScatterType.value },
+    { key: 'yAxis', label: labels.yAxis, placeholder: labels.yAxisPlaceholder, optional: false, showAggregation: chartConfig.value.type !== 'heatmap' },
+  ]
+  if (labels.extra)
+    zones.push({ key: labels.extra.slot, label: labels.extra.label, placeholder: labels.extra.placeholder, optional: true, showAggregation: labels.extra.slot === 'colorField' })
+  if (labels.size)
+    zones.push({ key: labels.size.slot, label: labels.size.label, placeholder: labels.size.placeholder, optional: true, showAggregation: true })
+  return zones
+})
 
 // Drag handlers
 function handleDragStart(field: ChartFieldInfo, event: DragEvent) {
@@ -236,7 +188,7 @@ function handleDragEnd() {
   dragOverZone.value = null
 }
 
-function handleDragOver(zone: string, event: DragEvent) {
+function handleDragOver(zone: ZoneKey, event: DragEvent) {
   event.preventDefault()
   dragOverZone.value = zone
 }
@@ -245,7 +197,7 @@ function handleDragLeave() {
   dragOverZone.value = null
 }
 
-function handleDrop(zone: string, event: DragEvent) {
+function handleDrop(zone: ZoneKey, event: DragEvent) {
   event.preventDefault()
   dragOverZone.value = null
 
@@ -253,52 +205,18 @@ function handleDrop(zone: string, event: DragEvent) {
     return
 
   const field = draggingField.value
-  const chartField = {
+  const chartField: ChartField = {
     field: field.field,
     label: field.label,
     role: field.role,
     aggregation: field.role === 'measure' ? 'sum' as ChartAggregation : undefined,
   }
-
-  switch (zone) {
-    case 'xAxis':
-      chartConfig.value = { ...chartConfig.value, xAxis: chartField }
-      break
-    case 'yAxis':
-      chartConfig.value = { ...chartConfig.value, yAxis: chartField }
-      break
-    case 'series':
-      chartConfig.value = { ...chartConfig.value, seriesField: chartField }
-      break
-    case 'size':
-      chartConfig.value = { ...chartConfig.value, sizeField: chartField }
-      break
-    case 'color':
-      chartConfig.value = { ...chartConfig.value, colorField: chartField }
-      break
-  }
-
+  chartConfig.value = { ...chartConfig.value, [zone]: chartField }
   emit('configChange', chartConfig.value)
 }
 
-function removeField(zone: string) {
-  switch (zone) {
-    case 'xAxis':
-      chartConfig.value = { ...chartConfig.value, xAxis: undefined }
-      break
-    case 'yAxis':
-      chartConfig.value = { ...chartConfig.value, yAxis: undefined }
-      break
-    case 'series':
-      chartConfig.value = { ...chartConfig.value, seriesField: undefined }
-      break
-    case 'size':
-      chartConfig.value = { ...chartConfig.value, sizeField: undefined }
-      break
-    case 'color':
-      chartConfig.value = { ...chartConfig.value, colorField: undefined }
-      break
-  }
+function removeField(zone: ZoneKey) {
+  chartConfig.value = { ...chartConfig.value, [zone]: undefined }
   emit('configChange', chartConfig.value)
 }
 
@@ -308,42 +226,11 @@ function selectChartType(type: ChartType) {
   emit('configChange', chartConfig.value)
 }
 
-function updateAggregation(zone: string, aggregation: ChartAggregation) {
-  let field
-  switch (zone) {
-    case 'xAxis':
-      field = chartConfig.value.xAxis
-      break
-    case 'yAxis':
-      field = chartConfig.value.yAxis
-      break
-    case 'size':
-      field = chartConfig.value.sizeField
-      break
-    case 'color':
-      field = chartConfig.value.colorField
-      break
-    default:
-      return
-  }
+function updateAggregation(zone: ZoneKey, aggregation: ChartAggregation) {
+  const field = chartConfig.value[zone]
   if (!field)
     return
-
-  const updated = { ...field, aggregation }
-  switch (zone) {
-    case 'xAxis':
-      chartConfig.value = { ...chartConfig.value, xAxis: updated }
-      break
-    case 'yAxis':
-      chartConfig.value = { ...chartConfig.value, yAxis: updated }
-      break
-    case 'size':
-      chartConfig.value = { ...chartConfig.value, sizeField: updated }
-      break
-    case 'color':
-      chartConfig.value = { ...chartConfig.value, colorField: updated }
-      break
-  }
+  chartConfig.value = { ...chartConfig.value, [zone]: { ...field, aggregation } }
   emit('configChange', chartConfig.value)
 }
 
@@ -454,7 +341,7 @@ const chartOptions = computed<ApexOptions>(() => {
       formatter: (val: unknown) => {
         if (isStacked && val === 0)
           return ''
-        return formatValue(val, options.valueFormat, options.decimals)
+        return formatChartValue(val, options.valueFormat, options.decimals)
       },
     },
     tooltip: {
@@ -467,7 +354,7 @@ const chartOptions = computed<ApexOptions>(() => {
       cssClass: isDark ? '' : 'apexcharts-tooltip-light',
       marker: { show: true },
       y: {
-        formatter: (val: number) => formatValue(val, options.valueFormat, options.decimals),
+        formatter: (val: number) => formatChartValue(val, options.valueFormat, options.decimals),
       },
     },
     markers: isLineOrArea
@@ -568,7 +455,7 @@ const chartOptions = computed<ApexOptions>(() => {
           fontSize: '11px',
           fontFamily: monoFont,
         },
-        formatter: (val: number) => formatValue(val, options.valueFormat, options.decimals),
+        formatter: (val: number) => formatChartValue(val, options.valueFormat, options.decimals),
       },
     }
   }
@@ -604,7 +491,7 @@ const chartOptions = computed<ApexOptions>(() => {
               fontSize: '11px',
               formatter: (w) => {
                 const total = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0)
-                return formatValue(total, options.valueFormat, options.decimals)
+                return formatChartValue(total, options.valueFormat, options.decimals)
               },
             },
           },
@@ -630,7 +517,8 @@ const chartOptions = computed<ApexOptions>(() => {
 
 const processedChartData = computed(() => {
   const config = chartConfig.value
-  if (!chartIsValid.value)
+  // D3 types shape their own data inside the lazy renderer
+  if (!chartIsValid.value || isD3Type.value)
     return { categories: [] as string[], series: [] as ApexAxisChartSeries | ApexNonAxisChartSeries }
 
   if (config.type === 'pie' || config.type === 'donut') {
@@ -659,6 +547,18 @@ const processedChartData = computed(() => {
 
   // Standard charts (bar, stackedBar, line, area, radar)
   return processChartData(props.data, config)
+})
+
+const d3Spec = computed<D3ChartSpec | null>(() => {
+  if (!isD3Type.value)
+    return null
+  const look = getChartLook(props.theme, activeChartTheme.value)
+  return {
+    config: chartConfig.value,
+    data: props.data,
+    theme: getD3ChartTheme(look, activeChartTheme.value, chartConfig.value.options?.colors),
+    animate: chartConfig.value.options?.animated ?? true,
+  }
 })
 
 const chartSeries = computed(() => processedChartData.value.series)
@@ -731,67 +631,18 @@ const chartOptionsWithCategories = computed<ApexOptions>(() => {
   return options
 })
 
-type ApexChartType = 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'radar' | 'scatter' | 'heatmap' | 'bubble'
-
-function getApexChartType(type: ChartType): ApexChartType {
-  const mapping: Record<ChartType, ApexChartType> = {
-    bar: 'bar',
-    stackedBar: 'bar',
-    line: 'line',
-    area: 'area',
-    pie: 'pie',
-    donut: 'donut',
-    radar: 'radar',
-    scatter: 'scatter',
-    bubble: 'bubble',
-    heatmap: 'heatmap',
-  }
-  return mapping[type] || 'bar'
+function getApexChartType(type: ChartType) {
+  return getChartTypeInfo(type)?.apexType ?? 'bar'
 }
 
-function formatValue(val: unknown, format?: string, decimals?: number): string {
-  // Handle non-number values (ApexCharts sometimes passes strings or undefined)
-  if (val === null || val === undefined)
-    return ''
-  if (typeof val !== 'number')
-    return String(val)
-  if (Number.isNaN(val))
-    return ''
-
-  const dec = decimals ?? 0
-  if (format === 'percent') {
-    return `${val.toFixed(dec)}%`
-  }
-  if (format === 'currency') {
-    return `$${val.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}`
-  }
-  if (Math.abs(val) >= 1000) {
-    return val.toLocaleString(undefined, { maximumFractionDigits: dec })
-  }
-  return val.toFixed(dec)
+/** Configs from the MCP server carry field names only; show a readable label either way. */
+function zoneFieldLabel(field?: ChartField): string {
+  return field ? field.label || formatFieldLabel(field.field) : ''
 }
 
-// Icons for chart types (inline SVG paths)
 function getChartIcon(type: ChartType): string {
-  const icons: Record<ChartType, string> = {
-    bar: 'M3 3v18h18V3H3zm4 14H5v-6h2v6zm4 0H9V7h2v10zm4 0h-2V9h2v8zm4 0h-2v-4h2v4z',
-    stackedBar: 'M3 3v18h18V3H3zm4 14H5v-3h2v3zm0-4H5v-3h2v3zm4 4H9v-5h2v5zm0-6H9v-4h2v4zm4 6h-2v-3h2v3zm0-4h-2v-5h2v5zm4 4h-2v-2h2v2zm0-3h-2v-2h2v2z',
-    line: 'M3.5 18.5l6-6 4 4 8-8M14.5 8.5h6v6',
-    area: 'M3 17l6-6 4 4 8-8v10H3z',
-    pie: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8v8l5.66 5.66C14.28 19.04 13.18 20 12 20z',
-    donut: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z',
-    scatter: 'M7 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm5-6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm5 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm-3 4a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
-    bubble: 'M7 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm5-5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm5 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
-    heatmap: 'M3 3h4v4H3V3zm6 0h4v4H9V3zm6 0h4v4h-4V3zM3 9h4v4H3V9zm6 0h4v4H9V9zm6 0h4v4h-4V9zM3 15h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4z',
-    radar: 'M12 2L4 6v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V6l-8-4zm0 3.18l6 3v5.09c0 4.08-2.76 7.91-6 9.14V5.18z',
-  }
-  return icons[type] || icons.bar
+  return (getChartTypeInfo(type) ?? CHART_TYPES[0]).icon
 }
-
-// Watch for data changes
-watch(() => props.data, () => {
-  // Fields might have changed, could reset config if needed
-}, { deep: true })
 
 // Emit initial config
 onMounted(() => {
@@ -908,138 +759,35 @@ onMounted(() => {
 
       <!-- Drop Zones -->
       <div class="vpg-chart-config-panel">
-        <!-- X-Axis -->
-        <div class="vpg-chart-drop-zone-wrapper">
-          <label class="vpg-chart-zone-label">{{ zoneLabels.xAxis }}</label>
+        <div v-for="zone in dropZones" :key="zone.key" class="vpg-chart-drop-zone-wrapper">
+          <label class="vpg-chart-zone-label">{{ zone.label }}</label>
           <div
             class="vpg-chart-drop-zone"
-            :class="{ 'drag-over': dragOverZone === 'xAxis', 'has-field': chartConfig.xAxis }"
-            @dragover="handleDragOver('xAxis', $event)"
+            :class="{ 'vpg-zone-optional': zone.optional, 'drag-over': dragOverZone === zone.key, 'has-field': chartConfig[zone.key] }"
+            @dragover="handleDragOver(zone.key, $event)"
             @dragleave="handleDragLeave"
-            @drop="handleDrop('xAxis', $event)"
+            @drop="handleDrop(zone.key, $event)"
           >
-            <template v-if="chartConfig.xAxis">
-              <span class="vpg-zone-field-name">{{ chartConfig.xAxis.label }}</span>
+            <template v-if="chartConfig[zone.key]">
+              <span class="vpg-zone-field-name">{{ zoneFieldLabel(chartConfig[zone.key]) }}</span>
               <select
-                v-if="isScatterType && chartConfig.xAxis.role === 'measure'"
+                v-if="zone.showAggregation && chartConfig[zone.key]?.role === 'measure'"
                 class="vpg-zone-aggregation"
-                :value="chartConfig.xAxis.aggregation || 'sum'"
-                @change="updateAggregation('xAxis', ($event.target as HTMLSelectElement).value as ChartAggregation)"
+                :value="chartConfig[zone.key]?.aggregation || 'sum'"
+                @change="updateAggregation(zone.key, ($event.target as HTMLSelectElement).value as ChartAggregation)"
               >
                 <option v-for="agg in CHART_AGGREGATIONS" :key="agg.value" :value="agg.value">
                   {{ agg.symbol }}
                 </option>
               </select>
-              <button class="vpg-zone-remove-btn" @click="removeField('xAxis')">
+              <button class="vpg-zone-remove-btn" :aria-label="`Remove ${zone.label}`" @click="removeField(zone.key)">
                 <svg class="vpg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </template>
             <template v-else>
-              <span class="vpg-zone-placeholder">{{ zoneLabels.xAxisPlaceholder }}</span>
-            </template>
-          </div>
-        </div>
-
-        <!-- Y-Axis -->
-        <div class="vpg-chart-drop-zone-wrapper">
-          <label class="vpg-chart-zone-label">{{ zoneLabels.yAxis }}</label>
-          <div
-            class="vpg-chart-drop-zone"
-            :class="{ 'drag-over': dragOverZone === 'yAxis', 'has-field': chartConfig.yAxis }"
-            @dragover="handleDragOver('yAxis', $event)"
-            @dragleave="handleDragLeave"
-            @drop="handleDrop('yAxis', $event)"
-          >
-            <template v-if="chartConfig.yAxis">
-              <span class="vpg-zone-field-name">{{ chartConfig.yAxis.label }}</span>
-              <select
-                v-if="chartConfig.yAxis.role === 'measure' && !isHeatmapType"
-                class="vpg-zone-aggregation"
-                :value="chartConfig.yAxis.aggregation || 'sum'"
-                @change="updateAggregation('yAxis', ($event.target as HTMLSelectElement).value as ChartAggregation)"
-              >
-                <option v-for="agg in CHART_AGGREGATIONS" :key="agg.value" :value="agg.value">
-                  {{ agg.symbol }}
-                </option>
-              </select>
-              <button class="vpg-zone-remove-btn" @click="removeField('yAxis')">
-                <svg class="vpg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </template>
-            <template v-else>
-              <span class="vpg-zone-placeholder">{{ zoneLabels.yAxisPlaceholder }}</span>
-            </template>
-          </div>
-        </div>
-
-        <!-- Series / Color (conditional) -->
-        <div v-if="zoneLabels.showSeries" class="vpg-chart-drop-zone-wrapper">
-          <label class="vpg-chart-zone-label">{{ zoneLabels.series }}</label>
-          <div
-            class="vpg-chart-drop-zone vpg-zone-optional"
-            :class="{ 'drag-over': dragOverZone === 'series', 'has-field': chartConfig.seriesField || (isHeatmapType && chartConfig.colorField) }"
-            @dragover="handleDragOver(isHeatmapType ? 'color' : 'series', $event)"
-            @dragleave="handleDragLeave"
-            @drop="handleDrop(isHeatmapType ? 'color' : 'series', $event)"
-          >
-            <template v-if="isHeatmapType ? chartConfig.colorField : chartConfig.seriesField">
-              <span class="vpg-zone-field-name">{{ isHeatmapType ? chartConfig.colorField?.label : chartConfig.seriesField?.label }}</span>
-              <select
-                v-if="isHeatmapType && chartConfig.colorField?.role === 'measure'"
-                class="vpg-zone-aggregation"
-                :value="chartConfig.colorField?.aggregation || 'sum'"
-                @change="updateAggregation('color', ($event.target as HTMLSelectElement).value as ChartAggregation)"
-              >
-                <option v-for="agg in CHART_AGGREGATIONS" :key="agg.value" :value="agg.value">
-                  {{ agg.symbol }}
-                </option>
-              </select>
-              <button class="vpg-zone-remove-btn" @click="removeField(isHeatmapType ? 'color' : 'series')">
-                <svg class="vpg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </template>
-            <template v-else>
-              <span class="vpg-zone-placeholder">{{ zoneLabels.seriesPlaceholder }}</span>
-            </template>
-          </div>
-        </div>
-
-        <!-- Size (for bubble charts) -->
-        <div v-if="zoneLabels.showSize" class="vpg-chart-drop-zone-wrapper">
-          <label class="vpg-chart-zone-label">Size (number)</label>
-          <div
-            class="vpg-chart-drop-zone vpg-zone-optional"
-            :class="{ 'drag-over': dragOverZone === 'size', 'has-field': chartConfig.sizeField }"
-            @dragover="handleDragOver('size', $event)"
-            @dragleave="handleDragLeave"
-            @drop="handleDrop('size', $event)"
-          >
-            <template v-if="chartConfig.sizeField">
-              <span class="vpg-zone-field-name">{{ chartConfig.sizeField.label }}</span>
-              <select
-                v-if="chartConfig.sizeField.role === 'measure'"
-                class="vpg-zone-aggregation"
-                :value="chartConfig.sizeField.aggregation || 'sum'"
-                @change="updateAggregation('size', ($event.target as HTMLSelectElement).value as ChartAggregation)"
-              >
-                <option v-for="agg in CHART_AGGREGATIONS" :key="agg.value" :value="agg.value">
-                  {{ agg.symbol }}
-                </option>
-              </select>
-              <button class="vpg-zone-remove-btn" @click="removeField('size')">
-                <svg class="vpg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </template>
-            <template v-else>
-              <span class="vpg-zone-placeholder">Drop a number for bubble size</span>
+              <span class="vpg-zone-placeholder">{{ zone.placeholder }}</span>
             </template>
           </div>
         </div>
@@ -1057,7 +805,8 @@ onMounted(() => {
       <!-- Chart Preview -->
       <div class="vpg-chart-preview-panel">
         <div v-if="chartIsValid" class="vpg-chart-container">
-          <Suspense>
+          <D3Chart v-if="d3Spec" :spec="d3Spec" />
+          <Suspense v-else>
             <VueApexCharts
               :key="`${chartConfig.type}-${Boolean(chartOptions.chart?.stacked)}-${props.theme ?? 'light'}-${activeChartTheme}-${JSON.stringify(chartConfig.xAxis)}-${JSON.stringify(chartConfig.yAxis)}-${JSON.stringify(chartConfig.seriesField)}`"
               :type="getApexChartType(chartConfig.type)"

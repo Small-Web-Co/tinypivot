@@ -1,6 +1,6 @@
 import type { ChartConfig, ChartThemePreset, PivotConfig, TerminalPalette } from '@smallwebco/tinypivot-core'
 import type { StoredDataset } from './store.js'
-import { computePivotResult, processChartData, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
+import { buildChartStory, computePivotResult, describeUnmatchedRegions, getChartTypeInfo, processChartData, processChartDataForChoropleth, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { DISTINCT_COUNT_CAP } from './store.js'
 
 const SUB_BLOCKS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
@@ -492,13 +492,17 @@ export function formatTerminalChart(
   if (!chartConfig?.xAxis || !chartConfig?.yAxis || dataset.rows.length === 0)
     return ''
 
+  // Types a text card cannot draw fall back to the nearest card, and say so.
+  const requestedType = chartConfig.type ?? 'bar'
+  const fallback = getChartTypeInfo(requestedType)?.terminalFallback
   const fullConfig: ChartConfig = {
-    type: chartConfig.type ?? 'bar',
+    type: fallback?.as ?? requestedType,
     xAxis: chartConfig.xAxis,
     yAxis: chartConfig.yAxis,
     seriesField: chartConfig.seriesField,
     options: chartConfig.options,
   }
+  const fallbackNote = fallback ? `ⓘ ${fallback.note}` : null
 
   const processed = processChartData(dataset.rows, fullConfig)
   if (!processed.categories.length || !processed.series.length)
@@ -528,6 +532,7 @@ export function formatTerminalChart(
     : null
   const peakCat = truncateVisual(String(processed.categories[peakIdx]), 14)
   const lowCat = truncateVisual(String(processed.categories[lowIdx]), 14)
+  const noteRow = fallbackNote ? (pal ? ansiFg(pal.muted, fallbackNote) : fallbackNote) : null
   const statsLine = `▲ Peak: ${peakCat} (${formatCompactNumber(totalsPerCat[peakIdx])})`
     + `  ·  ▼ Low: ${lowCat} (${formatCompactNumber(totalsPerCat[lowIdx])})`
     + `  ·  ◆ Avg: ${formatCompactNumber(avgVal)}`
@@ -596,6 +601,8 @@ export function formatTerminalChart(
     }
 
     body.push(CARD_DIVIDER, pal ? ansiFg(pal.muted, lineStats) : lineStats)
+    if (noteRow)
+      body.push(noteRow)
     if (liveRow)
       body.push(liveRow)
     const chartKind = fullConfig.type === 'area' ? 'Area' : 'Line'
@@ -673,6 +680,8 @@ export function formatTerminalChart(
   }
 
   body.push(CARD_DIVIDER, pal ? ansiFg(pal.muted, statsLine) : statsLine)
+  if (noteRow)
+    body.push(noteRow)
   if (liveRow)
     body.push(liveRow)
 
@@ -722,6 +731,26 @@ function formatDistinctCount(count: number): string {
   return count >= DISTINCT_COUNT_CAP ? `${DISTINCT_COUNT_CAP.toLocaleString('en-US')}+` : String(count)
 }
 
+/**
+ * Plain-text lines about what a chart shows and leaves out: the computed
+ * takeaway and any map labels that matched nothing. Same words as the chart.
+ */
+export function describeChartForText(rows: Record<string, unknown>[], config?: Partial<ChartConfig>): string[] {
+  if (!config?.type || !config.xAxis || !config.yAxis)
+    return []
+  const full = config as ChartConfig
+  const lines: string[] = []
+  const story = full.options?.annotations === false ? null : buildChartStory(rows, full)
+  if (story)
+    lines.push(`Takeaway (computed from the data): ${story.headline}.`)
+  if (full.type === 'choropleth') {
+    const unmatched = describeUnmatchedRegions(processChartDataForChoropleth(rows, full))
+    if (unmatched)
+      lines.push(`> **Map warning**: ${unmatched}`)
+  }
+  return lines
+}
+
 export function formatDatasetSummary(
   dataset: StoredDataset,
   companionUrl?: string,
@@ -754,6 +783,10 @@ export function formatDatasetSummary(
   if (integrityWarning) {
     parts.push('', integrityWarning)
   }
+
+  const chartText = describeChartForText(dataset.rows, dataset.chartConfig)
+  if (chartText.length > 0)
+    parts.push('', ...chartText)
 
   if (chartBlock) {
     const echoNote = companionUrl
