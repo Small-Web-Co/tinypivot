@@ -100,6 +100,88 @@ body,
   --color-border-secondary: rgba(148, 163, 184, 0.32);
 }
 
+/* Unified themes own the whole surface: accents plus background, text and borders. */
+
+.tp-mcp-shell.tp-theme-paper {
+  --tp-accent: #e8502a;
+  --tp-accent-2: #0f7a4f;
+  --tp-accent-soft: rgba(232, 80, 42, 0.14);
+  --tp-accent-border: rgba(232, 80, 42, 0.38);
+  --color-background-primary: #f4f0e6;
+  --color-background-secondary: #ece7dc;
+  --color-background-tertiary: #e3ddcf;
+  --color-text-primary: #111111;
+  --color-text-secondary: #4a463f;
+  --color-text-tertiary: #7d776c;
+  --color-text-inverse: #f4f0e6;
+  --color-border-primary: rgba(17, 17, 17, 0.16);
+  --color-border-secondary: rgba(17, 17, 17, 0.3);
+}
+
+.tp-mcp-shell.tp-theme-greenbar {
+  --tp-accent: #0f7a4f;
+  --tp-accent-2: #b58a1a;
+  --tp-accent-soft: rgba(15, 122, 79, 0.14);
+  --tp-accent-border: rgba(15, 122, 79, 0.38);
+  --color-background-primary: #f6f3ea;
+  --color-background-secondary: #e9efe4;
+  --color-background-tertiary: #dcebd9;
+  --color-text-primary: #17201a;
+  --color-text-secondary: #3f4d44;
+  --color-text-tertiary: #6c7a70;
+  --color-text-inverse: #f6f3ea;
+  --color-border-primary: rgba(23, 32, 26, 0.18);
+  --color-border-secondary: rgba(23, 32, 26, 0.32);
+}
+
+.tp-mcp-shell.tp-theme-onebit {
+  --tp-accent: #111111;
+  --tp-accent-2: #111111;
+  --tp-accent-soft: rgba(17, 17, 17, 0.1);
+  --tp-accent-border: #111111;
+  --color-background-primary: #ece7dc;
+  --color-background-secondary: #ece7dc;
+  --color-background-tertiary: #d9d3c5;
+  --color-text-primary: #111111;
+  --color-text-secondary: #111111;
+  --color-text-tertiary: #4a463f;
+  --color-text-inverse: #ece7dc;
+  --color-border-primary: #111111;
+  --color-border-secondary: #111111;
+}
+
+.tp-mcp-shell.tp-theme-crt-amber {
+  --tp-accent: #ffb000;
+  --tp-accent-2: #ff7a1a;
+  --tp-accent-soft: rgba(255, 176, 0, 0.14);
+  --tp-accent-border: rgba(255, 176, 0, 0.4);
+  --color-background-primary: #140e06;
+  --color-background-secondary: #1c1408;
+  --color-background-tertiary: rgba(255, 176, 0, 0.08);
+  --color-text-primary: #ffc457;
+  --color-text-secondary: #d39a2f;
+  --color-text-tertiary: #a8771a;
+  --color-text-inverse: #140e06;
+  --color-border-primary: rgba(255, 176, 0, 0.2);
+  --color-border-secondary: rgba(255, 176, 0, 0.34);
+}
+
+.tp-mcp-shell.tp-theme-crt-green {
+  --tp-accent: #35d689;
+  --tp-accent-2: #a3e635;
+  --tp-accent-soft: rgba(53, 214, 137, 0.14);
+  --tp-accent-border: rgba(53, 214, 137, 0.4);
+  --color-background-primary: #07110b;
+  --color-background-secondary: #0b1a11;
+  --color-background-tertiary: rgba(53, 214, 137, 0.08);
+  --color-text-primary: #b7f5cf;
+  --color-text-secondary: #7fd3a3;
+  --color-text-tertiary: #4f9a70;
+  --color-text-inverse: #07110b;
+  --color-border-primary: rgba(53, 214, 137, 0.2);
+  --color-border-secondary: rgba(53, 214, 137, 0.34);
+}
+
 /* Single sleek 36px IDE header bar — strictly single-line */
 .tp-mcp-bar {
   display: flex;

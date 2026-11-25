@@ -138,32 +138,60 @@ export const CHART_AGGREGATIONS: Array<{ value: ChartAggregation, label: string,
  * Curated code-style & quantitative color palettes for charts and MCP views.
  */
 export const CHART_THEME_PRESETS: Record<ChartThemePreset, { label: string, description: string, colors: string[] }> = {
-  code: {
+  'code': {
     label: 'Code',
     description: 'Crisp IDE cyan, emerald, violet, and amber accents',
     colors: ['#38bdf8', '#34d399', '#a78bfa', '#fbbf24', '#fb7185', '#22d3ee', '#818cf8', '#f97316'],
   },
-  phosphor: {
+  'phosphor': {
     label: 'Phosphor',
     description: 'Terminal emerald and teal monochrome-accent ramp',
     colors: ['#22c55e', '#34d399', '#2dd4bf', '#a3e635', '#06b6d4', '#10b981', '#84cc16', '#4ade80'],
   },
-  nord: {
+  'nord': {
     label: 'Nord',
     description: 'Calm frost, glacier, and aurora editorial palette',
     colors: ['#88c0d0', '#81a1c1', '#a3be8c', '#ebcb8b', '#d08770', '#b48ead', '#5e81ac', '#bf616a'],
   },
-  thermal: {
+  'thermal': {
     label: 'Thermal',
     description: 'High-contrast quantitative coral, rose, gold, and sky',
     colors: ['#f97316', '#f43f5e', '#eab308', '#d946ef', '#38bdf8', '#10b981', '#ef4444', '#fb923c'],
   },
-  mono: {
+  'mono': {
     label: 'Mono',
     description: 'Minimal print ink ramp with a single electric accent',
     colors: ['#6366f1', '#94a3b8', '#64748b', '#cbd5e1', '#475569', '#a5b4fc', '#334155', '#e2e8f0'],
   },
+  'paper': {
+    label: 'Paper',
+    description: 'Warm paper, black ink and one orange accent',
+    colors: ['#e8502a', '#1c1c1c', '#8fae9a', '#c98a1a', '#5f7f9e', '#b35a6b', '#7d776c', '#d9c9a3'],
+  },
+  'greenbar': {
+    label: 'Greenbar',
+    description: 'Ledger-paper greens with ink and brass accents',
+    colors: ['#0f7a4f', '#17201a', '#86c5a2', '#b58a1a', '#3f7f8f', '#a8371a', '#6c7a70', '#cfe6d2'],
+  },
+  'onebit': {
+    label: '1-Bit',
+    description: 'One ink, told apart by pattern instead of colour',
+    colors: ['#111111', '#111111', '#111111', '#111111', '#111111', '#111111', '#111111', '#111111'],
+  },
+  'crt-amber': {
+    label: 'Amber CRT',
+    description: 'Glowing amber phosphor on a dark screen',
+    colors: ['#ffb000', '#ff7a1a', '#fff0c9', '#c89628', '#ff5a3c', '#ffd27a', '#b37a00', '#ffe2a6'],
+  },
+  'crt-green': {
+    label: 'Green CRT',
+    description: 'Glowing green phosphor on a dark screen',
+    colors: ['#35d689', '#a3e635', '#2dd4bf', '#8ff0bd', '#e6e66a', '#10b981', '#5fe0d4', '#c8e66a'],
+  },
 }
+
+/** Every chart preset id, in menu order. */
+export const CHART_THEME_IDS = Object.keys(CHART_THEME_PRESETS) as ChartThemePreset[]
 
 /**
  * Resolve palette colors for a named chart theme preset (defaults to 'code').

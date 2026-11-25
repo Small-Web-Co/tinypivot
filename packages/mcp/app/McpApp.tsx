@@ -2,6 +2,7 @@ import type { ChartConfig, ChartSortOrder, ChartThemePreset, DataGridViewMode, D
 import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps'
 import {
   CHART_THEME_PRESETS,
+  isUnifiedTheme,
 
 } from '@smallwebco/tinypivot-core'
 import { DataGrid, enableDemoMode, setLicenseKey } from '@smallwebco/tinypivot-react'
@@ -1095,7 +1096,7 @@ export function McpApp() {
               <DataGrid
                 data={rows}
                 loading={loading}
-                theme={gridTheme}
+                theme={isUnifiedTheme(visualTheme) ? visualTheme : gridTheme}
                 chartTheme={visualTheme}
                 fontSize="sm"
                 rowHeight={28}

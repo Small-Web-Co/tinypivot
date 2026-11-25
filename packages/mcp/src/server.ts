@@ -13,6 +13,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
@@ -61,7 +62,9 @@ const CHART_TYPE_VALUES = [
 const CHART_AGG_VALUES = ['sum', 'avg', 'count', 'min', 'max'] as const
 
 const VIEW_MODE_VALUES = ['grid', 'pivot', 'chart'] as const
-const VISUAL_THEME_VALUES = ['code', 'phosphor', 'nord', 'thermal', 'mono'] as const
+// z.enum needs a non-empty tuple; the ids come from the shared theme list in core.
+const VISUAL_THEME_VALUES = CHART_THEME_IDS as [ChartThemePreset, ...ChartThemePreset[]]
+const VISUAL_THEME_LIST = CHART_THEME_IDS.join(', ')
 
 const pivotValueSchema = z.object({
   field: z.string().describe('Numeric or countable column name to aggregate'),
@@ -628,7 +631,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         aggregation: z.enum(CHART_AGG_VALUES).default('sum'),
         seriesField: z.string().optional(),
         title: z.string().optional(),
-        chartTheme: z.enum(VISUAL_THEME_VALUES).optional().describe('Optional code-style palette preset (code, phosphor, nord, thermal, mono)'),
+        chartTheme: z.enum(VISUAL_THEME_VALUES).optional().describe(`Optional visual theme (${VISUAL_THEME_LIST})`),
         model: z.string().optional().describe('Active LLM model name for dollarized token savings'),
       },
       _meta: INLINE_UI_META,
@@ -916,7 +919,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
-  // 11. App-only tool: set visual theme preset (code, phosphor, nord, thermal, mono)
+  // 11. App-only tool: set the visual theme preset (any id in CHART_THEME_IDS)
   server.registerTool(
     'set_visual_theme',
     {

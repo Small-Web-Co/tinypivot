@@ -46,6 +46,7 @@ export {
   analyzeFieldsForChart,
   CHART_AGGREGATIONS,
   CHART_COLORS,
+  CHART_THEME_IDS,
   CHART_THEME_PRESETS,
   CHART_TYPES,
   createDefaultChartConfig,
@@ -80,6 +81,7 @@ export {
 } from './export'
 
 export type { PivotExportData, SourceData } from './export'
+
 // License Management
 export {
   canUseAIAnalyst,
@@ -136,12 +138,33 @@ export {
   validateFormula,
   validateSimpleFormula,
 } from './pivot'
-
 export type { ComputePivotOptions, FormulaFunction } from './pivot'
 
 // Grouped pivot layout helpers
 export { computeRowSpans } from './pivot/rowspan'
+
 export type { RowSpanCell } from './pivot/rowspan'
+
+// Unified themes
+export {
+  chartGlowApplies,
+  chartPatternFill,
+  getChartLook,
+  isDarkTheme,
+  isUnifiedTheme,
+  resolveChartTheme,
+  TERMINAL_PALETTES,
+  UNIFIED_THEME_IDS,
+} from './theme'
+export type {
+  ChartFillMode,
+  ChartGlow,
+  ChartLook,
+  ChartPatternStyle,
+  Rgb,
+  TerminalPalette,
+  UnifiedThemeId,
+} from './theme'
 
 // Types
 export type {

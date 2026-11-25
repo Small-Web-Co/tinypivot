@@ -20,6 +20,9 @@ export type DateFormat = 'us' | 'eu' | 'iso'
  * - Brand themes: each brand has a light variant (e.g. `'slate'`) and a dark
  *   variant (e.g. `'slate-dark'`). The class `vpg-theme-${theme}` is applied
  *   on the root and themed via CSS.
+ * - Unified themes (`'paper'`, `'greenbar'`, `'onebit'`, `'crt-amber'`,
+ *   `'crt-green'`): style the grid and bring a matching chart preset and
+ *   rendering look. The two CRT themes are dark.
  */
 export type Theme
   = | 'light'
@@ -35,6 +38,7 @@ export type Theme
     | 'amber' | 'amber-dark'
     | 'solar' | 'solar-dark'
     | 'mono' | 'mono-dark'
+    | 'paper' | 'greenbar' | 'onebit' | 'crt-amber' | 'crt-green'
 
 /**
  * Resolved theme value passed to child components (no `'auto'`).
@@ -245,7 +249,7 @@ export interface DataGridProps {
   pivotConfig?: Partial<PivotConfig>
   /** Optional initial or programmatically updated chart configuration */
   chartConfig?: Partial<ChartConfig>
-  /** Optional visual palette preset for charts ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
+  /** Optional chart preset. Defaults to the grid theme's matching preset for unified themes, else `'code'`. */
   chartTheme?: ChartThemePreset
 }
 
@@ -451,15 +455,20 @@ export interface ChartConfig {
   options?: ChartOptions
 }
 
-/** Built-in visual palette & code-style aesthetic presets for charts and MCP views */
-export type ChartThemePreset = 'code' | 'phosphor' | 'nord' | 'thermal' | 'mono'
+/**
+ * Built-in chart presets. The first five are palettes; the unified ones
+ * (`'paper'` onward) also change how charts are drawn (see `getChartLook`).
+ */
+export type ChartThemePreset
+  = | 'code' | 'phosphor' | 'nord' | 'thermal' | 'mono'
+    | 'paper' | 'greenbar' | 'onebit' | 'crt-amber' | 'crt-green'
 
 /** Category sort order for charts ('data' preserves active DataGrid row order) */
 export type ChartSortOrder = 'value-desc' | 'value-asc' | 'label-asc' | 'label-desc' | 'data'
 
 /** Visual and display options for charts */
 export interface ChartOptions {
-  /** Built-in palette preset ('code' | 'phosphor' | 'nord' | 'thermal' | 'mono') */
+  /** Built-in chart preset (see `ChartThemePreset`) */
   chartTheme?: ChartThemePreset
   /** Category sort order ('value-desc' | 'value-asc' | 'label-asc' | 'label-desc' | 'data') */
   sortOrder?: ChartSortOrder

@@ -17,8 +17,11 @@ import {
   CHART_AGGREGATIONS,
   CHART_THEME_PRESETS,
   CHART_TYPES,
+  chartGlowApplies,
+  chartPatternFill,
   createDefaultChartConfig,
   getChartGuidance,
+  getChartLook,
   getChartThemeColors,
   isChartConfigValid,
   processChartData,
@@ -26,10 +29,14 @@ import {
   processChartDataForPie,
   processChartDataForScatter,
   resolveChartSortOrder,
+  resolveChartTheme,
 } from '@smallwebco/tinypivot-core'
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 
 const CHART_THEME_LIST = Object.entries(CHART_THEME_PRESETS) as Array<[ChartThemePreset, (typeof CHART_THEME_PRESETS)[ChartThemePreset]]>
+
+/** Pattern fills are assigned per series index; this covers any realistic series count. */
+const MAX_PATTERNED_SERIES = 12
 
 const SORT_CYCLE: Array<{ value: ChartSortOrder, label: string, title: string }> = [
   { value: 'value-desc', label: '↓ Desc', title: 'Sorted highest to lowest value — click to switch to ascending' },
@@ -76,8 +83,9 @@ export function ChartBuilder({
 }: ChartBuilderProps) {
   // Chart configuration state
   const [chartConfig, setChartConfig] = useState<ChartConfig>(() => mergeChartConfig(initialConfig))
-  const [localChartTheme, setLocalChartTheme] = useState<ChartThemePreset>(
-    () => chartTheme ?? initialConfig?.options?.chartTheme ?? 'code',
+  // Null until a preset is chosen, so the default keeps following the grid theme.
+  const [localChartTheme, setLocalChartTheme] = useState<ChartThemePreset | null>(
+    () => chartTheme ?? initialConfig?.options?.chartTheme ?? null,
   )
 
   useEffect(() => {
@@ -92,7 +100,7 @@ export function ChartBuilder({
     }
   }, [chartTheme])
 
-  const activeChartTheme: ChartThemePreset = chartTheme ?? localChartTheme
+  const activeChartTheme: ChartThemePreset = resolveChartTheme(theme, chartTheme ?? localChartTheme)
 
   const selectChartTheme = useCallback((preset: ChartThemePreset) => {
     setLocalChartTheme(preset)
@@ -395,7 +403,6 @@ export function ChartBuilder({
 
   // Chart options — high-craft code-style defaults (monospace numerals, subtle dashed hairlines, crisp geometry)
   const chartOptions = useMemo<ApexOptions>(() => {
-    const isDark = theme === 'dark' || (typeof theme === 'string' && theme.endsWith('-dark'))
     const config = chartConfig
     const options = config.options || {}
     const activePreset = activeChartTheme ?? options.chartTheme ?? 'code'
@@ -404,8 +411,13 @@ export function ChartBuilder({
       : getChartThemeColors(activePreset)
     const monoFont = 'ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, monospace'
     const sansFont = 'var(--font-sans, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif)'
-    const mutedColor = isDark ? '#94a3b8' : '#64748b'
-    const hairlineColor = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(100, 116, 139, 0.16)'
+    // Surface colours follow the grid theme; fills, radii, curves and glow follow the chart preset.
+    const look = getChartLook(theme, activePreset)
+    const isDark = look.isDark
+    const mutedColor = look.mutedColor
+    const hairlineColor = look.hairlineColor
+    const patternFill = chartPatternFill(look, MAX_PATTERNED_SERIES)
+    const usesGradientMarks = look.fillMode === 'gradient'
     const isLineOrArea = config.type === 'line' || config.type === 'area'
     const isBarLike = config.type === 'bar' || config.type === 'stackedBar'
     const isStacked = config.type === 'stackedBar' || (Boolean(options.stacked) && ['bar', 'area'].includes(config.type))
@@ -418,7 +430,7 @@ export function ChartBuilder({
         type: getApexChartType(config.type),
         stacked: isStacked,
         background: 'transparent',
-        foreColor: isDark ? '#e2e8f0' : '#1e293b',
+        foreColor: look.foreColor,
         toolbar: {
           show: true,
           tools: {
@@ -448,13 +460,13 @@ export function ChartBuilder({
             speed: 320,
           },
         },
-        dropShadow: isLineOrArea && isDark
+        dropShadow: look.glow && chartGlowApplies(look, config.type)
           ? {
               enabled: true,
-              top: 4,
+              top: look.glow.lineOnly ? 4 : 0,
               left: 0,
-              blur: 8,
-              opacity: 0.22,
+              blur: look.glow.blur,
+              opacity: look.glow.opacity,
               color: resolvedColors[0],
             }
           : { enabled: false },
@@ -467,7 +479,7 @@ export function ChartBuilder({
       grid: {
         show: options.showGrid ?? true,
         borderColor: hairlineColor,
-        strokeDashArray: 3,
+        strokeDashArray: look.gridDash,
         xaxis: { lines: { show: false } },
         yaxis: { lines: { show: true } },
         padding: { top: 4, right: 12, bottom: 10, left: 6 },
@@ -516,37 +528,57 @@ export function ChartBuilder({
         ? {
             size: 3,
             strokeWidth: 2,
-            strokeColors: isDark ? '#0f172a' : '#ffffff',
+            strokeColors: look.surfaceColor,
             hover: { size: 6 },
           }
         : { size: 0 },
       stroke: {
-        curve: 'monotoneCubic',
-        width: config.type === 'line' ? 2.5 : config.type === 'area' ? 2 : isBarLike ? 0 : 1.5,
+        curve: look.curve,
+        width: config.type === 'line' ? look.lineWidth : config.type === 'area' ? 2 : isBarLike ? look.markStrokeWidth : 1.5,
         ...(config.type === 'pie' || config.type === 'donut'
-          ? { colors: [isDark ? '#0f172a' : '#ffffff'] }
+          ? { colors: [look.surfaceColor] }
           : isBarLike
-            ? { colors: ['transparent'] }
+            ? { colors: [look.markStrokeWidth > 0 ? look.foreColor : 'transparent'] }
             : {}),
+        ...(isLineOrArea && look.lineDashes.length > 0 ? { dashArray: look.lineDashes } : {}),
       },
-      fill: config.type === 'area'
+      fill: patternFill && config.type !== 'line'
         ? {
-            type: 'gradient',
-            gradient: {
-              shadeIntensity: 1,
-              opacityFrom: isDark ? 0.42 : 0.34,
-              opacityTo: 0.02,
-              stops: [0, 95, 100],
-            },
+            type: patternFill.types,
+            opacity: 1,
+            pattern: { style: patternFill.styles, width: 6, height: 6, strokeWidth: 2 },
           }
-        : {
-            opacity: isStacked ? 1 : isBarLike ? 0.92 : 1,
-          },
+        : config.type === 'area'
+          ? {
+              type: 'gradient',
+              gradient: {
+                shadeIntensity: 1,
+                opacityFrom: look.areaOpacityFrom,
+                opacityTo: 0.02,
+                stops: [0, 95, 100],
+              },
+            }
+          : usesGradientMarks && (isBarLike || config.type === 'pie' || config.type === 'donut')
+            ? {
+                type: 'gradient',
+                gradient: {
+                  shade: 'light',
+                  type: 'vertical',
+                  shadeIntensity: 0.22,
+                  inverseColors: false,
+                  opacityFrom: 1,
+                  opacityTo: 0.86,
+                  stops: [0, 100],
+                },
+              }
+            : {
+                opacity: isStacked ? 1 : isBarLike ? look.barOpacity : 1,
+              },
       ...(isBarLike
         ? {
             plotOptions: {
               bar: {
-                borderRadius: 4,
+                borderRadius: look.barRadius,
                 borderRadiusApplication: 'end',
                 borderRadiusWhenStacked: 'last',
                 columnWidth: '54%',
@@ -618,7 +650,7 @@ export function ChartBuilder({
           fontSize: '14px',
           fontWeight: '600',
           fontFamily: sansFont,
-          color: isDark ? '#f1f5f9' : '#0f172a',
+          color: look.titleColor,
         },
       }
     }
@@ -654,7 +686,7 @@ export function ChartBuilder({
         radar: {
           polygons: {
             strokeColors: hairlineColor,
-            fill: { colors: isDark ? ['rgba(30,41,59,0.45)', 'transparent'] : ['rgba(241,245,249,0.7)', 'transparent'] },
+            fill: { colors: look.radarFill },
           },
         },
       }

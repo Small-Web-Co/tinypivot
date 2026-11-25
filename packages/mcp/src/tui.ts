@@ -1,8 +1,8 @@
-import type { ChartConfig, ChartThemePreset, ChartType, DataGridViewMode, PivotConfig } from '@smallwebco/tinypivot-core'
+import type { ChartConfig, ChartThemePreset, ChartType, DataGridViewMode, PivotConfig, TerminalPalette } from '@smallwebco/tinypivot-core'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { computePivotResult, processChartData } from '@smallwebco/tinypivot-core'
+import { CHART_THEME_IDS, computePivotResult, processChartData, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { padEndVisual, padStartVisual, truncateVisual, visualWidth } from './summary.js'
 
 interface TuiPayload {
@@ -30,65 +30,9 @@ interface TuiPayload {
   }
 }
 
-interface Palette {
-  label: string
-  accent: [number, number, number]
-  accent2: [number, number, number]
-  series: Array<[number, number, number]>
-  muted: [number, number, number]
-  border: [number, number, number]
-  text: [number, number, number]
-}
-
-const PALETTES: Record<ChartThemePreset, Palette> = {
-  code: {
-    label: 'Code',
-    accent: [56, 189, 248],
-    accent2: [52, 211, 153],
-    series: [[56, 189, 248], [52, 211, 153], [129, 140, 248], [245, 158, 11]],
-    muted: [148, 163, 184],
-    border: [71, 85, 105],
-    text: [226, 232, 240],
-  },
-  phosphor: {
-    label: 'Phosphor',
-    accent: [34, 197, 94],
-    accent2: [52, 211, 153],
-    series: [[34, 197, 94], [16, 185, 129], [163, 230, 53], [45, 212, 191]],
-    muted: [134, 239, 172],
-    border: [34, 94, 58],
-    text: [220, 252, 231],
-  },
-  nord: {
-    label: 'Nord',
-    accent: [136, 192, 208],
-    accent2: [163, 190, 140],
-    series: [[136, 192, 208], [163, 190, 140], [129, 161, 193], [235, 203, 139]],
-    muted: [147, 161, 177],
-    border: [76, 86, 106],
-    text: [236, 239, 244],
-  },
-  thermal: {
-    label: 'Thermal',
-    accent: [249, 115, 22],
-    accent2: [244, 63, 94],
-    series: [[249, 115, 22], [244, 63, 94], [250, 204, 21], [168, 85, 247]],
-    muted: [253, 186, 116],
-    border: [124, 45, 18],
-    text: [255, 247, 237],
-  },
-  mono: {
-    label: 'Mono',
-    accent: [129, 140, 248],
-    accent2: [148, 163, 184],
-    series: [[226, 232, 240], [148, 163, 184], [129, 140, 248], [100, 116, 139]],
-    muted: [148, 163, 184],
-    border: [71, 85, 105],
-    text: [241, 245, 249],
-  },
-}
-
-const THEME_ORDER: ChartThemePreset[] = ['code', 'phosphor', 'nord', 'thermal', 'mono']
+type Palette = TerminalPalette
+const PALETTES = TERMINAL_PALETTES
+const THEME_ORDER = CHART_THEME_IDS
 const CHART_CYCLE: ChartType[] = ['bar', 'stackedBar', 'line', 'area']
 const SUB_BLOCKS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
 const SPARK_CHARS = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']

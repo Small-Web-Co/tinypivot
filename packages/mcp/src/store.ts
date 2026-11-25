@@ -4,9 +4,10 @@ import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { DEFAULT_MODEL_PRICING, resolveModelPricing, tokensToUsd } from './pricing.js'
 
-const VALID_VISUAL_THEMES = new Set<ChartThemePreset>(['code', 'phosphor', 'nord', 'thermal', 'mono'])
+const VALID_VISUAL_THEMES = new Set<ChartThemePreset>(CHART_THEME_IDS)
 
 function parseVisualTheme(raw?: string): ChartThemePreset {
   const lower = raw?.trim().toLowerCase() as ChartThemePreset | undefined

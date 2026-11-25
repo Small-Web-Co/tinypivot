@@ -13,7 +13,7 @@ import type {
   AITableSchema,
   ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
-import { stripSQLFromContent } from '@smallwebco/tinypivot-core'
+import { isDarkTheme as isDarkGridTheme, stripSQLFromContent } from '@smallwebco/tinypivot-core'
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useAIAnalyst } from '../hooks/useAIAnalyst'
 
@@ -63,7 +63,7 @@ export const AIAnalyst = forwardRef<AIAnalystHandle, AIAnalystProps>(({
     onError,
   })
 
-  const isDarkTheme = theme === 'dark' || (typeof theme === 'string' && theme.endsWith('-dark'))
+  const isDarkTheme = isDarkGridTheme(theme)
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({

@@ -14,7 +14,7 @@ import type {
   AITableSchema,
   ResolvedTheme,
 } from '@smallwebco/tinypivot-core'
-import { stripSQLFromContent } from '@smallwebco/tinypivot-core'
+import { isDarkTheme as isDarkGridTheme, stripSQLFromContent } from '@smallwebco/tinypivot-core'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useAIAnalyst } from '../composables/useAIAnalyst'
 
@@ -246,10 +246,7 @@ function hasQueryResult(message: AIMessage): boolean {
   return !!message.metadata?.data && message.metadata.data.length > 0
 }
 
-const isDarkTheme = computed(() => {
-  const t = props.theme
-  return t === 'dark' || (typeof t === 'string' && t.endsWith('-dark'))
-})
+const isDarkTheme = computed(() => isDarkGridTheme(props.theme))
 </script>
 
 <template>

@@ -1,4 +1,5 @@
-import type { AIAnalystConfig, AIDataSource, AITableSchema, QueryExecutorResult, Theme } from '@smallwebco/tinypivot-core'
+import type { AIAnalystConfig, AIDataSource, AITableSchema, ChartConfig, QueryExecutorResult, Theme } from '@smallwebco/tinypivot-core'
+import { CHART_THEME_PRESETS, UNIFIED_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { onMounted, ref } from 'vue'
 import { DATASETS, getDataset } from '../datasets'
 import { executeQuery, initDuckDB, loadData } from '../utils/duckdb'
@@ -40,6 +41,8 @@ export function generateSalesRows(count: number) {
 const BRANDS = ['slate', 'zinc', 'indigo', 'violet', 'emerald', 'sky', 'rose', 'amber', 'solar', 'mono'] as const
 
 export const themeChoices: { value: Theme, label: string }[] = [
+  // Unified themes style the grid and its charts together.
+  ...UNIFIED_THEME_IDS.map(id => ({ value: id as Theme, label: CHART_THEME_PRESETS[id].label })),
   { value: 'dark', label: 'Dark' },
   { value: 'light', label: 'Light' },
   { value: 'auto', label: 'Auto (system)' },
@@ -54,6 +57,14 @@ export const numberFormats = [
   { value: 'eu', label: '1.000,00' },
   { value: 'plain', label: '1000' },
 ] as const
+
+/** So the Chart view opens on a real chart instead of an empty builder. */
+export const demoChartConfig: Partial<ChartConfig> = {
+  type: 'stackedBar',
+  xAxis: { field: 'quarter', label: 'Quarter', role: 'dimension' },
+  yAxis: { field: 'sales', label: 'Sales', role: 'measure', aggregation: 'sum' },
+  seriesField: { field: 'category', label: 'Category', role: 'dimension' },
+}
 
 export const dateFormats = [
   { value: 'iso', label: '2024-01-15' },

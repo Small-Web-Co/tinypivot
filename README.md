@@ -985,7 +985,7 @@ import '@smallwebco/tinypivot-react/style.css'
 
 ## Theming
 
-TinyPivot ships **22 themes** — 2 neutral (`light`, `dark`) plus 10 brand themes each with a light and dark variant. Themes are applied via the `theme` prop on `DataGrid`.
+TinyPivot ships **27 themes** — 2 neutral (`light`, `dark`), 10 brand themes each with a light and dark variant, and 5 unified themes that style the grid and its charts together. Themes are applied via the `theme` prop on `DataGrid`.
 
 ```vue
 <!-- Vue -->
@@ -1014,6 +1014,20 @@ TinyPivot ships **22 themes** — 2 neutral (`light`, `dark`) plus 10 brand them
 | `amber` / `amber-dark` | `#f59e0b` warm orange | Energy / wellness |
 | `solar` / `solar-dark` | `#b58900` mustard | Solarized — warm cream + dark teal |
 | `mono` / `mono-dark` | `#000` / `#fff` | Editorial — pure grayscale |
+
+### Unified themes
+
+A unified theme styles the grid, pivot table and charts as one. Set it once on `theme`; charts pick up the matching palette and rendering style automatically (pass `chartTheme` to override).
+
+| Theme | Surface | Charts |
+|---|---|---|
+| `paper` | Warm paper, black ink, orange accent | Gradient fills, rounded bars |
+| `greenbar` | Ledger printer paper with green stripes | Gradient fills, rounded bars |
+| `onebit` | One ink, square corners, hard shadow | Pattern fills instead of colour |
+| `crt-amber` | Dark amber phosphor with scanlines | Glowing marks |
+| `crt-green` | Dark green phosphor with scanlines | Glowing marks |
+
+The same five ids are valid `chartTheme` values, so `<DataGrid theme="slate" chartTheme="paper" />` also works. The MCP widget and terminal output use the same names.
 
 ### Custom themes
 
