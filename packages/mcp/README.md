@@ -6,7 +6,7 @@ Interactive **TinyPivot MCP Server, MCP App (`ui://tinypivot/app.html`) & Native
 
 ### Option 1: 1-Command Multi-Harness Setup (Recommended)
 
-Auto-detect and wire all installed AI harnesses on your machine (Claude Code, Claude Desktop, Cursor, Antigravity, OpenCode, Codex CLI, and pi):
+Auto-detect and wire all installed AI harnesses on your machine (Claude Code, Claude Desktop, Cursor, the Antigravity IDE and CLI, OpenCode, Codex CLI, and pi):
 
 ```bash
 npx @smallwebco/tinypivot-mcp@latest init
@@ -14,7 +14,7 @@ npx @smallwebco/tinypivot-mcp@latest init
 
 Options:
 
-- `--targets=claude,claude-desktop,cursor,opencode,antigravity,pi,codex` — configure specific harnesses
+- `--targets=claude,claude-desktop,cursor,opencode,antigravity,antigravity-cli,pi,codex` — configure specific harnesses
 - `--license=TP-...` — include your `TINYPIVOT_LICENSE_KEY` in the generated MCP config
 - `--local` — wire a local build (`node .../dist/cli.js`) for local development
 - `--no-rules` — skip adding the auto-use TinyPivot rule to `~/.claude/CLAUDE.md`

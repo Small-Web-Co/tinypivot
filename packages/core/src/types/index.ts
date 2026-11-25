@@ -533,18 +533,21 @@ export interface ChartTypeInfo {
   bestFor: string[]
 }
 
-/** Pre-processed data ready for chart rendering */
-export interface ChartData {
+/**
+ * Pre-processed data ready for chart rendering. In line and area charts a series has `null`
+ * where it has no rows for a category, so the line breaks there instead of dropping to zero.
+ */
+export interface ChartData<Value = number | null> {
   /** Category labels (x-axis values) */
   categories: string[]
   /** Data series */
-  series: ChartSeries[]
+  series: ChartSeries<Value>[]
 }
 
 /** A single data series for charts */
-export interface ChartSeries {
+export interface ChartSeries<Value = number | null> {
   name: string
-  data: number[]
+  data: Value[]
   /** For bubble charts: additional data dimensions */
   extra?: Record<string, unknown>[]
 }

@@ -75,7 +75,7 @@ Usage:
 Options:
   --local                 Wire this local build (node <path>/dist/cli.js) instead of npx
   --targets=<list>        Comma-separated harnesses to configure:
-                          claude, claude-desktop, cursor, opencode, antigravity, pi, codex
+                          claude, claude-desktop, cursor, opencode, antigravity, antigravity-cli, pi, codex
   --all                   Configure all supported harnesses even if not yet detected
   --license=<key>         Write TINYPIVOT_LICENSE_KEY into each configured server env
   --theme=<id>            Set default visual theme (${CHART_THEME_IDS.join(', ')})
@@ -521,6 +521,15 @@ export async function runInitCommand(args: string[]): Promise<void> {
       'Antigravity',
       path.join(home, '.gemini', 'antigravity', 'mcp_config.json'),
       path.join(home, '.gemini', 'antigravity'),
+      opts,
+      cliPath,
+    ),
+    // The Antigravity CLI (`agy`) keeps its own MCP list, separate from the IDE's.
+    await upsertStandardMcpJson(
+      'antigravity-cli',
+      'Antigravity CLI',
+      path.join(home, '.gemini', 'config', 'mcp_config.json'),
+      path.join(home, '.gemini', 'antigravity-cli'),
       opts,
       cliPath,
     ),

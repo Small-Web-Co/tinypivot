@@ -36,17 +36,17 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'addRowField', field: string): void
-  (e: 'removeRowField', field: string): void
-  (e: 'addColumnField', field: string): void
-  (e: 'removeColumnField', field: string): void
-  (e: 'addValueField', field: string, aggregation: AggregationFunction): void
-  (e: 'removeValueField', field: string, aggregation: AggregationFunction): void
-  (e: 'updateAggregation', field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction): void
-  (e: 'reorderRowFields', fields: string[]): void
-  (e: 'reorderColumnFields', fields: string[]): void
-  (e: 'toggleCollapse', key: string, altKey: boolean): void
-  (e: 'drillThroughCell', payload: { rowPath: string[], columnPath: string[], valueFieldIndex: number }): void
+  addRowField: [field: string]
+  removeRowField: [field: string]
+  addColumnField: [field: string]
+  removeColumnField: [field: string]
+  addValueField: [field: string, aggregation: AggregationFunction]
+  removeValueField: [field: string, aggregation: AggregationFunction]
+  updateAggregation: [field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction]
+  reorderRowFields: [fields: string[]]
+  reorderColumnFields: [fields: string[]]
+  toggleCollapse: [key: string, altKey: boolean]
+  drillThroughCell: [payload: { rowPath: string[], columnPath: string[], valueFieldIndex: number }]
 }>()
 
 // Helper to get display name for value fields (resolves calc IDs to names)

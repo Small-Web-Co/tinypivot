@@ -352,3 +352,33 @@ describe('counting a column that holds text', () => {
     expect(processChartData(orders, config('sum')).categories).toEqual([])
   })
 })
+
+describe('missing values in category charts', () => {
+  // 2026 has no rows for March, so its line should break there instead of dropping to zero.
+  const rows = [
+    { month: 'Jan', year: '2025', mrr: 10 },
+    { month: 'Feb', year: '2025', mrr: 12 },
+    { month: 'Mar', year: '2025', mrr: 14 },
+    { month: 'Jan', year: '2026', mrr: 20 },
+    { month: 'Feb', year: '2026', mrr: 0 },
+  ]
+  const config = {
+    type: 'line' as const,
+    xAxis: { field: 'month', role: 'dimension' as const },
+    yAxis: { field: 'mrr', role: 'measure' as const, aggregation: 'sum' as const },
+    seriesField: { field: 'year', role: 'dimension' as const },
+    options: { sortOrder: 'data' as const },
+  }
+
+  it('reports a category with no rows as null, and a real zero as zero', () => {
+    const res = processChartData(rows, config)
+    expect(res.categories).toEqual(['Jan', 'Feb', 'Mar'])
+    expect(res.series.find(s => s.name === '2025')?.data).toEqual([10, 12, 14])
+    expect(res.series.find(s => s.name === '2026')?.data).toEqual([20, 0, null])
+  })
+
+  it('still orders categories by total when one series is missing a value', () => {
+    const res = processChartData(rows, { ...config, options: { sortOrder: 'value-desc' as const } })
+    expect(res.categories).toEqual(['Jan', 'Mar', 'Feb'])
+  })
+})

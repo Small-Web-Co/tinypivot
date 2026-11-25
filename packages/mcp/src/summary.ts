@@ -450,24 +450,6 @@ function renderBrailleLineBody(
   return lines
 }
 
-function buildPresentSeriesPairs(
-  rows: Record<string, unknown>[],
-  xField: string,
-  seriesField?: string,
-): Set<string> | null {
-  if (!seriesField)
-    return null
-  const present = new Set<string>()
-  for (const row of rows) {
-    const xRaw = row[xField]
-    const sRaw = row[seriesField]
-    const xKey = xRaw === null || xRaw === undefined ? '(blank)' : String(xRaw)
-    const sKey = sRaw === null || sRaw === undefined ? '(blank)' : String(sRaw)
-    present.add(`${xKey}\u0000${sKey}`)
-  }
-  return present
-}
-
 function formatTrendDelta(values: number[]): string {
   if (values.length < 2)
     return ''
@@ -535,17 +517,10 @@ export function formatTerminalChart(
   // High-res 2x4 Braille line / area chart for time-series with >= 3 points
   if ((fullConfig.type === 'line' || fullConfig.type === 'area') && processed.categories.length >= 3) {
     const categoriesStr = processed.categories.map(String)
-    const presentPairs = processed.series.length > 1
-      ? buildPresentSeriesPairs(dataset.rows, chartConfig.xAxis.field, chartConfig.seriesField?.field)
-      : null
+    // A series with no rows at a category comes back as null, so its line breaks there.
     const brailleSeries: BrailleSeries[] = processed.series.map(s => ({
       name: s.name,
-      values: categoriesStr.map((cat, idx) => {
-        if (presentPairs && !presentPairs.has(`${cat}\u0000${s.name}`))
-          return null
-        const val = Number(s.data[idx])
-        return Number.isFinite(val) ? val : null
-      }),
+      values: s.data.map(val => (val !== null && Number.isFinite(val) ? val : null)),
     }))
     const body = renderBrailleLineBody(categoriesStr, brailleSeries, fullConfig.type === 'area', nonAdditive).map((row, rIdx) => {
       if (!pal)

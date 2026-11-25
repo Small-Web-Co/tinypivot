@@ -50,6 +50,13 @@ export const harnesses: HarnessSetup[] = [
     code: npxServer({ TINYPIVOT_LICENSE_KEY: 'optional-pro-key' }),
   },
   {
+    id: 'antigravity-cli',
+    label: 'Antigravity CLI',
+    summary: 'Terminal chart and pivot cards in agy. It keeps its own server list, separate from the IDE.',
+    filename: 'shell',
+    code: `${INIT_COMMAND} --targets=antigravity-cli\n\n# Or add it by hand:\nagy mcp add tinypivot -- npx -y ${MCP_SPEC}`,
+  },
+  {
     id: 'postgres',
     label: 'Direct Postgres (Pro)',
     summary: 'Read-only connector with SQL validation and a table allowlist. Every other database works by piping CSV or JSON.',

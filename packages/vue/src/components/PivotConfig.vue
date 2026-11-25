@@ -39,22 +39,22 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:showRowTotals', value: boolean): void
-  (e: 'update:showColumnTotals', value: boolean): void
-  (e: 'clearConfig'): void
-  (e: 'dragStart', field: string, event: DragEvent): void
-  (e: 'dragEnd'): void
-  (e: 'updateAggregation', field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction): void
-  (e: 'addRowField', field: string): void
-  (e: 'removeRowField', field: string): void
-  (e: 'addColumnField', field: string): void
-  (e: 'removeColumnField', field: string): void
-  (e: 'addValueField', field: string, aggregation: AggregationFunction): void
-  (e: 'removeValueField', field: string, aggregation: AggregationFunction): void
-  (e: 'addCalculatedField', field: CalculatedField): void
-  (e: 'removeCalculatedField', id: string): void
-  (e: 'updateCalculatedField', field: CalculatedField): void
-  (e: 'updateFieldFilter', field: string, excludedValues: string[]): void
+  'update:showRowTotals': [value: boolean]
+  'update:showColumnTotals': [value: boolean]
+  'clearConfig': []
+  'dragStart': [field: string, event: DragEvent]
+  'dragEnd': []
+  'updateAggregation': [field: string, oldAgg: AggregationFunction, newAgg: AggregationFunction]
+  'addRowField': [field: string]
+  'removeRowField': [field: string]
+  'addColumnField': [field: string]
+  'removeColumnField': [field: string]
+  'addValueField': [field: string, aggregation: AggregationFunction]
+  'removeValueField': [field: string, aggregation: AggregationFunction]
+  'addCalculatedField': [field: CalculatedField]
+  'removeCalculatedField': [id: string]
+  'updateCalculatedField': [field: CalculatedField]
+  'updateFieldFilter': [field: string, excludedValues: string[]]
 }>()
 
 const { canUseAdvancedAggregations } = useLicense()

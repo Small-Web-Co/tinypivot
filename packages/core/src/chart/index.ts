@@ -474,6 +474,9 @@ export function getChartGuidance(config: ChartConfig): string {
   }
 }
 
+/** Chart types drawn as connected lines, where a missing value is a gap rather than a zero. */
+const GAPPED_CHART_TYPES: ReadonlySet<ChartType> = new Set<ChartType>(['line', 'area'])
+
 /**
  * Reads the number a row contributes to a measure. Counting works on any column, so text is
  * kept: a plain count only needs a placeholder, and a distinct count gets one id per value.
@@ -699,14 +702,16 @@ export function processChartData(
   // Build series data
   const series: ChartSeries[] = []
 
-  for (const seriesName of seriesNames) {
-    const seriesData: number[] = []
+  // A line has no value where a series has no rows, so it breaks there instead of dropping to
+  // zero. Bars stay zero-filled: an empty bar and a zero bar look the same, and stacked totals
+  // need a number in every slot.
+  const missingValue = GAPPED_CHART_TYPES.has(config.type) ? null : 0
 
-    for (const category of categories) {
-      const xGroup = grouped.get(category)
-      const values = xGroup?.get(seriesName) || []
-      seriesData.push(aggregateValues(values, yAggregation))
-    }
+  for (const seriesName of seriesNames) {
+    const seriesData = categories.map((category) => {
+      const values = grouped.get(category)?.get(seriesName)
+      return values ? aggregateValues(values, yAggregation) : missingValue
+    })
 
     series.push({
       name: seriesName === '_default'
@@ -725,7 +730,7 @@ export function processChartData(
 export function processChartDataForPie(
   data: Record<string, unknown>[],
   config: ChartConfig,
-): ChartData {
+): ChartData<number> {
   if (!config.xAxis || !config.yAxis || data.length === 0) {
     return { categories: [], series: [] }
   }
