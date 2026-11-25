@@ -339,7 +339,33 @@ export class Studio {
       fs.mkdirSync(path.dirname(this.traceFile), { recursive: true })
       fs.appendFileSync(this.traceFile, `${JSON.stringify(step)}\n`)
       if (fs.statSync(this.traceFile).size > TRACE_FILE_MAX_BYTES)
-        fs.writeFileSync(this.traceFile, `${this.steps.map(s => JSON.stringify(s)).join('\n')}\n`)
+        this.rewriteTraceFile()
+    }
+    catch (error) {
+      console.error(`[tinypivot-mcp] Could not save the Studio trace: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  /**
+   * Deletes a table the user made with their own SQL, and its steps from the trace. Only the
+   * user's own: a table any agent step used stays, so the record of what the agent did is whole.
+   */
+  removeUserDataset(datasetId: string): void {
+    const steps = this.steps.filter(step => step.datasetId === datasetId)
+    if (steps.length === 0 || steps.some(step => step.actor !== 'user'))
+      throw new Error('Only a table you made with your own SQL can be deleted.')
+    this.steps = this.steps.filter(step => step.datasetId !== datasetId)
+    this.store.remove(datasetId)
+    this.rewriteTraceFile()
+    this.changed()
+  }
+
+  private rewriteTraceFile(): void {
+    if (!this.history.enabled)
+      return
+    try {
+      fs.mkdirSync(path.dirname(this.traceFile), { recursive: true })
+      fs.writeFileSync(this.traceFile, this.steps.map(s => `${JSON.stringify(s)}\n`).join(''))
     }
     catch (error) {
       console.error(`[tinypivot-mcp] Could not save the Studio trace: ${error instanceof Error ? error.message : String(error)}`)

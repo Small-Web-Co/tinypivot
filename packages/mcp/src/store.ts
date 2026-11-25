@@ -543,23 +543,32 @@ export class DatasetStore {
       }
       if (!evictId)
         break
-      this.datasets.delete(evictId)
-      for (const [key, ids] of this.sessionDatasetIds.entries()) {
-        const filtered = ids.filter(x => x !== evictId)
-        if (filtered.length !== ids.length)
-          this.sessionDatasetIds.set(key, filtered)
-      }
-      for (const [key, active] of this.sessionActiveId.entries()) {
-        if (active === evictId) {
-          const remaining = this.sessionDatasetIds.get(key) ?? []
-          const next = remaining[remaining.length - 1]
-          if (next)
-            this.sessionActiveId.set(key, next)
-          else
-            this.sessionActiveId.delete(key)
-        }
+      this.remove(evictId)
+    }
+  }
+
+  /** Drops a dataset from every session; each session that showed it falls back to its newest other one. */
+  remove(id: string): boolean {
+    if (!this.datasets.delete(id))
+      return false
+    for (const [key, ids] of this.sessionDatasetIds.entries()) {
+      const filtered = ids.filter(x => x !== id)
+      if (filtered.length !== ids.length)
+        this.sessionDatasetIds.set(key, filtered)
+    }
+    for (const [key, active] of this.sessionActiveId.entries()) {
+      if (active === id) {
+        const remaining = this.sessionDatasetIds.get(key) ?? []
+        const next = remaining[remaining.length - 1]
+        if (next)
+          this.sessionActiveId.set(key, next)
+        else
+          this.sessionActiveId.delete(key)
       }
     }
+    if (this.activeId === id)
+      this.activeId = [...this.datasets.keys()].at(-1) ?? null
+    return true
   }
 
   private slugify(name: string): string {

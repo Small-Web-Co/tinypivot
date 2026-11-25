@@ -297,6 +297,17 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
         return sendJson(res, 400, { error: errorMessage(error) })
       }
     }
+    if (pathname === '/api/studio/remove') {
+      const datasetId = typeof body.datasetId === 'string' ? body.datasetId : ''
+      try {
+        studio.removeUserDataset(datasetId)
+        broadcastUpdate()
+        return sendJson(res, 200, { ok: true })
+      }
+      catch (error) {
+        return sendJson(res, 400, { error: errorMessage(error) })
+      }
+    }
     if (pathname === '/api/studio/format') {
       const sql = typeof body.sql === 'string' ? body.sql : ''
       if (!sql.trim() || sql.length > MAX_SQL_CHARS)

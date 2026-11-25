@@ -331,6 +331,23 @@ export function McpApp() {
     openStudioInHost(url)
   }, [openStudioInHost])
 
+  /**
+   * Says a step is opening the moment the user asks, since a large table takes seconds to arrive
+   * and draw; the rows' arrival clears it. A failure clears it at once, and a lost update after a minute.
+   */
+  const openingTimer = useRef<ReturnType<typeof setTimeout>>()
+  const showOpening = useCallback((message: string | null) => {
+    clearTimeout(openingTimer.current)
+    setLoading(message !== null)
+    setStatusNote(message)
+    if (message !== null) {
+      openingTimer.current = setTimeout(() => {
+        setLoading(false)
+        setStatusNote(null)
+      }, 60_000)
+    }
+  }, [])
+
   const applyPayload = useCallback(async (payload: ToolPayload, fetchMore?: (id: string) => void) => {
     await applyLicense(payload)
 
@@ -372,6 +389,7 @@ export function McpApp() {
     }
     setLoading(false)
     setStatusNote(null)
+    clearTimeout(openingTimer.current)
 
     if (payload.hasMoreRows && payload.datasetId && fetchMore) {
       fetchMore(payload.datasetId)
@@ -1249,6 +1267,8 @@ export function McpApp() {
             onAttachView={rows.length > 0 ? handleAttachView : undefined}
             onClearAttachment={() => setSelectedContext(null)}
             notify={message => showToast(message)}
+            busy={loading}
+            onOpening={showOpening}
           />
         )}
         {studio && studioOpen && (

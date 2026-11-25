@@ -22,6 +22,8 @@ export interface WorkbenchTable {
   columns: string[]
   /** The SQL that made the table, formatted, for the user to start from. */
   sql?: string
+  /** Made by the user's own SQL, so they may delete it. */
+  mine?: boolean
 }
 
 interface SqlWorkbenchProps {
@@ -189,9 +191,10 @@ interface TableListProps {
   tables: WorkbenchTable[]
   onInsert: (text: string) => void
   onStartFrom: (sql: string) => void
+  onRemove: (table: WorkbenchTable) => void
 }
 
-function TableList({ tables, onInsert, onStartFrom }: TableListProps) {
+function TableList({ tables, onInsert, onStartFrom, onRemove }: TableListProps) {
   const [open, setOpen] = useState<string | null>(tables.at(-1)?.id ?? null)
   if (tables.length === 0)
     return <p className="tp-wb-empty">No tables loaded yet. Query a file directly: FROM &apos;/path/to/file.csv&apos;.</p>
@@ -204,6 +207,9 @@ function TableList({ tables, onInsert, onStartFrom }: TableListProps) {
               {open === table.id ? '▾' : '▸'}
             </button>
             <button type="button" className="tp-wb-name" title={`Insert ${sqlName(table.id)}`} onClick={() => onInsert(sqlName(table.id))}>{table.name}</button>
+            {table.mine && (
+              <button type="button" className="tp-wb-remove" aria-label={`Delete ${table.name}`} title="Delete this table and its step" onClick={() => onRemove(table)}>×</button>
+            )}
           </div>
           {open === table.id && (
             <>
@@ -284,6 +290,18 @@ export function SqlWorkbench({ initialSql, fromStepId, tables, onClose, notify }
   }, [fromStepId, name, notify, running])
   runRef.current = () => void run()
 
+  const remove = useCallback(async (table: WorkbenchTable) => {
+    if (!window.confirm(`Delete "${table.name}" and its step from the trace? This cannot be undone.`))
+      return
+    try {
+      await postToStudio('/api/studio/remove', { datasetId: table.id })
+      notify(`Deleted ${table.name}`)
+    }
+    catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }, [notify])
+
   const format = useCallback(async () => {
     const out = await formatted(editor.getSql())
     editor.setSql(out.sql)
@@ -309,7 +327,7 @@ export function SqlWorkbench({ initialSql, fromStepId, tables, onClose, notify }
         </header>
         <aside className="tp-wb-side">
           <p className="tp-studio-label">Tables</p>
-          <TableList tables={tables} onInsert={editor.insert} onStartFrom={editor.setSql} />
+          <TableList tables={tables} onInsert={editor.insert} onStartFrom={editor.setSql} onRemove={remove} />
         </aside>
         <div className="tp-wb-main">
           <div className="tp-wb-editor" ref={editor.host} />

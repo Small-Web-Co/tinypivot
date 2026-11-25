@@ -1822,6 +1822,12 @@ body.tp-resizing {
   cursor: pointer;
 }
 
+/* While a step's rows load, its buttons wait. */
+.tp-run-link:disabled {
+  cursor: progress;
+  opacity: 0.45;
+}
+
 .tp-run-link:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -2109,6 +2115,23 @@ body.tp-resizing {
   font-size: 12.5px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.tp-wb-remove {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--tp-radius);
+  background: none;
+  color: var(--color-text-tertiary, #64748b);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tp-wb-remove:hover,
+.tp-wb-remove:focus-visible {
+  background: var(--tp-accent-soft);
+  color: var(--tp-accent);
 }
 
 .tp-wb-table-sql {

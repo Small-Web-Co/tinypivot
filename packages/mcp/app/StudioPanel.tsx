@@ -26,6 +26,10 @@ interface StudioPanelProps {
   onAttachView?: () => void
   onClearAttachment: () => void
   notify: (message: string) => void
+  /** A step's data is on its way: the buttons that open steps wait until it has arrived. */
+  busy: boolean
+  /** Called as a step starts to open, with what to say while its rows load; null when opening failed. */
+  onOpening: (message: string | null) => void
 }
 
 const STAGE_LABELS: Record<ReturnType<typeof stageOf>, string> = {
@@ -246,13 +250,14 @@ interface StageProps {
   index: number
   active: boolean
   canOpen: boolean
+  busy: boolean
   checks?: StepCheck[]
   onOpen: (viewMode?: 'grid') => void
   onEdit: () => void
 }
 
 /** One step on the way to the answer: what it read or did, why, and what came out. */
-function Stage({ step, index, active, canOpen, checks, onOpen, onEdit }: StageProps) {
+function Stage({ step, index, active, canOpen, busy, checks, onOpen, onEdit }: StageProps) {
   const stage = stageOf(step)
   const [showSql, setShowSql] = useState(false)
   const result = resultText(step)
@@ -276,8 +281,8 @@ function Stage({ step, index, active, canOpen, checks, onOpen, onEdit }: StagePr
         {(result || canOpen) && stage !== 'answer' && (
           <div className="tp-run-result">
             {result && <span>{result}</span>}
-            {canOpen && <button type="button" className="tp-run-link" onClick={() => onOpen('grid')}>Rows</button>}
-            {canOpen && step.view && step.view !== 'table' && <button type="button" className="tp-run-link" onClick={() => onOpen()}>{step.viewMode === 'pivot' ? 'Pivot' : 'Chart'}</button>}
+            {canOpen && <button type="button" className="tp-run-link" disabled={busy} onClick={() => onOpen('grid')}>Rows</button>}
+            {canOpen && step.view && step.view !== 'table' && <button type="button" className="tp-run-link" disabled={busy} onClick={() => onOpen()}>{step.viewMode === 'pivot' ? 'Pivot' : 'Chart'}</button>}
             {sql && <button type="button" className="tp-run-link" onClick={onEdit}>Edit SQL</button>}
           </div>
         )}
@@ -296,6 +301,7 @@ interface RunCardProps {
   /** When each question was last checked, by run id. */
   checkTimes: Record<string, string>
   checking: boolean
+  busy: boolean
   onToggle: () => void
   onOpenStep: (step: StudioStep, viewMode?: 'grid') => void
   onEdit: (step: StudioStep) => void
@@ -339,7 +345,7 @@ function CheckReport({ lines, at }: { lines: Array<{ ok: boolean, text: string }
 }
 
 /** A question and, when open, every step that answered it. */
-function RunCard({ run, open, activeDatasetId, loaded, checks, checkTimes, checking, onToggle, onOpenStep, onEdit, onCheck, onCopy }: RunCardProps) {
+function RunCard({ run, open, activeDatasetId, loaded, checks, checkTimes, checking, busy, onToggle, onOpenStep, onEdit, onCheck, onCopy }: RunCardProps) {
   const stages = run.steps.filter(step => step.tool !== 'note')
   const { summary, checked, allOk } = runBadges(run, checks)
   const verifiable = run.steps.some(step => step.fingerprint || step.source)
@@ -366,6 +372,7 @@ function RunCard({ run, open, activeDatasetId, loaded, checks, checkTimes, check
                 index={index + 1}
                 active={Boolean(step.datasetId) && step.datasetId === activeDatasetId}
                 canOpen={Boolean(step.datasetId && (loaded.has(step.datasetId) || step.historyId))}
+                busy={busy}
                 checks={checks[step.id]}
                 onOpen={viewMode => onOpenStep(step, viewMode)}
                 onEdit={() => onEdit(step)}
@@ -637,7 +644,7 @@ function useChecks(notify: (message: string) => void) {
   return { checks, checkTimes, checking, check }
 }
 
-export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onAttachView, onClearAttachment, notify }: StudioPanelProps) {
+export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onAttachView, onClearAttachment, notify, busy, onOpening }: StudioPanelProps) {
   const [tab, setTab] = useState<'questions' | 'history'>('questions')
   const runs = useMemo(() => groupRuns(snapshot.steps), [snapshot.steps])
   const [openId, setOpenId] = useState<string | null>(null)
@@ -652,21 +659,27 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
   const workbenchTables = useMemo(() => tables.map((table) => {
     const steps = [...snapshot.steps].reverse().filter(s => s.datasetId === table.id)
     const withSql = steps.find(s => s.editableSql)
-    return { ...table, columns: steps.find(s => s.columns?.length)?.columns ?? [], sql: withSql ? shownSql(withSql) : undefined }
+    return {
+      ...table,
+      columns: steps.find(s => s.columns?.length)?.columns ?? [],
+      sql: withSql ? shownSql(withSql) : undefined,
+      // Only a table the user made themselves can be deleted; the agent's stay in the record.
+      mine: steps.length > 0 && steps.every(s => s.actor === 'user'),
+    }
   }), [snapshot.steps, tables])
   const live = snapshot.agent.live.length > 0
   // The newest question stays open until the user picks another.
   const shownId = openId ?? runs.at(-1)?.id
   const aboutRun = runs.find(run => run.id === aboutId)
 
-  const post = useCallback(async (route: string, body: unknown) => {
-    try {
-      await postToStudio(route, body)
-    }
-    catch (err) {
+  /** Opens a step or an earlier pull, saying so until its rows arrive. */
+  const openData = useCallback((route: string, body: unknown, message: string) => {
+    onOpening(message)
+    void postToStudio(route, body).catch((err) => {
+      onOpening(null)
       notify(err instanceof Error ? err.message : String(err))
-    }
-  }, [notify])
+    })
+  }, [notify, onOpening])
 
   return (
     <aside className="tp-studio" aria-label="TinyPivot Studio">
@@ -697,7 +710,13 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
 
       <div className="tp-studio-body" ref={listRef} onScroll={onScroll}>
         {tab === 'history'
-          ? <HistoryList entries={snapshot.history} enabled={snapshot.historyEnabled} onOpen={id => void post('/api/studio/open', { id })} />
+          ? (
+              <HistoryList
+                entries={snapshot.history}
+                enabled={snapshot.historyEnabled}
+                onOpen={id => openData('/api/studio/open', { id }, 'Reopening the pull…')}
+              />
+            )
           : runs.length === 0
             ? <p className="tp-studio-empty">Each question you ask your agent shows up here: where the data came from, the SQL, the rows, the chart, and the answer, with its numbers checked against the data.</p>
             : (
@@ -712,8 +731,9 @@ export function StudioPanel({ snapshot, tables, activeDatasetId, attachment, onA
                       checks={checks}
                       checkTimes={checkTimes}
                       checking={checking === run.id}
+                      busy={busy}
                       onToggle={() => setOpenId(run.id === shownId ? '' : run.id)}
-                      onOpenStep={(step, viewMode) => void post('/api/studio/show', { stepId: step.id, viewMode })}
+                      onOpenStep={(step, viewMode) => openData('/api/studio/show', { stepId: step.id, viewMode }, `Opening ${step.rows ? `${step.rows.toLocaleString()} rows` : 'the step'}…`)}
                       onEdit={step => setEditor({ sql: shownSql(step), fromStepId: step.id })}
                       onCheck={() => void check(run)}
                       onCopy={() => {

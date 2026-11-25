@@ -223,6 +223,20 @@ describe('query, profile and history tools', () => {
     expect(reply.claims).toEqual([{ text: '38,400', status: 'found', where: 'arr · APAC' }])
   }, 30_000)
 
+  it('deletes a table the user made, with its step, but never one the agent used', async () => {
+    const { call, studio, store, history } = await connect()
+    await call('query', { sql: `SELECT region, sum(mrr) AS mrr FROM ${quoteLiteral(csvPath)} GROUP BY 1` })
+    const agentTable = studio.recentSteps().at(-1)!.datasetId!
+    const { dataset } = await studio.runQuery({ sql: `SELECT count(*) AS n FROM ${quoteLiteral(csvPath)}`, actor: 'user' })
+
+    expect(() => studio.removeUserDataset(agentTable)).toThrow('Only a table you made with your own SQL can be deleted.')
+    studio.removeUserDataset(dataset.id)
+    expect(store.get(dataset.id)).toBeUndefined()
+    expect(studio.recentSteps().map(step => step.actor)).toEqual(['agent'])
+    // The trace on disk forgets it too.
+    expect(new Studio(new DatasetStore(), { history, sessionId: studio.sessionId }).recentSteps().map(step => step.actor)).toEqual(['agent'])
+  }, 30_000)
+
   it('records the user\'s own queries as theirs and reloads the trace after a restart', async () => {
     const { studio, store, history } = await connect()
     const { dataset } = await studio.runQuery({ sql: `SELECT count(*) AS n FROM ${quoteLiteral(csvPath)}`, actor: 'user' })
