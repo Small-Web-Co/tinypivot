@@ -215,3 +215,41 @@ describe('one theme everywhere', () => {
     }
   }, 15_000)
 })
+
+describe('files dropped into the Studio', () => {
+  it('saves them in the conversation\'s uploads folder and tells the agent where each one is', () => {
+    const studio = new Studio(new DatasetStore())
+    const csv = studio.saveFile('Q3 export (final).csv', Buffer.from('region,mrr\nEMEA,10\n'))
+    const image = studio.saveFile('../../chart.png', Buffer.from([0x89, 0x50]))
+    expect([csv.kind, image.kind]).toEqual(['data', 'image'])
+    expect(image.name).toBe('chart.png')
+    expect(fs.readFileSync(csv.path, 'utf8')).toContain('EMEA,10')
+    expect(path.dirname(image.path)).toBe(path.dirname(csv.path))
+
+    const pushed: string[] = []
+    studio.agent.connect({ name: 'pi', push: (_note, text) => pushed.push(text) > 0 })
+    studio.addNote('Does this match?', { fileIds: [csv.id, image.id, 'file-unknown'] })
+    expect(pushed[0]).toBe([
+      'Message from the user in TinyPivot Studio: Does this match?',
+      `Attached data file: ${csv.path} (load it with load_file).`,
+      `Attached image: ${image.path} (open it to see what the user means).`,
+    ].join('\n'))
+    expect(studio.recentSteps().at(-1)?.view).toBe('with Q3 export (final).csv, chart.png')
+  })
+
+  it('takes an upload over HTTP only with the Studio header, and refers to it by id', async () => {
+    const studio = new Studio(new DatasetStore())
+    const handle = await startCompanionServer({ store: studio.store, studio, loadHtml: async () => '' })
+    try {
+      const upload = (headers: Record<string, string>) => fetch(`${handle.url}/api/studio/upload`, { method: 'POST', headers: { 'x-file-name': encodeURIComponent('orders.csv'), ...headers }, body: 'a,b\n1,2\n' })
+      expect((await upload({})).status).toBe(403)
+      const res = await upload({ [STUDIO_HEADER]: '1' })
+      const { file } = await res.json() as { file: { id: string, path: string, kind: string } }
+      expect(file.kind).toBe('data')
+      expect(fs.readFileSync(file.path, 'utf8')).toBe('a,b\n1,2\n')
+    }
+    finally {
+      await handle.close()
+    }
+  })
+})

@@ -135,33 +135,39 @@ function errorMessage(error: unknown): string {
 
 const MAX_SQL_CHARS = 20_000
 const MAX_NOTE_CHARS = 2_000
+/** A dropped file: big enough for a typical export or screenshot, small enough to hold in memory. */
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 const MAX_BODY_BYTES = 256 * 1024
 
-function readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+/** The request body, or null when it is larger than `limit` bytes or the upload fails. */
+function readBody(req: http.IncomingMessage, limit: number): Promise<Buffer | null> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = []
     let size = 0
     req.on('data', (c: Buffer) => {
       size += c.length
-      if (size > MAX_BODY_BYTES) {
-        resolve({})
+      if (size > limit) {
+        resolve(null)
         req.destroy()
         return
       }
       chunks.push(c)
     })
-    req.on('end', () => {
-      try {
-        const text = Buffer.concat(chunks).toString('utf8').trim()
-        resolve(text ? JSON.parse(text) as Record<string, unknown> : {})
-      }
-      catch {
-        resolve({})
-      }
-    })
-    req.on('error', () => resolve({}))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', () => resolve(null))
   })
+}
+
+async function readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  const body = await readBody(req, MAX_BODY_BYTES)
+  try {
+    const text = body?.toString('utf8').trim()
+    return text ? JSON.parse(text) as Record<string, unknown> : {}
+  }
+  catch {
+    return {}
+  }
 }
 
 function buildFullCompanionPayload(
@@ -264,6 +270,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
         const note = studio.addNote(text, {
           stepId: typeof body.stepId === 'string' ? body.stepId : undefined,
           attachment: parseAttachment(body.attachment),
+          fileIds: Array.isArray(body.fileIds) ? body.fileIds.filter((id): id is string => typeof id === 'string') : undefined,
         })
         return sendJson(res, 200, { note })
       }
@@ -384,6 +391,17 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
 
     if (req.method === 'GET' && pathname === '/api/studio') {
       return studio ? sendJson(res, 200, studio.snapshot()) : sendJson(res, 404, { error: 'Studio is not available.' })
+    }
+
+    // A file dropped into the Studio: the raw bytes, its name in a header. Messages refer to it by the id returned.
+    if (req.method === 'POST' && pathname === '/api/studio/upload') {
+      if (!studio)
+        return sendJson(res, 404, { error: 'Studio is not available.' })
+      const bytes = await readBody(req, MAX_UPLOAD_BYTES)
+      if (!bytes)
+        return sendJson(res, 413, { error: `Files can be up to ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.` })
+      const name = decodeURIComponent(String(req.headers['x-file-name'] ?? 'file'))
+      return sendJson(res, 200, { file: studio.saveFile(name, bytes) })
     }
 
     if (req.method === 'POST' && pathname.startsWith('/api/studio/')) {

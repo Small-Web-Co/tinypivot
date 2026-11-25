@@ -2,14 +2,14 @@ import type { ChartConfig, DataGridViewMode, PivotConfig } from '@smallwebco/tin
 import type { ClaimSource } from './claims.js'
 import type { HistoryEntry, RecordInput } from './history.js'
 import type { DatasetStore, RowFilter, StoredDataset } from './store.js'
-import type { AgentHint, Fingerprint, NoteAttachment, SourceFile, StepActor, StepCheck, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
+import type { AgentHint, Fingerprint, NoteAttachment, SourceFile, StepActor, StepCheck, StudioFile, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { AgentBridge } from './agent-bridge.js'
 import { checkClaims } from './claims.js'
 import { DuckDbRunner, quoteIdentifier, quoteLiteral } from './duckdb.js'
-import { HistoryStore, SESSIONS_DIR } from './history.js'
+import { HistoryStore, SESSIONS_DIR, UPLOADS_DIR } from './history.js'
 import { DEFAULT_SESSION_KEY } from './store.js'
 
 /**
@@ -153,6 +153,24 @@ function checkSource(then: SourceFile): StepCheck {
   return { kind: 'source', ok, detail: ok ? 'The file is unchanged since this step.' : `The file changed: ${now.bytes.toLocaleString('en-US')} bytes, saved ${now.modifiedAt}.` }
 }
 
+const DATA_EXTENSIONS = new Set(['.csv', '.tsv', '.txt', '.json', '.jsonl', '.ndjson', '.parquet', '.xlsx', '.xls'])
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'])
+
+/** Whether a dropped file is data to load, an image to look at, or anything else. */
+export function fileKind(name: string): StudioFile['kind'] {
+  const extension = path.extname(name).toLowerCase()
+  if (DATA_EXTENSIONS.has(extension))
+    return 'data'
+  return IMAGE_EXTENSIONS.has(extension) ? 'image' : 'file'
+}
+
+/** How a dropped file reads to the agent, by kind. */
+const FILE_LINES: Record<StudioFile['kind'], (filePath: string) => string> = {
+  data: filePath => `Attached data file: ${filePath} (load it with load_file).`,
+  image: filePath => `Attached image: ${filePath} (open it to see what the user means).`,
+  file: filePath => `Attached file: ${filePath}.`,
+}
+
 let sequence = 0
 
 /** `20261125-101403-4f2a`: sortable by start time, unique per process. */
@@ -170,6 +188,8 @@ export class Studio {
   readonly history: HistoryStore
   readonly duck: DuckDbRunner
   private steps: TraceStep[] = []
+  /** Files dropped into the Studio this conversation, by id. */
+  private readonly files = new Map<string, StudioFile>()
   private readonly pullsByDataset = new Map<string, HistoryEntry>()
   private readonly listeners = new Set<() => void>()
   private changeQueued = false
@@ -418,21 +438,44 @@ export class Studio {
   }
 
   /**
+   * Saves a file the user dropped into the Studio, in this conversation's uploads folder, and
+   * returns how a message can refer to it. Only files saved here can be attached to a message.
+   */
+  saveFile(name: string, bytes: Buffer): StudioFile {
+    const dir = path.join(this.history.dir, UPLOADS_DIR, this.sessionId)
+    fs.mkdirSync(dir, { recursive: true })
+    const safeName = path.basename(name).replace(/[^\w.-]+/g, '-').slice(-120) || 'file'
+    const file: StudioFile = {
+      id: nextId('file'),
+      name: path.basename(name).slice(0, 200) || 'file',
+      kind: fileKind(name),
+      bytes: bytes.length,
+      path: path.join(dir, `${Date.now().toString(36)}-${safeName}`),
+    }
+    fs.writeFileSync(file.path, bytes)
+    this.files.set(file.id, file)
+    return file
+  }
+
+  /**
    * Sends the user's message straight into the agent's conversation. Throws when no live
    * connector takes it: the Studio only offers to send when the agent can receive.
    */
-  addNote(text: string, options: { stepId?: string, attachment?: NoteAttachment } = {}): StudioNote {
+  addNote(text: string, options: { stepId?: string, attachment?: NoteAttachment, fileIds?: string[] } = {}): StudioNote {
     const attachment = options.attachment && { label: options.attachment.label.slice(0, 120), text: options.attachment.text.slice(0, ATTACHMENT_MAX_CHARS) }
+    const files = (options.fileIds ?? []).flatMap(id => this.files.get(id) ?? [])
     const note: StudioNote = {
       id: nextId('note'),
       at: new Date().toISOString(),
       text: text.trim(),
       ...(options.stepId ? { stepId: options.stepId } : {}),
       ...(attachment ? { attachment } : {}),
+      ...(files.length ? { files } : {}),
     }
     if (!this.agent.push(note, this.describeNote(note)))
       throw new Error(`${this.agentName ? agentLabel(this.agentName) : 'Your agent'} cannot receive messages from the Studio. Ask in your terminal instead.`)
-    this.record({ actor: 'user', tool: 'note', why: note.text, ...(attachment ? { view: `with ${attachment.label}` } : {}) })
+    const attached = [attachment?.label, ...files.map(file => file.name)].filter(Boolean)
+    this.record({ actor: 'user', tool: 'note', why: note.text, ...(attached.length ? { view: `with ${attached.join(', ')}` } : {}) })
     return note
   }
 
@@ -444,6 +487,8 @@ export class Studio {
       lines.push(`About the step "${step.why ?? step.view ?? step.tool}"${step.datasetId ? ` on dataset \`${step.datasetId}\`` : ''}${step.sql ? `, SQL: ${step.sql.replace(/\s+/g, ' ')}` : ''}`)
     if (note.attachment)
       lines.push(`Attached (${note.attachment.label}):`, note.attachment.text)
+    for (const file of note.files ?? [])
+      lines.push(FILE_LINES[file.kind](file.path))
     return lines.join('\n')
   }
 

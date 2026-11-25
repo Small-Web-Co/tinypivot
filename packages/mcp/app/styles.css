@@ -1983,3 +1983,34 @@ body,
 .tp-run-report li.is-ok {
   color: var(--color-text-primary, inherit);
 }
+
+/* Files dropped or pasted into the message box, waiting to go with the next message. */
+.tp-studio-files {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tp-studio-files li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--color-border-primary, rgba(148, 163, 184, 0.2));
+  border-radius: var(--tp-radius);
+  font: 11px/1.4 var(--tp-mono);
+}
+
+.tp-studio-file-size {
+  margin-left: auto;
+  color: var(--color-text-tertiary, #64748b);
+}
+
+/* While a file is dragged over it, the message box says it will take it. */
+.tp-studio-composer.is-dropping {
+  outline: 2px dashed var(--tp-accent);
+  outline-offset: -4px;
+}

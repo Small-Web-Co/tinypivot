@@ -42,6 +42,8 @@ export const HISTORY_MAX_SAVED_ROWS = 200_000
 const DEFAULT_RETENTION_DAYS = 30
 /** Where each conversation's Studio trace is kept, under the history folder. */
 export const SESSIONS_DIR = 'sessions'
+/** Where files dropped into the Studio are kept, one folder per conversation. */
+export const UPLOADS_DIR = 'uploads'
 
 export function defaultHistoryDir(): string {
   const base = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share')
@@ -141,16 +143,18 @@ export class HistoryStore {
     return zlib.gunzipSync(fs.readFileSync(file)).toString('utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as Record<string, unknown>)
   }
 
-  /** Removes conversation traces last written before `cutoff`, and the old trace every session shared. */
+  /** Removes conversation traces and dropped files last written before `cutoff`, and the old trace every session shared. */
   private pruneTraces(cutoff: number): void {
     fs.rmSync(path.join(this.dir, 'trace.jsonl'), { force: true })
-    const sessions = path.join(this.dir, SESSIONS_DIR)
-    if (!fs.existsSync(sessions))
-      return
-    for (const file of fs.readdirSync(sessions)) {
-      const full = path.join(sessions, file)
-      if (fs.statSync(full).mtimeMs < cutoff)
-        fs.rmSync(full, { force: true })
+    for (const folder of [SESSIONS_DIR, UPLOADS_DIR]) {
+      const parent = path.join(this.dir, folder)
+      if (!fs.existsSync(parent))
+        continue
+      for (const entry of fs.readdirSync(parent)) {
+        const full = path.join(parent, entry)
+        if (fs.statSync(full).mtimeMs < cutoff)
+          fs.rmSync(full, { recursive: true, force: true })
+      }
     }
   }
 

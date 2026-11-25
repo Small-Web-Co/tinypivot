@@ -79,6 +79,16 @@ export interface NoteAttachment {
   text: string
 }
 
+/** A file the user dropped into the Studio, saved where the agent can read it. */
+export interface StudioFile {
+  id: string
+  name: string
+  /** `data` the agent can load with load_file, an `image` it can look at, or any other `file`. */
+  kind: 'data' | 'image' | 'file'
+  bytes: number
+  path: string
+}
+
 /** A message from the Studio, sent straight into the agent's conversation. */
 export interface StudioNote {
   id: string
@@ -86,6 +96,7 @@ export interface StudioNote {
   text: string
   stepId?: string
   attachment?: NoteAttachment
+  files?: StudioFile[]
 }
 
 /** How the user can make their agent take Studio messages live: a sentence, and a command to copy if there is one. */

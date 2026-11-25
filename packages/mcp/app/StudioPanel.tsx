@@ -1,8 +1,8 @@
 import type { HistoryEntry } from '../src/history'
-import type { Claim, NoteAttachment, StepCheck, StudioSnapshot } from '../src/studio-protocol'
+import type { Claim, NoteAttachment, StepCheck, StudioFile, StudioSnapshot } from '../src/studio-protocol'
 import type { Run, StudioStep } from './runs'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { postToStudio } from './companionApi'
+import { postToStudio, uploadToStudio } from './companionApi'
 import { checkReport, claimSummary, groupRuns, lastStep, markClaims, runTitle, stageOf } from './runs'
 
 /**
@@ -185,17 +185,37 @@ function ClaimMark({ claim }: { claim: Claim }) {
   return <mark className={`tp-claim tp-claim-${claim.status}`} title={title}>{claim.text}</mark>
 }
 
+/**
+ * Answer prose with bold and inline code, and each quoted number marked. The marks go inside the
+ * Markdown, so a number in bold stays bold instead of breaking the bold markers apart.
+ */
+function answerProse(text: string, claims: Claim[]): React.ReactNode[] {
+  const queue = [...claims]
+  const mark = (part: string, key: number): React.ReactNode[] => {
+    const here: Claim[] = []
+    let rest = part
+    while (queue.length > 0 && rest.includes(queue[0].text)) {
+      rest = rest.slice(rest.indexOf(queue[0].text) + queue[0].text.length)
+      here.push(queue.shift()!)
+    }
+    return markClaims(part, here).map((piece, index) => (typeof piece === 'string' ? piece : <ClaimMark key={`${key}-${index}`} claim={piece} />))
+  }
+  return text.split(INLINE_MARKDOWN).map((segment, index) => {
+    if (index % 2 === 0)
+      return <React.Fragment key={index}>{mark(segment, index)}</React.Fragment>
+    return segment.startsWith('**')
+      ? <strong key={index}>{mark(segment.slice(2, -2), index)}</strong>
+      : <code key={index}>{segment.slice(1, -1)}</code>
+  })
+}
+
 /** The agent's answer, each quoted number marked by whether the data backs it. */
 function AnswerText({ step }: { step: StudioStep }) {
   const claims = step.claims ?? []
   const summary = claims.length ? claimSummary(claims) : undefined
   return (
     <div className="tp-run-answer">
-      <p>
-        {markClaims(step.why ?? '', claims).map((part, index) =>
-          typeof part === 'string' ? <React.Fragment key={index}>{renderInline(part)}</React.Fragment> : <ClaimMark key={index} claim={part} />,
-        )}
-      </p>
+      <p>{answerProse(step.why ?? '', claims)}</p>
       {summary && summary.checked > 0 && (
         <span className={`tp-run-badge ${summary.found === summary.checked ? 'is-ok' : 'is-warn'}`}>{summary.text}</span>
       )}
@@ -492,9 +512,51 @@ function OfflineAgent({ agent, notify }: { agent: StudioSnapshot['agent'], notif
   )
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024)
+    return `${bytes} B`
+  return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** Files dropped or pasted into the message box: uploaded at once, sent with the next message. */
+function useDroppedFiles(notify: (message: string) => void) {
+  const [files, setFiles] = useState<StudioFile[]>([])
+  const [dragging, setDragging] = useState(false)
+  const add = useCallback(async (list: FileList | File[]) => {
+    for (const file of Array.from(list)) {
+      try {
+        const saved = await uploadToStudio(file)
+        setFiles(prev => [...prev, saved])
+      }
+      catch (err) {
+        notify(err instanceof Error ? err.message : String(err))
+      }
+    }
+  }, [notify])
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes('Files'))
+        return
+      e.preventDefault()
+      setDragging(true)
+    },
+    onDragLeave: () => setDragging(false),
+    onDrop: (e: React.DragEvent) => {
+      if (!e.dataTransfer.files.length)
+        return
+      e.preventDefault()
+      setDragging(false)
+      void add(e.dataTransfer.files)
+    },
+  }
+  const remove = (id: string) => setFiles(prev => prev.filter(file => file.id !== id))
+  return { files, dragging, dropProps, add, remove, clear: () => setFiles([]) }
+}
+
 function NoteComposer({ agent, aboutRun, attachment, onAttachView, onClearAttachment, onDetach, notify, focusKey }: NoteComposerProps) {
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const dropped = useDroppedFiles(notify)
 
   useEffect(() => {
     if (focusKey > 0)
@@ -506,8 +568,9 @@ function NoteComposer({ agent, aboutRun, attachment, onAttachView, onClearAttach
     if (!text.trim())
       return
     try {
-      await postToStudio('/api/studio/note', { text, stepId: aboutStep?.id, attachment: attachment ?? undefined })
+      await postToStudio('/api/studio/note', { text, stepId: aboutStep?.id, attachment: attachment ?? undefined, fileIds: dropped.files.map(file => file.id) })
       setText('')
+      dropped.clear()
       onDetach()
       onClearAttachment()
       notify(`Sent to ${agent.name ?? 'your agent'}`)
@@ -518,7 +581,7 @@ function NoteComposer({ agent, aboutRun, attachment, onAttachView, onClearAttach
   }
 
   return (
-    <div className="tp-studio-composer">
+    <div className={`tp-studio-composer ${dropped.dragging ? 'is-dropping' : ''}`} {...dropped.dropProps}>
       <AgentStatus agent={agent} />
       {aboutRun && (
         <div className="tp-studio-about">
@@ -540,14 +603,32 @@ function NoteComposer({ agent, aboutRun, attachment, onAttachView, onClearAttach
             + Attach the current view (or click a row or pivot cell)
           </button>
         )}
+      {dropped.files.length > 0 && (
+        <ul className="tp-studio-files" aria-label="Files to send">
+          {dropped.files.map(file => (
+            <li key={file.id} title={file.path}>
+              <span className="tp-studio-label">{file.kind}</span>
+              <span className="tp-studio-about-text">{file.name}</span>
+              <span className="tp-studio-file-size">{formatBytes(file.bytes)}</span>
+              <button type="button" className="tp-studio-icon-btn" aria-label={`Remove ${file.name}`} onClick={() => dropped.remove(file.id)}>×</button>
+            </li>
+          ))}
+        </ul>
+      )}
       <textarea
         ref={inputRef}
         className="tp-studio-note-input"
-        placeholder="Tell the agent what to check, fix or try next. Enter sends, Shift+Enter adds a line."
+        placeholder="Tell the agent what to check, fix or try next. Drop or paste files and images. Enter sends, Shift+Enter adds a line."
         value={text}
         rows={2}
         aria-label="Message for the agent"
         onChange={e => setText(e.target.value)}
+        onPaste={(e) => {
+          if (e.clipboardData.files.length === 0)
+            return
+          e.preventDefault()
+          void dropped.add(e.clipboardData.files)
+        }}
         onKeyDown={(e) => {
           // Enter sends; Shift+Enter, and Enter while an IME is composing, stay in the text.
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
