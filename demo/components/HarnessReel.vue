@@ -172,7 +172,15 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="reel-stage" :style="stageStyle">
-      <div v-if="recording?.studio" class="reel-split">
+      <StudioReplay
+        v-if="recording?.screen"
+        class="reel-screen"
+        :frames="recording.screen.frames"
+        :time="time"
+        :label="recording.screen.label"
+        :alt="`Recorded ${scene.harness} session. ${scene.headline}`"
+      />
+      <div v-else-if="recording?.studio" class="reel-split">
         <TerminalReplay
           :recording="recording"
           :time="time"

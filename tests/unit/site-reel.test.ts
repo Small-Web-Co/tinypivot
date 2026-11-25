@@ -1,4 +1,5 @@
 import type { RecordingFrame, Run } from '../../demo/site/reel/player'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { cameraFor, findCard, lastContentRow, wideShot } from '../../demo/site/reel/director'
 import { barCells, glyphRects, insetBar, sparklineCells, sparklineRect } from '../../demo/site/reel/glyphs'
@@ -244,15 +245,20 @@ describe('reel: camera', () => {
 
 describe('reel: tabs', () => {
   it('shows each scene in the theme its recording was converted in', () => {
-    expect(reelScenes.map(scene => [scene.id, scene.theme])).toEqual(manifest.recordings.map(recording => [recording.id, recording.theme]))
-    // No two scenes share a theme, so the reel shows them all off.
-    expect(new Set(reelScenes.map(scene => scene.theme)).size).toBe(reelScenes.length)
+    const terminal = reelScenes.filter(scene => scene.surface === 'terminal')
+    expect(terminal.map(scene => [scene.id, scene.theme])).toEqual(manifest.recordings.map(recording => [recording.id, recording.theme]))
+    // No two terminal scenes share a theme, so the reel shows them all off.
+    expect(new Set(terminal.map(scene => scene.theme)).size).toBe(terminal.length)
+    // A desktop app's scene names the theme TinyPivot drew in, as its scene file records it.
+    for (const scene of reelScenes.filter(scene => scene.surface === 'editor'))
+      expect(JSON.parse(readFileSync(`scripts/reel/screens/${scene.id}.json`, 'utf8')).theme.id).toBe(scene.theme)
   })
 
   it('groups the tabs by where the agent runs, keeping the order they play in', () => {
     const groups = reelGroups()
     expect(groups.map(group => [group.label, group.scenes.map(({ scene }) => scene.harness)])).toEqual([
       ['Terminal', ['pi + Studio', 'Claude Code', 'pi', 'OpenCode', 'Antigravity CLI']],
+      ['Editor', ['Antigravity']],
     ])
     expect(groups.flatMap(group => group.scenes.map(({ index }) => index))).toEqual(reelScenes.map((_, index) => index))
   })

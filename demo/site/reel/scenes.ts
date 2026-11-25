@@ -107,6 +107,18 @@ export const reelScenes: ReelScene[] = [
       { value: 2, label: 'tool calls you approved' },
     ],
   },
+  {
+    id: 'antigravity-ide',
+    harness: 'Antigravity',
+    surface: 'editor',
+    theme: 'onebit',
+    headline: 'In an editor, the chart opens in the agent panel.',
+    detail: 'Antigravity\'s agent calls TinyPivot and the live map, with its pivot and rows, appears right in the chat.',
+    stats: [
+      { value: 22730, label: '2026 orders summed on your machine' },
+      { value: 0, label: 'raw rows sent to the model' },
+    ],
+  },
 ]
 
 const SURFACE_LABELS: Record<ReelSurface, string> = { terminal: 'Terminal', editor: 'Editor' }

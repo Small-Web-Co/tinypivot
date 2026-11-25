@@ -40,6 +40,8 @@ export interface Recording {
   transcript: string
   /** TinyPivot Studio screenshots taken during the session, shown beside the terminal. */
   studio?: StudioFrame[]
+  /** A session recorded in a desktop app rather than a terminal: its window, frame by frame. */
+  screen?: { label: string, frames: StudioFrame[] }
 }
 
 export interface StudioFrame {

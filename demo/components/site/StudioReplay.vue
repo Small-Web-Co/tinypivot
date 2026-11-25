@@ -1,17 +1,25 @@
 <script setup lang="ts">
 /**
- * Plays the TinyPivot Studio screenshots taken during a recorded session, in step with the
- * terminal beside it. The parent owns the clock; each frame fades in over the last.
+ * Plays screenshots taken during a recorded session: the TinyPivot Studio beside the terminal,
+ * or a whole app window (an editor's agent panel) on its own. The parent owns the clock; each
+ * frame fades in over the last.
  */
 import type { StudioFrame } from '../../site/reel/player'
 import { computed } from 'vue'
 import { frameIndexAt } from '../../site/reel/player'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   frames: StudioFrame[]
   /** Milliseconds into the recording. */
   time: number
-}>()
+  /** What the screenshots show, over the pane. */
+  label?: string
+  /** Describes the frame on screen for screen readers. */
+  alt?: string
+}>(), {
+  label: 'TinyPivot Studio · live in the browser',
+  alt: 'TinyPivot Studio during the session: the trace of steps, the chart and the messages to the agent.',
+})
 
 /** -1 until the Studio's first screenshot: it opens once the agent's first data step runs. */
 const active = computed(() => frameIndexAt(props.frames, props.time))
@@ -23,7 +31,7 @@ const shown = computed(() => props.frames
 
 <template>
   <div class="studio-pane">
-    <span class="studio-replay-label">TinyPivot Studio · live in the browser</span>
+    <span class="studio-replay-label">{{ label }}</span>
     <div class="studio-replay">
       <p v-if="active < 0" class="studio-replay-waiting">
         The Studio opens with the agent's first data step<span class="studio-replay-cursor" aria-hidden="true">▍</span>
@@ -34,7 +42,7 @@ const shown = computed(() => props.frames
         class="studio-frame"
         :class="{ current: frame.index === active, upcoming: frame.index > active }"
         :src="frame.src"
-        :alt="frame.index === active ? 'TinyPivot Studio during the session: the trace of steps, the chart and the messages to the agent.' : ''"
+        :alt="frame.index === active ? alt : ''"
         width="1280"
         height="800"
         decoding="async"

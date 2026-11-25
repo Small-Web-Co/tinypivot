@@ -1,0 +1,13 @@
+{
+  "id": "antigravity-ide",
+  "take": "antigravity-ide-2",
+  "first": 1795635206865,
+  "label": "Antigravity · editor agent panel",
+  "theme": { "id": "onebit", "fg": "#e8e6e1", "bg": "#181818" },
+  "captions": [
+    { "frame": 1, "title": "Ask in the agent panel", "body": "One sentence to Antigravity's agent, about a 44,714-row file in the project." },
+    { "frame": 4, "title": "The map opens in the chat", "body": "TinyPivot sums 2026 MRR by region on your machine and draws it right in the agent panel, in its 1-Bit theme." },
+    { "frame": 7, "title": "Answered from every row", "body": "North America leads at $17.12M, 35.5% of $48.19M, across all 22,730 orders of 2026." }
+  ],
+  "transcript": "map 2026 MRR by region from acme-orders.csv, then tell me which region leads. North America leads 2026 MRR at $17.12M (35.5% of the $48.19M total), ahead of EMEA by $2.16M."
+}
