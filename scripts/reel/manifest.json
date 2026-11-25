@@ -1,47 +1,6 @@
 {
   "recordings": [
     {
-      "id": "studio-pi",
-      "take": "studio-pi-9.jsonl",
-      "theme": "crt-amber",
-      "studio": "studio-pi-9.studio.json",
-      "busyWhen": "Working",
-      "busySpeed": 7,
-      "maxHold": 3500,
-      "captions": [
-        {
-          "when": "chart MRR by month from acme",
-          "title": "Ask pi in the terminal",
-          "body": "One sentence about 44,714 orders on disk. TinyPivot opens its Studio beside the terminal."
-        },
-        {
-          "when": "mcp__tinypivot",
-          "title": "pi works through TinyPivot",
-          "body": "A monthly chart and a 2026 pivot by region and channel, both computed from the file on disk."
-        },
-        {
-          "when": "Message from the user in TinyPivot Studio: Partner",
-          "title": "Send the pivot back with a comment",
-          "body": "Attach the pivot in the Studio, say what looks wrong and press Enter. pi starts on it at once."
-        },
-        {
-          "when": "March 2026 is the outlier",
-          "title": "The answer comes back to the Studio",
-          "body": "pi splits Partner by month and finds March 2026: 90 orders against about 300 in a normal month."
-        },
-        {
-          "when": "Message from the user in TinyPivot Studio: Which",
-          "title": "Ask the next question from the Studio",
-          "body": "No second chat and no other model: the message goes straight into the same pi session."
-        },
-        {
-          "when": "Team \\+29\\.7%",
-          "title": "Answered where you asked",
-          "body": "Team grew fastest, +29.7%, while Enterprise added three quarters of the new MRR. The answer joins the trace."
-        }
-      ]
-    },
-    {
       "id": "charts",
       "take": "charts-pi-5.jsonl",
       "theme": "paper",

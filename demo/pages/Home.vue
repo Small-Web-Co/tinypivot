@@ -97,7 +97,7 @@ const capabilities = [
             Progress in the chat, <em>the full view a click away.</em>
           </h2>
           <p class="lede">
-            Recorded sessions in each agent. The Studio opens beside the terminal with every step and the SQL behind it, and sends the data back with your comment.
+            Recorded sessions in each agent. The Studio opens beside the terminal with every step and the SQL behind it, takes your next question straight to the agent, and checks every number in the answer against the data.
           </p>
         </header>
         <RetroWindow title="tinypivot — recorded sessions" flush>

@@ -3,7 +3,7 @@
  * Records a real pi session together with TinyPivot Studio, for the homepage reel.
  *
  *   node scripts/reel/record-studio.mjs <takes-dir> <take-name> --cwd <data-dir> --frames <out-dir>
- *     [--scenario <file>]            the story (default scenarios/studio-pi.json)
+ *     [--scenario <file>]            the story (default scenarios/charts-pi.json)
  *     [--keep-extension <path>]...   other pi extensions to keep loaded (a sandbox, say)
  *
  * The scenario's steps drive pi in the terminal; its `studio` block plays the user in the Studio:
@@ -51,7 +51,7 @@ function readArgs(argv) {
     cwd: resolve(values('--cwd')[0]),
     framesDir: resolve(values('--frames')[0]),
     keepExtensions: values('--keep-extension').map(path => resolve(path)),
-    scenario: resolve(values('--scenario')[0] ?? join(ROOT, 'scripts/reel/scenarios/studio-pi.json')),
+    scenario: resolve(values('--scenario')[0] ?? join(ROOT, 'scripts/reel/scenarios/charts-pi.json')),
   }
 }
 

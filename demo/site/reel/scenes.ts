@@ -36,18 +36,8 @@ export function themeLabel(id: string | undefined): string {
 
 export const reelScenes: ReelScene[] = [
   {
-    id: 'studio-pi',
-    harness: 'pi + Studio',
-    headline: 'The terminal and the Studio, talking to each other.',
-    detail: 'pi works the data in the terminal. Every step shows up in the Studio, where you send the data back with a comment, and pi answers in the trace.',
-    stats: [
-      { value: 2, label: 'questions sent from the Studio, both answered by pi' },
-      { value: ROWS_ON_DISK, label: 'rows queried on your machine' },
-    ],
-  },
-  {
     id: 'charts',
-    harness: 'Charts',
+    harness: 'pi + Studio',
     headline: 'A map, a slope and a bullet chart, each from one sentence.',
     detail: 'Three questions to pi, two of them asked in the Studio. Each answer comes with its chart, and the Studio checks every number in it against the data.',
     stats: [
