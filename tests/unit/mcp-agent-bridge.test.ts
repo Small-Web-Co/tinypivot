@@ -83,6 +83,10 @@ describe('pi extension bridge', () => {
     await handlers.get('agent_settled')!({})
     expect(studio.snapshot().agent.busy).toBe(false)
 
+    // A turn asked in the terminal that used TinyPivot sends its answer too, so the Studio can check it.
+    await handlers.get('agent_end')!({ messages: [{ role: 'assistant', content: [{ type: 'text', text: 'Revenue is 41.0K in all.' }] }] })
+    await vi.waitFor(() => expect(studio.recentSteps().at(-1)).toMatchObject({ actor: 'agent', tool: 'reply', why: 'Revenue is 41.0K in all.' }), { timeout: 3000 })
+
     studio.addNote('Which region is biggest?')
     await vi.waitFor(() => expect(sent).toHaveLength(1), { timeout: 3000 })
     expect(sent[0].content).toBe('Message from the user in TinyPivot Studio: Which region is biggest?')
@@ -144,8 +148,11 @@ describe('openCode plugin bridge', () => {
     expect(studio.snapshot().agent.busy).toBe(true)
     await hooks.event({ event: { type: 'session.idle', properties: { sessionID: 'ses_1' } } })
     expect(studio.snapshot().agent.busy).toBe(false)
-    // An idle session with no Studio message pending sends nothing back.
-    expect(studio.recentSteps().some(step => step.tool === 'reply')).toBe(false)
+    // A turn that used TinyPivot sends its answer to the Studio, even when it was asked in the terminal.
+    await vi.waitFor(() => expect(studio.recentSteps().filter(step => step.tool === 'reply')).toHaveLength(1), { timeout: 3000 })
+    // A later turn that did not use TinyPivot sends nothing.
+    await hooks.event({ event: { type: 'session.idle', properties: { sessionID: 'ses_1' } } })
+    expect(studio.recentSteps().filter(step => step.tool === 'reply')).toHaveLength(1)
 
     studio.addNote('Which region is biggest?')
     await vi.waitFor(() => expect(prompts).toHaveLength(1), { timeout: 3000 })

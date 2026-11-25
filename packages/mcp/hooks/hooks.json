@@ -1,0 +1,17 @@
+{
+  "description": "Sends Claude's reply to TinyPivot Studio after a turn that used TinyPivot, so the Studio shows the answer under the question and checks its numbers. Read-only; never blocks.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/studio-answer.mjs\"",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

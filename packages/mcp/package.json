@@ -51,6 +51,7 @@
     "LICENSE.md",
     "README.md",
     "dist",
+    "hooks",
     "rules",
     "server.json",
     "skills"

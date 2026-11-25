@@ -238,15 +238,18 @@ function lastAssistantText(messages: unknown): string {
 function createStudioBridge(pi: any) {
   let studioUrl: string | undefined;
   let stream: AbortController | undefined;
-  /** Set while a turn that a Studio message started is running, so its answer goes back. */
-  let awaiting = false;
+  /**
+   * Set when the turn's answer belongs in the Studio: a Studio message started it, or it used
+   * TinyPivot, so the Studio can show the answer under the question and check its numbers.
+   */
+  let answerWanted = false;
 
   function handleFrame(frame: string): void {
     if (!frame.startsWith("event: message")) return;
     const data = frame.split("\\n").find(line => line.startsWith("data: "));
     if (!data) return;
     const message = JSON.parse(data.slice(6)) as { text: string };
-    awaiting = true;
+    answerWanted = true;
     pi.sendMessage(
       { customType: "tinypivot-studio", content: message.text, display: true },
       { triggerTurn: true, deliverAs: "steer" },
@@ -287,7 +290,9 @@ function createStudioBridge(pi: any) {
     /** Starts listening to the Studio named in a TinyPivot tool reply. */
     noticeToolText(text: string): void {
       const url = STUDIO_LINK.exec(text)?.[1];
-      if (!url || url === studioUrl) return;
+      if (!url) return;
+      answerWanted = true;
+      if (url === studioUrl) return;
       stream?.abort();
       studioUrl = url;
       stream = new AbortController();
@@ -300,8 +305,8 @@ function createStudioBridge(pi: any) {
       await fetch(studioUrl + "/api/studio/agent-status", { method: "POST", headers: STUDIO_HEADERS, body: JSON.stringify({ busy }) }).catch(() => {});
     },
     async onAgentEnd(messages: unknown): Promise<void> {
-      if (!awaiting || !studioUrl) return;
-      awaiting = false;
+      if (!answerWanted || !studioUrl) return;
+      answerWanted = false;
       const text = lastAssistantText(messages);
       if (!text) return;
       await fetch(studioUrl + "/api/studio/reply", { method: "POST", headers: STUDIO_HEADERS, body: JSON.stringify({ text }) }).catch(() => {});

@@ -502,10 +502,14 @@ export class Studio {
     return this.record({ actor: 'agent', tool: 'reply', why: answer, ...(claims.length ? { claims } : {}) })
   }
 
-  /** The datasets the current question has used and that are still loaded, newest first. */
+  /**
+   * The datasets the current question has used and that are still loaded, newest first. A
+   * question starts at a Studio message, the user's own SQL, or a step carrying the request.
+   */
   private datasetsSinceLastAsk(sessionKey: string): ClaimSource[] {
+    const startsQuestion = (step: TraceStep) => Boolean(step.ask) || (step.actor === 'user' && (step.tool === 'note' || step.tool === 'query'))
     let lastAsk = this.steps.length - 1
-    while (lastAsk > 0 && !(this.steps[lastAsk].actor === 'user' && (this.steps[lastAsk].tool === 'note' || this.steps[lastAsk].tool === 'query')))
+    while (lastAsk > 0 && !startsQuestion(this.steps[lastAsk]))
       lastAsk--
     const ids = new Set(this.steps.slice(Math.max(0, lastAsk)).flatMap(step => (step.datasetId ? [step.datasetId] : [])))
     return [...ids].reverse().flatMap((id) => {

@@ -47,8 +47,11 @@ export const TinyPivotStudio = async ({ client }) => {
   let stream;
   /** The OpenCode session that called TinyPivot last: Studio messages go there. */
   let sessionID;
-  /** Set while a turn that a Studio message started is running, so its answer goes back. */
-  let awaiting = false;
+  /**
+   * Set when the turn's answer belongs in the Studio: a Studio message started it, or it used
+   * TinyPivot, so the Studio can show the answer under the question and check its numbers.
+   */
+  let answerWanted = false;
 
   function post(route, body) {
     if (!studioUrl) return Promise.resolve();
@@ -57,11 +60,11 @@ export const TinyPivotStudio = async ({ client }) => {
 
   async function deliver(text) {
     if (!sessionID) return;
-    awaiting = true;
+    answerWanted = true;
     try {
       await client.session.promptAsync({ path: { id: sessionID }, body: { parts: [{ type: "text", text }] } });
     } catch (error) {
-      awaiting = false;
+      answerWanted = false;
       console.error("[tinypivot] Could not send the Studio message to OpenCode:", error);
     }
   }
@@ -115,8 +118,8 @@ export const TinyPivotStudio = async ({ client }) => {
   }
 
   async function sendAnswer() {
-    if (!awaiting || !sessionID) return;
-    awaiting = false;
+    if (!answerWanted || !sessionID) return;
+    answerWanted = false;
     try {
       const res = await client.session.messages({ path: { id: sessionID } });
       const text = lastAssistantText(res?.data);
@@ -130,6 +133,7 @@ export const TinyPivotStudio = async ({ client }) => {
     "tool.execute.after": async (input, output) => {
       if (!String(input?.tool ?? "").toLowerCase().includes("tinypivot")) return;
       sessionID = input.sessionID;
+      answerWanted = true;
       noticeToolText(toolText(output));
     },
     event: async ({ event }) => {

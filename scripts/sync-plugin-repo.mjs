@@ -29,6 +29,8 @@ export const PLUGIN_FILES = [
   'plugin.json',
   'mcp_config.json',
   'skills/tinypivot/SKILL.md',
+  'hooks/hooks.json',
+  'hooks/studio-answer.mjs',
   'assets/icon.png',
   'LICENSE.md',
 ]
