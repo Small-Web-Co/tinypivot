@@ -43,12 +43,12 @@ const RULE_USE = 'Use the `tinypivot` MCP server for charts, pivot tables and da
 
 export const TINYPIVOT_CLAUDE_RULE_BLOCK = `${RULE_START}
 ${RULE_HEADING}
-${RULE_USE} In a terminal, show its \`text\` card verbatim with the Data IDE link.
+${RULE_USE} In a terminal, show its \`text\` card verbatim with the Studio link.
 ${RULE_END}`
 
 export const TINYPIVOT_PI_RULE_BLOCK = `${RULE_START}
 ${RULE_HEADING}
-${RULE_USE} The TinyPivot pi extension already shows each card, so reply with the takeaways and the Data IDE link. \`/tinypivot-theme\` switches themes.
+${RULE_USE} The TinyPivot pi extension already shows each card, so reply with the takeaways and the Studio link. \`/tinypivot-theme\` switches themes.
 ${RULE_END}`
 
 export function upsertTinyPivotRuleBlock(existing: string, block = TINYPIVOT_CLAUDE_RULE_BLOCK): string {

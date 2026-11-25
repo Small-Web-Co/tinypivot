@@ -1,5 +1,5 @@
 /**
- * Row limits for the interactive view (the Data IDE and the inline widget).
+ * Row limits for the interactive view (the Studio and the inline widget).
  *
  * Summaries, charts and pivots sent to the agent are computed on the server over every row.
  * These limits only bound what a browser has to hold in memory; when a dataset is larger,

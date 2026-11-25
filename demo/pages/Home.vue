@@ -17,8 +17,26 @@ onMounted(() => {
 
 const facts = ['free', 'runs locally', 'no signup', 'no API key']
 
-// Hero figures come from the measured benchmark shown in the savings section.
+// The hero's fine print comes from the measured benchmark shown in the savings section.
 const headline = benchmarkHeadline()
+
+const studioPoints = [
+  {
+    n: '01',
+    title: 'A trace you can check',
+    body: 'Every load, query, chart and pivot, with the agent\'s reason, what it shows and the SQL or filter behind it. Open any step to see the data as it was then.',
+  },
+  {
+    n: '02',
+    title: 'Edit and rerun',
+    body: 'Change a step\'s SQL and run it yourself with DuckDB, read-only, on your machine. The result keeps the chart and joins the trace as your step.',
+  },
+  {
+    n: '03',
+    title: 'Notes back to the agent',
+    body: 'Point at a step and say what to fix. The agent gets your note with its next TinyPivot reply, or copy it as a prompt to send now.',
+  },
+] as const
 
 const capabilities = [
   {
@@ -47,30 +65,25 @@ const capabilities = [
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
-                MCP server for AI agents
+                Data analysis studio for AI agents
               </p>
               <h1 class="display">
-                Stop pasting rows into chat. <em>Chart them instead.</em>
+                Your agent works the data. <em>You see every step.</em>
               </h1>
               <p class="lede">
-                Pasted rows are billed one by one and added up by eye. TinyPivot keeps them on your machine,
-                computes totals exactly, and charts them in Claude, Cursor, Antigravity, OpenCode and pi.
+                Claude, Cursor, Antigravity, OpenCode and pi load files, run SQL and build charts through TinyPivot.
+                Each step lands live in TinyPivot Studio on your machine, with the agent's reason and the exact SQL,
+                so you can check it, rerun it, or tell the agent what to change.
               </p>
-              <a href="#savings" class="hero-proof">
-                <span class="hero-stats">
-                  <span class="hero-stat">
-                    <strong>{{ headline.cheaperThanPastingPct }}<span class="hero-unit">%</span></strong>
-                    cheaper than pasting
-                  </span>
-                  <span class="hero-stat">
-                    <strong>{{ headline.correct }}<span class="hero-unit">/{{ headline.questions }}</span></strong>
-                    exact answers (pasting: {{ headline.pastedCorrect }}/{{ headline.questions }})
-                  </span>
-                </span>
-                <span class="hero-fine">
-                  Measured in Claude Code.<template v-if="headline.aboutSameAsPython"> Same cost as an agent writing Python, minus the code.</template>
-                  Benchmark ↓
-                </span>
+              <ul class="hero-points">
+                <li v-for="point in studioPoints" :key="point.n">
+                  {{ point.title }}
+                </li>
+              </ul>
+              <a href="#savings" class="hero-fine">
+                Measured in Claude Code: {{ headline.cheaperThanPastingPct }}% cheaper than pasting rows into chat,
+                {{ headline.correct }}/{{ headline.questions }} exact answers<template v-if="headline.aboutSameAsPython">, about the same cost as an agent writing Python</template>.
+                Benchmark ↓
               </a>
             </div>
             <div id="install" class="hero-install">
@@ -86,6 +99,44 @@ const capabilities = [
       </div>
     </section>
 
+    <section id="studio" class="block studio" aria-labelledby="studio-title">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            TinyPivot Studio · on localhost
+          </p>
+          <h2 id="studio-title" class="heading">
+            Every step the agent takes, <em>with the SQL behind it.</em>
+          </h2>
+          <p class="lede">
+            The first time your agent uses TinyPivot, the Studio opens in your browser and follows along.
+            The chat keeps a compact chart or table so you can see progress; the Studio is where you check the work.
+          </p>
+        </header>
+        <RetroWindow title="TinyPivot Studio — 127.0.0.1:47317" flush>
+          <img
+            class="studio-shot"
+            src="/reel/studio/trace.jpg"
+            width="2560"
+            height="1600"
+            loading="lazy"
+            alt="TinyPivot Studio: the agent's steps with their reasons and SQL beside a line chart of monthly revenue."
+          >
+        </RetroWindow>
+        <ol class="caps studio-points">
+          <li v-for="point in studioPoints" :key="point.n" class="cap">
+            <span class="cap-n mono">{{ point.n }}</span>
+            <h3 class="cap-title">
+              {{ point.title }}
+            </h3>
+            <p class="cap-body">
+              {{ point.body }}
+            </p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
     <section class="block reel" aria-labelledby="reel-title">
       <div class="wrap">
         <header class="section-head">
@@ -93,7 +144,7 @@ const capabilities = [
             In the harness
           </p>
           <h2 id="reel-title" class="heading">
-            Charts, pivots and drill-through <em>where the conversation already is.</em>
+            Progress in the chat, <em>the full view a click away.</em>
           </h2>
         </header>
         <RetroWindow title="tinypivot — recorded sessions" flush>
@@ -220,56 +271,42 @@ const capabilities = [
   font-size: 1.08rem;
 }
 
-.hero-proof {
+.hero-points {
   display: grid;
-  gap: 10px;
+  gap: 6px;
   padding: 12px;
   border: var(--line);
   background: var(--ledger);
+  list-style: none;
   font-family: var(--font-mono);
-  text-decoration: none;
+  font-size: 0.82rem;
 }
 
-.hero-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.hero-stat {
-  display: grid;
-  gap: 2px;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-
-.hero-stat + .hero-stat {
-  padding-left: 12px;
-  border-left: var(--line);
-}
-
-.hero-stat strong {
-  font-family: var(--font-dot);
-  font-size: clamp(2rem, 9vw, 3rem);
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0;
-  color: var(--ink);
-}
-
-/* The dot-matrix face draws "%" too loosely to read at a glance, so the unit uses the mono face. */
-.hero-unit {
-  font-family: var(--font-mono);
-  font-size: 0.62em;
+.hero-points li::before {
+  content: '› ';
+  color: var(--accent);
   font-weight: 700;
 }
 
 .hero-fine {
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1.5;
   color: var(--ink-muted);
+}
+
+.studio {
+  border-top: var(--line);
+}
+
+.studio-shot {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.studio-points {
+  margin-top: 32px;
 }
 
 .facts {

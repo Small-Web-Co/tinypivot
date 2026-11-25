@@ -1,6 +1,18 @@
 # @smallwebco/tinypivot-mcp
 
-Interactive **TinyPivot MCP Server, MCP App (`ui://tinypivot/app.html`) & Native Claude Plugin** — turn CSV, TSV, JSON, JSONL, API/MCP tool outputs, and SQL results from **any database** (BigQuery, Snowflake, MySQL, DuckDB, Databricks, PostgreSQL, SQLite) into interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, a live Ghostty TUI, drill-through modals, and Excel exports directly inside your AI harness (Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, pi, and any SEP-1865 MCP Apps host).
+**TinyPivot Studio: a data analysis workspace your AI agent works in, and you can check.** Your agent loads files, runs SQL and builds charts and pivot tables through TinyPivot. Each step shows up live in the Studio, a local page in your browser, with the reason the agent gave and the exact SQL behind it. Edit that SQL and rerun it, reopen any earlier result, and send the agent notes it picks up on its next step. In the chat, TinyPivot keeps to a compact chart or table card so you can follow progress.
+
+Works with Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, pi and any MCP Apps host. Reads CSV, TSV, JSON, JSONL and Parquet files, rows from other MCP tools, and SQL results from any database.
+
+## TinyPivot Studio
+
+In a terminal agent, the first TinyPivot step opens the Studio at `http://127.0.0.1:47317` (set `TINYPIVOT_OPEN_STUDIO=0` to open it yourself; a Studio tab left open from an earlier session reconnects instead of opening a new one). It has three parts:
+
+- **Trace:** every step, newest last, marked as the agent's or yours, with its reason (the `why` the agent passes), what it shows (for example `line chart: sum(mrr) by month`), the row count, and the SQL or file filter behind it. File loads are shown as the SQL that reproduces them.
+- **SQL editor:** edit a step's SQL, or write new SQL over local files and loaded tables, and run it with DuckDB, read-only. The result replaces the view, keeps the step's chart when its fields still exist, and joins the trace as your step.
+- **Notes to the agent:** write what to check or change, optionally about one step. The agent receives your notes at the end of its next TinyPivot reply. To send one at once, **Copy as prompt** puts the note, the step and its SQL on your clipboard.
+
+History holds every table the agent pulled (30 days, on your machine), and the Studio can reopen any of them without re-running the query. The Studio only answers this machine, on its own address, and accepts changes only from its own page.
 
 ## Quick Setup
 
@@ -80,7 +92,7 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
    cat metrics.csv | npx @smallwebco/tinypivot-mcp@latest --open
    ```
 
-   TinyPivot also runs a live SSE-synced localhost Companion Data IDE (`http://127.0.0.1:<port>`) for interactive filtering, drill-through, and exports.
+   `--open` shows the rows in TinyPivot Studio (`http://127.0.0.1:47317`) for filtering, drill-through and exports.
 
 ## Works With Any Database (Not Postgres-Only)
 
@@ -100,7 +112,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Pivot Table (`sum` aggregation) | Included | All aggregations & calculated fields |
 | Data Grid (sort, filter, search, copy Markdown, CSV export) | Included | Included |
 | Framed Terminal Cards & Live Ghostty TUI (`tinypivot-mcp tui`) | Included (subtle `tiny-pivot.com` signature) | Included (watermark-free) |
-| Terminal Companion Data IDE (`--open` / live SSE) | Included | Included |
+| TinyPivot Studio (trace, SQL editor, notes, history) | Included | Included |
 | Universal DB support via `load_file`, stdin pipe & `load_data` | Included | Included |
 | Dataset row limit | Up to 2,500 rows (explicitly bannered if truncated) | Unlimited |
 | Visual themes | `Code` theme (Dark & Light) | All 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`) |
@@ -128,15 +140,18 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `profile` | Describes each column of a loaded dataset: empty share, number and date ranges, commonest values. |
 | `history` | Lists every earlier pull, or reopens one by id without re-querying. Pulls are saved locally under `~/.local/share/tinypivot/history` for 30 days. |
 
+Data tools take an optional `why`: one sentence the agent writes about each step, shown in the Studio trace.
+
 ## Environment Variables (Optional)
 
 - `TINYPIVOT_LICENSE_KEY` — TinyPivot MCP Pro/Team license key (`TP-MCPP-...` or `TP-MCPT-...`; note that UI Library `TP-PRO*` keys apply to `@smallwebco/tinypivot-react`/`-vue` only)
 - `DATABASE_URL` — Optional PostgreSQL connection string for direct read-only `query_postgres` (Pro). The tool is only offered to the model when this is set. Works with **any** database (BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, Postgres) today via CLI/file handoff (`load_file`), stdin pipe, or MCP piping (`load_data`)
 - `TINYPIVOT_ALLOWED_TABLES` — Comma-separated table allowlist for `query_postgres`
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
-- `TINYPIVOT_NO_COMPANION=1` — Disable the localhost Companion Data IDE server
-- `TINYPIVOT_PORT` — Fixed localhost port for the Companion Data IDE server
-- `TINYPIVOT_REPRINT_CARDS` — Set to `0` so the model does not reprint each chart card in a terminal. Saves about 400 output tokens per question; the card stays visible in the Data IDE, the `tui` pane and pi.
+- `TINYPIVOT_NO_COMPANION=1` — Disable the localhost Studio server
+- `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; another free port is used when it is taken, unless this is set)
+- `TINYPIVOT_OPEN_STUDIO` — Set to `0` so the first TinyPivot step in a terminal agent does not open the Studio in your browser
+- `TINYPIVOT_REPRINT_CARDS` — Set to `0` so the model does not reprint each chart card in a terminal. Saves about 400 output tokens per question; the card stays visible in the Studio, the `tui` pane and pi.
 - `TINYPIVOT_HISTORY` — Set to `0` to stop saving pulls to history. `TINYPIVOT_HISTORY_DAYS` sets how long they are kept (default 30).
 
 ## Privacy & Telemetry

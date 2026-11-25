@@ -1,16 +1,25 @@
 # TinyPivot — Developer & In-Agent Analytics Reference
 
-> Updated for TinyPivot MCP v0.1.2 & TinyPivot React/Vue v1.0.82.
+> Updated for TinyPivot MCP v0.4.0 & TinyPivot React/Vue v1.4.5.
 
 TinyPivot is **one deterministic analytics engine** shipped in two complementary forms:
-1. **TinyPivot MCP (`@smallwebco/tinypivot-mcp`)** — Interactive Data IDE (MCP App + Native Claude Plugin + Framed Terminal Cards + Live Ghostty TUI) for AI agents.
+1. **TinyPivot MCP (`@smallwebco/tinypivot-mcp`)** — Data analysis studio for AI agents: TinyPivot Studio on localhost, an MCP App, a native Claude plugin, framed terminal cards and a live Ghostty TUI.
 2. **TinyPivot UI Library (`@smallwebco/tinypivot-react` & `@smallwebco/tinypivot-vue`)** — Lightweight Excel-like `<DataGrid />` with Pivot Tables, Charts, and Embedded AI Data Analyst for web apps.
 
 ---
 
 ## TinyPivot MCP (`@smallwebco/tinypivot-mcp`) — In-Agent Analytics
 
-Turn any AI coding or chat agent into an interactive Data IDE with zero raw-row dumping and deterministic `@smallwebco/tinypivot-core` math.
+Give any AI coding or chat agent a data analysis studio, with zero raw-row dumping and deterministic `@smallwebco/tinypivot-core` math.
+
+### TinyPivot Studio
+
+In terminal agents the first TinyPivot step opens TinyPivot Studio at `http://127.0.0.1:47317` (`TINYPIVOT_OPEN_STUDIO=0` turns that off). It shows:
+
+- **Trace:** every step by the agent or the user, with the agent's reason (the optional `why` argument on every data tool), what it shows, and the SQL or file filter behind it. Opening a step shows the data as it was right after that step.
+- **SQL editor:** edit a step's SQL or write new read-only DuckDB SQL over local files and loaded tables; the result joins the trace as the user's step.
+- **Notes:** the user writes what to check or change; the agent receives the notes at the end of its next TinyPivot tool reply.
+- **History:** every pull, kept locally for 30 days and reopened without re-querying.
 
 ### 1-Command Install & Native Claude Plugin
 
@@ -37,7 +46,7 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 ### Supported AI Harnesses
 
 - **Native Inline MCP App Widgets:** Antigravity, Claude Desktop, Cursor, and any SEP-1865 MCP Apps host (`ui://tinypivot/app.html`)
-- **Terminal-First Harnesses:** Claude Code (native plugin + skill), OpenCode, Codex CLI, pi, Ghostty — outputs crisp rounded-border Unicode terminal cards (sub-block bars, stacked legends, 2x4 Braille line charts, sparkline pivot tables), a live SSE split-pane TUI (`npx @smallwebco/tinypivot-mcp@latest tui`), and a live localhost Companion Data IDE (`http://127.0.0.1:<port>`).
+- **Terminal-First Harnesses:** Claude Code (native plugin + skill), OpenCode, Codex CLI, pi, Ghostty — outputs crisp rounded-border Unicode terminal cards (sub-block bars, stacked legends, 2x4 Braille line charts, sparkline pivot tables), a live SSE split-pane TUI (`npx @smallwebco/tinypivot-mcp@latest tui`), and a TinyPivot Studio on localhost (`http://127.0.0.1:<port>`).
 
 ### Works With Any Database (Not Postgres-Only)
 
@@ -68,7 +77,7 @@ MCP licenses (`TP-MCPP-*` / `TP-MCPT-*`) are separate from the React/Vue UI Libr
 
 | Plan | Price | Key Capabilities |
 |---|---|---|
-| **MCP Free** | $0 (no account) | Core charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), Basic Pivot (`sum`), Data Grid (sort/filter/CSV/Markdown), Terminal Cards & Live Ghostty TUI, Companion Data IDE, `Code` theme, up to **2,500 rows** (explicit amber UI banner + LLM warning if truncated — never silent) |
+| **MCP Free** | $0 (no account) | Core charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), Basic Pivot (`sum`), Data Grid (sort/filter/CSV/Markdown), Terminal Cards & Live Ghostty TUI, TinyPivot Studio, `Code` theme, up to **2,500 rows** (explicit amber UI banner + LLM warning if truncated — never silent) |
 | **MCP Pro** | **$19/mo**, **$149/yr**, or **$399 Local Lifetime** | Unlimited rows, all 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`), double-click Drill-Through, all 9+ aggregations & calculated fields, styled `.xlsx` Excel export, optional direct read-only `query_postgres`, watermark-free UI & terminal cards |
 | **MCP Team (5 seats)** | **$79/mo** or **$699/yr** | All MCP Pro features for 5 team seats (`TP-MCPT-*`) |
 
@@ -79,7 +88,7 @@ MCP licenses (`TP-MCPP-*` / `TP-MCPT-*`) are separate from the React/Vue UI Libr
 - **Q: Does TinyPivot MCP only work with PostgreSQL?**
   A: No. TinyPivot works with **any database** (BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, PostgreSQL) via CSV/JSON file handoff (`load_file`), stdin piping (`... | npx @smallwebco/tinypivot-mcp@latest --open`), or direct MCP/API row piping (`load_data`). PostgreSQL additionally has an optional direct read-only `query_postgres` connector on Pro.
 - **Q: How does TinyPivot MCP work in terminal agents like Claude Code, Ghostty, OpenCode, or pi?**
-  A: It renders aligned Unicode terminal chart/pivot cards directly in scrollback, supports direct stdin piping, launches a live SSE-synced Companion Data IDE at `http://127.0.0.1:<port>`, and includes a full-screen live split-pane TUI via `npx @smallwebco/tinypivot-mcp@latest tui`.
+  A: It renders aligned Unicode terminal chart/pivot cards directly in scrollback, supports direct stdin piping, launches a live SSE-synced TinyPivot Studio at `http://127.0.0.1:<port>`, and includes a full-screen live split-pane TUI via `npx @smallwebco/tinypivot-mcp@latest tui`.
 - **Q: Is TinyPivot MCP free, and what happens over 2,500 rows?**
   A: Yes — Free requires no signup and includes core charts, sum pivots, terminal cards, live TUI, and up to 2,500 rows. If a file exceeds 2,500 rows on Free, TinyPivot never truncates silently: both the UI banner and the LLM tool summary explicitly state that totals reflect the first 2,500 rows only.
 - **Q: Does TinyPivot send my data or SQL queries to external servers?**

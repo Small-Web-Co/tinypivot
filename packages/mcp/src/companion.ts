@@ -1,17 +1,21 @@
 import type { ChartThemePreset } from '@smallwebco/tinypivot-core'
 import type { AddressInfo } from 'node:net'
 import type { DatasetStore } from './store.js'
+import type { Studio } from './studio.js'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
 import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
+import { STUDIO_HEADER } from './studio-protocol.js'
 import { getCompanionSessionFile } from './tui.js'
 
 export interface CompanionServerHandle {
   url: string
   port: number
   broadcastUpdate: () => void
+  /** Browser tabs connected to the live stream right now. */
+  clientCount: () => number
   close: () => Promise<void>
 }
 
@@ -21,12 +25,56 @@ export interface StartCompanionOptions {
   licenseKey?: string
   demoToken?: string
   port?: number
+  /** Trace, notes and history shown in the Studio; without one the Studio routes answer 404. */
+  studio?: Studio
 }
+
+/**
+ * Only this machine's browser, on this server's own address, may use the API. Checking Host stops
+ * DNS rebinding; requiring the custom header and a matching Origin on writes stops other sites
+ * from posting to it.
+ */
+export function isAllowedRequest(
+  request: { method?: string, host?: string, origin?: string, studioHeader?: string },
+  port: number,
+): boolean {
+  const allowedHosts = [`127.0.0.1:${port}`, `localhost:${port}`]
+  if (!request.host || !allowedHosts.includes(request.host))
+    return false
+  if (request.method === 'GET' || request.method === 'HEAD')
+    return true
+  if (request.studioHeader !== '1')
+    return false
+  return !request.origin || allowedHosts.some(host => request.origin === `http://${host}`)
+}
+
+function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify(body))
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+const MAX_SQL_CHARS = 20_000
+const MAX_NOTE_CHARS = 2_000
+
+const MAX_BODY_BYTES = 256 * 1024
 
 function readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = []
-    req.on('data', (c: Buffer) => chunks.push(c))
+    let size = 0
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > MAX_BODY_BYTES) {
+        resolve({})
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
     req.on('end', () => {
       try {
         const text = Buffer.concat(chunks).toString('utf8').trim()
@@ -90,16 +138,13 @@ function buildFullCompanionPayload(
 /**
  * Localhost companion HTTP + SSE server so terminal-first harnesses
  * (Claude Code, OpenCode, pi, Rex, Ghostty, Codex CLI) get the exact same
- * live-updating interactive TinyPivot Data IDE in a browser tab alongside the terminal.
+ * live-updating interactive TinyPivot Studio in a browser tab alongside the terminal.
  */
 export async function startCompanionServer(options: StartCompanionOptions): Promise<CompanionServerHandle> {
   const sseClients = new Set<http.ServerResponse>()
 
-  const broadcastUpdate = () => {
-    const payload = buildFullCompanionPayload(options.store, undefined, options)
-    if (!payload)
-      return
-    const frame = `event: update\ndata: ${JSON.stringify(payload)}\n\n`
+  const send = (event: string, payload: unknown) => {
+    const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
     for (const res of sseClients) {
       try {
         res.write(frame)
@@ -110,11 +155,81 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     }
   }
 
+  const broadcastUpdate = () => {
+    const payload = buildFullCompanionPayload(options.store, undefined, options)
+    if (payload)
+      send('update', payload)
+  }
+
+  const { studio } = options
+  studio?.subscribe(() => send('studio', studio.snapshot()))
+
+  /** Studio writes: the user's own SQL, notes for the agent, and reopening saved pulls. */
+  const handleStudioPost = async (pathname: string, body: Record<string, unknown>, res: http.ServerResponse) => {
+    if (!studio)
+      return sendJson(res, 404, { error: 'Studio is not available.' })
+    if (pathname === '/api/studio/query') {
+      const sql = typeof body.sql === 'string' ? body.sql.trim() : ''
+      if (!sql || sql.length > MAX_SQL_CHARS)
+        return sendJson(res, 400, { error: 'Send one SELECT statement.' })
+      const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 120) : undefined
+      try {
+        const viewFromStepId = typeof body.fromStepId === 'string' ? body.fromStepId : undefined
+        const { dataset, truncated } = await studio.runQuery({ sql, name, actor: 'user', viewFromStepId })
+        broadcastUpdate()
+        return sendJson(res, 200, { datasetId: dataset.id, rows: dataset.rows.length, truncated })
+      }
+      catch (error) {
+        return sendJson(res, 400, { error: errorMessage(error) })
+      }
+    }
+    if (pathname === '/api/studio/note') {
+      const text = typeof body.text === 'string' ? body.text.trim() : ''
+      if (!text || text.length > MAX_NOTE_CHARS)
+        return sendJson(res, 400, { error: `Write a note of up to ${MAX_NOTE_CHARS.toLocaleString('en-US')} characters.` })
+      const note = studio.addNote(text, typeof body.stepId === 'string' ? body.stepId : undefined)
+      return sendJson(res, 200, { note })
+    }
+    if (pathname === '/api/studio/note/delete') {
+      return sendJson(res, 200, { removed: typeof body.id === 'string' && studio.removeNote(body.id) })
+    }
+    if (pathname === '/api/studio/show') {
+      try {
+        const dataset = await studio.showStep(String(body.stepId ?? ''))
+        broadcastUpdate()
+        return sendJson(res, 200, { datasetId: dataset.id })
+      }
+      catch (error) {
+        return sendJson(res, 400, { error: errorMessage(error) })
+      }
+    }
+    if (pathname === '/api/studio/open') {
+      try {
+        const dataset = await studio.reopen(String(body.id ?? ''), { actor: 'user' })
+        broadcastUpdate()
+        return sendJson(res, 200, { datasetId: dataset.id })
+      }
+      catch (error) {
+        return sendJson(res, 400, { error: errorMessage(error) })
+      }
+    }
+    return sendJson(res, 404, { error: 'Not found' })
+  }
+
   const server = http.createServer(async (req, res) => {
     const urlObj = new URL(req.url || '/', 'http://127.0.0.1')
     const pathname = urlObj.pathname
 
     res.setHeader('Cache-Control', 'no-store')
+    const port = (server.address() as AddressInfo).port
+    const allowed = isAllowedRequest({
+      method: req.method,
+      host: req.headers.host,
+      origin: req.headers.origin,
+      studioHeader: req.headers[STUDIO_HEADER] as string | undefined,
+    }, port)
+    if (!allowed)
+      return sendJson(res, 403, { error: 'Forbidden' })
 
     if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
       const html = await options.loadHtml()
@@ -130,8 +245,19 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
         'Connection': 'keep-alive',
       })
       res.write('retry: 2000\n\n')
+      if (studio)
+        res.write(`event: studio\ndata: ${JSON.stringify(studio.snapshot())}\n\n`)
       sseClients.add(res)
       req.on('close', () => sseClients.delete(res))
+      return
+    }
+
+    if (req.method === 'GET' && pathname === '/api/studio') {
+      return studio ? sendJson(res, 200, studio.snapshot()) : sendJson(res, 404, { error: 'Studio is not available.' })
+    }
+
+    if (req.method === 'POST' && pathname.startsWith('/api/studio/')) {
+      await handleStudioPost(pathname, await readJsonBody(req), res)
       return
     }
 
@@ -139,12 +265,10 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       const dsId = urlObj.searchParams.get('datasetId') ?? undefined
       const payload = buildFullCompanionPayload(options.store, dsId, options)
       if (!payload) {
-        res.writeHead(404, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ error: 'Dataset not found' }))
+        sendJson(res, 404, { error: 'Dataset not found' })
         return
       }
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify(payload))
+      sendJson(res, 200, payload)
       return
     }
 
@@ -156,8 +280,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
           typeof body.customRatePerMillion === 'number' ? body.customRatePerMillion : undefined,
         )
       }
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ session: options.store.getSessionSavings() }))
+      sendJson(res, 200, { session: options.store.getSessionSavings() })
       return
     }
 
@@ -173,8 +296,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
           options.store.setVisualTheme(requested)
         }
       }
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ chartTheme: isPro ? options.store.getVisualTheme() : 'code' }))
+      sendJson(res, 200, { chartTheme: isPro ? options.store.getVisualTheme() : 'code' })
       return
     }
 
@@ -182,13 +304,11 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       const body = await readJsonBody(req)
       const dsId = typeof body.datasetId === 'string' ? body.datasetId : undefined
       const result = options.store.recordLocalAction(dsId)
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify(result))
+      sendJson(res, 200, result)
       return
     }
 
-    res.writeHead(404, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ error: 'Not found' }))
+    sendJson(res, 404, { error: 'Not found' })
   })
 
   await new Promise<void>((resolve, reject) => {
@@ -213,6 +333,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     url,
     port: address.port,
     broadcastUpdate,
+    clientCount: () => sseClients.size,
     close: () => {
       if (closePromise)
         return closePromise

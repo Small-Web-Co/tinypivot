@@ -10,6 +10,7 @@ const toc = [
   { id: 'quickstart', label: 'Quick start' },
   { id: 'setup', label: 'Setup by harness' },
   { id: 'prompts', label: 'Prompts' },
+  { id: 'studio', label: 'Studio' },
   { id: 'tools', label: 'Tools' },
   { id: 'savings', label: 'Token savings' },
   { id: 'privacy', label: 'Privacy' },
@@ -88,6 +89,25 @@ const { copiedKey, copy } = useCopy()
               </button>
             </li>
           </ul>
+        </section>
+
+        <section id="studio" class="docs-section">
+          <h2 class="heading">
+            TinyPivot Studio
+          </h2>
+          <p class="docs-text">
+            In a terminal agent, the first TinyPivot step opens the Studio at <code>http://127.0.0.1:47317</code>.
+            A Studio tab left open from an earlier session reconnects instead. Set <code>TINYPIVOT_OPEN_STUDIO=0</code> to open it yourself.
+          </p>
+          <ul class="docs-text studio-list">
+            <li><strong>Trace.</strong> Each step, the agent's or yours, with its reason (the <code>why</code> the agent passes on every data tool), what it shows, and the SQL or file filter behind it. <em>Open</em> shows the data as it was right after that step.</li>
+            <li><strong>SQL editor.</strong> Edit a step's SQL or write new SQL over local files and loaded tables, and run it with DuckDB, read-only. The result keeps the step's chart when its fields still exist.</li>
+            <li><strong>Notes.</strong> Write what to check or change, optionally about one step. The agent receives your notes at the end of its next TinyPivot reply; <em>Copy as prompt</em> sends one at once.</li>
+            <li><strong>History.</strong> Every table the agent pulled, kept on your machine for 30 days, reopened without running the query again.</li>
+          </ul>
+          <p class="docs-text">
+            The Studio answers only this machine, on its own address, and accepts changes only from its own page.
+          </p>
         </section>
 
         <section id="tools" class="docs-section">
@@ -215,6 +235,16 @@ const { copiedKey, copy } = useCopy()
 .docs-text code,
 .method code {
   font-size: 0.85em;
+}
+
+.studio-list {
+  display: grid;
+  gap: 8px;
+  padding-left: 1.1em;
+}
+
+.studio-list strong {
+  color: var(--ink);
 }
 
 .steps {

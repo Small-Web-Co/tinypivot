@@ -33,7 +33,7 @@ function ansiFgBold(rgb: [number, number, number], text: string): string {
 export interface TerminalFormatOptions {
   /** Show subtle tiny-pivot.com card signature (true on Free tier, false on Pro) */
   showBranding?: boolean
-  /** Live local Companion Data IDE URL to embed inside the card footer */
+  /** Live local Studio URL to embed inside the card footer */
   companionUrl?: string
   /** Optional 24-bit ANSI truecolor palette for direct TTY CLI output (omit for LLM Markdown) */
   colorTheme?: ChartThemePreset
@@ -791,9 +791,9 @@ export function formatDatasetSummary(
 
   parts.push('', formatColumnNotes(dataset.columns))
 
-  // The card's footer already carries the Data IDE link; state it separately only without a card.
+  // The card's footer already carries the Studio link; state it separately only without a card.
   if (companionUrl && !chartBlock)
-    parts.push(`Data IDE: ${companionUrl}`)
+    parts.push(`Studio: ${companionUrl}`)
 
   return parts.join('\n')
 }
@@ -948,7 +948,7 @@ export function formatPivotSummary(
     ? `Pivot on **${dataset.name}** (**first ${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows — Free tier subset**):`
     : `Pivot on **${dataset.name}** (${dataset.rows.length.toLocaleString()} source rows):`
 
-  // The card itself notes clipped rows and carries the Data IDE link in its footer.
+  // The card itself notes clipped rows and carries the Studio link in its footer.
   const out = [headline, '', tableLines.join('\n')]
   if (companionUrl && options.reprintNote !== false)
     out.push(REPRINT_NOTE)

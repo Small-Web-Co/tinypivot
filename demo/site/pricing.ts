@@ -40,7 +40,7 @@ export const plans: Record<Product, Plan[]> = {
       features: [
         'Bar, stacked bar, line, area, pie and donut charts',
         'Pivot table (sum) and data grid',
-        'Terminal cards + live companion Data IDE',
+        'Terminal cards + TinyPivot Studio',
         'Up to 2,500 rows per dataset',
       ],
       action: { kind: 'link', to: '/#install', label: 'Install free' },

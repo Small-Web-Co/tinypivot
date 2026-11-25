@@ -9,7 +9,7 @@ import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
  *   and renders framed charts & pivot tables directly in pi's TUI in full 24-bit ANSI truecolor
  *   using TinyPivot's unified theme palettes (zero extra LLM context tokens).
  * - Registers `/tinypivot-theme [theme-id]` inside pi for instant interactive theme switching
- *   persisted to `~/.config/tinypivot/preferences.json` and synced to the live Companion IDE.
+ *   persisted to `~/.config/tinypivot/preferences.json` and synced to the live Studio.
  */
 export function buildPiExtensionSource(): string {
   const palettesJson = JSON.stringify(TERMINAL_PALETTES, null, 2)
@@ -240,7 +240,7 @@ export default function (pi: any) {
 
   if (typeof pi.registerCommand === "function") {
     pi.registerCommand("tinypivot-theme", {
-      description: "Switch TinyPivot visual theme (all 10 palettes, synced with Companion IDE)",
+      description: "Switch TinyPivot visual theme (all 10 palettes, synced with Studio)",
       handler: async (args: string, ctx: { ui?: { select?: (t: string, o: string[]) => Promise<string | undefined>; notify?: (m: string, t?: string) => void } }) => {
         const active = readActiveThemeId();
         let chosen = args?.trim().toLowerCase();

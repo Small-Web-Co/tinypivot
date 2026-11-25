@@ -1,4 +1,5 @@
 import type { ChartConfig, ChartSortOrder, ChartThemePreset, DataGridViewMode, DrillThroughResult, PivotConfig, Theme } from '@smallwebco/tinypivot-core'
+import type { StudioSnapshot } from '../src/studio-protocol'
 import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps'
 import {
   CHART_THEME_PRESETS,
@@ -8,6 +9,8 @@ import {
 import { DataGrid, enableDemoMode, setLicenseKey } from '@smallwebco/tinypivot-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { INTERACTIVE_ROW_LIMIT, ROW_PAGE_SIZE } from '../src/limits'
+import { postToStudio } from './companionApi'
+import { StudioPanel } from './StudioPanel'
 
 interface DatasetMeta {
   id: string
@@ -213,6 +216,8 @@ export function McpApp() {
   const [selectedContext, setSelectedContext] = useState<SelectedContext | null>(null)
   const [actionToast, setActionToast] = useState<ActionToast | null>(null)
   const [userSurfaceOverride, setUserSurfaceOverride] = useState(false)
+  const [studio, setStudio] = useState<StudioSnapshot | null>(null)
+  const [studioOpen, setStudioOpen] = useState(true)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const showToast = useCallback((message: string, options?: { upgradeCta?: boolean, durationMs?: number }) => {
@@ -386,13 +391,8 @@ export function McpApp() {
     const targetId = id || datasetId
 
     if (transportMode === 'companion') {
-      void fetch('/api/local-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ datasetId: targetId }),
-      })
-        .then(r => r.json())
-        .then((sc: { session?: SessionSavings }) => {
+      void postToStudio<{ session?: SessionSavings }>('/api/local-action', { datasetId: targetId })
+        .then((sc) => {
           if (sc?.session)
             setTokenStats(prev => prev ? { ...prev, session: sc.session! } : prev)
         })
@@ -431,12 +431,7 @@ export function McpApp() {
 
     if (transportMode === 'companion') {
       try {
-        const res = await fetch('/api/model', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: modelId }),
-        })
-        const sc = await res.json() as { session?: SessionSavings }
+        const sc = await postToStudio<{ session?: SessionSavings }>('/api/model', { model: modelId })
         if (sc?.session)
           setTokenStats(prev => prev ? { ...prev, session: sc.session! } : prev)
       }
@@ -484,11 +479,7 @@ export function McpApp() {
     }
     catch {}
     if (transportMode === 'companion') {
-      void fetch('/api/theme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: nextTheme }),
-      }).catch(() => {})
+      void postToStudio('/api/theme', { theme: nextTheme }).catch(() => {})
       return
     }
     const app = appRef.current
@@ -534,6 +525,13 @@ export function McpApp() {
         return
       setTransportMode('companion')
       setInlineHeight(null) // Full 100vh browser companion window
+      void fetch('/api/studio')
+        .then(res => (res.ok ? res.json() as Promise<StudioSnapshot> : null))
+        .then((snapshot) => {
+          if (active && snapshot)
+            setStudio(snapshot)
+        })
+        .catch(() => {})
       try {
         const res = await fetch('/api/state')
         if (res.ok) {
@@ -565,6 +563,14 @@ export function McpApp() {
           try {
             const payload = JSON.parse((ev as MessageEvent).data) as ToolPayload
             void applyPayload(payload)
+          }
+          catch {}
+        })
+        eventSource.addEventListener('studio', (ev) => {
+          if (!active)
+            return
+          try {
+            setStudio(JSON.parse((ev as MessageEvent).data) as StudioSnapshot)
           }
           catch {}
         })
@@ -841,14 +847,26 @@ export function McpApp() {
               )}
 
           {transportMode === 'companion' && (
-            <span className="tp-mcp-pill tp-mcp-pill-live" title="Live-synced with your terminal AI agent over SSE">
+            <span className="tp-mcp-pill tp-mcp-pill-live" title="Live-synced with your AI agent">
               ● LIVE
             </span>
+          )}
+          {studio && (
+            <button
+              type="button"
+              className={`tp-mcp-pill ${studioOpen ? 'tp-mcp-pill-accent' : ''}`}
+              aria-pressed={studioOpen}
+              title="Show or hide the trace of steps, SQL and notes"
+              onClick={() => setStudioOpen(open => !open)}
+            >
+              Studio
+            </button>
           )}
         </div>
 
         <div className="tp-mcp-bar-right">
-          {totalRows > 0 && (
+          {/* The savings estimate assumes the rows would otherwise be pasted, which overstates it, so the Studio leaves it out. */}
+          {totalRows > 0 && !studio && (
             <div className="tp-mcp-savings-wrap">
               <button
                 type="button"
@@ -1131,51 +1149,61 @@ export function McpApp() {
 
       {statusNote && <div className="tp-mcp-status">{statusNote}</div>}
 
-      <main ref={mainRef} className="tp-mcp-grid-wrap">
-        {licenseReady && rows.length > 0
-          ? (
-              <DataGrid
-                data={rows}
-                loading={loading}
-                theme={isUnifiedTheme(visualTheme) ? visualTheme : gridTheme}
-                chartTheme={visualTheme}
-                fontSize="sm"
-                rowHeight={28}
-                headerHeight={32}
-                viewMode={viewMode}
-                pivotConfig={pivotConfig}
-                chartConfig={chartConfig}
-                showPivot={true}
-                enableExport={true}
-                enableSearch={true}
-                enablePagination={true}
-                pageSize={100}
-                enableColumnResize={true}
-                enableClipboard={true}
-                enableDrillDown={true}
-                enableDrillThrough={true}
-                enableVerticalResize={false}
-                initialHeight={440}
-                exportFilename={`${datasetId || 'tinypivot'}.csv`}
-                onViewModeChange={setViewMode}
-                onChartThemeChange={preset => void handleVisualThemeChange(preset)}
-                onCellClick={handleCellClick}
-                onDrillThrough={handleDrillThrough}
-              />
-            )
-          : loading
+      <div className={studio && studioOpen ? 'tp-studio-layout' : 'tp-studio-layout is-closed'}>
+        {studio && studioOpen && (
+          <StudioPanel
+            snapshot={studio}
+            tables={datasets.map(ds => ({ id: ds.id, name: ds.name }))}
+            activeDatasetId={datasetId}
+            notify={message => showToast(message)}
+          />
+        )}
+        <main ref={mainRef} className="tp-mcp-grid-wrap">
+          {licenseReady && rows.length > 0
             ? (
-                <div className="tp-mcp-empty">
-                  <strong>Loading TinyPivot…</strong>
-                </div>
+                <DataGrid
+                  data={rows}
+                  loading={loading}
+                  theme={isUnifiedTheme(visualTheme) ? visualTheme : gridTheme}
+                  chartTheme={visualTheme}
+                  fontSize="sm"
+                  rowHeight={28}
+                  headerHeight={32}
+                  viewMode={viewMode}
+                  pivotConfig={pivotConfig}
+                  chartConfig={chartConfig}
+                  showPivot={true}
+                  enableExport={true}
+                  enableSearch={true}
+                  enablePagination={true}
+                  pageSize={100}
+                  enableColumnResize={true}
+                  enableClipboard={true}
+                  enableDrillDown={true}
+                  enableDrillThrough={true}
+                  enableVerticalResize={false}
+                  initialHeight={440}
+                  exportFilename={`${datasetId || 'tinypivot'}.csv`}
+                  onViewModeChange={setViewMode}
+                  onChartThemeChange={preset => void handleVisualThemeChange(preset)}
+                  onCellClick={handleCellClick}
+                  onDrillThrough={handleDrillThrough}
+                />
               )
-            : (
-                <div className="tp-mcp-empty">
-                  <strong>No dataset loaded yet</strong>
-                  <span>Ask your AI agent to load a CSV/JSON file, query Postgres, or pipe rows from another MCP tool.</span>
-                </div>
-              )}
-      </main>
+            : loading
+              ? (
+                  <div className="tp-mcp-empty">
+                    <strong>Loading TinyPivot…</strong>
+                  </div>
+                )
+              : (
+                  <div className="tp-mcp-empty">
+                    <strong>No dataset loaded yet</strong>
+                    <span>Ask your AI agent to load a CSV/JSON file, query Postgres, or pipe rows from another MCP tool.</span>
+                  </div>
+                )}
+        </main>
+      </div>
 
       {actionToast && (
         <div className="tp-mcp-toast" role="status" aria-live="polite">

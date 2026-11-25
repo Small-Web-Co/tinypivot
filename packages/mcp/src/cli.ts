@@ -9,6 +9,7 @@ import { startCompanionServer } from './companion.js'
 import { runInitCommand } from './init.js'
 import { createTinyPivotMcpServer, isMcpLicenseKey, loadAppHtml, resolveLicenseKey } from './server.js'
 import { DatasetStore, FREE_TIER_ROW_LIMIT, getPreferencesPath, loadSavedVisualTheme, parseDelimitedText, saveVisualThemePreference } from './store.js'
+import { Studio } from './studio.js'
 import { formatDatasetSummary, formatPivotSummary, formatTerminalChart } from './summary.js'
 import { runTuiCommand } from './tui.js'
 
@@ -27,6 +28,14 @@ function openInBrowser(url: string) {
     // Non-fatal if browser cannot be opened automatically
   }
 }
+
+/**
+ * The Studio's usual port. Keeping it stable lets a Studio tab left open from an earlier session
+ * reconnect on its own; when it is taken (another agent session), a free port is used instead.
+ */
+const STUDIO_PORT = 47317
+/** How long to wait for an open Studio tab to reconnect before opening a new one. */
+const STUDIO_RECONNECT_MS = 2500
 
 function normalizeJsonRow(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input))
@@ -194,7 +203,7 @@ async function runInteractiveThemePicker(active: ChartThemePreset): Promise<Char
       '\x1B[2K',
       ...themes.map((id, idx) => `\x1B[2K${formatThemeRow(id, active, idx === cursor, useColor)}`),
       '\x1B[2K',
-      `\x1B[2K  Saves to ${getPreferencesPath()} (applies across all MCP sessions, Companion IDE & TUI)`,
+      `\x1B[2K  Saves to ${getPreferencesPath()} (applies across all MCP sessions, Studio & TUI)`,
     ]
     process.stdout.write(`${out.join('\n')}\n`)
   }
@@ -281,12 +290,12 @@ async function runThemeCommand(args: string[]): Promise<void> {
 
   saveVisualThemePreference(requested as ChartThemePreset)
   console.log(`✓ Default TinyPivot theme set to "${requested}" (${TERMINAL_PALETTES[requested as ChartThemePreset].label}) — saved to ${getPreferencesPath()}`)
-  console.log('  Applies immediately on next TinyPivot MCP turn, Companion IDE load, or TUI launch.')
+  console.log('  Applies immediately on next TinyPivot MCP turn, Studio load, or TUI launch.')
 }
 
 function printRootHelp(): void {
   console.log(`
-TinyPivot MCP — Interactive Data IDE & Terminal Charts for AI Agents
+TinyPivot MCP — Data Analysis Studio & Terminal Charts for AI Agents
 
 Commands:
   tinypivot-mcp init [options]       Configure Claude Code, Claude Desktop, pi, Cursor, OpenCode, Codex & Antigravity
@@ -297,8 +306,8 @@ Commands:
 Options:
   --theme=<id>                       Visual theme (${CHART_THEME_IDS.join(', ')})
   --pivot                            Also print a framed sparkline pivot table on stdin pipe
-  --open                             Open the live Companion Data IDE in your browser
-  --port=<n>                         Bind Companion Data IDE on a specific localhost port
+  --open                             Open TinyPivot Studio in your browser now
+  --port=<n>                         Serve the Studio on this localhost port (default 47317)
   --name=<title>                     Dataset title for piped stdin / loaded files
 `.trim())
 }
@@ -332,7 +341,7 @@ async function main() {
 
   let appHtmlPath: string | undefined
   let explicitPort = false
-  let port = process.env.TINYPIVOT_PORT ? Number(process.env.TINYPIVOT_PORT) : 0
+  let port = process.env.TINYPIVOT_PORT ? Number(process.env.TINYPIVOT_PORT) : STUDIO_PORT
   let disableCompanion = process.env.TINYPIVOT_NO_COMPANION === '1'
   let autoOpen = false
   let forceStdinPipe = false
@@ -378,29 +387,48 @@ async function main() {
   let companion: CompanionServerHandle | undefined
   let companionPromise: Promise<CompanionServerHandle | undefined> | null = null
 
-  const ensureCompanionStarted = (): Promise<CompanionServerHandle | undefined> => {
+  const studio = new Studio(store)
+  const startCompanion = (onPort: number) => startCompanionServer({
+    store,
+    studio,
+    loadHtml: () => loadAppHtml(appHtmlPath),
+    licenseKey,
+    demoToken,
+    port: onPort,
+  })
+
+  /** Opens the Studio unless a tab from an earlier session reconnects first. */
+  const openStudioIfNoTab = (handle: CompanionServerHandle) => {
+    setTimeout(() => {
+      if (handle.clientCount() === 0)
+        openInBrowser(handle.url)
+    }, STUDIO_RECONNECT_MS).unref()
+  }
+
+  const ensureCompanionStarted = (openStudio = autoOpen): Promise<CompanionServerHandle | undefined> => {
     if (disableCompanion)
       return Promise.resolve(undefined)
     if (companion)
       return Promise.resolve(companion)
     if (companionPromise)
       return companionPromise
-    companionPromise = startCompanionServer({
-      store,
-      loadHtml: () => loadAppHtml(appHtmlPath),
-      licenseKey,
-      demoToken,
-      port,
-    })
+    companionPromise = startCompanion(port)
+      .catch((err) => {
+        if (explicitPort || process.env.TINYPIVOT_PORT)
+          throw err
+        return startCompanion(0)
+      })
       .then((handle) => {
         companion = handle
-        console.error(`[tinypivot-mcp] Companion Data IDE ready at ${handle.url}`)
+        console.error(`[tinypivot-mcp] TinyPivot Studio ready at ${handle.url}`)
         if (autoOpen)
           openInBrowser(handle.url)
+        else if (openStudio)
+          openStudioIfNoTab(handle)
         return handle
       })
       .catch((err) => {
-        console.error('[tinypivot-mcp] Companion server disabled (could not bind localhost):', err instanceof Error ? err.message : err)
+        console.error('[tinypivot-mcp] Studio disabled (could not bind localhost):', err instanceof Error ? err.message : err)
         return undefined
       })
     return companionPromise
@@ -479,7 +507,7 @@ async function main() {
     }
 
     if (liveCompanionUrl) {
-      console.error(`[tinypivot-mcp] Serving live Companion IDE at ${liveCompanionUrl} (press Ctrl+C to stop)`)
+      console.error(`[tinypivot-mcp] Serving live Studio at ${liveCompanionUrl} (press Ctrl+C to stop)`)
       await new Promise<void>(() => {})
     }
     return
@@ -511,13 +539,15 @@ async function main() {
 
   const { server } = createTinyPivotMcpServer({
     store,
+    studio,
     appHtmlPath,
     licenseKey,
     demoToken,
     companionUrl: companion?.url,
     ensureCompanion: disableCompanion
       ? undefined
-      : async () => (await ensureCompanionStarted())?.url,
+      // A terminal agent's first data step opens the Studio, unless TINYPIVOT_OPEN_STUDIO=0.
+      : async () => (await ensureCompanionStarted(process.env.TINYPIVOT_OPEN_STUDIO !== '0'))?.url,
     onStateChanged: () => companion?.broadcastUpdate(),
   })
 

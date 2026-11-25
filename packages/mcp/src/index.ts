@@ -43,6 +43,19 @@ export {
   type StoredDataset,
 } from './store.js'
 export {
+  type StepActor,
+  STUDIO_HEADER,
+  type StudioNote,
+  type StudioSnapshot,
+  type TraceStep,
+} from './studio-protocol.js'
+export {
+  describeView,
+  fileStepSql,
+  Studio,
+  type StudioQueryInput,
+} from './studio.js'
+export {
   formatDatasetSummary,
   formatPivotSummary,
   formatTerminalChart,

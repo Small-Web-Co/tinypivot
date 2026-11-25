@@ -22,8 +22,8 @@ export const installOptions: InstallOption[] = [
   {
     id: 'claude-code',
     label: 'Claude Code',
-    lines: [`claude mcp add tinypivot -- npx -y ${MCP_SPEC} --open`],
-    note: 'Terminal charts plus a live Data IDE on localhost.',
+    lines: [`claude mcp add tinypivot -- npx -y ${MCP_SPEC}`],
+    note: 'Terminal charts, plus TinyPivot Studio in your browser.',
   },
   {
     id: 'plugin',

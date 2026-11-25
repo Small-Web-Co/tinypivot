@@ -9,6 +9,7 @@ import { DuckDbRunner, quoteLiteral, toPlainValue, withinBudget } from '../../pa
 import { formatHistoryList, HistoryStore } from '../../packages/mcp/src/history'
 import { createTinyPivotMcpServer, DatasetStore } from '../../packages/mcp/src/index'
 import { formatProfile } from '../../packages/mcp/src/profile'
+import { describeView, fileStepSql, Studio } from '../../packages/mcp/src/studio'
 
 const CSV = [
   'period,region,channel,orders,mrr',
@@ -99,6 +100,23 @@ describe('profile', () => {
   })
 })
 
+describe('studio helpers', () => {
+  it('describes what a dataset shows in one line', () => {
+    const store = new DatasetStore()
+    const ds = dataset(store)
+    expect(describeView(ds)).toBe('stackedBar chart: sum(mrr) by day, split by region')
+    store.updateView(ds.id, { viewMode: 'grid' })
+    expect(describeView(store.get(ds.id)!)).toBe('table')
+    store.updateView(ds.id, { viewMode: 'pivot', pivotConfig: { rowFields: ['region'], columnFields: [], valueFields: [{ field: 'mrr', aggregation: 'sum' }] } })
+    expect(describeView(store.get(ds.id)!)).toBe('pivot: sum(mrr) · rows region')
+  })
+
+  it('writes a file load as the SQL that reproduces it', () => {
+    expect(fileStepSql('/data/o.csv', [{ field: 'region', equals: ['EMEA', 'APAC'] }]))
+      .toBe('SELECT *\nFROM \'/data/o.csv\'\nWHERE CAST("region" AS VARCHAR) IN (\'EMEA\', \'APAC\')')
+  })
+})
+
 describe('duckdb helpers', () => {
   it('turns DuckDB values into plain ones TinyPivot can store', () => {
     expect(toPlainValue(42n)).toBe(42)
@@ -117,7 +135,9 @@ describe('duckdb helpers', () => {
 describe('query, profile and history tools', () => {
   async function connect() {
     const history = new HistoryStore({ dir: path.join(dir, 'history') })
-    const { server } = createTinyPivotMcpServer({ licenseKey: 'TP-MCPP-TESTKEY1-20991231', history, duckdb: new DuckDbRunner() })
+    const store = new DatasetStore()
+    const studio = new Studio(store, { history, duck: new DuckDbRunner() })
+    const { server } = createTinyPivotMcpServer({ licenseKey: 'TP-MCPP-TESTKEY1-20991231', store, studio })
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
     const client = new Client({ name: 'test-host', version: '1.0.0' }, { capabilities: {} })
     await server.connect(serverTransport)
@@ -126,8 +146,78 @@ describe('query, profile and history tools', () => {
       const result = await client.callTool({ name, arguments: args })
       return { isError: Boolean(result.isError), text: (result.content as Array<{ text: string }>)[0].text }
     }
-    return { call, history }
+    return { call, history, studio, store }
   }
+
+  it('records each step with its reason and SQL, and hands the user\'s notes to the agent once', async () => {
+    const { call, studio } = await connect()
+    const sql = `SELECT region, sum(mrr) AS mrr FROM ${quoteLiteral(csvPath)} GROUP BY 1`
+    await call('query', { sql, name: 'MRR by region', why: 'Compare regions before splitting by channel' })
+
+    const step = studio.recentSteps().at(-1)!
+    expect(step).toMatchObject({ actor: 'agent', tool: 'query', why: 'Compare regions before splitting by channel', sql, rows: 2 })
+    expect(step.historyId).toBeDefined()
+
+    studio.addNote('Exclude the Partner channel', step.id)
+    const reply = await call('profile', {})
+    expect(reply.text).toContain('Notes from the user in TinyPivot Studio')
+    expect(reply.text).toContain('Exclude the Partner channel (about "Compare regions before splitting by channel", SQL: SELECT region')
+    expect((await call('profile', {})).text).not.toContain('Notes from the user')
+  }, 30_000)
+
+  it('records the user\'s own queries as theirs and reloads the trace after a restart', async () => {
+    const { studio, store, history } = await connect()
+    const { dataset } = await studio.runQuery({ sql: `SELECT count(*) AS n FROM ${quoteLiteral(csvPath)}`, actor: 'user' })
+    expect(dataset.name).toBe('Your query')
+    expect(store.get()?.id).toBe(dataset.id)
+
+    const restarted = new Studio(new DatasetStore(), { history })
+    expect(restarted.recentSteps().map(s => [s.actor, s.tool])).toEqual([['user', 'query']])
+  }, 30_000)
+
+  it('keeps a step\'s chart when the user edits its SQL, if the result still has its fields', async () => {
+    const { call, studio } = await connect()
+    const source = quoteLiteral(csvPath)
+    await call('query', {
+      sql: `SELECT period, sum(mrr) AS mrr FROM ${source} GROUP BY 1 ORDER BY 1`,
+      chartConfig: { type: 'line', xAxisField: 'period', yAxisField: 'mrr', aggregation: 'sum' },
+    })
+    const step = studio.recentSteps().at(-1)!
+
+    const edited = await studio.runQuery({ sql: `SELECT period, sum(mrr) AS mrr FROM ${source} WHERE channel <> 'Partner' GROUP BY 1`, actor: 'user', viewFromStepId: step.id })
+    expect(describeView(edited.dataset)).toBe('line chart: sum(mrr) by period')
+
+    const reshaped = await studio.runQuery({ sql: `SELECT region, count(*) AS n FROM ${source} GROUP BY 1`, actor: 'user', viewFromStepId: step.id })
+    expect(describeView(reshaped.dataset)).not.toContain('line chart')
+  }, 30_000)
+
+  it('shows a step\'s dataset as it was after that step, even after later steps changed it', async () => {
+    const { call, studio, store } = await connect()
+    await call('query', {
+      sql: `SELECT region, channel, sum(mrr) AS mrr FROM ${quoteLiteral(csvPath)} GROUP BY 1, 2`,
+      pivotConfig: { rowFields: ['region'], columnFields: ['channel'], valueFields: [{ field: 'mrr', aggregation: 'sum' }] },
+    })
+    const pivotStep = studio.recentSteps().at(-1)!
+    await call('configure_chart', { type: 'bar', xAxisField: 'region', yAxisField: 'mrr', aggregation: 'sum' })
+    expect(store.get()?.viewMode).toBe('chart')
+
+    const shown = await studio.showStep(pivotStep.id)
+    expect(describeView(shown)).toBe('pivot: sum(mrr) · rows region · columns channel')
+    // Looking at a step is not a step.
+    expect(studio.recentSteps().at(-1)?.tool).toBe('configure_chart')
+    await expect(studio.showStep('nope')).rejects.toThrow('no data')
+  }, 30_000)
+
+  it('reopens a saved pull from the Studio with its view', async () => {
+    const { call, studio } = await connect()
+    await call('load_data', { name: 'Signups', rows: [{ month: 'Jan', n: 3 }, { month: 'Feb', n: 5 }], chartConfig: { type: 'line', xAxisField: 'month', yAxisField: 'n' } })
+    const saved = studio.history.list(1)[0]
+
+    const reopened = await studio.reopen(saved.id, { actor: 'user' })
+    expect(reopened.rows).toHaveLength(2)
+    expect(studio.recentSteps().at(-1)).toMatchObject({ actor: 'user', tool: 'history', view: 'line chart: sum(n) by month' })
+    await expect(studio.reopen('missing', { actor: 'user' })).rejects.toThrow('No saved pull')
+  })
 
   it('charts the result of SQL over a file, without its rows entering the reply', async () => {
     const { call } = await connect()

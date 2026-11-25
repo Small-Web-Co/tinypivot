@@ -24,9 +24,9 @@ export const harnesses: HarnessSetup[] = [
   {
     id: 'terminal',
     label: 'Claude Code, OpenCode, pi, Codex',
-    summary: 'Unicode charts and pivot cards in the terminal, plus a live Data IDE on localhost.',
+    summary: 'Chart and pivot cards in the terminal. The first data step opens TinyPivot Studio in your browser.',
     filename: 'shell',
-    code: `# Wire every harness it finds:\n${INIT_COMMAND}\n\n# Or add it to Claude Code by hand:\nclaude mcp add tinypivot -- npx -y ${MCP_SPEC} --open`,
+    code: `# Wire every harness it finds:\n${INIT_COMMAND}\n\n# Or add it to Claude Code by hand:\nclaude mcp add tinypivot -- npx -y ${MCP_SPEC}`,
   },
   {
     id: 'claude-desktop',
@@ -70,7 +70,7 @@ export const harnesses: HarnessSetup[] = [
 ]
 
 export const tools = [
-  { name: 'open_tinypivot', role: 'Open the Data IDE', desc: 'Opens the Chart / Pivot / Data view. With no arguments it loads sample data.' },
+  { name: 'open_tinypivot', role: 'Open the Studio', desc: 'Opens the Chart / Pivot / Data view. With no arguments it loads sample data.' },
   { name: 'load_file', role: 'Local files', desc: 'Loads a CSV, TSV or JSON file, including exports from BigQuery, Snowflake, MySQL, DuckDB or Databricks. Rows stay out of context.' },
   { name: 'load_data', role: 'Rows from other tools', desc: 'Takes JSON rows from Stripe, GitHub, an API or another SQL MCP server and renders a chart and pivot.' },
   { name: 'configure_pivot', role: 'Exact pivots', desc: 'Sums, averages, medians and totals computed by TinyPivot, not by the model.' },
