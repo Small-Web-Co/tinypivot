@@ -1,0 +1,55 @@
+{
+  "name": "tinypivot",
+  "displayName": "TinyPivot",
+  "version": "0.6.0",
+  "description": "Data analysis studio inside Claude — turn CSV, TSV, JSON, JSONL, API/MCP outputs, and SQL results from any database into interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, and Excel exports.",
+  "author": {
+    "name": "Small Web, LLC",
+    "url": "https://tiny-pivot.com"
+  },
+  "homepage": "https://tiny-pivot.com/mcp",
+  "repository": "https://github.com/Small-Web-Co/tinypivot",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "keywords": [
+    "tinypivot",
+    "mcp",
+    "mcp-app",
+    "charts",
+    "pivot-table",
+    "data-grid",
+    "analytics",
+    "terminal-ui",
+    "csv",
+    "sql",
+    "bigquery",
+    "snowflake",
+    "postgres",
+    "excel"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://tiny-pivot.com/mcp",
+  "supportUrl": "https://github.com/Small-Web-Co/tinypivot/issues",
+  "privacyPolicyUrl": "https://tiny-pivot.com/privacy",
+  "termsOfServiceUrl": "https://tiny-pivot.com/terms",
+  "channels": [
+    {
+      "server": "tinypivot",
+      "displayName": "TinyPivot Studio"
+    }
+  ],
+  "network": {
+    "hosts": [
+      "registry.npmjs.org",
+      "tiny-pivot.com",
+      "www.tiny-pivot.com"
+    ]
+  },
+  "userConfig": {
+    "license_key": {
+      "type": "string",
+      "title": "TinyPivot license key",
+      "description": "Optional Pro or Team key (TP-MCPP-… or TP-MCPT-…). Leave empty for the free tier.",
+      "sensitive": true
+    }
+  }
+}

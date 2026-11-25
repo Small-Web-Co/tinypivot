@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "tinypivot": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smallwebco/tinypivot-mcp@0.6.0"
+      ],
+      "env": {
+        "TINYPIVOT_LICENSE_KEY": "${user_config.license_key}"
+      }
+    }
+  }
+}
