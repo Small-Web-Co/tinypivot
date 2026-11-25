@@ -1010,6 +1010,13 @@
   box-shadow: 0 14px 30px -18px rgb(17 17 17 / 0.45);
 }
 
+.vpg-theme-paper,
+.vpg-theme-paper *,
+.vpg-theme-paper *::before,
+.vpg-theme-paper *::after {
+  border-radius: 0 !important;
+}
+
 /* ==========================================================================
    Greenbar (ledger printer paper)
    ========================================================================== */
@@ -1067,6 +1074,13 @@
 .vpg-theme-greenbar .vpg-cell,
 .vpg-theme-greenbar .vpg-pivot-table td {
   font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+}
+
+.vpg-theme-greenbar,
+.vpg-theme-greenbar *,
+.vpg-theme-greenbar *::before,
+.vpg-theme-greenbar *::after {
+  border-radius: 0 !important;
 }
 
 /* ==========================================================================
@@ -1191,6 +1205,13 @@
   box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 34px -8px rgb(255 176 0 / 0.38);
 }
 
+.vpg-theme-crt-amber,
+.vpg-theme-crt-amber *,
+.vpg-theme-crt-amber *::before,
+.vpg-theme-crt-amber *::after {
+  border-radius: 0 !important;
+}
+
 .vpg-data-grid.vpg-theme-crt-amber::after {
   content: '';
   position: absolute;
@@ -1259,6 +1280,13 @@
   font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
   text-shadow: 0 0 7px rgb(53 214 137 / 0.36);
   box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 34px -8px rgb(53 214 137 / 0.36);
+}
+
+.vpg-theme-crt-green,
+.vpg-theme-crt-green *,
+.vpg-theme-crt-green *::before,
+.vpg-theme-crt-green *::after {
+  border-radius: 0 !important;
 }
 
 .vpg-data-grid.vpg-theme-crt-green::after {

@@ -104,7 +104,8 @@ describe('unified themes', () => {
 
   it('glows on every chart type for CRT looks', () => {
     const look = getChartLook('crt-green', 'crt-green')
-    expect(look.fillMode).toBe('gradient')
+    expect(look.fillMode).toBe('solid')
+    expect(look.barRadius).toBe(0)
     expect(chartGlowApplies(look, 'bar')).toBe(true)
     expect(chartGlowApplies(look, 'pie')).toBe(true)
   })
@@ -112,8 +113,18 @@ describe('unified themes', () => {
   it('takes the surface from the grid theme and the style from the chart preset', () => {
     const look = getChartLook('slate', 'paper')
     expect(look.surfaceColor).toBe('#ffffff')
-    expect(look.fillMode).toBe('gradient')
-    expect(look.barRadius).toBe(6)
+    expect(look.barRadius).toBe(0)
+    expect(look.barOpacity).toBe(1)
+  })
+})
+
+describe('unified chart marks', () => {
+  it('are flat and square in every unified theme', () => {
+    for (const id of UNIFIED_THEME_IDS) {
+      const look = getChartLook(id, id)
+      expect(look.barRadius).toBe(0)
+      expect(['solid', 'pattern']).toContain(look.fillMode)
+    }
   })
 })
 

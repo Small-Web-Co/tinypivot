@@ -17,6 +17,16 @@ const ROOTS = ['.vpg-data-grid', '.vpg-pivot-config', '.vpg-pivot-skeleton', '.v
 
 const MONO = `ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace`
 
+/** Square every corner inside a theme: the flat, hard-edged look. */
+function squareCorners(id) {
+  return `.vpg-theme-${id},
+.vpg-theme-${id} *,
+.vpg-theme-${id} *::before,
+.vpg-theme-${id} *::after {
+  border-radius: 0 !important;
+}`
+}
+
 /** Token order matches the brand themes above the marker. */
 const themes = [
   {
@@ -66,7 +76,9 @@ const themes = [
 .vpg-data-grid.vpg-theme-${id} {
   border-color: #111111;
   box-shadow: 0 14px 30px -18px rgb(17 17 17 / 0.45);
-}`,
+}
+
+${squareCorners(id)}`,
   },
   {
     id: 'greenbar',
@@ -120,7 +132,9 @@ const themes = [
 .vpg-theme-${id} .vpg-cell,
 .vpg-theme-${id} .vpg-pivot-table td {
   font-family: ${MONO};
-}`,
+}
+
+${squareCorners(id)}`,
   },
   {
     id: 'onebit',
@@ -171,12 +185,7 @@ const themes = [
   box-shadow: 6px 6px 0 #111111;
 }
 
-.vpg-theme-${id},
-.vpg-theme-${id} *,
-.vpg-theme-${id} *::before,
-.vpg-theme-${id} *::after {
-  border-radius: 0 !important;
-}
+${squareCorners(id)}
 
 /* A 4px checkerboard stands in for mid-grey on the toolbar. */
 .vpg-theme-${id} .vpg-toolbar {
@@ -284,6 +293,8 @@ function crtExtra(id, glow) {
   text-shadow: 0 0 7px ${glow};
   box-shadow: 0 0 0 1px var(--vpg-border-default), 0 0 34px -8px ${glow};
 }
+
+${squareCorners(id)}
 
 .vpg-data-grid.vpg-theme-${id}::after {
   content: '';

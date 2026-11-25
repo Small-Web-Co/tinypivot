@@ -1021,11 +1021,11 @@ A unified theme styles the grid, pivot table and charts as one. Set it once on `
 
 | Theme | Surface | Charts |
 |---|---|---|
-| `paper` | Warm paper, black ink, orange accent | Gradient fills, rounded bars |
-| `greenbar` | Ledger printer paper with green stripes | Gradient fills, rounded bars |
+| `paper` | Warm paper, black ink, orange accent | Flat fills, square bars |
+| `greenbar` | Ledger printer paper with green stripes | Flat fills, square bars |
 | `onebit` | One ink, square corners, hard shadow | Pattern fills instead of colour |
-| `crt-amber` | Dark amber phosphor with scanlines | Glowing marks |
-| `crt-green` | Dark green phosphor with scanlines | Glowing marks |
+| `crt-amber` | Dark amber phosphor with scanlines | Flat marks with glow |
+| `crt-green` | Dark green phosphor with scanlines | Flat marks with glow |
 
 The same five ids are valid `chartTheme` values, so `<DataGrid theme="slate" chartTheme="paper" />` also works. The MCP widget and terminal output use the same names.
 

@@ -417,7 +417,6 @@ export function ChartBuilder({
     const mutedColor = look.mutedColor
     const hairlineColor = look.hairlineColor
     const patternFill = chartPatternFill(look, MAX_PATTERNED_SERIES)
-    const usesGradientMarks = look.fillMode === 'gradient'
     const isLineOrArea = config.type === 'line' || config.type === 'area'
     const isBarLike = config.type === 'bar' || config.type === 'stackedBar'
     const isStacked = config.type === 'stackedBar' || (Boolean(options.stacked) && ['bar', 'area'].includes(config.type))
@@ -558,22 +557,9 @@ export function ChartBuilder({
                 stops: [0, 95, 100],
               },
             }
-          : usesGradientMarks && (isBarLike || config.type === 'pie' || config.type === 'donut')
-            ? {
-                type: 'gradient',
-                gradient: {
-                  shade: 'light',
-                  type: 'vertical',
-                  shadeIntensity: 0.22,
-                  inverseColors: false,
-                  opacityFrom: 1,
-                  opacityTo: 0.86,
-                  stops: [0, 100],
-                },
-              }
-            : {
-                opacity: isStacked ? 1 : isBarLike ? look.barOpacity : 1,
-              },
+          : {
+              opacity: isStacked ? 1 : isBarLike ? look.barOpacity : 1,
+            },
       ...(isBarLike
         ? {
             plotOptions: {

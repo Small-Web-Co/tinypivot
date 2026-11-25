@@ -93,7 +93,7 @@ const capabilities = [
           </h2>
           <p class="lede">
             Pick a theme. The grid, the pivot and the chart restyle together, and the terminal prints the same data in the same colours.
-            Rich surfaces get gradients, glow and smooth curves; the terminal gets the best it can draw.
+            Rich surfaces get crisp flat marks, smooth lines and hover detail; the terminal gets the best it can draw.
           </p>
         </header>
         <ThemeShowcase v-if="isMounted" />

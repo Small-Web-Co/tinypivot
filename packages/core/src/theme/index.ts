@@ -42,7 +42,7 @@ export function resolveChartTheme(
 }
 
 /** How bars, pie slices and other filled marks are painted. */
-export type ChartFillMode = 'solid' | 'gradient' | 'pattern'
+export type ChartFillMode = 'solid' | 'pattern'
 
 /** ApexCharts pattern names, cycled per series by the 1-bit look. */
 export type ChartPatternStyle = 'verticalLines' | 'horizontalLines' | 'slantedLines' | 'squares' | 'circles'
@@ -171,10 +171,11 @@ function legacyStyle(isDark: boolean): ChartStyle {
   }
 }
 
-const RICH_STYLE: ChartStyle = {
-  fillMode: 'gradient',
+/** Flat, square marks at full opacity: the shared base for the unified themes. */
+const FLAT_STYLE: ChartStyle = {
+  fillMode: 'solid',
   patternStyles: [],
-  barRadius: 6,
+  barRadius: 0,
   barOpacity: 1,
   markStrokeWidth: 0,
   curve: 'monotoneCubic',
@@ -186,16 +187,15 @@ const RICH_STYLE: ChartStyle = {
 }
 
 const CRT_STYLE: ChartStyle = {
-  ...RICH_STYLE,
-  barRadius: 3,
+  ...FLAT_STYLE,
   areaOpacityFrom: 0.5,
   gridDash: 2,
   glow: { blur: 10, opacity: 0.55, lineOnly: false },
 }
 
 const UNIFIED_STYLE: Record<UnifiedThemeId, ChartStyle> = {
-  'paper': RICH_STYLE,
-  'greenbar': { ...RICH_STYLE, gridDash: 2 },
+  'paper': FLAT_STYLE,
+  'greenbar': { ...FLAT_STYLE, gridDash: 2 },
   'onebit': {
     fillMode: 'pattern',
     // The first series stays solid ink; later series cycle through these.
