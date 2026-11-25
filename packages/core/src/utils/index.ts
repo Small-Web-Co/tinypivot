@@ -4,6 +4,25 @@
  */
 import type { ColumnStats, DateFormat, FieldStats, NumberFormat } from '../types'
 
+/** Three numeric parts split by -, / or . (2024-03-05, 3/5/2024, 05.03.2024), with an optional time. */
+const NUMERIC_DATE_RE = /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}(?:[T ,]|$)/
+/** A month name next to a number: "Mar 5, 2024", "5 March 2024", "Tue, 05 Mar 2024 10:00:00 GMT". */
+const MONTH_NAME_DATE_RE = /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,? \d|\d,? (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i
+
+/**
+ * Whether a value is a date. `Date.parse` alone is far too generous: JavaScript engines read
+ * "ORD-000001", "Team 5" and "order 12" as dates, which turned ID columns into date columns.
+ * A string counts only when it is written like a date and also parses as one.
+ */
+export function looksLikeDate(value: unknown): boolean {
+  if (value instanceof Date)
+    return !Number.isNaN(value.getTime())
+  if (typeof value !== 'string')
+    return false
+  const text = value.trim()
+  return (NUMERIC_DATE_RE.test(text) || MONTH_NAME_DATE_RE.test(text)) && !Number.isNaN(Date.parse(text))
+}
+
 /**
  * Detect column data type from values
  */
@@ -24,7 +43,7 @@ export function detectColumnType(values: unknown[]): ColumnStats['type'] {
     else if (typeof val === 'number' || (!Number.isNaN(Number(val)) && val !== '')) {
       numberCount++
     }
-    else if (val instanceof Date || !Number.isNaN(Date.parse(String(val)))) {
+    else if (looksLikeDate(val)) {
       dateCount++
     }
   }
@@ -98,7 +117,7 @@ export function getColumnUniqueValues<T>(
           numericMax = num
       }
       // Track date min/max
-      if (value instanceof Date || (typeof value === 'string' && !Number.isNaN(Date.parse(String(value))))) {
+      if (looksLikeDate(value)) {
         const dateObj = value instanceof Date ? value : new Date(String(value))
         if (!Number.isNaN(dateObj.getTime())) {
           const isoStr = dateObj.toISOString().split('T')[0]

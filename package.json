@@ -1,7 +1,7 @@
 {
   "name": "tinypivot-monorepo",
   "type": "module",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "packageManager": "pnpm@10.34.3",
   "description": "TinyPivot — Interactive Data IDE for AI Agents (MCP App) + Lightweight React & Vue 3 Data Grid, Pivot Tables, Charts & AI Analyst.",

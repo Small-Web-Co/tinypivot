@@ -15,6 +15,7 @@ import type {
   FieldRole,
   FieldRoleOverrides,
 } from '../types'
+import { looksLikeDate } from '../utils'
 
 /**
  * Chart type definitions with metadata
@@ -245,7 +246,7 @@ export function detectFieldRole(
         jsNumberCount++
       }
     }
-    if (val instanceof Date || (typeof val === 'string' && !Number.isNaN(Date.parse(val)) && val.includes('-'))) {
+    if (looksLikeDate(val)) {
       dateCount++
     }
   }

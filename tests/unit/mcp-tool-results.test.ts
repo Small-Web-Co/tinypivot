@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTinyPivotMcpServer } from '../../packages/mcp/src/index'
+import { INTERACTIVE_ROW_LIMIT, ROW_PAGE_SIZE } from '../../packages/mcp/src/limits'
 
 const WIDGET_ONLY_TOOLS = ['fetch_dataset_rows', 'set_session_model', 'record_local_action', 'get_datasets_state']
 const ROWS = Array.from({ length: 300 }, (_, i) => ({
@@ -118,5 +119,40 @@ describe('the card a load answers with', () => {
 
     expect(textOf(result)).toContain('· Bar')
     expect(textOf(result)).not.toContain('Trend')
+  })
+})
+
+describe('paging a large dataset into the widget', () => {
+  beforeEach(() => {
+    vi.stubEnv('TINYPIVOT_TELEMETRY', '0')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('serves rows page by page so the widget can load past its first request', async () => {
+    const total = ROW_PAGE_SIZE + 40
+    const { server } = createTinyPivotMcpServer({ licenseKey: 'TP-MCPP-TESTKEY1-20991231' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const client = new Client({ name: 'test-host', version: '1.0.0' }, { capabilities: { extensions: { 'io.modelcontextprotocol/ui': {} } } })
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+
+    await client.callTool({
+      name: 'load_data',
+      arguments: { name: 'big', rows: Array.from({ length: total }, (_, i) => ({ id: i, mrr: i % 9 })) },
+    })
+    const page = async (offset: number) => (await client.callTool({
+      name: 'fetch_dataset_rows',
+      arguments: { offset, limit: ROW_PAGE_SIZE },
+    })).structuredContent as { rows: Array<{ id: number }>, totalRows: number }
+
+    const first = await page(0)
+    const second = await page(ROW_PAGE_SIZE)
+    expect(first.totalRows).toBe(total)
+    expect(first.rows).toHaveLength(ROW_PAGE_SIZE)
+    expect(second.rows.map(row => row.id)).toEqual(Array.from({ length: 40 }, (_, i) => ROW_PAGE_SIZE + i))
+    expect(INTERACTIVE_ROW_LIMIT).toBeGreaterThanOrEqual(ROW_PAGE_SIZE)
   })
 })

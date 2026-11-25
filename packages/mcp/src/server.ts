@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
+import { ROW_PAGE_SIZE } from './limits.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { chartConfigFromPivot, DatasetStore, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
@@ -322,7 +323,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.2.7',
+      version: '0.2.8',
     },
     {
       capabilities: {
@@ -931,7 +932,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       inputSchema: {
         datasetId: z.string().optional(),
         offset: z.number().int().min(0).default(0),
-        limit: z.number().int().min(1).max(25000).default(10000),
+        limit: z.number().int().min(1).max(ROW_PAGE_SIZE).default(10000),
       },
       _meta: APP_ONLY_META,
     },

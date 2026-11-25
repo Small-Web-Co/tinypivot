@@ -273,6 +273,7 @@ export {
   formatNumber,
   getColumnUniqueValues,
   getDatePlaceholder,
+  looksLikeDate,
   makeKey,
   naturalSort,
   parseDateInput,

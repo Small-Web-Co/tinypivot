@@ -7,6 +7,7 @@ import {
 } from '@smallwebco/tinypivot-core'
 import { DataGrid, enableDemoMode, setLicenseKey } from '@smallwebco/tinypivot-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { INTERACTIVE_ROW_LIMIT, ROW_PAGE_SIZE } from '../src/limits'
 
 interface DatasetMeta {
   id: string
@@ -331,6 +332,25 @@ export function McpApp() {
     }
   }, [applyLicense])
 
+  /** Pages in the rest of a dataset after its first page, up to the interactive limit. */
+  const fetchRemainingRows = useCallback(async (app: App, id: string, loaded: number, total: number) => {
+    const target = Math.min(total, INTERACTIVE_ROW_LIMIT)
+    let offset = loaded
+    while (offset < target) {
+      setStatusNote(`Streaming dataset locally… ${offset.toLocaleString()} of ${target.toLocaleString()} rows`)
+      const res = await app.callServerTool({
+        name: 'fetch_dataset_rows',
+        arguments: { datasetId: id, offset, limit: Math.min(ROW_PAGE_SIZE, target - offset) },
+      })
+      const page = (res.structuredContent as ToolPayload | undefined)?.rows ?? []
+      if (page.length === 0)
+        break
+      setRows(previous => previous.concat(page))
+      offset += page.length
+    }
+    setStatusNote(null)
+  }, [])
+
   const fetchAllRowsMcp = useCallback(async (id?: string) => {
     const app = appRef.current
     if (!app)
@@ -339,11 +359,12 @@ export function McpApp() {
       setStatusNote('Streaming dataset locally…')
       const res = await app.callServerTool({
         name: 'fetch_dataset_rows',
-        arguments: { ...(id ? { datasetId: id } : {}), offset: 0, limit: 25000 },
+        arguments: { ...(id ? { datasetId: id } : {}), offset: 0, limit: ROW_PAGE_SIZE },
       })
       const sc = res.structuredContent as ToolPayload | undefined
       if (sc?.rows) {
         await applyPayload(sc)
+        await fetchRemainingRows(app, sc.datasetId, sc.rows.length, sc.totalRows)
       }
       else {
         setLicenseReady(true)
@@ -356,7 +377,7 @@ export function McpApp() {
       setLoading(false)
       setStatusNote(`Could not fetch dataset rows: ${err instanceof Error ? err.message : String(err)}`)
     }
-  }, [applyPayload])
+  }, [applyPayload, fetchRemainingRows])
 
   const trackLocalAction = useCallback((id?: string) => {
     const fallbackAdd = Math.round((tokenStats?.estimatedDatasetTokens ?? 0) * 0.1) + 2500
@@ -656,17 +677,19 @@ export function McpApp() {
     try {
       const res = await app.callServerTool({
         name: 'fetch_dataset_rows',
-        arguments: { datasetId: nextId, offset: 0, limit: 25000 },
+        arguments: { datasetId: nextId, offset: 0, limit: ROW_PAGE_SIZE },
       })
       const sc = res.structuredContent as ToolPayload | undefined
-      if (sc)
+      if (sc) {
         await applyPayload(sc)
+        await fetchRemainingRows(app, sc.datasetId, sc.rows?.length ?? 0, sc.totalRows)
+      }
     }
     catch (err) {
       setStatusNote(`Failed to switch dataset: ${err instanceof Error ? err.message : String(err)}`)
       setLoading(false)
     }
-  }, [applyPayload, transportMode])
+  }, [applyPayload, transportMode, fetchRemainingRows])
 
   const handleCellClick = useCallback((payload: { row: number, col: number, value: unknown, rowData: Record<string, unknown> }) => {
     const preview = Object.entries(payload.rowData)
@@ -1085,6 +1108,24 @@ export function McpApp() {
           >
             Unlock unlimited rows →
           </button>
+        </div>
+      )}
+
+      {!loading && !statusNote && rows.length > 0 && rows.length < totalRows && (
+        <div className="tp-mcp-truncation-banner" role="alert">
+          <span className="tp-mcp-truncation-text">
+            <strong>Large dataset</strong>
+            {' · '}
+            This view holds the first
+            {' '}
+            <strong>{rows.length.toLocaleString()}</strong>
+            {' '}
+            of
+            {' '}
+            <strong>{totalRows.toLocaleString()}</strong>
+            {' '}
+            rows, so charts and totals here cover that part only. The summary your agent received was computed on every row.
+          </span>
         </div>
       )}
 

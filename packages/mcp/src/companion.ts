@@ -4,6 +4,7 @@ import type { DatasetStore } from './store.js'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
+import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { getCompanionSessionFile } from './tui.js'
 
@@ -63,7 +64,7 @@ function buildFullCompanionPayload(
     sourceTotalRows: ds.sourceTotalRows,
     truncatedForFreeTier: ds.truncatedForFreeTier,
     tier: isPro ? 'pro' : 'free',
-    rows: ds.rows.slice(0, 25000),
+    rows: ds.rows.slice(0, INTERACTIVE_ROW_LIMIT),
     hasMoreRows: false,
     columns: ds.columns,
     viewMode: ds.viewMode,

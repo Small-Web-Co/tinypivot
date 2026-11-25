@@ -12,6 +12,7 @@ import {
   formatNumber,
   getColumnUniqueValues,
   getDatePlaceholder,
+  looksLikeDate,
   makeKey,
   naturalSort,
   parseDateInput,
@@ -375,5 +376,26 @@ describe('getColumnUniqueValues for date columns', () => {
     expect(result.type).toBe('date')
     expect(result.dateMin).toBe('2024-01-15')
     expect(result.dateMax).toBe('2024-06-20')
+  })
+})
+
+describe('looksLikeDate', () => {
+  it('accepts values written as dates', () => {
+    for (const value of ['2024-03-05', '2024-03-05T10:30:00Z', '2024-03-05 10:30', '3/5/2024', '05.03.2024', 'Mar 5, 2024', '5 March 2024', 'Tue, 05 Mar 2024 10:00:00 GMT'])
+      expect(looksLikeDate(value), value).toBe(true)
+    expect(looksLikeDate(new Date('2024-03-05'))).toBe(true)
+  })
+
+  it('rejects ids and labels that JavaScript would still parse as dates', () => {
+    for (const value of ['ORD-000001', 'ORD-000032', 'A-1', 'Team 5', 'order 12', '2025-01', 'Q1 2025', 'North America', '12'])
+      expect(looksLikeDate(value), value).toBe(false)
+    expect(looksLikeDate(20240305)).toBe(false)
+    expect(looksLikeDate(new Date('nope'))).toBe(false)
+  })
+
+  it('keeps an id column a text column', () => {
+    const ids = Array.from({ length: 100 }, (_, i) => `ORD-${String(i + 1).padStart(6, '0')}`)
+    expect(detectColumnType(ids)).toBe('string')
+    expect(detectColumnType(['2024-03-05', '2024-03-06', '2024-03-07'])).toBe('date')
   })
 })
