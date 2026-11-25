@@ -48,7 +48,7 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 
 ### Honest, Cache-Aware Token Savings
 
-- **`load_file` and `query_postgres` (direct ingestion):** Raw rows stream locally to the UI iframe and Companion IDE at **0 LLM tokens**; only a compact ~200-token schema and deterministic summary return to the model.
+- **`load_file` and `query_postgres` (direct ingestion):** Raw rows stream locally to the UI iframe and Companion IDE at **0 LLM tokens**; only a short summary (a few hundred tokens: the chart card plus column notes) returns to the model.
 - **Zero-token local exploration:** Every click inside the UI — switching Chart ↔ Pivot ↔ Data, sorting, filtering, changing themes, or double-click Drill-Through — runs locally in the browser/iframe for **$0** instead of burning another LLM round-trip.
 - **Honest accounting:** Inline `load_data` calls (where rows already entered context) report `0` ingestion bypass savings rather than inflating numbers.
 

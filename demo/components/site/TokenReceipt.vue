@@ -9,8 +9,8 @@ const lines = [
   { sign: '-', label: `${fmt(workload.rows)} rows pasted into context`, tokens: e.pasted },
   { sign: '-', label: `${workload.followUps} follow-ups re-read them (cached)`, tokens: e.rereads },
   { sign: '-', label: `${workload.followUps} tables rewritten by the model`, tokens: e.rewrites },
-  { sign: '+', label: 'tinypivot schema summary, re-read too', tokens: e.withInput },
-  { sign: '+', label: `${workload.followUps} follow-ups as local clicks`, tokens: 0 },
+  { sign: '+', label: `${workload.followUps + 1} tinypivot replies, re-read (cached)`, tokens: e.withInput },
+  { sign: '+', label: 'chart cards reprinted by the model', tokens: e.withOutput },
 ] as const
 </script>
 

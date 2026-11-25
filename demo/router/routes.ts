@@ -97,7 +97,7 @@ export const routeDefinitions = [
     component: () => import('../pages/Home.vue'),
     meta: {
       title: 'TinyPivot — Charts & pivot tables inside your AI agent, without the token bill',
-      description: 'MCP server that renders interactive charts, pivot tables and drill-through inside Claude, Cursor, Antigravity, OpenCode and pi. The model gets a ~200-token schema; rows stay local.',
+      description: 'MCP server that renders interactive charts, pivot tables and drill-through inside Claude, Cursor, Antigravity, OpenCode and pi. The model gets a short summary; rows stay local.',
     },
   },
   {

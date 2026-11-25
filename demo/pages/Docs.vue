@@ -3,7 +3,7 @@ import CodeBlock from '../components/site/CodeBlock.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import SavingsCalculator from '../components/site/SavingsCalculator.vue'
 import { harnesses, prompts, telemetryEnvVars, tools } from '../site/docs'
-import { CACHED_REREAD_FACTOR, OUTPUT_TOKENS_PER_REWRITE, SCHEMA_SUMMARY_TOKENS, TOKENS_PER_CELL } from '../site/savings'
+import { CACHED_REREAD_FACTOR, CARD_ECHO_TOKENS, OUTPUT_TOKENS_PER_REWRITE, TOKENS_PER_CELL, TOOL_REPLY_TOKENS } from '../site/savings'
 import { useCopy } from '../site/useCopy'
 
 const toc = [
@@ -117,8 +117,9 @@ const { copiedKey, copy } = useCopy()
           <SavingsCalculator />
           <p class="method">
             Assumes ~{{ TOKENS_PER_CELL }} tokens per cell, cached re-reads billed at {{ CACHED_REREAD_FACTOR * 100 }}% of input price,
-            ~{{ OUTPUT_TOKENS_PER_REWRITE }} output tokens per rewritten table, and a ~{{ SCHEMA_SUMMARY_TOKENS }}-token schema summary with TinyPivot.
-            If you already aggregate down to a handful of rows in SQL before the model sees them, the raw-row savings shrink; you still skip the re-prompting for every new chart or slice.
+            and ~{{ OUTPUT_TOKENS_PER_REWRITE }} output tokens per rewritten table. With TinyPivot, every question is a tool call whose reply adds
+            ~{{ TOOL_REPLY_TOKENS }} tokens (measured on a 2,000-row, 6-column file), and in a terminal the model reprints the card, ~{{ CARD_ECHO_TOKENS }} output tokens per answer.
+            If you already aggregate down to a handful of rows in SQL before the model sees them, there is little or nothing to save.
           </p>
         </section>
 

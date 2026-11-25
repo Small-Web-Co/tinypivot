@@ -21,13 +21,15 @@ const pastedSegments: UnitSegment[] = [
   { label: 'Re-read on follow-ups', value: e.rereads, fill: 'dither' },
   { label: 'Tables rewritten', value: e.rewrites, fill: 'accent' },
 ]
+const withTotal = e.withInput + e.withOutput
 const summarySegments: UnitSegment[] = [
-  { label: 'Schema summary', value: e.withInput, fill: 'ink' },
+  { label: 'TinyPivot replies', value: e.withInput, fill: 'ink' },
+  { label: 'Cards reprinted', value: e.withOutput, fill: 'accent' },
 ]
 
 const panels = [
   { id: 'pasted', title: 'Pasted into chat', total: withoutTotal, cells: allocateCells(pastedSegments, tokensPerCell, CELLS) },
-  { id: 'tinypivot', title: 'With TinyPivot', total: e.withInput, cells: allocateCells(summarySegments, tokensPerCell, CELLS) },
+  { id: 'tinypivot', title: 'With TinyPivot', total: withTotal, cells: allocateCells(summarySegments, tokensPerCell, CELLS) },
 ] as const
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US')

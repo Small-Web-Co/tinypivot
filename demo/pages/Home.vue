@@ -143,7 +143,7 @@ const capabilities = [
           </h2>
           <p class="lede">
             Pasting a query result into chat bills you for every cell, then again on each follow-up.
-            With TinyPivot the rows stream straight to the UI, and re-slicing them is a local click.
+            With TinyPivot the rows stay on your machine. Each question costs a short reply, and re-slicing in the Data IDE costs nothing.
           </p>
           <router-link to="/docs#savings" class="text-link">
             Run the numbers for your own workload →
