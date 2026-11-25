@@ -22,7 +22,7 @@ Everything below is ready in the repository unless a line says **You**.
 ## Before any submission
 
 - **Privacy and terms pages.** `https://tiny-pivot.com/privacy` and `https://tiny-pivot.com/terms` are added in this branch (`demo/site/legal.ts`). They go live with the next site deploy. Claude's, Codex's and Cursor's forms ask for them. Have someone qualified read both: they describe what the code does, but they are not legal advice, and the terms leave out governing law and a refund policy.
-- **License.** The plugin manifests say `MIT`, matching `packages/mcp/package.json`. The repository's `LICENSE.md` describes a free tier and a Pro tier. Make sure the license you settle on and the manifests' `license` field agree; directories show that field.
+- **License.** The manifests' `license` field is `SEE LICENSE IN LICENSE.md`, matching `packages/mcp/package.json` and the dual-license `packages/mcp/LICENSE.md` (a test keeps them in step). Some forms ask for an SPDX identifier; where one does, answer with the license file instead of `MIT`.
 - **Icon.** `packages/mcp/assets/icon.png` (512×512, the site's pivot-grid mark). Antigravity asks for about 10% padding and legibility on light and dark backgrounds: the mark has a cream background, so it reads on both.
 - **Versions.** Every manifest carries the MCP package version (0.6.0). `tests/unit/mcp-init.test.ts` fails if one of them drifts, so a release has to bump all of them: `packages/mcp/package.json`, `server.json`, `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `plugin.json`, the root `.claude-plugin/marketplace.json` and `gemini-extension.json`.
 
@@ -146,7 +146,7 @@ Listings (**You**, once the repository qualifies):
 
 ## Antigravity
 
-- `packages/mcp/plugin.json` (`displayName`, `logo`, three `suggestedPrompts`, …) and `packages/mcp/mcp_config.json` (now npx; it pointed at `dist/cli.js`, which is not in the repository). `agy plugin validate packages/mcp` passes with one warning it cannot avoid: it notices Claude Code's `.mcp.json` in the same folder.
+- `packages/mcp/plugin.json` (`displayName`, `logo`, three `suggestedPrompts`, …) and `packages/mcp/mcp_config.json` (now npx; it pointed at `dist/cli.js`, which is not in the repository). `agy plugin validate packages/mcp` passes with two warnings it cannot avoid: it notices Claude Code's `.mcp.json` and Cursor's `mcp.json` in the same folder and says it won't load them.
 - The marketplace (launched 2026-10-29) takes partner plugins only. **You:** fill in the interest form at https://forms.gle/2EX5RFYPoJe1UgxR9 (linked from https://antigravity.google/blog/plugin-marketplace-in-antigravity/).
 - The Antigravity MCP store has no documented submission process.
 - `init` keeps configuring the Antigravity IDE and CLI directly.

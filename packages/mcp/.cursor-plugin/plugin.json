@@ -9,7 +9,7 @@
   },
   "homepage": "https://tiny-pivot.com/mcp",
   "repository": "https://github.com/Small-Web-Co/tinypivot",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE.md",
   "keywords": ["tinypivot", "mcp", "charts", "pivot-table", "data-grid", "analytics", "csv", "sql", "excel"],
   "logo": "assets/icon.png"
 }

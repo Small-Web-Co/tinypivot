@@ -113,6 +113,13 @@ describe('plugin manifests for each agent marketplace', () => {
     }
   })
 
+  it('carry the MCP package license', async () => {
+    const { license } = await read('packages/mcp/package.json')
+    for (const file of ['packages/mcp/.claude-plugin/plugin.json', 'packages/mcp/.cursor-plugin/plugin.json', 'packages/mcp/.codex-plugin/plugin.json', 'packages/mcp/plugin.json'])
+      expect({ file, license: (await read(file)).license }).toEqual({ file, license })
+    expect((await read('.claude-plugin/marketplace.json')).plugins[0].license).toBe(license)
+  })
+
   it('carry the MCP package version, so a release updates every listing', async () => {
     const { version } = await read('packages/mcp/package.json')
     const versions = {
