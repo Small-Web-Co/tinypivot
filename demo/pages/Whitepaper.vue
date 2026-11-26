@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
+import TrustBenchmarkChart from '../components/site/TrustBenchmarkChart.vue'
 import TrustBenchmarkTable from '../components/site/TrustBenchmarkTable.vue'
 import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroStats } from '../site/whitepaper'
 </script>
@@ -75,6 +76,7 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
           </p>
         </header>
 
+        <TrustBenchmarkChart />
         <TrustBenchmarkTable />
 
         <div class="wp-findings">

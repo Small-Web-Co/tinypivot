@@ -26,7 +26,7 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
               TinyPivot Pro
             </th>
             <th scope="col">
-              Measured Pro Lift
+              Baseline → Pro Impact
             </th>
           </tr>
         </thead>
@@ -49,7 +49,24 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
               <span class="sub">{{ row.proMeta }}</span>
             </td>
             <td class="lift">
-              {{ row.proHighlight }}
+              <dl class="impact-list">
+                <div>
+                  <dt>Acc</dt>
+                  <dd>{{ row.impact.accuracy }}</dd>
+                </div>
+                <div>
+                  <dt>Speed</dt>
+                  <dd>{{ row.impact.speed }}</dd>
+                </div>
+                <div>
+                  <dt>Tok</dt>
+                  <dd>{{ row.impact.tokens }}</dd>
+                </div>
+                <div>
+                  <dt>Cost</dt>
+                  <dd>{{ row.impact.cost }}</dd>
+                </div>
+              </dl>
             </td>
           </tr>
         </tbody>
@@ -64,56 +81,71 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
               {{ TRUST_BENCH_TOTALS.proPassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.proPct }}%)
             </td>
             <td class="lift">
-              +{{ TRUST_BENCH_TOTALS.proPct - TRUST_BENCH_TOTALS.baselinePct }} pts vs baseline · lower output/cost on Pro
+              +{{ TRUST_BENCH_TOTALS.proPct - TRUST_BENCH_TOTALS.baselinePct }} pts vs baseline · faster on local &amp; stats · Sonnet cheaper than text-only Python
             </td>
           </tr>
         </tfoot>
       </table>
     </div>
 
-    <!-- Mobile stacked cards: spacious 1-row-per-arm layout for phones -->
+    <!-- Mobile cards: 3-across arms + 2x2 Speed / Tokens / Accuracy / Cost impact grid -->
     <div class="tbench-cards">
       <article v-for="row in trustBenchRows" :key="row.id" class="tb-card">
         <div class="tb-card-head">
           <strong>{{ row.model }}</strong>
           <span class="sub">{{ row.hardware }} · vs {{ row.baselineLabel }}</span>
         </div>
-        <div class="tb-arm-rows">
-          <div class="tb-arm-row">
+        <div class="tb-arms-3">
+          <div class="tb-arm-cell">
             <span class="tb-arm-lbl">Baseline</span>
             <span class="score">{{ row.baselineScore }} ({{ row.baselinePct }}%)</span>
-            <span class="tb-arm-meta">{{ row.baselineMeta }}</span>
+            <span class="tb-arm-short">{{ row.baselineShort }}</span>
           </div>
-          <div class="tb-arm-row">
-            <span class="tb-arm-lbl">TinyPivot Free</span>
+          <div class="tb-arm-cell">
+            <span class="tb-arm-lbl">TP Free</span>
             <span class="score">{{ row.freeScore }} ({{ row.freePct }}%)</span>
-            <span class="tb-arm-meta">{{ row.freeMeta }}</span>
+            <span class="tb-arm-short">{{ row.freeShort }}</span>
           </div>
-          <div class="tb-arm-row col-pro">
-            <span class="tb-arm-lbl">TinyPivot Pro</span>
+          <div class="tb-arm-cell col-pro">
+            <span class="tb-arm-lbl">TP Pro</span>
             <span class="score">{{ row.proScore }} ({{ row.proPct }}%)</span>
-            <span class="tb-arm-meta">{{ row.proMeta }}</span>
+            <span class="tb-arm-short">{{ row.proShort }}</span>
           </div>
         </div>
-        <p class="tb-card-lift">
-          {{ row.proHighlight }}
-        </p>
+        <dl class="tb-impact-grid">
+          <div class="tb-impact-cell">
+            <dt>Accuracy</dt>
+            <dd>{{ row.impact.accuracy }}</dd>
+          </div>
+          <div class="tb-impact-cell">
+            <dt>Speed</dt>
+            <dd>{{ row.impact.speed }}</dd>
+          </div>
+          <div class="tb-impact-cell">
+            <dt>Tokens</dt>
+            <dd>{{ row.impact.tokens }}</dd>
+          </div>
+          <div class="tb-impact-cell">
+            <dt>Cost</dt>
+            <dd>{{ row.impact.cost }}</dd>
+          </div>
+        </dl>
       </article>
       <div class="tb-card tb-card-total">
         <div class="tb-card-head">
           <strong>Combined ({{ TRUST_BENCH_TOTALS.totalModelTasks }} tasks/arm)</strong>
         </div>
-        <div class="tb-total-strip">
-          <div class="tb-total-pill">
+        <div class="tb-arms-3">
+          <div class="tb-arm-cell">
             <span class="tb-arm-lbl">Baseline</span>
             <span class="score">{{ TRUST_BENCH_TOTALS.baselinePassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.baselinePct }}%)</span>
           </div>
-          <div class="tb-total-pill">
-            <span class="tb-arm-lbl">TinyPivot Free</span>
+          <div class="tb-arm-cell">
+            <span class="tb-arm-lbl">TP Free</span>
             <span class="score">{{ TRUST_BENCH_TOTALS.freePassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.freePct }}%)</span>
           </div>
-          <div class="tb-total-pill col-pro">
-            <span class="tb-arm-lbl">TinyPivot Pro</span>
+          <div class="tb-arm-cell col-pro">
+            <span class="tb-arm-lbl">TP Pro</span>
             <span class="score">{{ TRUST_BENCH_TOTALS.proPassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.proPct }}%)</span>
           </div>
         </div>
@@ -179,52 +211,88 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
   color: var(--ink);
 }
 
-.tb-arm-rows {
-  display: grid;
-  gap: 6px;
-}
-
-.tb-arm-row {
-  display: grid;
-  grid-template-columns: 7.5rem auto;
-  gap: 2px 10px;
-  align-items: baseline;
-  padding: 8px 10px;
-  border: 1px solid var(--rule);
-}
-
-.tb-arm-lbl {
-  font-size: 0.64rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-muted);
-}
-
-.tb-arm-meta {
-  grid-column: 1 / -1;
-  font-size: 0.7rem;
-  line-height: 1.4;
-  color: var(--ink-muted);
-}
-
-.tb-total-strip {
+.tb-arms-3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
-.tb-total-pill {
-  padding: 8px;
+.tb-arm-cell {
+  padding: 8px 7px;
   border: 1px solid var(--rule);
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
-.tb-card-lift {
+.tb-arm-lbl {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.tb-arm-short {
+  font-size: 0.64rem;
+  line-height: 1.3;
+  color: var(--ink-muted);
+}
+
+.tb-impact-grid {
   margin: 0;
-  font-size: 0.74rem;
-  line-height: 1.45;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tb-impact-cell {
+  padding: 6px 8px;
+  border: 1px dashed var(--rule);
+  background: var(--paper-raised, var(--paper));
+}
+
+.tb-impact-cell dt {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent, var(--ink-muted));
+}
+
+.tb-impact-cell dd {
+  margin: 2px 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.impact-list {
+  margin: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.impact-list > div {
+  display: grid;
+  grid-template-columns: 3.1rem minmax(0, 1fr);
+  gap: 6px;
+  align-items: baseline;
+}
+
+.impact-list dt {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent, var(--ink-muted));
+}
+
+.impact-list dd {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
   color: var(--ink);
 }
 

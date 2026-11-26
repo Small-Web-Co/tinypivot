@@ -3,6 +3,13 @@
  * All figures come directly from reproducible multi-model benchmarks run on 2026-11-26.
  */
 
+export interface TrustBenchImpact {
+  accuracy: string
+  speed: string
+  tokens: string
+  cost: string
+}
+
 export interface TrustBenchModelRow {
   id: string
   model: string
@@ -11,13 +18,17 @@ export interface TrustBenchModelRow {
   baselineScore: string
   baselinePct: number
   baselineMeta: string
+  baselineShort: string
   freeScore: string
   freePct: number
   freeMeta: string
+  freeShort: string
   proScore: string
   proPct: number
   proMeta: string
+  proShort: string
   proHighlight: string
+  impact: TrustBenchImpact
 }
 
 export const TRUST_BENCH_DATE = '2026-11-26'
@@ -31,13 +42,22 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
     baselineScore: '2/6',
     baselinePct: 33,
     baselineMeta: '74.3s/task · 7.7 turns · 15.4k out (115k tot)',
+    baselineShort: '74.3s · 15.4k out',
     freeScore: '2/6',
     freePct: 33,
     freeMeta: '80.1s/task · 7.7 turns · 13.9k out (302k tot)',
+    freeShort: '80.1s · 13.9k out',
     proScore: '5/6',
     proPct: 83,
     proMeta: '80.9s/task · 6.7 turns · 14.6k out (298k tot)',
-    proHighlight: '+50 pts accuracy (matches Sonnet on Python) · 2× faster on A/B & regression · −5% output tok',
+    proShort: '80.9s · 14.6k out',
+    proHighlight: '+50 pts accuracy vs bare SQL (matches Sonnet on Python) · 2× faster on A/B & OLS · −5% output tok',
+    impact: {
+      accuracy: '+50 pts (33% → 83%)',
+      speed: '2× faster A/B & OLS (−1 turn)',
+      tokens: '−5% out vs SQL (−47% w/ mem)',
+      cost: '$0 local (Mac)',
+    },
   },
   {
     id: 'deepseek',
@@ -47,13 +67,22 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
     baselineScore: '5/6',
     baselinePct: 83,
     baselineMeta: '40.0s/task · 6.5 turns · 19.9k out (135k tot)',
+    baselineShort: '40.0s · 19.9k out',
     freeScore: '5/6',
     freePct: 83,
     freeMeta: '45.1s/task · 6.7 turns · 21.4k out (273k tot)',
+    freeShort: '45.1s · 21.4k out',
     proScore: '6/6',
     proPct: 100,
     proMeta: '36.2s/task · 6.5 turns · 15.7k out (234k tot)',
-    proHighlight: '+17 pts · 10% faster than bare SQL (20% faster than TinyPivot Free) · −21% output tok',
+    proShort: '36.2s · 15.7k out',
+    proHighlight: '+17 pts vs bare SQL · 10% faster overall (60% faster on A/B) · −21% output tok',
+    impact: {
+      accuracy: '+17 pts (83% → 100%)',
+      speed: '10% faster (40.0s → 36.2s)',
+      tokens: '−21% output vs bare SQL',
+      cost: '$0 local (DGX Spark)',
+    },
   },
   {
     id: 'haiku',
@@ -63,13 +92,22 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
     baselineScore: '6/6',
     baselinePct: 100,
     baselineMeta: '$0.0379 · 681k raw tok*',
+    baselineShort: '$0.0379 · text',
     freeScore: '6/6',
     freePct: 100,
     freeMeta: '$0.0673 · 1,192k raw tok*',
+    freeShort: '$0.0673 · charts',
     proScore: '6/6',
     proPct: 100,
     proMeta: '$0.0476 · 25.0s/task · 1,064k raw tok*',
-    proHighlight: '−29.3% cost & −10.7% tok vs TinyPivot Free (17.8s on A/B trap; beats Python on 3/6 tasks)',
+    proShort: '$0.0476 · 25.0s',
+    proHighlight: '100% parity + live Studio charts & lineage for +0.16¢/task vs text-only Python (cheaper on 3/6 tasks)',
+    impact: {
+      accuracy: '100% parity + charts & lineage',
+      speed: '25.0s avg (17.8s on A/B)',
+      tokens: 'Cheaper on 3/6 tasks vs Python',
+      cost: '+0.16¢/task vs text Python',
+    },
   },
   {
     id: 'sonnet',
@@ -79,13 +117,22 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
     baselineScore: '5/6',
     baselinePct: 83,
     baselineMeta: '$0.5677 · 505k raw tok*',
+    baselineShort: '$0.5677 · text',
     freeScore: '6/6',
     freePct: 100,
     freeMeta: '$0.9072 · 968k raw tok*',
+    freeShort: '$0.9072 · charts',
     proScore: '6/6',
     proPct: 100,
     proMeta: '$0.5407 · 31.6s/task · 748k raw tok*',
-    proHighlight: '100% vs 83% · cheaper than Python (−40.4% cost vs TinyPivot Free; 18.3s on A/B trap)',
+    proShort: '$0.5407 · 31.6s',
+    proHighlight: '+17 pts vs Python (100% vs 83%) · 4.8% cheaper than text-only Python + live Studio charts & lineage',
+    impact: {
+      accuracy: '+17 pts (83% → 100% vs Python)',
+      speed: '31.6s avg (18.3s on A/B)',
+      tokens: '−44% A/B · −36% Kitagawa cost',
+      cost: '−4.8% vs Python ($0.54 vs $0.57)',
+    },
   },
 ]
 
