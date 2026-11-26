@@ -178,17 +178,16 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
     <section class="block">
       <div class="wrap wp-prose">
         <p class="label">
-          05 · Why Free Now Has Unlimited Local Rows
+          05 · Why Free Includes Unlimited Local Rows
         </p>
         <h2 class="heading">
           Never truncate <em>a trust tool.</em>
         </h2>
         <p>
-          Previously, TinyPivot Free capped datasets at 2,500 rows. That cap worked against our core promise:
-          an analyst evaluating a trust layer on a 15,000-row CSV should never see partial totals. Starting today,
+          An analyst evaluating a trust layer on a 15,000-row CSV should never see partial totals.
           <strong>TinyPivot Free includes unlimited local rows</strong> (up to DuckDB’s safe memory cap), charts,
           pivots, DuckDB SQL, Studio IDE + Proof-of-Work Lineage, basic SQL guardrails, offline HTML export, and
-          <code>analyze(explain_change, ab_test)</code>.
+          <code>analyze(explain_change, ab_test)</code> — with no signup or trial clock.
         </p>
         <p>
           <strong>TinyPivot Pro</strong> gates the enterprise trust &amp; data science engine: deep relational and
