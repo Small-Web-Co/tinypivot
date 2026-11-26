@@ -37,11 +37,12 @@ const BASE_URL = 'https://tiny-pivot.com'
  */
 const EXCLUDED_PATHS = new Set(['/success'])
 
-function makeArticleJsonLd(title, url) {
+function makeArticleJsonLd(title, url, description = '') {
   return JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Article',
     'headline': title,
+    'description': description,
     'url': url,
     'publisher': {
       '@type': 'Organization',
@@ -55,10 +56,32 @@ function makeArticleJsonLd(title, url) {
   }, null, 2)
 }
 
+function makeWhitepaperJsonLd(title, url, description) {
+  return JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    'headline': title,
+    'description': description,
+    'url': url,
+    'datePublished': '2026-11-26',
+    'dateModified': '2026-11-26',
+    'keywords': 'TinyPivot MCP, AI data analysis trust layer, DuckDB SQL guardrails, Sample Ratio Mismatch, Holm-Bonferroni, Simpson paradox, LLM data science benchmark, Recursive Data Memory',
+    'author': {
+      '@type': 'Person',
+      'name': 'Brice Vallieres',
+      'url': 'https://bvallieres.com',
+    },
+    'publisher': {
+      '@type': 'Organization',
+      'name': 'Small Web, LLC',
+      'url': BASE_URL,
+    },
+  }, null, 2)
+}
+
 /**
  * Derive the prerender route descriptor from a raw route definition.
- * Guide routes (those whose path matches a marketingGuides slug) get
- * Article JSON-LD; all others get null.
+ * Guide routes get Article JSON-LD; /whitepaper gets TechArticle JSON-LD.
  */
 function buildRouteDescriptor(routeDef, guideSlugSet) {
   const path = routeDef.path
@@ -67,9 +90,11 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
   const description = meta.description ?? ''
   const canonical = BASE_URL + (path === '/' ? '/' : path)
   const outFile = path === '/' ? 'index.html' : `${path.replace(/^\//, '')}/index.html`
-  const jsonLd = (guideSlugSet.has(path.replace(/^\//, '')) || path === '/whitepaper')
-    ? makeArticleJsonLd(title, canonical)
-    : null
+  let jsonLd = null
+  if (path === '/whitepaper')
+    jsonLd = makeWhitepaperJsonLd(title, canonical, description)
+  else if (guideSlugSet.has(path.replace(/^\//, '')))
+    jsonLd = makeArticleJsonLd(title, canonical, description)
 
   return { url: path, outFile, title, description, canonical, jsonLd }
 }

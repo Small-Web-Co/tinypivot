@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import BenchmarkTable from '../components/site/BenchmarkTable.vue'
 import CodeBlock from '../components/site/CodeBlock.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import SavingsCalculator from '../components/site/SavingsCalculator.vue'
+import TokenReceipt from '../components/site/TokenReceipt.vue'
+import { benchmarkHeadline } from '../site/benchmark'
 import { edges, harnesses, prompts, telemetryEnvVars, tools } from '../site/docs'
 import { CACHED_REREAD_FACTOR, CARD_ECHO_TOKENS, OUTPUT_TOKENS_PER_REWRITE, TOKENS_PER_CELL, TOOL_REPLY_TOKENS } from '../site/savings'
 import { useCopy } from '../site/useCopy'
+
+const headline = benchmarkHeadline()
 
 const toc = [
   { id: 'quickstart', label: 'Quick start' },
@@ -146,7 +151,10 @@ const { copiedKey, copy } = useCopy()
             <li><strong>Left alone on purpose.</strong> Years, dates, links, code, and small counts like "4 regions" are not checked. A growth rate the data cannot show directly is marked unchecked rather than wrong.</li>
           </ul>
           <p class="docs-text">
-            What this does not prove yet: that the agent asked the right question of the data, such as comparing a full year with ten months. Next, each figure gets its own proof query, run against a snapshot of the data as it was, and the agent's SQL gets structural checks for problems like a filter on one side of a comparison only.
+            TinyPivot also runs deterministic SQL &amp; statistical guardrails on every query (join fan-out, chasm traps, non-additive rate averages, partial trailing periods, silent NULL drops, extreme outliers) and tracks clickable Proof-of-Work Lineage back to underlying source rows.
+            <router-link to="/whitepaper">
+              Read the Trust Layer White Paper &amp; 4-model benchmarks →
+            </router-link>
           </p>
         </section>
 
@@ -169,11 +177,22 @@ const { copiedKey, copy } = useCopy()
 
         <section id="savings" class="docs-section">
           <h2 class="heading">
-            Token savings, <em>with the caveats.</em>
+            Token savings, <em>measured &amp; modelled.</em>
           </h2>
           <p class="docs-text">
-            This calculator compares TinyPivot with pasting rows into chat. Against an agent that writes Python, our measured cost in Claude Code was 10–15% lower, so most of the savings this calculator shows apply only where rows would otherwise go into the conversation.
-            Move the sliders to match your own work. The model counts what you avoid sending: the raw rows, their re-reads on follow-ups, and the tables the model would otherwise rewrite.
+            Measured in Claude Code on a {{ headline.largeRows.toLocaleString('en-US') }}-row dataset, TinyPivot cost
+            <strong>{{ headline.cheaperThanPythonPct }}% less than writing Python</strong> ({{ headline.cheaperThanPythonSmallPct }}% less on the small file) with every figure verified, while pasting rows cost ~2× more and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
+            On our 6-task hard Data Science trap benchmark, TinyPivot Pro also ran <strong>40.4% cheaper than Free on Claude Sonnet</strong> ($0.54 vs. $0.57 vanilla Python) and cut repeat schema tokens by <strong>47%</strong> with Recursive Data Memory —
+            <router-link to="/whitepaper">
+              see full benchmark tables →
+            </router-link>
+          </p>
+          <div class="docs-proof-grid">
+            <BenchmarkTable />
+            <TokenReceipt />
+          </div>
+          <p class="docs-text">
+            Move the sliders below to model what you avoid sending when raw rows stay in local DuckDB instead of entering context:
           </p>
           <SavingsCalculator />
           <p class="method">
@@ -207,6 +226,19 @@ const { copiedKey, copy } = useCopy()
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
+}
+
+.docs-proof-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+@media (min-width: 960px) {
+  .docs-proof-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
 }
 
 .docs-toc {

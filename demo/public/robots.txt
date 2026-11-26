@@ -1,11 +1,33 @@
-# TinyPivot robots.txt
+# TinyPivot robots.txt — Search & AI Crawlers Welcome
 User-agent: *
 Allow: /
-
-# Sitemap
-Sitemap: https://tiny-pivot.com/sitemap.xml
-
-# Block checkout/transactional pages from indexing
 Disallow: /success
 Disallow: /api/
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+# Discovery
+Sitemap: https://tiny-pivot.com/sitemap.xml
+# LLM-readable site index: https://tiny-pivot.com/llms.txt
+# Full LLM reference: https://tiny-pivot.com/llms-full.txt
+
 

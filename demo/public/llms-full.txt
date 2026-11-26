@@ -1,6 +1,6 @@
 # TinyPivot — Developer & In-Agent Analytics Reference
 
-> Updated for TinyPivot MCP v0.7.6 & TinyPivot React/Vue v1.4.9.
+> Updated for TinyPivot MCP v0.8.0 & TinyPivot React/Vue v1.4.9.
 
 TinyPivot is **one deterministic analytics engine** shipped in two complementary forms:
 1. **TinyPivot MCP (`@smallwebco/tinypivot-mcp`)** — Data analysis studio for AI agents: TinyPivot Studio on localhost, an MCP App, a native Claude plugin, framed terminal cards and a live Ghostty TUI.
@@ -54,6 +54,21 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
   - Large results (`>500` rows): export via your SQL CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`) to CSV/TSV/JSON/JSONL and pass the path to `load_file` — **0 raw rows enter LLM context**, or pipe stdout directly to `npx @smallwebco/tinypivot-mcp@latest --open`.
   - Small in-memory results (up to `~50` rows from another MCP server, API, or aggregated query): pass flat JSON objects directly to `load_data` with `chartConfig`/`pivotConfig` in 1 call (write larger sets to a file and use `load_file` so raw rows aren't billed as output tokens).
 - **Optional Direct PostgreSQL Connector (Pro):** Set `DATABASE_URL` (+ optional `TINYPIVOT_ALLOWED_TABLES`) to run AST-validated read-only `SELECT` queries directly via `query_postgres`.
+
+### Empirical 4-Model Trust & Data Science Benchmarks (2026-11-26)
+
+Full white paper and methodology: `https://tiny-pivot.com/whitepaper`
+
+| Model | Baseline (Bare SQL or Python) | TinyPivot Free | TinyPivot Pro | Measured Pro Lift |
+|---|---|---|---|---|
+| **Inkling 2 Mini (Mac local, fast)** | 2/6 (33%) · 7.7 turns | 2/6 (33%) · 301.5k tok | **5/6 (83%)** · 6.7 turns · 297.9k tok | **+50 pts accuracy** (matches Sonnet on Python) |
+| **DeepSeek V4.1 Flash 1017 (DGX Spark)** | 5/6 (83%) · 6.5 turns | 5/6 (83%) · 272.6k tok | **6/6 (100%)** · 234.1k tok | **+17 pts · −14.1% tokens vs Free** |
+| **Claude Haiku 4.5** | 6/6 (100%) · $0.0379 | 6/6 (100%) · $0.0673 | **6/6 (100%)** · $0.0476 | **−29.3% cost vs Free** |
+| **Claude Sonnet** | 5/6 (83%) · $0.5677 | 6/6 (100%) · $0.9072 | **6/6 (100%)** · $0.5407 | **100% vs 83% · cheaper than Python (−40.4% vs Free)** |
+| **Combined (24 tasks/arm)** | **18/24 (75%)** | **19/24 (79%)** | **23/24 (96%)** | **+21 pts vs baseline · fewer tokens than Free on all 4 models** |
+
+- **Recursive Data Memory:** Local learning from caught SQL traps and Studio edits cut repeat `join_fanout` inquiry cost on Inkling 2 Mini from `6 turns / 32.5k tok` (Free) → `4 turns / 22.7k` (Pro cold) → **`3 turns / 17.1k tok` (−47%)** warm.
+- **Everyday BI Cost (44,714 rows in Claude Code):** TinyPivot ran **15% cheaper than Python** (`5.6¢` vs `6.6¢` per question) and avoided **92.9%** of context tokens vs pasting rows.
 
 ### Honest, Cache-Aware Token Savings
 

@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { defineAsyncComponent, onMounted, ref } from 'vue'
 import HarnessReel from '../components/HarnessReel.vue'
-import BenchmarkTable from '../components/site/BenchmarkTable.vue'
 import HeroCharts from '../components/site/HeroCharts.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
-import TokenReceipt from '../components/site/TokenReceipt.vue'
-import TrustBenchmarkTable from '../components/site/TrustBenchmarkTable.vue'
 import { benchmarkHeadline } from '../site/benchmark'
 import { whitepaperHeroStats } from '../site/whitepaper'
 
@@ -156,11 +153,9 @@ const capabilities = [
             Higher accuracy <em>and lower token cost.</em>
           </h2>
           <p class="lede">
-            Verification usually adds tokens. TinyPivot does the opposite: deterministic SQL audits and 1-call statistical
-            tools eliminate trial-and-error Python turns, while <strong>Recursive Data Memory</strong> cuts repeat schema
-            spend by <strong>47%</strong>. Across 6 hard Data Science traps on 4 local &amp; frontier models, Pro lifts
-            accuracy from <strong>75% → 96%</strong> and runs <strong>40.4% cheaper than Free on Claude Sonnet</strong>
-            ($0.54 vs. $0.57 for vanilla Python).
+            Verification usually adds tokens. TinyPivot does the opposite: deterministic DuckDB audits and 1-call statistical
+            tools eliminate trial-and-error Python turns, while <strong>Recursive Data Memory</strong> learns your schemas to
+            cut repeat spend by <strong>47%</strong>.
           </p>
         </header>
 
@@ -175,39 +170,34 @@ const capabilities = [
           </div>
         </dl>
 
-        <div class="savings-trust">
-          <TrustBenchmarkTable />
-          <div class="savings-links">
-            <router-link to="/whitepaper" class="text-link">
-              Read the full White Paper, 6-trap methodology &amp; Recursive Memory results →
-            </router-link>
-            <router-link to="/docs#savings" class="text-link">
-              Run the token &amp; cost calculator for your workload →
-            </router-link>
-          </div>
-        </div>
+        <div class="proof-cards">
+          <router-link to="/whitepaper" class="proof-card">
+            <p class="label">
+              Proof 01 · Technical White Paper
+            </p>
+            <h3 class="proof-title">
+              4-Model Hard Data Science &amp; BI Trap Benchmark
+            </h3>
+            <p class="proof-body">
+              Head-to-head across Inkling 2 Mini (<strong>33% → 83%</strong>), DeepSeek V4.1 (<strong>83% → 100%</strong>, −14.1% tokens),
+              Claude Haiku 4.5 (−29.3% cost), and Claude Sonnet (<strong>100% at $0.54</strong> vs. $0.57 vanilla Python).
+            </p>
+            <span class="text-link">Read the White Paper &amp; full benchmark tables →</span>
+          </router-link>
 
-        <div class="savings-everyday">
-          <div class="savings-everyday-col">
+          <router-link to="/docs#savings" class="proof-card">
             <p class="label">
-              Everyday BI · {{ headline.largeRows.toLocaleString('en-US') }}-row cost per question
+              Proof 02 · Everyday BI Cost &amp; Token Calculator
             </p>
-            <p class="savings-sub">
-              Most agents answer data questions by writing Python; TinyPivot did the same 3-question session for
-              <strong>{{ headline.cheaperThanPythonPct }}% less</strong> on the {{ headline.largeRows.toLocaleString('en-US') }}-row file
-              ({{ headline.cheaperThanPythonSmallPct }}% less on the small one) with every figure verified — while pasting rows cost ~2× more and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
+            <h3 class="proof-title">
+              {{ headline.cheaperThanPythonPct }}% cheaper than Python · 92.9% fewer context tokens
+            </h3>
+            <p class="proof-body">
+              Measured on a {{ headline.largeRows.toLocaleString('en-US') }}-row dataset in Claude Code (5.6¢ vs. 6.6¢ per question)
+              with 0 raw rows pasted into context. Includes the greenbar token receipt and interactive workload calculator.
             </p>
-            <BenchmarkTable />
-          </div>
-          <div class="savings-everyday-col">
-            <p class="label">
-              Where the tokens go when you paste rows
-            </p>
-            <p class="savings-sub">
-              Raw rows stay in local DuckDB instead of re-entering LLM context on every follow-up turn.
-            </p>
-            <TokenReceipt />
-          </div>
+            <span class="text-link">Inspect cost breakdown &amp; run the calculator →</span>
+          </router-link>
         </div>
       </div>
     </section>
@@ -423,34 +413,38 @@ const capabilities = [
   color: var(--ink-muted);
 }
 
-.savings-trust {
-  display: grid;
-  gap: 14px;
-}
-
-.savings-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 28px;
-}
-
-.savings-everyday {
+.proof-cards {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 28px;
-  padding-top: 24px;
-  border-top: var(--line);
+  gap: 18px;
 }
 
-.savings-everyday-col {
+.proof-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: start;
-  min-width: 0;
+  padding: 22px;
+  border: var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
 }
 
-.savings-sub {
-  font-size: 0.92rem;
+.proof-card:hover {
+  background: var(--ledger);
+}
+
+.proof-title {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.proof-body {
+  font-size: 0.94rem;
   line-height: 1.55;
   color: var(--ink-muted);
 }
@@ -578,9 +572,9 @@ const capabilities = [
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .savings-everyday {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    gap: 40px;
+  .proof-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
   }
 }
 </style>
