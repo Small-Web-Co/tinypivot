@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@smallwebco/tinypivot-mcp@0.7.8"
+        "@smallwebco/tinypivot-mcp@0.7.9"
       ],
       "env": {
         "CLAUDE_PLUGIN_OPTION_LICENSE_KEY": "${user_config.license_key}"

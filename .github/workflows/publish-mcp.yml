@@ -90,6 +90,11 @@ jobs:
           pnpm pack --pack-destination "${RUNNER_TEMP}/npm-packages"
           ls -1 "${RUNNER_TEMP}/npm-packages"
 
+      - name: Clean-room tarball smoke test (fresh HOME + cold DuckDB)
+        run: |
+          tarball="$(ls "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-mcp-*.tgz | head -n 1)"
+          node scripts/smoke-test-mcp.mjs --tarball="${tarball}" --with-duckdb
+
       - name: Publish @smallwebco/tinypivot-mcp with OIDC
         run: npm publish "${RUNNER_TEMP}"/npm-packages/smallwebco-tinypivot-mcp-*.tgz --access public
 

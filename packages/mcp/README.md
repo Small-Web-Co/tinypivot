@@ -122,7 +122,7 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 TinyPivot is **database-agnostic**. Use whichever data workflow matches your stack:
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, or Postgres (CLI / file handoff — 0 raw rows in LLM context):** Export query output to `.csv`, `.tsv`, `.json`, or `.jsonl` via `bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, or `psql` and pass the path to `load_file` (or pipe stdout straight into `npx @smallwebco/tinypivot-mcp@latest --open`).
-- **Any MCP Server or API (Stripe, GitHub, BigQuery MCP, Snowflake MCP, REST APIs):** Pipe structured JSON rows (<500 rows already in memory) directly into `load_data` with `chartConfig` / `pivotConfig` in a single call — no temp CSV required.
+- **Any MCP Server or API (Stripe, GitHub, BigQuery MCP, Snowflake MCP, REST APIs):** Pipe structured JSON rows (up to `~50` rows already in memory) directly into `load_data` with `chartConfig` / `pivotConfig` in a single call — no temp CSV required (for larger sets, write a file and use `load_file`).
 - **Optional Direct PostgreSQL Connector (Pro):** If you use PostgreSQL and want zero-temp-file SQL execution inside the MCP server itself, set `DATABASE_URL` (and optionally `TINYPIVOT_ALLOWED_TABLES`) to enable the AST-validated, read-only `query_postgres` tool.
 
 ## Free vs. Pro
@@ -155,7 +155,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `open_tinypivot` | Opens TinyPivot (side pane, sidebar, or inline). Works with `{}` using the built-in sample dataset. |
 | `load_file` | Loads a local `.csv`, `.tsv`, `.json`, or `.jsonl` file (including SQL CLI exports from any database) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call. Pass `where` (for example `[{"field":"year","equals":[2026]}]`) to load only the rows a question is about; filtering runs on disk. |
 | `query` | Runs one read-only DuckDB `SELECT` over local CSV, Parquet or JSON files and over loaded datasets (tables named by dataset id), then charts or pivots the result. Rows never enter the model's context. DuckDB (about 20 MB) downloads once, on first use, into `~/.cache/tinypivot`. |
-| `load_data` | Loads flat JSON rows already in memory (<500 rows) from any other MCP tool, API, or small SQL query without writing a temp CSV; renders chart + pivot in 1 call. |
+| `load_data` | Loads flat JSON rows already in memory (up to `~50` rows) from any other MCP tool, API, or small SQL query without writing a temp CSV; renders chart + pivot in 1 call. |
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
 | `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, maps (`choropleth`), `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`, etc.; loose names like `map` work too). |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |

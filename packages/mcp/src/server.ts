@@ -22,6 +22,7 @@ import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList } from './history.js'
 import { refreshAgentExtension } from './init.js'
+import { classifyMcpLicenseKey, isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
@@ -321,8 +322,9 @@ function buildAppPayload(
 
   const turnUsdSaved = tokensToUsd(turnTokensSaved, sessionSavings.model.ratePerMillion)
 
-  const validMcpKey = isMcpLicenseKey(options.licenseKey) ? options.licenseKey : null
-  const isPro = Boolean(validMcpKey || options.demoToken)
+  const validMcpKey = isMcpLicenseKey(options.licenseKey) ? options.licenseKey! : null
+  const validDemoToken = isValidDemoToken(options.demoToken) ? options.demoToken! : null
+  const isPro = Boolean(validMcpKey || validDemoToken)
 
   return {
     datasetId: dataset.id,
@@ -339,7 +341,7 @@ function buildAppPayload(
     chartTheme: isPro ? store.getVisualTheme() : 'code',
     datasets: store.listMetadata(options.sessionKey),
     licenseKey: validMcpKey,
-    demoToken: options.demoToken ?? null,
+    demoToken: validDemoToken,
     modelCatalog: MODEL_CATALOG,
     tokenStats: {
       ingestionMode: dataset.ingestionMode,
@@ -380,10 +382,69 @@ export async function loadAppHtml(customPath?: string): Promise<string> {
   </body></html>`
 }
 
-export function isMcpLicenseKey(key?: string | null): boolean {
-  if (!key)
-    return false
-  return key.startsWith('TP-MCPP-') || key.startsWith('TP-MCPT-')
+export { isMcpLicenseKey }
+
+const READ_ONLY_LOCAL_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const
+
+const READ_ONLY_REMOTE_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: true,
+} as const
+
+const LOCAL_WRITE_IDEMPOTENT_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const
+
+const STUDIO_REPLY_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const
+
+function datasetNotFoundError(datasetId: string | undefined, store: DatasetStore, sessionKey: string) {
+  const available = store.listMetadata(sessionKey).map(d => d.id)
+  const hint = available.length > 0
+    ? `Available dataset IDs: ${available.join(', ')}. Pass one of those IDs, or call list_datasets to inspect schemas.`
+    : 'No datasets are loaded in this session. Call load_file (for local CSV/TSV/JSON/JSONL), query (for DuckDB SQL), or load_data (for small in-memory rows) first.'
+  return {
+    isError: true as const,
+    content: [{ type: 'text' as const, text: `Dataset "${datasetId ?? '(active)'}" not found. ${hint}` }],
+  }
+}
+
+function formatLoadFileError(filePath: string, err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  const code = (err as { code?: string } | null)?.code
+  if (code === 'ENOENT' || /ENOENT|no such file/i.test(message)) {
+    return `Failed to load file "${filePath}": ${message}. Try passing an absolute file path and verify the file exists.`
+  }
+  if (code === 'EACCES' || /EACCES|permission denied/i.test(message)) {
+    return `Failed to load file "${filePath}": ${message}. Check file read permissions before retrying.`
+  }
+  return `Failed to load file "${filePath}": ${message}. Supported direct formats are CSV, TSV, JSON, and JSONL; for Parquet or custom SQL transformations, try the query tool with DuckDB SQL.`
+}
+
+function formatQueryError(error: unknown, store: DatasetStore, sessionKey: string): string {
+  const message = error instanceof Error ? error.message : String(error)
+  if (error instanceof QueryRejected) {
+    return `${message} Pass a single read-only SELECT, WITH, DESCRIBE, or EXPLAIN statement.`
+  }
+  const tables = store.listMetadata(sessionKey).map(d => d.id)
+  const tableHint = tables.length > 0
+    ? ` Loaded tables: ${tables.join(', ')}.`
+    : ''
+  return `Query failed: ${message}.${tableHint} Call list_datasets to inspect loaded table and column names, or quote local file paths like FROM '/path/to/file.csv'.`
 }
 
 /**
@@ -430,11 +491,19 @@ export function resolveLicenseKey(explicit?: string): string | undefined {
 
 export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOptions = {}) {
   const rawLicenseKey = resolveLicenseKey(options.licenseKey)
-  const licenseKey = isMcpLicenseKey(rawLicenseKey) ? rawLicenseKey : undefined
-  if (rawLicenseKey && !licenseKey && rawLicenseKey.startsWith('TP-PRO')) {
+  const licenseStatus = classifyMcpLicenseKey(rawLicenseKey)
+  const licenseKey = licenseStatus === 'mcp' ? rawLicenseKey : undefined
+  if (licenseStatus === 'ui') {
     console.error('[tinypivot-mcp] Notice: UI Library keys (TP-PRO*) apply to @smallwebco/tinypivot-react/-vue. TinyPivot MCP Pro requires an MCP license key (TP-MCPP* / TP-MCPT*) from https://tiny-pivot.com/pricing')
   }
-  const demoToken = options.demoToken ?? process.env.TINYPIVOT_DEMO_TOKEN
+  else if (licenseStatus === 'expired') {
+    console.error('[tinypivot-mcp] Notice: TINYPIVOT_LICENSE_KEY has expired — running on Free tier. Renew at https://tiny-pivot.com/pricing')
+  }
+  else if (licenseStatus === 'invalid') {
+    console.error('[tinypivot-mcp] Notice: TINYPIVOT_LICENSE_KEY failed signature verification — running on Free tier. Check your key or get one at https://tiny-pivot.com/pricing')
+  }
+  const rawDemoToken = options.demoToken ?? process.env.TINYPIVOT_DEMO_TOKEN
+  const demoToken = isValidDemoToken(rawDemoToken) ? rawDemoToken : undefined
   const isPro = Boolean(licenseKey || demoToken)
   const tier: 'free' | 'pro' = isPro ? 'pro' : 'free'
   const store = options.store ?? new DatasetStore({
@@ -460,7 +529,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.7.8',
+      version: '0.7.9',
     },
     {
       capabilities: {
@@ -560,6 +629,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         title: 'Reply in TinyPivot Studio',
         description: 'Answer a message from TinyPivot Studio. The user reads it there.',
         inputSchema: { text: z.string().min(1).max(8000) },
+        annotations: STUDIO_REPLY_ANNOTATIONS,
       },
       async ({ text }) => {
         studio.reply(text)
@@ -681,16 +751,14 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         datasetId: z.string().optional(),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: PANE_UI_META,
     },
     async ({ datasetId, viewMode }, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const ds = store.get(datasetId, sessionKey)
       if (!ds) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `Dataset "${datasetId}" not found. Available: ${store.listMetadata(sessionKey).map(d => d.id).join(', ')}` }],
-        }
+        return datasetNotFoundError(datasetId, store, sessionKey)
       }
       if (viewMode) {
         store.updateView(ds.id, { viewMode }, sessionKey)
@@ -732,6 +800,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         chartConfig: loadChartSchema.optional(),
         keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
     async ({ filePath, name, why, ask, where, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
@@ -761,7 +830,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       catch (err) {
         return {
           isError: true,
-          content: [{ type: 'text', text: `Failed to load file "${filePath}": ${err instanceof Error ? err.message : String(err)}` }],
+          content: [{ type: 'text', text: formatLoadFileError(filePath, err) }],
         }
       }
     },
@@ -784,6 +853,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         chartConfig: loadChartSchema.optional(),
         keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
     async ({ name, why, ask, rows, source, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
@@ -820,16 +890,14 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         showRowTotals: z.boolean().default(true),
         showColumnTotals: z.boolean().default(true),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
     async ({ datasetId, rowFields, columnFields, valueFields, why, showRowTotals, showColumnTotals }, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const ds = store.get(datasetId, sessionKey)
       if (!ds) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `Dataset not found. Loaded datasets: ${store.listMetadata(sessionKey).map(d => d.id).join(', ')}` }],
-        }
+        return datasetNotFoundError(datasetId, store, sessionKey)
       }
 
       const fullPivotConfig: PivotConfig = {
@@ -888,6 +956,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         why: whyParam,
         chartTheme: z.enum(VISUAL_THEME_VALUES).optional(),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
     async ({ datasetId, chartTheme, why, filters, ...chartInput }, extra) => {
@@ -895,10 +964,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const ds = store.get(datasetId, sessionKey)
       if (!ds) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `Dataset not found. Loaded datasets: ${store.listMetadata(sessionKey).map(d => d.id).join(', ')}` }],
-        }
+        return datasetNotFoundError(datasetId, store, sessionKey)
       }
 
       if (chartTheme && (isPro || chartTheme === 'code')) {
@@ -976,6 +1042,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           pivotConfig: pivotConfigSchema.optional(),
           keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
         },
+        annotations: READ_ONLY_REMOTE_ANNOTATIONS,
         _meta: INLINE_UI_META,
       },
       async ({ sql, why, ask, name, viewMode, pivotConfig, keepExisting }, extra) => {
@@ -984,7 +1051,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             isError: true,
             content: [{
               type: 'text',
-              text: 'Read-only PostgreSQL querying (`query_postgres`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). Free tier includes local CSV/TSV/JSON files and inline data up to 2,500 rows. Upgrade at https://tiny-pivot.com/pricing',
+              text: 'Read-only PostgreSQL querying (`query_postgres`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). Free tier includes local CSV/TSV/JSON files and inline data up to 2,500 rows — or export via `psql --csv` and pass the file to `load_file`. Upgrade at https://tiny-pivot.com/pricing',
             }],
           }
         }
@@ -1008,7 +1075,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         catch (err) {
           return {
             isError: true,
-            content: [{ type: 'text', text: `PostgreSQL query failed: ${err instanceof Error ? err.message : String(err)}` }],
+            content: [{ type: 'text', text: `PostgreSQL query failed: ${err instanceof Error ? err.message : String(err)}. Call list_datasets to check available PostgreSQL tables and ensure the query is a single read-only SELECT.` }],
           }
         }
       },
@@ -1032,6 +1099,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         chartConfig: loadChartSchema.optional(),
         keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
     async ({ sql, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
@@ -1055,8 +1123,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         return replyWithDataset(dataset, sessionKey, 'query', truncated ? `\n_Result cut at ${dataset.rows.length.toLocaleString('en-US')} rows._` : '')
       }
       catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        return { isError: true, content: [{ type: 'text' as const, text: error instanceof QueryRejected ? message : `Query failed: ${message}` }] }
+        return { isError: true, content: [{ type: 'text' as const, text: formatQueryError(error, store, sessionKey) }] }
       }
     },
   )
@@ -1071,12 +1138,13 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         datasetId: z.string().optional(),
         why: whyParam,
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
     async ({ datasetId, why }, extra) => {
       const { sessionKey } = resolveSessionContext(extra)
       const ds = store.get(datasetId, sessionKey)
       if (!ds)
-        return { isError: true, content: [{ type: 'text' as const, text: `Dataset "${datasetId ?? '(active)'}" not found.` }] }
+        return datasetNotFoundError(datasetId, store, sessionKey)
       studio.recordDatasetStep(ds, { actor: 'agent', tool: 'profile', why })
       return { content: [{ type: 'text' as const, text: formatProfile(ds) }] }
     },
@@ -1093,6 +1161,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         why: whyParam,
         limit: z.number().int().min(1).max(100).optional(),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
     async ({ open, why, limit }, extra) => {
@@ -1108,7 +1177,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       }
       catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        return { isError: true, content: [{ type: 'text' as const, text: `Could not reopen "${open}": ${message} ${formatHistoryList(history.list(5))}` }] }
+        return { isError: true, content: [{ type: 'text' as const, text: `Could not reopen "${open}": ${message}. Try one of the saved pull IDs below, or call history with no arguments to list more.\n${formatHistoryList(history.list(5))}` }] }
       }
     },
   )
@@ -1119,6 +1188,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       title: 'List Datasets',
       description: 'List loaded datasets with their row counts and columns.',
       inputSchema: {},
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
     async (_args, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
@@ -1158,6 +1228,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       title: 'Clear Session Datasets',
       description: 'Unload all datasets.',
       inputSchema: {},
+      annotations: LOCAL_WRITE_IDEMPOTENT_ANNOTATIONS,
     },
     async (_args, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
@@ -1190,16 +1261,14 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         offset: z.number().int().min(0).default(0),
         limit: z.number().int().min(1).max(ROW_PAGE_SIZE).default(10000),
       },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: APP_ONLY_META,
     },
     async ({ datasetId, offset, limit }, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const ds = store.get(datasetId, sessionKey)
       if (!ds) {
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `Dataset "${datasetId ?? '(active)'}" not found.` }],
-        }
+        return datasetNotFoundError(datasetId, store, sessionKey)
       }
       const rows = ds.rows.slice(offset, offset + limit)
       return {
@@ -1249,6 +1318,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         model: z.string(),
         customRatePerMillion: z.number().min(0).optional(),
       },
+      annotations: LOCAL_WRITE_IDEMPOTENT_ANNOTATIONS,
       _meta: APP_ONLY_META,
     },
     async ({ model, customRatePerMillion }) => {
@@ -1270,6 +1340,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       inputSchema: {
         datasetId: z.string().optional(),
       },
+      annotations: STUDIO_REPLY_ANNOTATIONS,
       _meta: APP_ONLY_META,
     },
     async ({ datasetId }) => {
@@ -1304,6 +1375,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       inputSchema: {
         theme: z.enum(VISUAL_THEME_VALUES),
       },
+      annotations: LOCAL_WRITE_IDEMPOTENT_ANNOTATIONS,
       _meta: {
         ui: { visibility: ['model', 'app'] as const },
       },
@@ -1343,6 +1415,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       title: 'Get Datasets State (App Internal)',
       description: 'Internal app-only tool returning all loaded datasets for the UI switcher.',
       inputSchema: {},
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: APP_ONLY_META,
     },
     async (_args, extra) => {

@@ -10,14 +10,14 @@ description: Preferred default chart, map, YoY/MoM comparison, pivot table, and 
 ## Core Workflow Rules
 
 1. **Render in 1 tool call:** Always pass `chartConfig` and/or `pivotConfig` directly on `load_file` or `load_data` (or `pivotConfig` on `query_postgres`) so TinyPivot loads the dataset and renders the exact requested chart or pivot table in a single turn. Avoid calling `load_file` and then making a second `configure_chart` call unless the user asks to change the view afterward.
-2. **Do not write redundant intermediate CSV files for small in-memory data (<500 rows):**
-   - If you already have `<500` flat rows in memory (for example, returned by another MCP tool like Stripe, GitHub, BigQuery/Snowflake MCP, an HTTP API, or a small aggregated SQL query), pass those rows directly to `load_data` with `chartConfig` / `pivotConfig`.
-   - Do **not** write those rows to a temp `.csv` file just to call `load_file`.
-3. **Use `load_file` for local files and large results (>500 rows):**
-   - For existing `.csv`, `.tsv`, `.json`, or `.jsonl` files on disk — or large exports from any database CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`, `sqlite3`) — pass the file path directly to `load_file`.
+2. **Do not write redundant intermediate CSV files for small in-memory data (up to ~50 rows):**
+   - If you already have up to `~50` flat rows in memory (for example, returned by another MCP tool like Stripe, GitHub, BigQuery/Snowflake MCP, an HTTP API, or a small aggregated SQL query), pass those rows directly to `load_data` with `chartConfig` / `pivotConfig`.
+   - Every row passed to `load_data` is billed as output tokens (~5× input), so write larger results (`>50` rows) to a local file and call `load_file` instead.
+3. **Use `load_file` for local files and larger results (>50 rows):**
+   - For existing `.csv`, `.tsv`, `.json`, or `.jsonl` files on disk — or exports from any database CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`, `sqlite3`) — pass the file path directly to `load_file` (or run DuckDB SQL directly via `query`).
    - `load_file` keeps raw rows out of LLM context (0 raw rows sent to the model; only a compact schema + summary returns) while streaming the full dataset locally to the TinyPivot UI and Studio.
 4. **Universal database support (not Postgres-only):**
-   - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, etc.:** Export large results to a local CSV/JSON file and call `load_file`, or pass small (<500 row) query outputs directly to `load_data`.
+   - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, etc.:** Export larger results to a local CSV/JSON file and call `load_file` (or `query`), or pass small (up to `~50` row) query outputs directly to `load_data`.
    - **Direct PostgreSQL (Pro, optional):** When `DATABASE_URL` is configured and a Pro license is active, use `query_postgres` for AST-validated read-only `SELECT` queries without writing temp files.
 5. **Presentation-only layer for shares, rates, margins & ratios (critical math rule):**
    - TinyPivot is a **deterministic presentation & additive-rollup layer** (`sum`/`count`/`avg`/`min`/`max`).
@@ -55,8 +55,8 @@ description: Preferred default chart, map, YoY/MoM comparison, pivot table, and 
 
 | Tool | When to use |
 |---|---|
-| `load_file` | Local `.csv`/`.tsv`/`.json`/`.jsonl` files or large (>500 row) SQL CLI exports from any database. Pass `chartConfig` and/or `pivotConfig` in the same call. Pass `keepExisting: true` only when comparing multiple datasets in the same conversation. |
-| `load_data` | Flat JSON rows already in memory (<500 rows) from another MCP tool, API, or small SQL query — no intermediate CSV needed. Pass `chartConfig` and/or `pivotConfig` in the same call. Pre-compute exact ratios at chart grain before calling. |
+| `load_file` | Local `.csv`/`.tsv`/`.json`/`.jsonl` files or larger (`>50` row) SQL CLI exports from any database. Pass `chartConfig` and/or `pivotConfig` in the same call. Pass `keepExisting: true` only when comparing multiple datasets in the same conversation. |
+| `load_data` | Flat JSON rows already in memory (up to `~50` rows) from another MCP tool, API, or small SQL query — no intermediate CSV needed. Pass `chartConfig` and/or `pivotConfig` in the same call. Pre-compute exact ratios at chart grain before calling. |
 | `configure_chart` | Switch chart type (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, `choropleth`, `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`, etc.), axes, aggregation, series, target, map geography, or theme on an already-loaded dataset. |
 | `configure_pivot` | Compute a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM arithmetic errors) on an already-loaded dataset. |
 | `query_postgres` | *(Optional Pro)* Run AST-validated read-only `SELECT` queries directly against `DATABASE_URL`. |

@@ -70,6 +70,7 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest",
     "test:unit": "vitest run",
+    "test:smoke:mcp": "node scripts/smoke-test-mcp.mjs",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "release:core": "cd packages/core && pnpm publish --access public --no-git-checks",

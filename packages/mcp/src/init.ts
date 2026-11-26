@@ -9,22 +9,51 @@ import { buildOpenCodePluginSource } from './opencode-plugin.js'
 import { buildPiExtensionSource, PI_ENTRY_EXTRAS } from './pi-extension.js'
 import { saveVisualThemePreference } from './store.js'
 
+export const VALID_INIT_TARGETS = [
+  'claude',
+  'claude-desktop',
+  'cursor',
+  'opencode',
+  'antigravity',
+  'antigravity-cli',
+  'pi',
+  'codex',
+] as const
+
+const VALID_INIT_TARGET_SET = new Set<string>(VALID_INIT_TARGETS)
+
 interface InitOptions {
   local: boolean
   all: boolean
   dryRun: boolean
   noRules: boolean
+  json: boolean
   targets: Set<string> | null
   licenseKey?: string
   theme?: ChartThemePreset
 }
 
-interface TargetResult {
+export interface TargetResult {
   id: string
   label: string
   configPath: string
   status: 'updated' | 'skipped' | 'unchanged' | 'error'
   detail: string
+}
+
+export interface InitSummary {
+  ok: boolean
+  exitCode: number
+  dryRun: boolean
+  mode: 'local' | 'npx'
+  spec: string
+  configuredCount: number
+  errorCount: number
+  results: TargetResult[]
+  error?: string
+  hint?: string
+  validTargets?: readonly string[]
+  availableThemes?: readonly string[]
 }
 
 /**
@@ -84,6 +113,7 @@ Options:
   --theme=<id>            Set default visual theme (${CHART_THEME_IDS.join(', ')})
   --no-rules              Skip adding auto-use TinyPivot rules to CLAUDE.md / AGENTS.md
   --dry-run               Preview planned changes without writing files
+  --json                  Print machine-readable JSON to stdout (no prompts, real exit codes)
   -h, --help              Show this help message
 
 Privacy:
@@ -92,19 +122,25 @@ Privacy:
 `.trim())
 }
 
-function parseArgs(args: string[]): InitOptions | null {
+type ParseArgsResult
+  = | { kind: 'help' }
+    | { kind: 'ok', opts: InitOptions }
+    | { kind: 'error', json: boolean, error: string, hint?: string, validTargets?: readonly string[], availableThemes?: readonly string[] }
+
+function parseArgs(args: string[]): ParseArgsResult {
   const opts: InitOptions = {
     local: false,
     all: false,
     dryRun: false,
     noRules: false,
+    json: args.includes('--json'),
     targets: null,
   }
 
   for (const arg of args) {
     if (arg === '-h' || arg === '--help') {
       printHelp()
-      return null
+      return { kind: 'help' }
     }
     else if (arg === '--local') {
       opts.local = true
@@ -118,8 +154,30 @@ function parseArgs(args: string[]): InitOptions | null {
     else if (arg === '--no-rules') {
       opts.noRules = true
     }
+    else if (arg === '--json') {
+      opts.json = true
+    }
     else if (arg.startsWith('--targets=')) {
       const list = arg.slice('--targets='.length).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      const unknown = list.filter(t => !VALID_INIT_TARGET_SET.has(t))
+      if (unknown.length > 0) {
+        return {
+          kind: 'error',
+          json: opts.json,
+          error: `Unknown target(s): ${unknown.join(', ')}.`,
+          hint: `Use one or more of: ${VALID_INIT_TARGETS.join(', ')}.`,
+          validTargets: VALID_INIT_TARGETS,
+        }
+      }
+      if (list.length === 0) {
+        return {
+          kind: 'error',
+          json: opts.json,
+          error: 'No targets provided for --targets.',
+          hint: `Pass a comma-separated list from: ${VALID_INIT_TARGETS.join(', ')}.`,
+          validTargets: VALID_INIT_TARGETS,
+        }
+      }
       opts.targets = new Set(list)
     }
     else if (arg.startsWith('--license=')) {
@@ -131,13 +189,26 @@ function parseArgs(args: string[]): InitOptions | null {
         opts.theme = candidate as ChartThemePreset
       }
       else {
-        console.error(`Unknown theme "${candidate}". Available themes: ${CHART_THEME_IDS.join(', ')}`)
-        process.exit(1)
+        return {
+          kind: 'error',
+          json: opts.json,
+          error: `Unknown theme "${candidate}".`,
+          hint: `Available themes: ${CHART_THEME_IDS.join(', ')}.`,
+          availableThemes: CHART_THEME_IDS,
+        }
+      }
+    }
+    else if (arg.startsWith('-')) {
+      return {
+        kind: 'error',
+        json: opts.json,
+        error: `Unknown option "${arg}".`,
+        hint: 'Run "tinypivot-mcp init --help" to see supported options.',
       }
     }
   }
 
-  return opts
+  return { kind: 'ok', opts }
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -517,15 +588,45 @@ async function upsertAllAgentRules(opts: InitOptions): Promise<TargetResult[]> {
   return candidates.filter((r): r is TargetResult => r !== null)
 }
 
-export async function runInitCommand(args: string[]): Promise<void> {
-  const opts = parseArgs(args)
-  if (!opts)
-    return
+export async function runInitCommand(args: string[]): Promise<InitSummary | null> {
+  const parsed = parseArgs(args)
+  if (parsed.kind === 'help')
+    return null
 
-  const home = os.homedir()
   const cliPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'cli.js')
 
-  console.log(`\nTinyPivot MCP Installer (${opts.local ? `local: ${cliPath}` : `npx ${MCP_NPX_SPEC}`})${opts.dryRun ? ' [DRY RUN]' : ''}\n`)
+  if (parsed.kind === 'error') {
+    const summary: InitSummary = {
+      ok: false,
+      exitCode: 1,
+      dryRun: false,
+      mode: 'npx',
+      spec: MCP_NPX_SPEC,
+      configuredCount: 0,
+      errorCount: 1,
+      results: [],
+      error: parsed.error,
+      hint: parsed.hint,
+      ...(parsed.validTargets ? { validTargets: parsed.validTargets } : {}),
+      ...(parsed.availableThemes ? { availableThemes: parsed.availableThemes } : {}),
+    }
+    if (parsed.json) {
+      console.log(JSON.stringify(summary, null, 2))
+    }
+    else {
+      console.error(`${parsed.error}${parsed.hint ? ` ${parsed.hint}` : ''}`)
+    }
+    return summary
+  }
+
+  const opts = parsed.opts
+  const home = os.homedir()
+  const mode = opts.local ? 'local' as const : 'npx' as const
+  const spec = opts.local ? cliPath : MCP_NPX_SPEC
+
+  if (!opts.json) {
+    console.log(`\nTinyPivot MCP Installer (${opts.local ? `local: ${cliPath}` : `npx ${MCP_NPX_SPEC}`})${opts.dryRun ? ' [DRY RUN]' : ''}\n`)
+  }
 
   const results: TargetResult[] = [
     await upsertStandardMcpJson(
@@ -589,6 +690,30 @@ export async function runInitCommand(args: string[]): Promise<void> {
   const ruleResults = await upsertAllAgentRules(opts)
   results.push(...ruleResults)
 
+  const configuredCount = results.filter(r => r.status === 'updated' || r.status === 'unchanged').length
+  const errorCount = results.filter(r => r.status === 'error').length
+  const ok = errorCount === 0 && configuredCount > 0
+  const hint = configuredCount === 0
+    ? 'No supported AI harness configs were detected. Re-run with --all or --targets=claude,cursor,opencode.'
+    : undefined
+
+  const summary: InitSummary = {
+    ok,
+    exitCode: ok ? 0 : 1,
+    dryRun: opts.dryRun,
+    mode,
+    spec,
+    configuredCount,
+    errorCount,
+    results,
+    ...(hint ? { hint } : {}),
+  }
+
+  if (opts.json) {
+    console.log(JSON.stringify(summary, null, 2))
+    return summary
+  }
+
   const iconFor: Record<TargetResult['status'], string> = {
     updated: '✓',
     unchanged: '·',
@@ -602,9 +727,8 @@ export async function runInitCommand(args: string[]): Promise<void> {
     console.log(`  ${iconFor[r.status]} ${r.label.padEnd(18)} ${r.detail} (${r.configPath})`)
   }
 
-  const configuredCount = results.filter(r => r.status === 'updated' || r.status === 'unchanged').length
   if (configuredCount === 0) {
-    console.log('\n  No supported AI harness configs were detected. Re-run with --all or --targets=claude,cursor,opencode.')
+    console.log(`\n  ${hint}`)
   }
   else {
     console.log('\nNext steps:')
@@ -614,4 +738,5 @@ export async function runInitCommand(args: string[]): Promise<void> {
     console.log('     Unlock unlimited rows, drill-through, Excel export, Postgres, & 10 themes at https://tiny-pivot.com/pricing')
   }
   console.log('')
+  return summary
 }

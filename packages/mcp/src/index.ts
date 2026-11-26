@@ -10,6 +10,12 @@ export {
   TINYPIVOT_PI_RULE_BLOCK,
   upsertTinyPivotRuleBlock,
 } from './init.js'
+export {
+  classifyMcpLicenseKey,
+  isMcpLicenseKey,
+  isValidDemoToken,
+  type LicenseKeyStatus,
+} from './license.js'
 export { buildPiExtensionSource } from './pi-extension.js'
 export {
   executeReadOnlyPostgresQuery,

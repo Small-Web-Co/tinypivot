@@ -16,11 +16,13 @@ import {
   TINYPIVOT_MCP_INSTRUCTIONS,
   upsertTinyPivotRuleBlock,
 } from '../../packages/mcp/src/index'
+import { classifyMcpLicenseKey, isValidDemoToken } from '../../packages/mcp/src/license'
 import { extractSessionKey, isMcpLicenseKey } from '../../packages/mcp/src/server'
 import { FREE_TIER_ROW_LIMIT, SAMPLE_DATASET_ID } from '../../packages/mcp/src/store'
 import { bucketRowCount, isTelemetryEnabled } from '../../packages/mcp/src/telemetry'
 import { isNonAdditiveMeasure } from '../../packages/mcp/src/terminal-chart'
 import { getCompanionSessionFile, isProcessAlive, resolveCompanionUrl } from '../../packages/mcp/src/tui'
+import { installTestLicenseKeypair } from '../helpers/license'
 
 function createMockMcpSession(server: ReturnType<typeof createTinyPivotMcpServer>['server']) {
   const pending = new Map<number, (msg: Record<string, unknown>) => void>()
@@ -49,9 +51,13 @@ function createMockMcpSession(server: ReturnType<typeof createTinyPivotMcpServer
     connect: () => server.connect(transport as never),
     initialize: (capabilities: Record<string, unknown>) =>
       request('initialize', { protocolVersion: '2024-11-05', capabilities, clientInfo: { name: 'test', version: '1.0.0' } }),
+    listTools: async () => {
+      const res = await request('tools/list', {})
+      return (res.result as { tools: Array<{ name: string, annotations?: Record<string, unknown> }> }).tools
+    },
     callTool: async (name: string, args: Record<string, unknown>, meta?: Record<string, unknown>) => {
       const res = await request('tools/call', { name, arguments: args, ...(meta ? { _meta: meta } : {}) })
-      return res.result as { structuredContent?: Record<string, unknown>, content?: Array<{ text: string }> }
+      return res.result as { isError?: boolean, structuredContent?: Record<string, unknown>, content?: Array<{ text: string }> }
     },
   }
 }
@@ -170,15 +176,82 @@ describe('mCP Privacy-First Telemetry Helpers', () => {
   })
 })
 
-describe('mcp license scoping (prevents UI Library key arbitrage)', () => {
-  it('accepts TP-MCPP and TP-MCPT keys for MCP Pro and rejects UI Library TP-PRO* keys', () => {
-    expect(isMcpLicenseKey('TP-MCPP-abc123-20991231')).toBe(true)
-    expect(isMcpLicenseKey('TP-MCPT-abc123-20991231')).toBe(true)
-    expect(isMcpLicenseKey('TP-PRO1-abc123-20991231')).toBe(false)
-    expect(isMcpLicenseKey('TP-PROU-abc123-20991231')).toBe(false)
-    expect(isMcpLicenseKey('TP-PROT-abc123-20991231')).toBe(false)
-    expect(isMcpLicenseKey('')).toBe(false)
-    expect(isMcpLicenseKey(null)).toBe(false)
+describe('mcp license verification & scoping (ECDSA P-256 + prevents UI Library key arbitrage)', () => {
+  it('accepts validly signed TP-MCPP and TP-MCPT keys and rejects forged, expired, and UI TP-PRO* keys', () => {
+    const signer = installTestLicenseKeypair()
+    try {
+      const validPro = signer.signLicense('MCPP', '20991231')
+      const validTeam = signer.signLicense('MCPT', '20991231')
+      const expiredPro = signer.signLicense('MCPP', '20200101')
+      const validUiSingle = signer.signLicense('PRO1', '20991231')
+      const validUiUnlimited = signer.signLicense('PROU', '20991231')
+      const validUiTeam = signer.signLicense('PROT', '20991231')
+
+      expect(isMcpLicenseKey(validPro)).toBe(true)
+      expect(isMcpLicenseKey(validTeam)).toBe(true)
+      expect(classifyMcpLicenseKey(validPro)).toBe('mcp')
+      expect(classifyMcpLicenseKey(validTeam)).toBe('mcp')
+
+      // Forged keys with valid prefix must fail cryptographic verification
+      expect(isMcpLicenseKey('TP-MCPP-abc123-20991231')).toBe(false)
+      expect(isMcpLicenseKey('TP-MCPT-abc123-20991231')).toBe(false)
+      expect(classifyMcpLicenseKey('TP-MCPP-abc123-20991231')).toBe('invalid')
+
+      // Expired MCP key must be rejected
+      expect(isMcpLicenseKey(expiredPro)).toBe(false)
+      expect(classifyMcpLicenseKey(expiredPro)).toBe('expired')
+
+      // Validly signed UI library keys must still be rejected for MCP
+      expect(isMcpLicenseKey(validUiSingle)).toBe(false)
+      expect(isMcpLicenseKey(validUiUnlimited)).toBe(false)
+      expect(isMcpLicenseKey(validUiTeam)).toBe(false)
+      expect(classifyMcpLicenseKey(validUiSingle)).toBe('ui')
+
+      // Empty/null
+      expect(isMcpLicenseKey('')).toBe(false)
+      expect(isMcpLicenseKey(null)).toBe(false)
+      expect(classifyMcpLicenseKey(null)).toBe('none')
+
+      // Demo tokens must also verify cryptographically and respect expiry
+      const validDemo = signer.signDemoToken('https://tiny-pivot.com', Date.now() + 60_000)
+      const expiredDemo = signer.signDemoToken('https://tiny-pivot.com', Date.now() - 60_000)
+      expect(isValidDemoToken(validDemo)).toBe(true)
+      expect(isValidDemoToken(expiredDemo)).toBe(false)
+      expect(isValidDemoToken('not-a-real-token')).toBe(false)
+      expect(isValidDemoToken('TPDEMO.9999999999999.aHR0cHM6Ly9leGFtcGxlLmNvbQ.ZmFrZQ')).toBe(false)
+    }
+    finally {
+      signer.restore()
+    }
+  })
+
+  it('exposes MCP tool readOnlyHint annotations and actionable error recovery hints', async () => {
+    const { server } = createTinyPivotMcpServer()
+    const session = createMockMcpSession(server)
+    await session.connect()
+    await session.initialize({})
+
+    try {
+      const tools = await session.listTools()
+      const byName = new Map(tools.map(t => [t.name, t]))
+      for (const name of ['open_tinypivot', 'load_file', 'load_data', 'configure_pivot', 'configure_chart', 'query', 'profile', 'history', 'list_datasets']) {
+        expect(byName.get(name)?.annotations?.readOnlyHint).toBe(true)
+        expect(byName.get(name)?.annotations?.destructiveHint).toBe(false)
+      }
+      expect(byName.get('clear_datasets')?.annotations?.readOnlyHint).toBe(false)
+      expect(byName.get('set_visual_theme')?.annotations?.readOnlyHint).toBe(false)
+
+      const missingDs = await session.callTool('profile', { datasetId: 'missing_id' })
+      expect(missingDs.isError).toBe(true)
+      expect(missingDs.content?.[0]?.text).toContain('list_datasets')
+
+      const missingFile = await session.callTool('load_file', { filePath: '/nonexistent/path/sales.csv' })
+      expect(missingFile.isError).toBe(true)
+      expect(missingFile.content?.[0]?.text).toContain('absolute file path')
+    }
+    finally {
+      await server.close()
+    }
   })
 })
 

@@ -32,10 +32,8 @@ const PLAN_CODES: Record<string, string> = {
   single: 'PRO1',
   unlimited: 'PROU',
   team: 'PROT',
-  mcp_pro_monthly: 'MCPP',
   mcp_pro_yearly: 'MCPP',
   mcp_pro_lifetime: 'MCPP',
-  mcp_team_monthly: 'MCPT',
   mcp_team_yearly: 'MCPT',
 }
 
@@ -46,10 +44,8 @@ const PLAN_PRICES: Record<string, string | undefined> = {
   single: process.env.STRIPE_PRICE_SINGLE || 'price_1SZZLxBMwUz92tuidNM2wzOn',
   unlimited: process.env.STRIPE_PRICE_UNLIMITED || 'price_1SZZMFBMwUz92tuiMy5AZ4xD',
   team: process.env.STRIPE_PRICE_TEAM || 'price_1SZZMWBMwUz92tuibrSiGNhb',
-  mcp_pro_monthly: process.env.STRIPE_PRICE_MCP_PRO_MONTHLY || 'price_1UfR6hBMwUz92tui4vtPTgzb',
   mcp_pro_yearly: process.env.STRIPE_PRICE_MCP_PRO_YEARLY || 'price_1UfR6nBMwUz92tuiR83KcMYF',
   mcp_pro_lifetime: process.env.STRIPE_PRICE_MCP_PRO_LIFETIME || 'price_1UfRhNBMwUz92tuiDxc0F0Ht',
-  mcp_team_monthly: process.env.STRIPE_PRICE_MCP_TEAM_MONTHLY || 'price_1UfR6wBMwUz92tuic7EMgc3p',
   mcp_team_yearly: process.env.STRIPE_PRICE_MCP_TEAM_YEARLY || 'price_1UfR73BMwUz92tuiNd8bx6A7',
 }
 
@@ -116,10 +112,8 @@ async function sendLicenseEmail(email: string, licenseKey: string, plan: string)
     single: 'TinyPivot UI — Single App',
     unlimited: 'TinyPivot UI — Unlimited Apps',
     team: 'TinyPivot UI — Team License',
-    mcp_pro_monthly: 'TinyPivot MCP — Pro (Monthly)',
     mcp_pro_yearly: 'TinyPivot MCP — Pro (Yearly)',
     mcp_pro_lifetime: 'TinyPivot MCP — Pro (Lifetime)',
-    mcp_team_monthly: 'TinyPivot MCP — Team 5 Seats (Monthly)',
     mcp_team_yearly: 'TinyPivot MCP — Team 5 Seats (Yearly)',
   }
   const isMcpPlan = plan.startsWith('mcp_')
@@ -139,7 +133,7 @@ async function sendLicenseEmail(email: string, licenseKey: string, plan: string)
 npx @smallwebco/tinypivot-mcp@latest init --license=${licenseKey}
           </pre>
           <p>Or set <code>TINYPIVOT_LICENSE_KEY</code> in your MCP config's <code>env</code> block and restart your AI harness (Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, or pi).</p>
-          <p>This unlocks unlimited rows, all 5 chart themes, double-click drill-through, advanced aggregations, styled <code>.xlsx</code> exports, and read-only <code>query_postgres</code>.</p>
+          <p>This unlocks unlimited rows, all 10 visual themes, double-click drill-through, advanced aggregations, styled <code>.xlsx</code> exports, and read-only <code>query_postgres</code>.</p>
     `
     : `
           <h2>How to use your license:</h2>

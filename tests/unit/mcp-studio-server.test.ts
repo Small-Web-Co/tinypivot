@@ -12,6 +12,7 @@ import { HistoryStore } from '../../packages/mcp/src/history'
 import { DatasetStore } from '../../packages/mcp/src/store'
 import { Studio } from '../../packages/mcp/src/studio'
 import { STUDIO_HEADER } from '../../packages/mcp/src/studio-protocol'
+import { installTestLicenseKeypair } from '../helpers/license'
 
 describe('isAllowedRequest', () => {
   const port = 47317
@@ -190,9 +191,10 @@ describe('one theme everywhere', () => {
   })
 
   it('serves the page in the saved theme and repaints open tabs when it changes elsewhere', async () => {
+    const signer = installTestLicenseKeypair()
     const store = new DatasetStore()
     store.setVisualTheme('paper')
-    const handle = await startCompanionServer({ store, loadHtml: async () => '<html><head></head><body></body></html>', licenseKey: 'TP-MCPP-TESTKEY1-20991231', themeWatchMs: 50 })
+    const handle = await startCompanionServer({ store, loadHtml: async () => '<html><head></head><body></body></html>', licenseKey: signer.signLicense('MCPP'), themeWatchMs: 50 })
     try {
       expect(await (await fetch(handle.url)).text()).toContain('<meta name="tinypivot-theme" content="paper">')
 
@@ -211,6 +213,7 @@ describe('one theme everywhere', () => {
       controller.abort()
     }
     finally {
+      signer.restore()
       await handle.close()
     }
   }, 15_000)

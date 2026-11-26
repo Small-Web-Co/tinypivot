@@ -7,7 +7,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { startCompanionServer, STUDIO_IDLE_STOP_MS } from './companion.js'
 import { runInitCommand } from './init.js'
-import { createTinyPivotMcpServer, isMcpLicenseKey, loadAppHtml, resolveLicenseKey } from './server.js'
+import { isMcpLicenseKey, isValidDemoToken } from './license.js'
+import { createTinyPivotMcpServer, loadAppHtml, resolveLicenseKey } from './server.js'
 import { DatasetStore, FREE_TIER_ROW_LIMIT, getPreferencesPath, loadSavedVisualTheme, parseDelimitedText, saveVisualThemePreference } from './store.js'
 import { Studio } from './studio.js'
 import { formatDatasetSummary, formatPivotSummary } from './summary.js'
@@ -247,51 +248,90 @@ async function runInteractiveThemePicker(active: ChartThemePreset): Promise<Char
   })
 }
 
-async function runThemeCommand(args: string[]): Promise<void> {
+async function runThemeCommand(args: string[]): Promise<number> {
   const validSet = new Set<string>(CHART_THEME_IDS)
-  const requested = args[0]?.trim().toLowerCase()
-  const active = (process.env.TINYPIVOT_THEME?.trim().toLowerCase() && validSet.has(process.env.TINYPIVOT_THEME.trim().toLowerCase()))
-    ? process.env.TINYPIVOT_THEME.trim().toLowerCase() as ChartThemePreset
-    : (loadSavedVisualTheme() ?? 'code')
+  const jsonMode = args.includes('--json')
+  const requested = args.find(arg => arg !== '--json')?.trim().toLowerCase()
+  const envTheme = process.env.TINYPIVOT_THEME?.trim().toLowerCase()
+  const envOverride = envTheme && validSet.has(envTheme) ? envTheme as ChartThemePreset : null
+  const active: ChartThemePreset = envOverride ?? (loadSavedVisualTheme() ?? 'code')
   const useColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR)
+  const preferencesPath = getPreferencesPath()
 
-  if (!requested && process.stdin.isTTY && process.stdout.isTTY) {
+  if (!jsonMode && !requested && process.stdin.isTTY && process.stdout.isTTY) {
     console.log('')
     const picked = await runInteractiveThemePicker(active)
     console.log('')
     if (!picked) {
       console.log('Theme unchanged.')
-      return
+      return 0
     }
     saveVisualThemePreference(picked)
     console.log(`✓ Default TinyPivot theme set to "${picked}" (${TERMINAL_PALETTES[picked].label})`)
     if (process.env.TINYPIVOT_THEME) {
       console.log(`  Note: TINYPIVOT_THEME=${process.env.TINYPIVOT_THEME} in your shell/harness env overrides preferences.json.`)
     }
-    return
+    return 0
   }
 
   if (!requested || requested === '-h' || requested === '--help' || requested === 'list') {
+    if (jsonMode) {
+      console.log(JSON.stringify({
+        ok: true,
+        active,
+        envOverride,
+        preferencesPath,
+        themes: CHART_THEME_IDS.map(id => ({
+          id,
+          label: TERMINAL_PALETTES[id].label,
+          active: id === active,
+        })),
+      }, null, 2))
+      return 0
+    }
     console.log('\nTinyPivot MCP — Visual Themes\n')
     for (const id of CHART_THEME_IDS) {
       console.log(formatThemeRow(id, active, false, useColor))
     }
-    console.log(`\nPreferences file: ${getPreferencesPath()}`)
+    console.log(`\nPreferences file: ${preferencesPath}`)
     if (process.env.TINYPIVOT_THEME) {
       console.log(`Note: TINYPIVOT_THEME=${process.env.TINYPIVOT_THEME} is set in env and overrides preferences.json.`)
     }
-    console.log('\nUsage: npx @smallwebco/tinypivot-mcp theme [theme-id]\n')
-    return
+    console.log('\nUsage: npx @smallwebco/tinypivot-mcp theme [theme-id] [--json]\n')
+    return 0
   }
 
   if (!validSet.has(requested)) {
-    console.error(`Unknown theme "${requested}". Available themes: ${CHART_THEME_IDS.join(', ')}`)
-    process.exit(1)
+    const error = `Unknown theme "${requested}".`
+    if (jsonMode) {
+      console.log(JSON.stringify({
+        ok: false,
+        error,
+        hint: `Choose one of: ${CHART_THEME_IDS.join(', ')}.`,
+        availableThemes: CHART_THEME_IDS,
+      }, null, 2))
+    }
+    else {
+      console.error(`${error} Available themes: ${CHART_THEME_IDS.join(', ')}`)
+    }
+    return 1
   }
 
-  saveVisualThemePreference(requested as ChartThemePreset)
-  console.log(`✓ Default TinyPivot theme set to "${requested}" (${TERMINAL_PALETTES[requested as ChartThemePreset].label}) — saved to ${getPreferencesPath()}`)
+  const chosen = requested as ChartThemePreset
+  saveVisualThemePreference(chosen)
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      ok: true,
+      theme: chosen,
+      label: TERMINAL_PALETTES[chosen].label,
+      preferencesPath,
+      envOverride,
+    }, null, 2))
+    return 0
+  }
+  console.log(`✓ Default TinyPivot theme set to "${chosen}" (${TERMINAL_PALETTES[chosen].label}) — saved to ${preferencesPath}`)
   console.log('  Applies immediately on next TinyPivot MCP turn, Studio load, or TUI launch.')
+  return 0
 }
 
 function printRootHelp(): void {
@@ -300,11 +340,12 @@ TinyPivot MCP — Data Analysis Studio & Terminal Charts for AI Agents
 
 Commands:
   tinypivot-mcp init [options]       Configure Claude Code, Claude Desktop, pi, Cursor, OpenCode, Codex & Antigravity
-  tinypivot-mcp theme [id]           Interactive arrow-key theme picker (or set theme directly)
+  tinypivot-mcp theme [id] [--json]  Interactive arrow-key theme picker (or set/list themes directly)
   tinypivot-mcp tui                  Attach a live truecolor split-pane TUI (Ghostty/tmux)
   <cmd> | tinypivot-mcp [options]    Pipe CSV/TSV/JSON/JSONL directly from psql, duckdb, bq, etc.
 
 Options:
+  --json                             Print machine-readable JSON to stdout (init, theme, or piped stdin)
   --theme=<id>                       Visual theme (${CHART_THEME_IDS.join(', ')})
   --pivot                            Also print a framed sparkline pivot table on stdin pipe
   --open                             Open TinyPivot Studio in your browser now
@@ -327,7 +368,9 @@ async function main() {
     return
   }
   if (args[0] === 'init') {
-    await runInitCommand(args.slice(1))
+    const summary = await runInitCommand(args.slice(1))
+    if (summary && summary.exitCode !== 0)
+      process.exitCode = summary.exitCode
     return
   }
   if (args[0] === 'tui' || args[0] === 'attach') {
@@ -335,13 +378,16 @@ async function main() {
     return
   }
   if (args[0] === 'theme' || args[0] === 'themes') {
-    await runThemeCommand(args.slice(1))
+    const exitCode = await runThemeCommand(args.slice(1))
+    if (exitCode !== 0)
+      process.exitCode = exitCode
     return
   }
 
   const rawLicenseKey = resolveLicenseKey()
   const licenseKey = isMcpLicenseKey(rawLicenseKey) ? rawLicenseKey : undefined
-  const demoToken = process.env.TINYPIVOT_DEMO_TOKEN
+  const rawDemoToken = process.env.TINYPIVOT_DEMO_TOKEN
+  const demoToken = isValidDemoToken(rawDemoToken) ? rawDemoToken : undefined
   const isPro = Boolean(licenseKey || demoToken)
   const store = new DatasetStore({
     maxRowsPerDataset: isPro ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
@@ -354,8 +400,10 @@ async function main() {
   let autoOpen = false
   let forceStdinPipe = false
   let showPivotOutput = false
+  let jsonOutput = false
   let datasetName: string | undefined
   const filesToLoad: string[] = []
+  const validThemeSet = new Set<string>(CHART_THEME_IDS)
 
   for (const arg of args) {
     if (arg.startsWith('--app-html=')) {
@@ -366,8 +414,12 @@ async function main() {
       explicitPort = true
     }
     else if (arg.startsWith('--theme=')) {
-      const requestedTheme = arg.slice('--theme='.length)
-      if (isPro || requestedTheme.trim().toLowerCase() === 'code') {
+      const requestedTheme = arg.slice('--theme='.length).trim().toLowerCase()
+      if (!validThemeSet.has(requestedTheme)) {
+        console.error(`Unknown theme "${requestedTheme}". Available themes: ${CHART_THEME_IDS.join(', ')}`)
+        process.exit(1)
+      }
+      if (isPro || requestedTheme === 'code') {
         store.setVisualTheme(requestedTheme)
       }
     }
@@ -385,6 +437,9 @@ async function main() {
     }
     else if (arg === '--pivot') {
       showPivotOutput = true
+    }
+    else if (arg === '--json') {
+      jsonOutput = true
     }
     else if (!arg.startsWith('--')) {
       filesToLoad.push(arg)
@@ -482,7 +537,16 @@ async function main() {
     const rawText = await readRemainingStdin(probe.buffered, probe.ended)
     const { rows, format } = parsePipedStdinData(rawText)
     if (rows.length === 0) {
-      console.error('[tinypivot-mcp] No tabular rows detected on stdin.')
+      if (jsonOutput) {
+        console.log(JSON.stringify({
+          ok: false,
+          error: 'No tabular rows detected on stdin.',
+          hint: 'Pipe CSV, TSV, JSON array, or JSONL data with at least one row.',
+        }, null, 2))
+      }
+      else {
+        console.error('[tinypivot-mcp] No tabular rows detected on stdin. Pipe CSV, TSV, JSON array, or JSONL data with at least one row.')
+      }
       process.exit(1)
     }
 
@@ -498,7 +562,7 @@ async function main() {
       : ''
     console.error(`[tinypivot-mcp] Loaded ${ds.name} (${ds.rows.length.toLocaleString()} rows)${truncSuffix}`)
 
-    const useTtyColor = Boolean(process.stdout.isTTY && !process.env.NO_COLOR)
+    const useTtyColor = Boolean(!jsonOutput && process.stdout.isTTY && !process.env.NO_COLOR)
     let liveCompanionUrl: string | undefined
     if ((autoOpen || explicitPort) && !disableCompanion) {
       const handle = await ensureCompanionStarted()
@@ -512,22 +576,52 @@ async function main() {
       raw: useTtyColor,
     }
     const chartCard = formatTerminalChart(ds, ds.chartConfig, fmtOpts)
-    if (chartCard) {
-      console.log(chartCard)
+    const pivotConfig = showPivotOutput && ds.pivotConfig?.valueFields?.length
+      ? {
+          rowFields: ds.pivotConfig.rowFields ?? [],
+          columnFields: ds.pivotConfig.columnFields ?? [],
+          valueFields: ds.pivotConfig.valueFields,
+          showRowTotals: ds.pivotConfig.showRowTotals ?? true,
+          showColumnTotals: ds.pivotConfig.showColumnTotals ?? true,
+        }
+      : null
+    const pivotCard = pivotConfig
+      ? formatPivotSummary(ds, pivotConfig, liveCompanionUrl, fmtOpts)
+      : null
+
+    if (jsonOutput) {
+      console.log(JSON.stringify({
+        ok: true,
+        tier: isPro ? 'pro' : 'free',
+        dataset: {
+          id: ds.id,
+          name: ds.name,
+          source: ds.source,
+          format,
+          rowCount: ds.rows.length,
+          sourceTotalRows: ds.sourceTotalRows,
+          truncatedForFreeTier: ds.truncatedForFreeTier,
+          columns: ds.columns,
+        },
+        chart: {
+          config: ds.chartConfig ?? null,
+          card: chartCard || null,
+        },
+        pivot: pivotConfig ? { config: pivotConfig, card: pivotCard } : null,
+        studioUrl: liveCompanionUrl ?? null,
+      }, null, 2))
     }
     else {
-      console.log(formatDatasetSummary(ds, liveCompanionUrl, fmtOpts))
-    }
+      if (chartCard) {
+        console.log(chartCard)
+      }
+      else {
+        console.log(formatDatasetSummary(ds, liveCompanionUrl, fmtOpts))
+      }
 
-    if (showPivotOutput && ds.pivotConfig?.valueFields?.length) {
-      const pivotCard = formatPivotSummary(ds, {
-        rowFields: ds.pivotConfig.rowFields ?? [],
-        columnFields: ds.pivotConfig.columnFields ?? [],
-        valueFields: ds.pivotConfig.valueFields,
-        showRowTotals: ds.pivotConfig.showRowTotals ?? true,
-        showColumnTotals: ds.pivotConfig.showColumnTotals ?? true,
-      }, liveCompanionUrl, fmtOpts)
-      console.log(`\n${pivotCard}`)
+      if (pivotCard) {
+        console.log(`\n${pivotCard}`)
+      }
     }
 
     if (liveCompanionUrl) {
@@ -538,6 +632,14 @@ async function main() {
   }
 
   if (probe?.mode === 'empty') {
+    if (jsonOutput) {
+      console.log(JSON.stringify({
+        ok: false,
+        error: 'Empty stdin.',
+        hint: 'Pipe CSV, TSV, JSON array, or JSONL data, or pass a subcommand such as init or theme.',
+      }, null, 2))
+      process.exit(1)
+    }
     return
   }
 

@@ -111,7 +111,7 @@ export const termsOfService: LegalDocument = {
     {
       heading: 'Paid plans',
       paragraphs: [
-        'Pro and Team plans unlock the features described on the pricing page. Monthly and yearly plans renew until you cancel; a lifetime or one-time license does not renew. A license key is for the person or team that bought it: do not publish or resell it. We may revoke a key that was shared publicly or obtained by fraud. Payments are processed by Stripe. For a billing problem or a refund request, email us.',
+        'Pro and Team plans unlock the features described on the pricing page. Yearly plans renew until you cancel; a lifetime or one-time license does not renew. A license key is for the person or team that bought it: do not publish or resell it. We may revoke a key that was shared publicly or obtained by fraud. Payments are processed by Stripe. For a billing problem or a refund request, email us.',
       ],
     },
     {

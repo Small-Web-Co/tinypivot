@@ -52,7 +52,7 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, PostgreSQL:**
   - Large results (`>500` rows): export via your SQL CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`) to CSV/TSV/JSON/JSONL and pass the path to `load_file` — **0 raw rows enter LLM context**, or pipe stdout directly to `npx @smallwebco/tinypivot-mcp@latest --open`.
-  - Small in-memory results (`<500` rows from another MCP server, API, or aggregated query): pass flat JSON objects directly to `load_data` with `chartConfig`/`pivotConfig` in 1 call (no redundant temp CSV needed).
+  - Small in-memory results (up to `~50` rows from another MCP server, API, or aggregated query): pass flat JSON objects directly to `load_data` with `chartConfig`/`pivotConfig` in 1 call (write larger sets to a file and use `load_file` so raw rows aren't billed as output tokens).
 - **Optional Direct PostgreSQL Connector (Pro):** Set `DATABASE_URL` (+ optional `TINYPIVOT_ALLOWED_TABLES`) to run AST-validated read-only `SELECT` queries directly via `query_postgres`.
 
 ### Honest, Cache-Aware Token Savings
@@ -65,7 +65,7 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 
 - `open_tinypivot` — Opens TinyPivot (works with `{}` using the built-in sample dataset).
 - `load_file` — Loads local `.csv`, `.tsv`, `.json`, or `.jsonl` files (or SQL CLI exports) with 0 raw rows in context; accepts `chartConfig` and `pivotConfig` in 1 call.
-- `load_data` — Loads flat JSON rows already in memory (`<500` rows) directly without temp CSVs; accepts `chartConfig` and `pivotConfig` in 1 call.
+- `load_data` — Loads flat JSON rows already in memory (up to `~50` rows) directly without temp CSVs; accepts `chartConfig` and `pivotConfig` in 1 call.
 - `configure_pivot` — Deterministic pivot calculation via `@smallwebco/tinypivot-core` (zero LLM arithmetic errors).
 - `configure_chart` — Interactive charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, `scatter`, `bubble`, `heatmap`, `radar`, `choropleth` maps of countries / US states / sales regions, `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`) + Unicode terminal cards.
 - `query_postgres` — *(Optional Pro)* AST-validated read-only `SELECT` against `DATABASE_URL`.
@@ -78,8 +78,8 @@ MCP licenses (`TP-MCPP-*` / `TP-MCPT-*`) are separate from the React/Vue UI Libr
 | Plan | Price | Key Capabilities |
 |---|---|---|
 | **MCP Free** | $0 (no account) | Core charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), Basic Pivot (`sum`), Data Grid (sort/filter/CSV/Markdown), Terminal Cards & Live Ghostty TUI, TinyPivot Studio, `Code` theme, up to **2,500 rows** (explicit amber UI banner + LLM warning if truncated — never silent) |
-| **MCP Pro** | **$19/mo**, **$149/yr**, or **$399 Local Lifetime** | Unlimited rows, all 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`), double-click Drill-Through, all 9+ aggregations & calculated fields, styled `.xlsx` Excel export, optional direct read-only `query_postgres`, watermark-free UI & terminal cards |
-| **MCP Team (5 seats)** | **$79/mo** or **$699/yr** | All MCP Pro features for 5 team seats (`TP-MCPT-*`) |
+| **MCP Pro** | **$149/yr** or **$399 Local Lifetime** | Unlimited rows, all 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`), double-click Drill-Through, all 9+ aggregations & calculated fields, styled `.xlsx` Excel export, optional direct read-only `query_postgres`, watermark-free UI & terminal cards |
+| **MCP Team (5 seats)** | **$699/yr** | All MCP Pro features for 5 team seats (`TP-MCPT-*`) |
 
 ### Frequently Asked Questions (Quick Answers for Agents & Developers)
 

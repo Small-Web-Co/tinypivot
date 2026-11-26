@@ -11,8 +11,8 @@ import {
 import BreakEvenChart from './BreakEvenChart.vue'
 
 // Keep in step with the MCP Pro prices in site/pricing.ts.
-const PRO_MONTHLY_USD = 19
 const PRO_YEARLY_USD = 149
+const PRO_MONTHLY_EQUIV_USD = PRO_YEARLY_USD / 12
 const proYearlyLabel = `Pro yearly ($${PRO_YEARLY_USD})`
 
 const input = reactive({
@@ -40,14 +40,14 @@ const byModel = computed(() => {
     const perAnalysis = usdSavedPerAnalysis(estimate.value, rate)
     return { name: rate.name, perAnalysis, monthly: perAnalysis * analysesPerMonth.value }
   })
-  const max = Math.max(...rows.map(r => r.monthly), PRO_MONTHLY_USD)
+  const max = Math.max(...rows.map(r => r.monthly), PRO_MONTHLY_EQUIV_USD)
   return rows.map(r => ({ ...r, pct: Math.max(2, (r.monthly / max) * 100) }))
 })
 
 const reference = computed(() => byModel.value[1])
 const proMarkerPct = computed(() => {
-  const max = Math.max(...byModel.value.map(r => r.monthly), PRO_MONTHLY_USD)
-  return (PRO_MONTHLY_USD / max) * 100
+  const max = Math.max(...byModel.value.map(r => r.monthly), PRO_MONTHLY_EQUIV_USD)
+  return (PRO_MONTHLY_EQUIV_USD / max) * 100
 })
 </script>
 
@@ -92,7 +92,7 @@ const proMarkerPct = computed(() => {
       <div class="calc-models">
         <p class="label calc-models-head">
           <span>Monthly savings by model</span>
-          <span class="calc-pro-key">┊ Pro ${{ PRO_MONTHLY_USD }}/mo</span>
+          <span class="calc-pro-key">┊ Pro ${{ PRO_MONTHLY_EQUIV_USD.toFixed(2) }}/mo (${{ PRO_YEARLY_USD }}/yr)</span>
         </p>
         <div v-for="row in byModel" :key="row.name" class="calc-model">
           <span class="calc-model-name">{{ row.name }}</span>

@@ -64,12 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cancelPath: '/pricing?product=ui',
     },
 
-    // TinyPivot MCP (choose Subscription or Lifetime)
-    mcp_pro_monthly: {
-      priceId: process.env.STRIPE_PRICE_MCP_PRO_MONTHLY || 'price_1UfR6hBMwUz92tui4vtPTgzb',
-      mode: 'subscription',
-      cancelPath: '/pricing',
-    },
+    // TinyPivot MCP (Yearly subscription or Lifetime one-time)
     mcp_pro_yearly: {
       priceId: process.env.STRIPE_PRICE_MCP_PRO_YEARLY || 'price_1UfR6nBMwUz92tuiR83KcMYF',
       mode: 'subscription',
@@ -78,11 +73,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     mcp_pro_lifetime: {
       priceId: process.env.STRIPE_PRICE_MCP_PRO_LIFETIME || 'price_1UfRhNBMwUz92tuiDxc0F0Ht',
       mode: 'payment',
-      cancelPath: '/pricing',
-    },
-    mcp_team_monthly: {
-      priceId: process.env.STRIPE_PRICE_MCP_TEAM_MONTHLY || 'price_1UfR6wBMwUz92tuic7EMgc3p',
-      mode: 'subscription',
       cancelPath: '/pricing',
     },
     mcp_team_yearly: {

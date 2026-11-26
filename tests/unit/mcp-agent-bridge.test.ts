@@ -14,6 +14,7 @@ import { buildOpenCodePluginSource } from '../../packages/mcp/src/opencode-plugi
 import { buildPiExtensionSource } from '../../packages/mcp/src/pi-extension'
 import { DatasetStore } from '../../packages/mcp/src/store'
 import { Studio } from '../../packages/mcp/src/studio'
+import { installTestLicenseKeypair } from '../helpers/license'
 
 let dir: string
 let studio: Studio
@@ -269,18 +270,22 @@ describe('pi extension cards', () => {
 
 describe('pi extension coloured cards', () => {
   let handle: CompanionServerHandle
+  let signer: ReturnType<typeof installTestLicenseKeypair> | undefined
 
   afterEach(async () => {
+    signer?.restore()
+    signer = undefined
     await handle?.close()
   })
 
   it('draws cards from codemode in the Studio\'s full colour', async () => {
+    signer = installTestLicenseKeypair()
     const { formatTerminalChart } = await import('../../packages/mcp/src/terminal-chart')
     const rows = ['A', 'B'].flatMap(s => ['2026-01', '2026-02', '2026-03'].map((month, i) => ({ month, s, v: i + (s === 'A' ? 1 : 3) })))
     const chartConfig = { type: 'line' as const, xAxis: { field: 'month', role: 'dimension' as const }, yAxis: { field: 'v', role: 'measure' as const, aggregation: 'sum' as const }, seriesField: { field: 's', role: 'dimension' as const } }
     const dataset = studio.store.register({ name: 'Trend', source: 'test', rows, viewMode: 'chart', chartConfig })
     studio.store.setVisualTheme('crt-amber')
-    handle = await startCompanionServer({ store: studio.store, studio, loadHtml: async () => '', licenseKey: 'TP-MCPP-TESTKEY1-20991231' })
+    handle = await startCompanionServer({ store: studio.store, studio, loadHtml: async () => '', licenseKey: signer.signLicense('MCPP') })
 
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tinypivot-pi-colour-'))
     const file = path.join(dir, 'tinypivot-pi.mjs')

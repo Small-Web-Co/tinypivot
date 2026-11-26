@@ -99,6 +99,43 @@ describe('init writes configs that fetch the newest release', () => {
     expect(TINYPIVOT_CLAUDE_RULE_BLOCK).toMatch(/ranking.*instead of a Markdown table/)
     expect(TINYPIVOT_PI_RULE_BLOCK).toMatch(/ranking.*instead of a Markdown table/)
   })
+
+  it('supports --json output with real exit codes and actionable errors on invalid flags', async () => {
+    const logSpy = vi.mocked(console.log)
+    logSpy.mockClear()
+
+    const okSummary = await runInitCommand(['--targets=claude', '--no-rules', '--json'])
+    expect(okSummary).toMatchObject({ ok: true, exitCode: 0, configuredCount: 1, errorCount: 0 })
+    const parsedOk = JSON.parse(String(logSpy.mock.calls.at(-1)?.[0]))
+    expect(parsedOk.ok).toBe(true)
+    expect(parsedOk.results.some((r: { id: string, status: string }) => r.id === 'claude' && r.status === 'updated')).toBe(true)
+
+    logSpy.mockClear()
+    const badTarget = await runInitCommand(['--targets=does-not-exist', '--json'])
+    expect(badTarget).toMatchObject({ ok: false, exitCode: 1 })
+    const parsedBad = JSON.parse(String(logSpy.mock.calls.at(-1)?.[0]))
+    expect(parsedBad.ok).toBe(false)
+    expect(parsedBad.validTargets).toContain('claude')
+
+    logSpy.mockClear()
+    const badTheme = await runInitCommand(['--targets=claude', '--theme=rainbow', '--json'])
+    expect(badTheme).toMatchObject({ ok: false, exitCode: 1 })
+    const parsedTheme = JSON.parse(String(logSpy.mock.calls.at(-1)?.[0]))
+    expect(parsedTheme.availableThemes).toContain('code')
+
+    logSpy.mockClear()
+    const emptyHome = await fs.mkdtemp(path.join(os.tmpdir(), 'tinypivot-empty-'))
+    try {
+      vi.stubEnv('HOME', emptyHome)
+      vi.stubEnv('XDG_CONFIG_HOME', path.join(emptyHome, '.config'))
+      const noneDetected = await runInitCommand(['--no-rules', '--json'])
+      expect(noneDetected).toMatchObject({ ok: false, exitCode: 1, configuredCount: 0 })
+      expect(noneDetected?.hint).toContain('--all')
+    }
+    finally {
+      await fs.rm(emptyHome, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('plugin manifests for each agent marketplace', () => {

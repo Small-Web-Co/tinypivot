@@ -93,5 +93,11 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
+      - name: Build MCP package
+        run: pnpm build:mcp
+
+      - name: Clean-room MCP tarball smoke test
+        run: pnpm test:smoke:mcp
+
       - name: Build demo
         run: pnpm build:demo

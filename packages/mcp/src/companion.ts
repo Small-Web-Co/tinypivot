@@ -7,6 +7,7 @@ import fsSync, { unwatchFile, watchFile } from 'node:fs'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
+import { isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { datasetView, getPreferencesPath } from './store.js'
@@ -79,14 +80,14 @@ const STOPPED_STUDIO_PAGE = `<!doctype html><meta charset="utf-8"><title>TinyPiv
 <h1 style="font-size:16px">This TinyPivot Studio has stopped</h1>
 <p>The conversation this link belongs to is not running a Studio now. Ask your agent to open TinyPivot again; its reply has the new link.</p>`
 
-/** The license key when it is one for the MCP server (Pro or team), otherwise null. */
+/** The license key when it is a cryptographically valid MCP key (Pro or Team), otherwise null. */
 function validMcpKey(licenseKey?: string): string | null {
-  return licenseKey && (licenseKey.startsWith('TP-MCPP-') || licenseKey.startsWith('TP-MCPT-')) ? licenseKey : null
+  return isMcpLicenseKey(licenseKey) ? licenseKey! : null
 }
 
 /** Whether this Studio may use the Pro features, such as the extra themes. */
 function isProCompanion(options: { licenseKey?: string, demoToken?: string }): boolean {
-  return Boolean(validMcpKey(options.licenseKey) || options.demoToken)
+  return Boolean(validMcpKey(options.licenseKey) || isValidDemoToken(options.demoToken))
 }
 
 /** The page with the saved theme in a meta tag, so its first paint is already in that theme. */
@@ -235,7 +236,7 @@ function buildFullCompanionPayload(
     chartTheme: isPro ? store.getVisualTheme() : 'code',
     datasets: store.listMetadata(),
     licenseKey: validMcpKey(opts.licenseKey),
-    demoToken: opts.demoToken ?? null,
+    demoToken: isValidDemoToken(opts.demoToken) ? opts.demoToken! : null,
     modelCatalog: MODEL_CATALOG,
     tokenStats: {
       ingestionMode: ds.ingestionMode,

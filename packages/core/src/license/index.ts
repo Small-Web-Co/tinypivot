@@ -58,10 +58,85 @@ const DEMO_LICENSE: LicenseInfo = {
 
 // Public key for license verification (ECDSA P-256)
 // This is safe to embed - it can only VERIFY signatures, not create them
-const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+export const LICENSE_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE436rfGofder4lfo4UHsRF2M88Gs0
 zLsikg2H9GMkL8hLGuOtnGMpVfLRlc7cD8FdkPBBRgiQ8UFnG8hm+nMIug==
 -----END PUBLIC KEY-----`
+
+export interface ParsedLicenseKey {
+  typeCode: string
+  signature: string
+  expiry: string
+  payload: string
+}
+
+/**
+ * Parse a TinyPivot license key (`TP-{TYPE}-{SIGNATURE}-{YYYYMMDD}`).
+ * Returns null if the structural format is invalid.
+ */
+export function parseLicenseKey(key: string): ParsedLicenseKey | null {
+  if (!key || !key.startsWith('TP-')) {
+    return null
+  }
+
+  const lastDashIdx = key.lastIndexOf('-')
+  if (lastDashIdx === -1 || key.length - lastDashIdx !== 9) {
+    return null
+  }
+  const expiry = key.slice(lastDashIdx + 1)
+  if (!/^\d{8}$/.test(expiry)) {
+    return null
+  }
+
+  const withoutPrefix = key.slice(3)
+  const secondDashIdx = withoutPrefix.indexOf('-')
+  if (secondDashIdx === -1) {
+    return null
+  }
+  const typeCode = withoutPrefix.slice(0, secondDashIdx)
+  const signature = withoutPrefix.slice(secondDashIdx + 1, withoutPrefix.lastIndexOf('-'))
+  if (!typeCode || !signature) {
+    return null
+  }
+
+  return {
+    typeCode,
+    signature,
+    expiry,
+    payload: `TP-${typeCode}-${expiry}`,
+  }
+}
+
+/**
+ * Parse the YYYYMMDD segment into a UTC end-of-day Date, or null if invalid.
+ */
+export function parseLicenseExpiryDate(expiry: string): Date | null {
+  if (!/^\d{8}$/.test(expiry)) {
+    return null
+  }
+  const year = Number.parseInt(expiry.slice(0, 4), 10)
+  const month = Number.parseInt(expiry.slice(4, 6), 10)
+  const day = Number.parseInt(expiry.slice(6, 8), 10)
+  const date = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null
+  }
+  return date
+}
+
+/**
+ * Check whether an embedded expiry date has passed. `20991231` is treated as perpetual.
+ */
+export function isLicenseExpired(expiry: string, now: Date = new Date()): boolean {
+  if (expiry === '20991231') {
+    return false
+  }
+  const expiresAt = parseLicenseExpiryDate(expiry)
+  if (!expiresAt) {
+    return true
+  }
+  return expiresAt.getTime() < now.getTime()
+}
 
 /**
  * Convert base64 (or URL-safe base64) to Uint8Array
@@ -232,7 +307,7 @@ async function importPublicKey(): Promise<CryptoKey | null> {
     }
 
     // Convert PEM to binary
-    const pemContents = PUBLIC_KEY_PEM
+    const pemContents = LICENSE_PUBLIC_KEY_PEM
       .replace('-----BEGIN PUBLIC KEY-----', '')
       .replace('-----END PUBLIC KEY-----', '')
       .replace(/\s/g, '')
@@ -256,7 +331,7 @@ async function importPublicKey(): Promise<CryptoKey | null> {
  * Get SPKI bytes from the embedded PEM public key
  */
 function getSpkiBytes(): Uint8Array {
-  const pemContents = PUBLIC_KEY_PEM
+  const pemContents = LICENSE_PUBLIC_KEY_PEM
     .replace('-----BEGIN PUBLIC KEY-----', '')
     .replace('-----END PUBLIC KEY-----', '')
     .replace(/\s/g, '')
@@ -328,59 +403,40 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
     return FREE_LICENSE
   }
 
-  // License key format: TP-{TYPE}-{SIGNATURE}-{EXPIRY}
-  // Example: TP-PRO1-base64signature-20251231
-  // Note: signature uses URL-safe base64 which can contain dashes
-  // So we parse from known positions: prefix (TP), type (4 chars), expiry (8 chars at end)
-
-  if (!key.startsWith('TP-')) {
+  const parsed = parseLicenseKey(key)
+  if (!parsed) {
     return INVALID_LICENSE
   }
-
-  // Extract expiry (last 8 characters after final dash)
-  const lastDashIdx = key.lastIndexOf('-')
-  if (lastDashIdx === -1 || key.length - lastDashIdx !== 9) {
-    return INVALID_LICENSE
-  }
-  const expiryStr = key.slice(lastDashIdx + 1)
-
-  // Extract type code (between first and second dash)
-  const withoutPrefix = key.slice(3) // Remove "TP-"
-  const secondDashIdx = withoutPrefix.indexOf('-')
-  if (secondDashIdx === -1) {
-    return INVALID_LICENSE
-  }
-  const typeCode = withoutPrefix.slice(0, secondDashIdx)
-
-  // Extract signature (everything between type and expiry)
-  const signature = withoutPrefix.slice(secondDashIdx + 1, withoutPrefix.lastIndexOf('-'))
 
   // Verify cryptographic signature
-  const isValidSignature = await verifySignature(typeCode, signature, expiryStr)
+  const isValidSignature = await verifySignature(parsed.typeCode, parsed.signature, parsed.expiry)
   if (!isValidSignature) {
     return INVALID_LICENSE
   }
 
-  // Parse the embedded date segment from the key format.
-  const year = Number.parseInt(expiryStr.slice(0, 4))
-  const month = Number.parseInt(expiryStr.slice(4, 6)) - 1
-  const day = Number.parseInt(expiryStr.slice(6, 8))
-  const expiresAt = new Date(year, month, day)
+  const expiresAt = parseLicenseExpiryDate(parsed.expiry)
+  if (!expiresAt) {
+    return INVALID_LICENSE
+  }
 
   // Determine license type
   let type: LicenseType = 'free'
-  if (typeCode === 'PRO1')
+  if (parsed.typeCode === 'PRO1')
     type = 'pro-single'
-  else if (typeCode === 'PROU')
+  else if (parsed.typeCode === 'PROU')
     type = 'pro-unlimited'
-  else if (typeCode === 'PROT')
+  else if (parsed.typeCode === 'PROT')
     type = 'pro-team'
-  else if (typeCode === 'MCPP')
+  else if (parsed.typeCode === 'MCPP')
     type = 'mcp-pro'
-  else if (typeCode === 'MCPT')
+  else if (parsed.typeCode === 'MCPT')
     type = 'mcp-team'
 
-  // Features remain active forever. The parsed date is retained for compatibility.
+  if ((type === 'mcp-pro' || type === 'mcp-team') && isLicenseExpired(parsed.expiry)) {
+    return INVALID_LICENSE
+  }
+
+  // UI library licenses remain perpetual; MCP licenses with 20991231 also never expire.
   return {
     type,
     isValid: true,

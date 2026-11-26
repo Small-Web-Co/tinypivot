@@ -155,11 +155,16 @@ export {
   configureLicenseSecret,
   getDemoLicenseInfo,
   getFreeLicenseInfo,
+  isLicenseExpired,
   isPro,
+  LICENSE_PUBLIC_KEY_PEM,
   logProRequired,
+  parseLicenseExpiryDate,
+  parseLicenseKey,
   shouldShowWatermark,
   validateLicenseKey,
 } from './license'
+export type { ParsedLicenseKey } from './license'
 
 // Pivot Table Logic
 export {

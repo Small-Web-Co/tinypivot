@@ -10,6 +10,7 @@ import { formatHistoryList, HistoryStore, SESSIONS_DIR } from '../../packages/mc
 import { createTinyPivotMcpServer, DatasetStore } from '../../packages/mcp/src/index'
 import { formatProfile } from '../../packages/mcp/src/profile'
 import { describeView, fileStepSql, Studio } from '../../packages/mcp/src/studio'
+import { installTestLicenseKeypair } from '../helpers/license'
 
 const CSV = [
   'period,region,channel,orders,mrr',
@@ -150,11 +151,19 @@ describe('duckdb helpers', () => {
 })
 
 describe('query, profile and history tools', () => {
+  let signer: ReturnType<typeof installTestLicenseKeypair> | undefined
+
+  afterEach(() => {
+    signer?.restore()
+    signer = undefined
+  })
+
   async function connect() {
+    signer ??= installTestLicenseKeypair()
     const history = new HistoryStore({ dir: path.join(dir, 'history') })
     const store = new DatasetStore()
     const studio = new Studio(store, { history, duck: new DuckDbRunner() })
-    const { server } = createTinyPivotMcpServer({ licenseKey: 'TP-MCPP-TESTKEY1-20991231', store, studio })
+    const { server } = createTinyPivotMcpServer({ licenseKey: signer.signLicense('MCPP'), store, studio })
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
     const client = new Client({ name: 'test-host', version: '1.0.0' }, { capabilities: {} })
     await server.connect(serverTransport)

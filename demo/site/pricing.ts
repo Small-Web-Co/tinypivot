@@ -50,8 +50,7 @@ export const plans: Record<Product, Plan[]> = {
       name: 'Pro',
       featured: true,
       options: [
-        { id: 'mcp_pro_monthly', label: 'Monthly', price: '$19', period: '/month', note: 'Cancel anytime.' },
-        { id: 'mcp_pro_yearly', label: 'Yearly', price: '$149', period: '/year', note: '$12.42/mo billed yearly. Save 35%.' },
+        { id: 'mcp_pro_yearly', label: 'Yearly', price: '$149', period: '/year', note: '$12.42/mo billed yearly. Offline key.' },
         { id: 'mcp_pro_lifetime', label: 'Lifetime', price: '$399', period: 'once', note: 'Perpetual key, all v1.x updates.' },
       ],
       defaultOptionId: 'mcp_pro_yearly',
@@ -70,8 +69,7 @@ export const plans: Record<Product, Plan[]> = {
       id: 'mcp-team',
       name: 'Team',
       options: [
-        { id: 'mcp_team_monthly', label: 'Monthly', price: '$79', period: '/month', note: 'Up to 5 seats ($15.80/seat).' },
-        { id: 'mcp_team_yearly', label: 'Yearly', price: '$699', period: '/year', note: 'Up to 5 seats ($11.65/seat/mo). Save 26%.' },
+        { id: 'mcp_team_yearly', label: 'Yearly', price: '$699', period: '/year', note: 'Up to 5 seats ($11.65/seat/mo billed yearly).' },
       ],
       defaultOptionId: 'mcp_team_yearly',
       lead: 'Everything in Pro, plus',
