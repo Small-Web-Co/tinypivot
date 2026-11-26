@@ -67,7 +67,7 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
   const description = meta.description ?? ''
   const canonical = BASE_URL + (path === '/' ? '/' : path)
   const outFile = path === '/' ? 'index.html' : `${path.replace(/^\//, '')}/index.html`
-  const jsonLd = guideSlugSet.has(path.replace(/^\//, ''))
+  const jsonLd = (guideSlugSet.has(path.replace(/^\//, '')) || path === '/whitepaper')
     ? makeArticleJsonLd(title, canonical)
     : null
 
@@ -81,6 +81,7 @@ function buildRouteDescriptor(routeDef, guideSlugSet) {
  */
 const PAGE_FILES = {
   '/': ['demo/pages/Home.vue'],
+  '/whitepaper': ['demo/pages/Whitepaper.vue', 'demo/site/whitepaper.ts'],
   '/ui': ['demo/pages/Ui.vue'],
   '/docs': ['demo/pages/Docs.vue', 'demo/site/docs.ts'],
   '/pricing': ['demo/pages/Pricing.vue', 'demo/site/pricing.ts'],

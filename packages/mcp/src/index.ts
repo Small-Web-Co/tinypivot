@@ -1,9 +1,39 @@
+export {
+  type AnalyzeInput,
+  type AnalyzeMethod,
+  type AnalyzeOutput,
+  runAbTest,
+  runAnalysis,
+  runAnomalyDetection,
+  runCohortRetention,
+  runRegression,
+} from './analyze.js'
+export {
+  auditChartReaggregation,
+  type AuditKind,
+  auditNonAdditiveSql,
+  auditQueryResult,
+  type AuditWarning,
+  formatAuditWarnings,
+  formatSqlRepairHint,
+} from './audit.js'
 export { type TerminalFormatOptions } from './card.js'
 export {
   type CompanionServerHandle,
   type StartCompanionOptions,
   startCompanionServer,
 } from './companion.js'
+export {
+  type AdditiveDriver,
+  type ExplainChangeInput,
+  type ExplainChangeResult,
+  explainMetricChange,
+  type MixRateDimensionSummary,
+  type MixRateSegment,
+  type OutlierCheck,
+} from './explain.js'
+export { buildStandaloneHtmlReport } from './export-html.js'
+export { formatHistoryList, formatSessionList, type HistoryEntry, HistoryStore, type SessionSummary } from './history.js'
 export {
   runInitCommand,
   TINYPIVOT_CLAUDE_RULE_BLOCK,
@@ -16,6 +46,8 @@ export {
   isValidDemoToken,
   type LicenseKeyStatus,
 } from './license.js'
+export { buildStepLineage, extractSqlLineage, type LineageNode, type SqlLineageInfo, type StepLineage } from './lineage.js'
+export { computeSchemaKey, DataMemoryStore, defaultMemoryPath, type LearnedLesson, normalizeTableHint, type SchemaMemoryEntry } from './memory.js'
 export { buildPiExtensionSource } from './pi-extension.js'
 export {
   executeReadOnlyPostgresQuery,
@@ -30,6 +62,7 @@ export {
   resolveModelPricing,
   tokensToUsd,
 } from './pricing.js'
+export { formatProfile, formatProLoadTraps } from './profile.js'
 export {
   APP_MIME_TYPE,
   APP_RESOURCE_URI,
@@ -65,6 +98,7 @@ export {
 } from './studio.js'
 export { formatDatasetSummary, formatPivotSummary } from './summary.js'
 export { formatTerminalChart } from './terminal-chart.js'
+export { FEATURE_TIERS, type FeatureKey, hasFeature, type Tier } from './tiers.js'
 export {
   getCompanionSessionFile,
   isProcessAlive,

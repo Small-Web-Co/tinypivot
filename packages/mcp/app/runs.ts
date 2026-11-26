@@ -105,3 +105,77 @@ export function checkReport(run: StudioRun, checks: Record<string, StepCheck[]>)
   const claims = claimLine(run)
   return claims ? [...lines, claims] : lines
 }
+
+/** One browsable chart / pivot / data-frame output produced during the Studio session. */
+export interface SessionOutput {
+  step: StudioStep
+  /** 1-based position across the session. */
+  index: number
+  label: string
+  /** Short badge describing the view: chart type, pivot, or table. */
+  kind: string
+  /** Resolved SQL for this step or its dataset, when available. */
+  sql?: string
+}
+
+const NON_OUTPUT_TOOLS = new Set(['reply', 'note', 'profile'])
+
+/**
+ * Collects every viewable chart, pivot or table output in chronological order so the user can
+ * step through session outputs in sync with SQL, Chart/Pivot and Data Frame.
+ */
+export function collectSessionOutputs(steps: StudioStep[], loaded: ReadonlySet<string>): SessionOutput[] {
+  const sqlByDataset = new Map<string, string>()
+  const outputs: SessionOutput[] = []
+
+  for (const step of steps) {
+    if (step.datasetId && step.editableSql) {
+      sqlByDataset.set(step.datasetId, step.editableSql)
+    }
+    if (NON_OUTPUT_TOOLS.has(step.tool))
+      continue
+    if (!step.datasetId || (!loaded.has(step.datasetId) && !step.historyId))
+      continue
+
+    const kind = step.viewMode === 'pivot'
+      ? 'pivot'
+      : step.view && step.view !== 'table'
+        ? step.view.split(/\s+/)[0]
+        : 'table'
+
+    outputs.push({
+      step,
+      index: outputs.length + 1,
+      label: step.datasetName ?? step.why ?? `Step ${outputs.length + 1}`,
+      kind,
+      sql: step.editableSql ?? sqlByDataset.get(step.datasetId),
+    })
+  }
+
+  return outputs
+}
+
+/**
+ * Picks which session output is currently active: an explicit step selection wins, otherwise the
+ * latest output for the active dataset, otherwise the newest output in the session.
+ */
+export function resolveActiveOutputIndex(
+  outputs: SessionOutput[],
+  selectedStepId: string | null,
+  activeDatasetId: string,
+): number {
+  if (outputs.length === 0)
+    return -1
+  if (selectedStepId) {
+    const exact = outputs.findIndex(o => o.step.id === selectedStepId)
+    if (exact >= 0)
+      return exact
+  }
+  if (activeDatasetId) {
+    for (let i = outputs.length - 1; i >= 0; i--) {
+      if (outputs[i].step.datasetId === activeDatasetId)
+        return i
+    }
+  }
+  return outputs.length - 1
+}

@@ -1,18 +1,19 @@
 import type { ChartThemePreset } from '@smallwebco/tinypivot-core'
 import type { AddressInfo } from 'node:net'
-import type { DatasetStore } from './store.js'
 import type { NoteAttachment, StudioNote } from './studio-protocol.js'
-import type { Studio } from './studio.js'
 import fsSync, { unwatchFile, watchFile } from 'node:fs'
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
+import { buildStandaloneHtmlReport } from './export-html.js'
 import { isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { INTERACTIVE_ROW_LIMIT } from './limits.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
-import { datasetView, getPreferencesPath } from './store.js'
+import { DatasetStore, datasetView, FREE_TIER_ROW_LIMIT, getPreferencesPath } from './store.js'
 import { STUDIO_HEADER } from './studio-protocol.js'
+import { Studio } from './studio.js'
 import { cardTitle, datasetCard } from './summary.js'
+import { hasFeature } from './tiers.js'
 import { getCompanionSessionFile, isProcessAlive } from './tui.js'
 
 export interface CompanionServerHandle {
@@ -35,6 +36,8 @@ export interface StartCompanionOptions {
   port?: number
   /** Trace, notes and history shown in the Studio; without one the Studio routes answer 404. */
   studio?: Studio
+  /** When true (e.g. `tinypivot-mcp studio <id>`), no live MCP agent is attached (`liveSessionId = null`). */
+  standalone?: boolean
   /**
    * How long the server stays up after the last Studio tab closes. Only counts once a tab has
    * connected, so a Live link printed in a card keeps working until someone opens it. 0 keeps it up.
@@ -256,11 +259,26 @@ function buildFullCompanionPayload(
  * live-updating interactive TinyPivot Studio in a browser tab alongside the terminal.
  */
 export async function startCompanionServer(options: StartCompanionOptions): Promise<CompanionServerHandle> {
-  const sseClients = new Set<http.ServerResponse>()
+  const { studio } = options
+  const primarySessionId = studio?.sessionId ?? 'default'
+  const liveSessionId = studio && !options.standalone ? studio.sessionId : null
 
-  const send = (event: string, payload: unknown) => {
+  /** Every connected SSE tab is scoped strictly to a single sessionId (zero cross-session event bleed). */
+  const sseClients = new Map<http.ServerResponse, string>()
+
+  /**
+   * Isolated Studio instances for archived sessions opened in the browser.
+   * Each archived session gets its OWN `DatasetStore` and `Studio` so its datasets, DuckDB views,
+   * SQL edits, and steps can never bleed into the live agent session or into another archived session.
+   */
+  const MAX_ARCHIVED_STUDIOS = 4
+  const archivedStudios = new Map<string, { studio: Studio, lastUsed: number, unsubscribe: () => void }>()
+
+  const sendToSession = (sessionId: string, event: string, payload: unknown) => {
     const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
-    for (const res of sseClients) {
+    for (const [res, clientSessionId] of sseClients.entries()) {
+      if (clientSessionId !== sessionId)
+        continue
       try {
         res.write(frame)
       }
@@ -270,29 +288,124 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     }
   }
 
+  const sendSessionUpdate = (target: Studio, datasetId?: string) => {
+    const payload = buildFullCompanionPayload(target.store, datasetId, options)
+    if (payload)
+      sendToSession(target.sessionId, 'update', payload)
+  }
+
   const broadcastUpdate = () => {
     const payload = buildFullCompanionPayload(options.store, undefined, options)
     if (payload)
-      send('update', payload)
+      sendToSession(primarySessionId, 'update', payload)
   }
 
-  const { studio } = options
-  studio?.subscribe(() => send('studio', studio.snapshot()))
+  const snapshotFor = (target: Studio) => target.snapshot(undefined, { liveSessionId })
 
-  /** Studio writes: the user's own SQL, notes for the agent, and reopening saved pulls. */
+  const broadcastSessionsList = () => {
+    if (studio)
+      sendToSession(studio.sessionId, 'studio', snapshotFor(studio))
+    for (const entry of archivedStudios.values())
+      sendToSession(entry.studio.sessionId, 'studio', snapshotFor(entry.studio))
+  }
+
+  studio?.subscribe(() => sendToSession(studio.sessionId, 'studio', snapshotFor(studio)))
+
+  const resolveStudio = async (requestedSessionId?: string): Promise<Studio | null> => {
+    if (!studio)
+      return null
+    const id = requestedSessionId?.trim() || studio.sessionId
+    if (id === studio.sessionId)
+      return studio
+    if (!studio.history.enabled || !studio.history.hasSession(id))
+      return null
+    const cached = archivedStudios.get(id)
+    if (cached) {
+      cached.lastUsed = Date.now()
+      return cached.studio
+    }
+    if (archivedStudios.size >= MAX_ARCHIVED_STUDIOS) {
+      let oldestId: string | undefined
+      let oldestTime = Number.POSITIVE_INFINITY
+      for (const [sid, entry] of archivedStudios.entries()) {
+        if (entry.lastUsed < oldestTime) {
+          oldestTime = entry.lastUsed
+          oldestId = sid
+        }
+      }
+      if (oldestId) {
+        archivedStudios.get(oldestId)?.unsubscribe()
+        archivedStudios.delete(oldestId)
+      }
+    }
+    const isolatedStore = new DatasetStore({
+      maxRowsPerDataset: hasFeature(isProCompanion(options), 'unlimited_rows') ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
+    })
+    isolatedStore.setVisualTheme(options.store.getVisualTheme())
+    const isolated = new Studio(isolatedStore, {
+      history: studio.history,
+      duck: studio.duck,
+      sessionId: id,
+      formatSql: studio.formatSql,
+    })
+    await isolated.hydrateFromHistory()
+    const unsubscribe = isolated.subscribe(() => {
+      sendToSession(id, 'studio', snapshotFor(isolated))
+    })
+    archivedStudios.set(id, { studio: isolated, lastUsed: Date.now(), unsubscribe })
+    return isolated
+  }
+
+  /** Studio writes: routed strictly to the requested isolated session. */
   const handleStudioPost = async (pathname: string, body: Record<string, unknown>, res: http.ServerResponse) => {
     if (!studio)
       return sendJson(res, 404, { error: 'Studio is not available.' })
+
+    if (pathname === '/api/studio/session/pin') {
+      const targetId = typeof body.sessionId === 'string' && body.sessionId.trim() ? body.sessionId.trim() : studio.sessionId
+      const pinned = body.pinned === true
+      if (!studio.history.setSessionPinned(targetId, pinned))
+        return sendJson(res, 400, { error: 'Could not update session pin state.' })
+      broadcastSessionsList()
+      return sendJson(res, 200, { sessionId: targetId, pinned })
+    }
+
+    const reqSessionId = typeof body.sessionId === 'string' && body.sessionId.trim() ? body.sessionId.trim() : undefined
+    const target = await resolveStudio(reqSessionId)
+    if (!target)
+      return sendJson(res, 404, { error: 'Session not found.' })
+
     if (pathname === '/api/studio/query') {
       const sql = typeof body.sql === 'string' ? body.sql.trim() : ''
       if (!sql || sql.length > MAX_SQL_CHARS)
         return sendJson(res, 400, { error: 'Send one SELECT statement.' })
       const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 120) : undefined
       try {
+        const updateStepId = typeof body.updateStepId === 'string' && body.updateStepId ? body.updateStepId : undefined
+        if (updateStepId) {
+          const { step, dataset, truncated } = await target.updateStepSql(updateStepId, sql, { name })
+          sendSessionUpdate(target, dataset.id)
+          return sendJson(res, 200, { stepId: step.id, datasetId: dataset.id, rows: dataset.rows.length, truncated, updated: true })
+        }
         const viewFromStepId = typeof body.fromStepId === 'string' ? body.fromStepId : undefined
-        const { dataset, truncated } = await studio.runQuery({ sql, name, actor: 'user', viewFromStepId })
-        broadcastUpdate()
+        const { dataset, truncated } = await target.runQuery({ sql, name, actor: 'user', viewFromStepId })
+        sendSessionUpdate(target, dataset.id)
         return sendJson(res, 200, { datasetId: dataset.id, rows: dataset.rows.length, truncated })
+      }
+      catch (error) {
+        return sendJson(res, 400, { error: errorMessage(error) })
+      }
+    }
+    if (pathname === '/api/studio/restore') {
+      const stepId = typeof body.stepId === 'string' ? body.stepId : ''
+      const revisionIndex = typeof body.revisionIndex === 'number' ? body.revisionIndex : -1
+      if (!stepId || revisionIndex < 0)
+        return sendJson(res, 400, { error: 'Provide stepId and revisionIndex.' })
+      try {
+        const { step, dataset } = await target.restoreStepRevision(stepId, revisionIndex)
+        if (dataset)
+          sendSessionUpdate(target, dataset.id)
+        return sendJson(res, 200, { stepId: step.id, datasetId: dataset?.id })
       }
       catch (error) {
         return sendJson(res, 400, { error: errorMessage(error) })
@@ -301,8 +414,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     if (pathname === '/api/studio/remove') {
       const datasetId = typeof body.datasetId === 'string' ? body.datasetId : ''
       try {
-        studio.removeUserDataset(datasetId)
-        broadcastUpdate()
+        target.removeUserDataset(datasetId)
+        sendSessionUpdate(target)
         return sendJson(res, 200, { ok: true })
       }
       catch (error) {
@@ -314,14 +427,17 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
       if (!sql.trim() || sql.length > MAX_SQL_CHARS)
         return sendJson(res, 400, { error: 'Send the SQL to format.' })
       // null: no SQLFluff on this machine, and the Studio formats in the browser.
-      return sendJson(res, 200, { sql: await studio.formatSql(sql) })
+      return sendJson(res, 200, { sql: await target.formatSql(sql) })
     }
     if (pathname === '/api/studio/note') {
+      // Never allow sending messages into a live agent from a different/archived session.
+      if (!liveSessionId || target.sessionId !== liveSessionId)
+        return sendJson(res, 409, { error: 'Cannot message a live agent while viewing a saved session. Return to the live session first.' })
       const text = typeof body.text === 'string' ? body.text.trim() : ''
       if (!text || text.length > MAX_NOTE_CHARS)
         return sendJson(res, 400, { error: `Write a note of up to ${MAX_NOTE_CHARS.toLocaleString('en-US')} characters.` })
       try {
-        const note = studio.addNote(text, {
+        const note = target.addNote(text, {
           stepId: typeof body.stepId === 'string' ? body.stepId : undefined,
           attachment: parseAttachment(body.attachment),
           fileIds: Array.isArray(body.fileIds) ? body.fileIds.filter((id): id is string => typeof id === 'string') : undefined,
@@ -334,7 +450,7 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     }
     if (pathname === '/api/studio/verify') {
       try {
-        return sendJson(res, 200, { checks: await studio.verifyStep(String(body.stepId ?? '')) })
+        return sendJson(res, 200, { checks: await target.verifyStep(String(body.stepId ?? '')) })
       }
       catch (error) {
         return sendJson(res, 400, { error: errorMessage(error) })
@@ -354,8 +470,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     if (pathname === '/api/studio/show') {
       try {
         const viewMode = body.viewMode === 'grid' || body.viewMode === 'chart' || body.viewMode === 'pivot' ? body.viewMode : undefined
-        const dataset = await studio.showStep(String(body.stepId ?? ''), { viewMode })
-        broadcastUpdate()
+        const dataset = await target.showStep(String(body.stepId ?? ''), { viewMode })
+        sendSessionUpdate(target, dataset.id)
         return sendJson(res, 200, { datasetId: dataset.id })
       }
       catch (error) {
@@ -364,8 +480,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     }
     if (pathname === '/api/studio/open') {
       try {
-        const dataset = await studio.reopen(String(body.id ?? ''), { actor: 'user' })
-        broadcastUpdate()
+        const dataset = await target.reopen(String(body.id ?? ''), { actor: 'user' })
+        sendSessionUpdate(target, dataset.id)
         return sendJson(res, 200, { datasetId: dataset.id })
       }
       catch (error) {
@@ -395,8 +511,8 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     if (!allowed)
       return sendJson(res, 403, { error: 'Forbidden' })
 
-    // A link names its conversation. Another conversation's link is forwarded to the server that
-    // has it, or answered with a page saying that Studio has stopped: never with this one's data.
+    // A link names its conversation. Another live conversation's link is forwarded to its server;
+    // a saved session on disk is served directly in its own isolated Studio context.
     const linkSession = /^\/s\/([\w-]+)\/?$/.exec(pathname)?.[1]
     if (req.method === 'GET' && linkSession && linkSession !== studio?.sessionId) {
       const target = await liveStudioUrl(linkSession)
@@ -405,9 +521,11 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
         res.end()
         return
       }
-      res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(STOPPED_STUDIO_PAGE)
-      return
+      if (!studio?.history.hasSession(linkSession)) {
+        res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(STOPPED_STUDIO_PAGE)
+        return
+      }
     }
 
     if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html' || linkSession)) {
@@ -418,15 +536,18 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     }
 
     if (req.method === 'GET' && pathname === '/api/events') {
+      const requestedSession = urlObj.searchParams.get('sessionId') ?? undefined
+      const target = await resolveStudio(requestedSession)
+      const channelId = target?.sessionId ?? primarySessionId
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       })
       res.write('retry: 2000\n\n')
-      if (studio)
-        res.write(`event: studio\ndata: ${JSON.stringify(studio.snapshot())}\n\n`)
-      sseClients.add(res)
+      if (target)
+        res.write(`event: studio\ndata: ${JSON.stringify(snapshotFor(target))}\n\n`)
+      sseClients.set(res, channelId)
       clearTimeout(idleTimer)
       req.on('close', () => {
         sseClients.delete(res)
@@ -459,7 +580,61 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     }
 
     if (req.method === 'GET' && pathname === '/api/studio') {
-      return studio ? sendJson(res, 200, studio.snapshot()) : sendJson(res, 404, { error: 'Studio is not available.' })
+      const requestedSession = urlObj.searchParams.get('sessionId') ?? undefined
+      const target = await resolveStudio(requestedSession)
+      return target ? sendJson(res, 200, snapshotFor(target)) : sendJson(res, 404, { error: 'Studio session not found.' })
+    }
+
+    if (req.method === 'GET' && pathname === '/api/studio/sessions') {
+      if (!studio)
+        return sendJson(res, 404, { error: 'Studio is not available.' })
+      return sendJson(res, 200, {
+        liveSessionId,
+        sessions: studio.history.enabled ? studio.history.listSessions(50) : [],
+      })
+    }
+
+    if (req.method === 'GET' && pathname === '/api/studio/export-html') {
+      const requestedSession = urlObj.searchParams.get('sessionId') ?? undefined
+      const target = await resolveStudio(requestedSession)
+      if (!target)
+        return sendJson(res, 404, { error: 'Studio session not found.' })
+      const isPro = isProCompanion(options)
+      const theme = isPro ? target.store.getVisualTheme() : 'code'
+      const html = await buildStandaloneHtmlReport(target, { theme, showBranding: !hasFeature(isPro, 'white_label_export') })
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `attachment; filename="tinypivot-${target.sessionId}.html"`,
+      })
+      res.end(html)
+      return
+    }
+
+    if (req.method === 'GET' && pathname === '/api/studio/step-data') {
+      const requestedSession = urlObj.searchParams.get('sessionId') ?? undefined
+      const target = await resolveStudio(requestedSession)
+      if (!target)
+        return sendJson(res, 404, { error: 'Studio session not found.' })
+      const stepId = urlObj.searchParams.get('stepId') ?? ''
+      if (!stepId)
+        return sendJson(res, 400, { error: 'Provide stepId.' })
+      try {
+        const { step, dataset } = await target.getStepDataset(stepId)
+        return sendJson(res, 200, {
+          stepId: step.id,
+          datasetId: dataset.id,
+          name: dataset.name,
+          totalRows: dataset.rows.length,
+          rows: dataset.rows.slice(0, INTERACTIVE_ROW_LIMIT),
+          viewMode: step.viewMode ?? dataset.viewMode,
+          chartConfig: step.chartConfig ?? dataset.chartConfig ?? null,
+          pivotConfig: step.pivotConfig ?? dataset.pivotConfig ?? null,
+          filterFields: dataset.filterFields ?? [],
+        })
+      }
+      catch (error) {
+        return sendJson(res, 404, { error: errorMessage(error) })
+      }
     }
 
     // A file dropped into the Studio: the raw bytes, its name in a header. Messages refer to it by the id returned.
@@ -480,7 +655,10 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
 
     if (req.method === 'GET' && pathname === '/api/state') {
       const dsId = urlObj.searchParams.get('datasetId') ?? undefined
-      const payload = buildFullCompanionPayload(options.store, dsId, options)
+      const requestedSession = urlObj.searchParams.get('sessionId') ?? undefined
+      const target = requestedSession ? await resolveStudio(requestedSession) : studio
+      const storeForReq = target ? target.store : options.store
+      const payload = buildFullCompanionPayload(storeForReq, dsId, options)
       if (!payload) {
         sendJson(res, 404, { error: 'Dataset not found' })
         return
@@ -552,7 +730,10 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     if (registration)
       void fs.rm(registration, { force: true })
     closePromise = (async () => {
-      for (const client of sseClients) {
+      for (const entry of archivedStudios.values())
+        entry.unsubscribe()
+      archivedStudios.clear()
+      for (const client of sseClients.keys()) {
         try {
           client.end()
         }
@@ -592,6 +773,10 @@ export async function startCompanionServer(options: StartCompanionOptions): Prom
     if (theme === shownTheme)
       return
     shownTheme = theme
+    for (const entry of archivedStudios.values()) {
+      entry.studio.store.setVisualTheme(theme)
+      sendSessionUpdate(entry.studio)
+    }
     broadcastUpdate()
   }
 

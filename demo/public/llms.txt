@@ -1,6 +1,6 @@
 # TinyPivot
 
-> A data analysis studio for AI agents (MCP) and lightweight React & Vue 3 data grid with free core charts & pivot tables, Pro unlimited rows, drill-through, read-only PostgreSQL, and Excel export.
+> The neuro-symbolic trust layer and data analysis studio for AI agents (MCP), plus a lightweight React & Vue 3 data grid. Free includes unlimited local rows, charts, pivots, DuckDB SQL, Studio IDE + lineage, and basic SQL guardrails; Pro unlocks deep relational & statistical audits, the full Data Science shelf, Recursive Data Memory, white-label exports, and read-only PostgreSQL.
 
 ## Install in one command
 
@@ -10,9 +10,11 @@
 - Gemini CLI extension: `gemini extensions install https://github.com/Small-Web-Co/tinypivot`
 - Plugin repository: https://github.com/Small-Web-Co/tinypivot-plugin
 
-TinyPivot is an **In-Agent Analytics MCP App** (`@smallwebco/tinypivot-mcp`) and a batteries-included analytics DataGrid for Vue 3 and React. The MCP server streams CSV, TSV, JSON, inline MCP tool outputs, and read-only PostgreSQL results straight into an interactive Chart, Pivot Table, and Data Grid without stuffing raw rows into LLM context. Each step the agent takes (load, SQL query, chart, pivot) appears live in TinyPivot Studio on localhost with the agent's reason and the SQL behind it; users can edit and rerun that SQL, reopen earlier pulls, and send notes back to the agent. Free includes core charts and basic pivot up to 2,500 rows (with explicit UI/LLM truncation banners); MCP Pro ($149/yr or $399 local v1.x lifetime) and MCP Team ($699/yr for 5 seats) unlock unlimited rows, 10 themes, drill-through, Excel export, and read-only Postgres via dedicated offline-verified `TP-MCP*` keys. UI Library perpetual licenses ($49–$399, `TP-PRO*` keys) remain separate for React & Vue web apps.
+TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinypivot-mcp`) plus a batteries-included analytics DataGrid for Vue 3 and React. The MCP server streams CSV, TSV, JSON, Parquet, inline MCP tool outputs, and read-only PostgreSQL results straight into local DuckDB + an interactive Chart, Pivot Table, and Data Grid without stuffing raw rows into LLM context. Every SQL query, chart, and pivot is automatically audited for silent analytical traps (join fan-out, non-additive rates, partial trailing periods, Simpson's Paradox, SRM, confounding, and outliers) and logged with Proof-of-Work Lineage in TinyPivot Studio on localhost. Free includes **unlimited local rows**, core charts, basic pivot, Studio IDE + lineage, offline HTML export, basic SQL guardrails, and `analyze(explain_change, ab_test)` with no signup; MCP Pro ($149/yr or $399 local v1.x lifetime) and MCP Team ($699/yr for 5 seats) unlock deep relational & statistical guardrails, the full Data Science shelf (`analyze` with SRM + Holm-Bonferroni, controlled regression, right-censored cohorts, seasonal anomalies), Recursive Data Memory, 10 themes, drill-through, white-label HTML & Excel export, and read-only Postgres via dedicated offline-verified `TP-MCP*` keys. UI Library perpetual licenses ($49–$399, `TP-PRO*` keys) remain separate for React & Vue web apps.
 
 ## Docs
+
+- [Technical White Paper & 4-Model Benchmarks](https://tiny-pivot.com/whitepaper): Empirical evaluation across Inkling 2 Mini, DeepSeek V4.1 Flash, Claude Haiku 4.5, and Claude Sonnet (75% → 96% hard-trap accuracy, up to 40% lower cost than Free)
 
 - [In-Agent Analytics (TinyPivot MCP Docs)](https://tiny-pivot.com/docs): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference
 - [Full AI-friendly developer reference](https://tiny-pivot.com/llms-full.txt): Complete install, quick-start code, all props, free vs Pro feature matrix, pricing, aggregations, theming, and AI Data Analyst setup for both Vue and React

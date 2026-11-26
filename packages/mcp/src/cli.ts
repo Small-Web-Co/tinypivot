@@ -6,6 +6,7 @@ import { PassThrough } from 'node:stream'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { startCompanionServer, STUDIO_IDLE_STOP_MS } from './companion.js'
+import { formatSessionList, HistoryStore } from './history.js'
 import { runInitCommand } from './init.js'
 import { isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { createTinyPivotMcpServer, loadAppHtml, resolveLicenseKey } from './server.js'
@@ -13,6 +14,7 @@ import { DatasetStore, FREE_TIER_ROW_LIMIT, getPreferencesPath, loadSavedVisualT
 import { Studio } from './studio.js'
 import { formatDatasetSummary, formatPivotSummary } from './summary.js'
 import { formatTerminalChart } from './terminal-chart.js'
+import { hasFeature } from './tiers.js'
 import { runTuiCommand } from './tui.js'
 
 function openInBrowser(url: string) {
@@ -334,12 +336,116 @@ async function runThemeCommand(args: string[]): Promise<number> {
   return 0
 }
 
+async function runStudioCommand(args: string[]): Promise<number> {
+  const jsonMode = args.includes('--json')
+  const listMode = args.includes('--list') || args.includes('-l') || args[0] === 'list'
+  const noOpen = args.includes('--no-open')
+  const pinIdx = args.indexOf('--pin')
+  const unpinIdx = args.indexOf('--unpin')
+  const portArg = args.find(a => a.startsWith('--port='))
+  const port = portArg ? (Number(portArg.slice('--port='.length)) || 0) : 0
+  const history = new HistoryStore()
+
+  if (args.includes('-h') || args.includes('--help')) {
+    console.log(`
+TinyPivot Studio — Reopen & Manage Saved Sessions (Isolated)
+
+Usage:
+  tinypivot-mcp studio [--list] [--json]        List saved sessions on disk
+  tinypivot-mcp studio [sessionId]              Reopen a saved session (or newest) in your browser
+  tinypivot-mcp studio --pin <sessionId>        Pin a session so it is never pruned after 30 days
+  tinypivot-mcp studio --unpin <sessionId>      Unpin a session
+
+Options:
+  --port=<n>    Listen on a specific localhost port
+  --no-open     Print URL without launching the browser
+  --json        Machine-readable JSON output for --list / --pin / --unpin
+`.trim())
+    return 0
+  }
+
+  if (pinIdx >= 0 || unpinIdx >= 0) {
+    const pinning = pinIdx >= 0
+    const targetId = args[(pinning ? pinIdx : unpinIdx) + 1]?.trim()
+    if (!targetId) {
+      console.error(`Usage: tinypivot-mcp studio ${pinning ? '--pin' : '--unpin'} <sessionId>`)
+      return 1
+    }
+    const ok = history.setSessionPinned(targetId, pinning)
+    if (jsonMode)
+      console.log(JSON.stringify({ ok, sessionId: targetId, pinned: pinning }, null, 2))
+    else
+      console.log(ok ? `${pinning ? '★ Pinned' : 'Unpinned'} session ${targetId}` : `Invalid session id "${targetId}"`)
+    return ok ? 0 : 1
+  }
+
+  const sessions = history.listSessions(50)
+  if (listMode) {
+    if (jsonMode) {
+      console.log(JSON.stringify({ ok: true, dir: history.dir, sessions }, null, 2))
+      return 0
+    }
+    console.log(formatSessionList(sessions))
+    return 0
+  }
+
+  const positional = args.find(a => !a.startsWith('-'))
+  const targetId = positional ?? sessions[0]?.id
+  if (!targetId || !history.hasSession(targetId)) {
+    const msg = positional
+      ? `Saved session "${positional}" was not found.`
+      : 'No saved Studio sessions found yet. Start an analysis with your AI agent first.'
+    if (jsonMode)
+      console.log(JSON.stringify({ ok: false, error: msg, sessions }, null, 2))
+    else
+      console.error(msg)
+    return 1
+  }
+
+  const rawLicenseKey = resolveLicenseKey()
+  const licenseKey = isMcpLicenseKey(rawLicenseKey) ? rawLicenseKey : undefined
+  const rawDemoToken = process.env.TINYPIVOT_DEMO_TOKEN
+  const demoToken = isValidDemoToken(rawDemoToken) ? rawDemoToken : undefined
+  const isPro = Boolean(licenseKey || demoToken)
+  const store = new DatasetStore({
+    maxRowsPerDataset: hasFeature(isPro, 'unlimited_rows') ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
+  })
+  const studio = new Studio(store, { history, sessionId: targetId })
+  const hydratedCount = await studio.hydrateFromHistory()
+
+  const handle = await startCompanionServer({
+    store,
+    studio,
+    standalone: true,
+    loadHtml: () => loadAppHtml(),
+    licenseKey,
+    demoToken,
+    port,
+    idleStopMs: 0,
+  })
+
+  console.error(`[tinypivot-mcp] Reopened isolated session ${targetId} (${hydratedCount} table${hydratedCount === 1 ? '' : 's'} hydrated)`)
+  console.log(handle.link)
+  if (!noOpen)
+    openInBrowser(handle.link)
+
+  await new Promise<void>((resolve) => {
+    const stop = () => {
+      void handle.close().finally(resolve)
+    }
+    process.once('SIGINT', stop)
+    process.once('SIGTERM', stop)
+  })
+  return 0
+}
+
 function printRootHelp(): void {
   console.log(`
 TinyPivot MCP — Data Analysis Studio & Terminal Charts for AI Agents
 
 Commands:
   tinypivot-mcp init [options]       Configure Claude Code, Claude Desktop, pi, Cursor, OpenCode, Codex & Antigravity
+  tinypivot-mcp studio [id|--list]   Reopen, list, or pin saved Studio sessions in full isolation
   tinypivot-mcp theme [id] [--json]  Interactive arrow-key theme picker (or set/list themes directly)
   tinypivot-mcp tui                  Attach a live truecolor split-pane TUI (Ghostty/tmux)
   <cmd> | tinypivot-mcp [options]    Pipe CSV/TSV/JSON/JSONL directly from psql, duckdb, bq, etc.
@@ -377,6 +483,12 @@ async function main() {
     await runTuiCommand(args.slice(1))
     return
   }
+  if (args[0] === 'studio' || args[0] === 'sessions') {
+    const exitCode = await runStudioCommand(args.slice(1))
+    if (exitCode !== 0)
+      process.exitCode = exitCode
+    return
+  }
   if (args[0] === 'theme' || args[0] === 'themes') {
     const exitCode = await runThemeCommand(args.slice(1))
     if (exitCode !== 0)
@@ -390,7 +502,7 @@ async function main() {
   const demoToken = isValidDemoToken(rawDemoToken) ? rawDemoToken : undefined
   const isPro = Boolean(licenseKey || demoToken)
   const store = new DatasetStore({
-    maxRowsPerDataset: isPro ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
+    maxRowsPerDataset: hasFeature(isPro, 'unlimited_rows') ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
   })
 
   let appHtmlPath: string | undefined

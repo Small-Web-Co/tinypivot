@@ -3,7 +3,7 @@ import type { ClaimSource } from './claims.js'
 import type { HistoryEntry, RecordInput } from './history.js'
 import type { SqlFormatter } from './sql-format.js'
 import type { DatasetStore, RowFilter, StoredDataset } from './store.js'
-import type { AgentHint, Fingerprint, NoteAttachment, SourceFile, StepActor, StepCheck, StudioFile, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
+import type { AgentHint, Fingerprint, NoteAttachment, SourceFile, StepActor, StepCheck, StepRevision, StudioFile, StudioNote, StudioSnapshot, TraceStep } from './studio-protocol.js'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -11,6 +11,8 @@ import { AgentBridge } from './agent-bridge.js'
 import { checkClaims } from './claims.js'
 import { DuckDbRunner, quoteIdentifier, quoteLiteral } from './duckdb.js'
 import { HistoryStore, SESSIONS_DIR, UPLOADS_DIR } from './history.js'
+import { extractSqlLineage } from './lineage.js'
+import { DataMemoryStore } from './memory.js'
 import { groupRuns } from './runs.js'
 import { sqlfluffFormatter } from './sql-format.js'
 import { DEFAULT_SESSION_KEY } from './store.js'
@@ -217,6 +219,7 @@ function nextId(prefix: string): string {
 
 export class Studio {
   readonly history: HistoryStore
+  readonly memory: DataMemoryStore
   readonly duck: DuckDbRunner
   private steps: TraceStep[] = []
   /** Files dropped into the Studio this conversation, by id. */
@@ -239,8 +242,9 @@ export class Studio {
    */
   readonly sessionId: string
 
-  constructor(readonly store: DatasetStore, options: { history?: HistoryStore, duck?: DuckDbRunner, sessionId?: string, formatSql?: SqlFormatter } = {}) {
+  constructor(readonly store: DatasetStore, options: { history?: HistoryStore, memory?: DataMemoryStore, duck?: DuckDbRunner, sessionId?: string, formatSql?: SqlFormatter } = {}) {
     this.history = options.history ?? new HistoryStore()
+    this.memory = options.memory ?? new DataMemoryStore()
     this.formatSql = options.formatSql ?? sqlfluffFormatter()
     this.duck = options.duck ?? new DuckDbRunner()
     this.sessionId = options.sessionId ?? newSessionId()
@@ -264,8 +268,20 @@ export class Studio {
     })
   }
 
-  snapshot(sessionKey = DEFAULT_SESSION_KEY): StudioSnapshot {
+  snapshot(sessionKey = DEFAULT_SESSION_KEY, options: { liveSessionId?: string | null } = {}): StudioSnapshot {
+    const liveSessionId = options.liveSessionId !== undefined ? options.liveSessionId : this.sessionId
+    const isLive = liveSessionId === this.sessionId
+    const pinned = this.history.enabled ? this.history.isSessionPinned(this.sessionId) : false
+    const savedSessions = this.history.enabled ? this.history.listSessions(50) : []
+    const sessions = savedSessions.some(s => s.id === this.sessionId)
+      ? savedSessions
+      : [this.history.summarizeSession(this.sessionId, this.steps, pinned), ...savedSessions]
+
     return {
+      sessionId: this.sessionId,
+      liveSessionId,
+      pinned,
+      sessions,
       steps: this.steps.map((step) => {
         const editableSql = step.sql ?? (step.file ? fileStepSql(step.file, step.where) : undefined)
         const formattedSql = editableSql ? this.formatted(editableSql) : undefined
@@ -274,8 +290,64 @@ export class Studio {
       history: this.history.enabled ? this.history.list(HISTORY_IN_SNAPSHOT) : [],
       historyEnabled: this.history.enabled,
       loadedIds: this.store.listMetadata(sessionKey).map(meta => meta.id),
-      agent: { name: this.agentName ? agentLabel(this.agentName) : undefined, live: this.agent.live(), busy: this.agentBusy, ...(this.agentHint ? { hint: this.agentHint } : {}) },
+      agent: isLive
+        ? { name: this.agentName ? agentLabel(this.agentName) : undefined, live: this.agent.live(), busy: this.agentBusy, ...(this.agentHint ? { hint: this.agentHint } : {}) }
+        : { name: undefined, live: [], busy: false },
     }
+  }
+
+  /**
+   * Rehydrates ONLY the datasets belonging to THIS session from its saved `historyId` pulls into
+   * this Studio's isolated `DatasetStore` (without recording duplicate trace steps or bleeding any
+   * datasets from other sessions).
+   */
+  async hydrateFromHistory(sessionKey = DEFAULT_SESSION_KEY): Promise<number> {
+    if (!this.history.enabled)
+      return 0
+    const seen = new Set<string>()
+    let loaded = 0
+    for (const step of this.steps) {
+      if (!step.datasetId || !step.historyId || seen.has(step.datasetId))
+        continue
+      seen.add(step.datasetId)
+      if (this.store.get(step.datasetId, sessionKey))
+        continue
+      const entry = this.history.get(step.historyId)
+      if (!entry)
+        continue
+      try {
+        const rows = entry.kind === 'file'
+          ? (await this.store.loadFromFile(entry.source, entry.name, { sessionKey, keepExisting: true, where: entry.where })).rows
+          : this.history.readRows(entry)
+        const ds = this.store.register({
+          id: step.datasetId,
+          name: step.datasetName ?? entry.name,
+          source: entry.source,
+          ingestionMode: 'direct',
+          rows,
+          viewMode: step.viewMode,
+          chartConfig: step.chartConfig ?? entry.chartConfig,
+          pivotConfig: step.pivotConfig ?? entry.pivotConfig,
+          sessionKey,
+          keepExisting: true,
+        })
+        this.pullsByDataset.set(ds.id, entry)
+        loaded += 1
+      }
+      catch {
+        // Source file may have moved or rows may exceed saved limit; remaining cells still load cleanly.
+      }
+    }
+    // Activate the newest loaded dataset from this session so the initial view matches where it left off.
+    const latest = [...this.steps].reverse().find(s => s.datasetId && this.store.get(s.datasetId, sessionKey))
+    if (latest?.datasetId) {
+      this.store.updateView(latest.datasetId, {
+        ...(latest.viewMode ? { viewMode: latest.viewMode } : {}),
+        ...(latest.chartConfig ? { chartConfig: latest.chartConfig } : {}),
+        ...(latest.pivotConfig ? { pivotConfig: latest.pivotConfig } : {}),
+      }, sessionKey)
+    }
+    return loaded
   }
 
   /** SQL as SQLFluff lays it out, once it has; asks for it the first time, and tells the Studio when it lands. */
@@ -467,6 +539,153 @@ export class Studio {
     this.remember(shown, { kind: 'query', source: input.sql })
     this.recordDatasetStep(shown, { actor: input.actor, tool: 'query', why: input.why, ask: input.ask, sql: input.sql })
     return { dataset: shown, truncated: result.truncated }
+  }
+
+  /**
+   * Non-mutating lookup of a step's dataset (for rendering historical cells in Notebook view),
+   * reopening from history if no longer in memory without switching the active dataset.
+   */
+  async getStepDataset(stepId: string, sessionKey = DEFAULT_SESSION_KEY): Promise<{ step: TraceStep, dataset: StoredDataset }> {
+    const step = this.steps.find(s => s.id === stepId)
+    if (!step?.datasetId)
+      throw new Error('That step has no data to show.')
+    let dataset = this.store.get(step.datasetId, sessionKey)
+    if (!dataset) {
+      if (!step.historyId)
+        throw new Error('That data is no longer loaded and was not saved to history.')
+      dataset = await this.reopen(step.historyId, { actor: 'user', sessionKey, record: false })
+    }
+    return { step, dataset }
+  }
+
+  /**
+   * Edits an existing step's SQL in place while preserving its prior version in `step.revisions`.
+   * Later agent chats append new steps while keeping this step's edited SQL, rows, and revisions intact.
+   */
+  async updateStepSql(
+    stepId: string,
+    sql: string,
+    options: { name?: string, sessionKey?: string } = {},
+  ): Promise<{ step: TraceStep, dataset: StoredDataset, truncated: boolean }> {
+    const step = this.steps.find(s => s.id === stepId)
+    if (!step)
+      throw new Error('That step is no longer in the trace.')
+    const sessionKey = options.sessionKey ?? DEFAULT_SESSION_KEY
+    const prevSql = step.sql ?? (step.file ? fileStepSql(step.file, step.where) : undefined)
+    const result = await this.duck.run(sql, this.queryViews(sessionKey))
+    const dataset = this.store.register({
+      name: options.name ?? step.datasetName ?? 'Edited query',
+      source: sql,
+      ingestionMode: 'direct',
+      rows: result.rows,
+      viewMode: step.viewMode,
+      pivotConfig: step.pivotConfig,
+      chartConfig: step.chartConfig,
+      sessionKey,
+      keepExisting: true,
+    })
+    const shown = this.keepViewOf(stepId, dataset, sessionKey) ?? dataset
+    const entry = this.remember(shown, { kind: 'query', source: sql })
+
+    const revision: StepRevision = {
+      at: step.editedAt ?? step.at,
+      actor: step.editedAt ? 'user' : step.actor,
+      ...(prevSql ? { sql: prevSql } : {}),
+      ...(step.datasetId ? { datasetId: step.datasetId } : {}),
+      ...(typeof step.rows === 'number' ? { rows: step.rows } : {}),
+      ...(step.fingerprint ? { fingerprint: step.fingerprint } : {}),
+      note: 'SQL edited',
+    }
+    step.revisions = [...(step.revisions ?? []), revision].slice(-20)
+    step.sql = sql
+    step.datasetId = shown.id
+    step.datasetName = shown.name
+    step.rows = shown.rows.length
+    step.columns = shown.columns.map(column => column.name)
+    step.fingerprint = fingerprintRows(shown.rows)
+    step.view = describeView(shown)
+    step.viewMode = shown.viewMode
+    step.chartConfig = shown.chartConfig ? structuredClone(shown.chartConfig) : undefined
+    step.pivotConfig = shown.pivotConfig ? structuredClone(shown.pivotConfig) : undefined
+    step.historyId = entry?.id ?? step.historyId
+    step.editedAt = new Date().toISOString()
+
+    this.rewriteTraceFile()
+    const editedSources = extractSqlLineage(sql).sources
+    if (editedSources.length > 0) {
+      const compactSql = sql.replace(/\s+/g, ' ').trim().slice(0, 180)
+      this.memory.recordLesson({
+        tableHint: editedSources[0],
+        key: `edit:${editedSources[0].toLowerCase()}`,
+        kind: 'user_edit',
+        summary: `User-edited SQL for ${editedSources[0]}: \`${compactSql}\``,
+      })
+    }
+    this.changed()
+    return { step, dataset: shown, truncated: result.truncated }
+  }
+
+  /** Restores a step to a previous revision from `step.revisions` while preserving the current state in history. */
+  async restoreStepRevision(
+    stepId: string,
+    revisionIndex: number,
+    sessionKey = DEFAULT_SESSION_KEY,
+  ): Promise<{ step: TraceStep, dataset?: StoredDataset }> {
+    const step = this.steps.find(s => s.id === stepId)
+    if (!step)
+      throw new Error('That step is no longer in the trace.')
+    const target = step.revisions?.[revisionIndex]
+    if (!target)
+      throw new Error('That revision is no longer available.')
+
+    const currentRev: StepRevision = {
+      at: step.editedAt ?? step.at,
+      actor: 'user',
+      ...(step.sql ? { sql: step.sql } : {}),
+      ...(step.datasetId ? { datasetId: step.datasetId } : {}),
+      ...(typeof step.rows === 'number' ? { rows: step.rows } : {}),
+      ...(step.fingerprint ? { fingerprint: step.fingerprint } : {}),
+      note: 'Before restore',
+    }
+    step.revisions = [...(step.revisions ?? []), currentRev].slice(-20)
+    step.editedAt = new Date().toISOString()
+
+    let dataset: StoredDataset | undefined
+    if (target.datasetId && this.store.get(target.datasetId, sessionKey)) {
+      dataset = this.store.get(target.datasetId, sessionKey)
+      step.sql = target.sql
+      step.datasetId = dataset!.id
+      step.datasetName = dataset!.name
+      step.rows = dataset!.rows.length
+      step.columns = dataset!.columns.map(c => c.name)
+      step.fingerprint = fingerprintRows(dataset!.rows)
+      step.view = describeView(dataset!)
+    }
+    else if (target.sql) {
+      const result = await this.duck.run(target.sql, this.queryViews(sessionKey))
+      dataset = this.store.register({
+        name: step.datasetName ?? 'Restored query',
+        source: target.sql,
+        ingestionMode: 'direct',
+        rows: result.rows,
+        viewMode: step.viewMode,
+        pivotConfig: step.pivotConfig,
+        chartConfig: step.chartConfig,
+        sessionKey,
+        keepExisting: true,
+      })
+      this.remember(dataset, { kind: 'query', source: target.sql })
+      step.sql = target.sql
+      step.datasetId = dataset.id
+      step.rows = dataset.rows.length
+      step.columns = dataset.columns.map(c => c.name)
+      step.fingerprint = fingerprintRows(dataset.rows)
+      step.view = describeView(dataset)
+    }
+
+    this.rewriteTraceFile()
+    this.changed()
+    return { step, dataset }
   }
 
   /** Gives `dataset` the view of the step's dataset when every field that view uses is in the result. */

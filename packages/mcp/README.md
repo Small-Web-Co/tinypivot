@@ -135,16 +135,19 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Pivot Table (`sum` aggregation) | Included | All aggregations & calculated fields |
 | Data Grid (sort, filter, search, copy Markdown, CSV export) | Included | Included |
 | Framed Terminal Cards & Live Ghostty TUI (`tinypivot-mcp tui`) | Included (subtle `tiny-pivot.com` signature) | Included (watermark-free) |
-| TinyPivot Studio (trace, SQL editor, notes, history) | Included | Included |
+| TinyPivot Studio (IDE, Notebook, Lineage, isolated sessions, offline HTML export) | Included (subtle footer on HTML) | Included (white-label) |
 | Universal DB support via `load_file`, stdin pipe & `load_data` | Included | Included |
-| Dataset row limit | Up to 2,500 rows (explicitly bannered if truncated) | Unlimited |
+| Dataset row limit | **Unlimited local rows** | **Unlimited** |
+| SQL Guardrails & Repair Hints | Basic (`SUM`/`AVG` rate traps, zero-row hints, SQL repair) | **Deep** (join fan-out, chasm traps, partial periods, NULL drops, outlier distortion, Turn-1 guard) |
+| 1-Call Data Science Shelf (`analyze`) | `explain_change`, basic `ab_test` | **Full Pro shelf** (`ab_test` SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, seasonal `anomalies`) |
+| Recursive Data Memory (`~/.local/share/tinypivot/memory.json`) | — | **Included** (learns schemas & Studio SQL edits locally) |
 | Visual themes | `Code` theme (Dark & Light) | All 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`) |
 | Drill-Through modals | — | Included |
 | Formatted `.xlsx` Excel export | — | Included |
 | Optional direct `query_postgres` (`DATABASE_URL`) | — | Included |
-| Watermark-free UI & terminal cards | — | Included |
+| Watermark-free UI, HTML & terminal cards | — | Included |
 
-> **High-Trust Row Limit:** If a dataset exceeds 2,500 rows on the Free tier, TinyPivot never truncates silently — both the UI (amber top banner) and the tool summary sent to the LLM explicitly state `Showing first 2,500 of N rows — totals reflect this subset only`.
+> **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the 4-model benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper).
 
 Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 

@@ -7,6 +7,7 @@ const columns = [
   {
     title: 'Product',
     links: [
+      { to: '/whitepaper', label: 'White paper & benchmarks' },
       { to: '/docs', label: 'MCP docs' },
       { to: '/ui', label: 'React & Vue library' },
       { to: '/pricing', label: 'Pricing' },

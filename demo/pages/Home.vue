@@ -7,6 +7,7 @@ import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
+import TrustBenchmarkTable from '../components/site/TrustBenchmarkTable.vue'
 import { benchmarkHeadline } from '../site/benchmark'
 
 // The showcase loads the real grid and chart library, so it is fetched in the
@@ -17,32 +18,32 @@ onMounted(() => {
   isMounted.value = true
 })
 
-const facts = ['free', 'runs locally', 'no signup', 'no API key']
+const facts = ['free · unlimited local rows', 'runs locally', 'no signup', 'no API key']
 
 // The hero's fine print comes from the measured benchmark shown in the savings section.
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  'Raw rows stay on your machine — 50k+ rows in ~200ms',
-  'Pivot, filter, drill through & .xlsx at $0 tokens',
-  'Every figure checked against the data, with its SQL',
+  'Raw rows stay on your machine — unlimited local rows, ~200ms',
+  'Proof-of-Work Lineage, underlying source rows & offline HTML notebooks',
+  'Deterministic SQL & statistical guardrails — 75% → 96% across 4 models',
 ] as const
 
 const capabilities = [
   {
     n: '01',
-    title: 'Any database',
-    body: 'Pipe CSV or JSON from BigQuery, Snowflake, DuckDB, MySQL or Databricks, or the output of any other MCP tool. Pro adds a read-only Postgres connector.',
+    title: 'Trust & SQL guardrails',
+    body: 'Silent-when-clean DuckDB audits catch join fan-out, chasm traps, unweighted rate averages, partial trailing months, NULL drops and extreme outliers before the model answers.',
   },
   {
     n: '02',
-    title: 'Exact numbers',
-    body: 'Sums, medians and percent-of-total are computed by the TinyPivot engine, not estimated by the model. No arithmetic hallucinations.',
+    title: '1-call Data Science shelf',
+    body: 'Deterministic A/B testing (with SRM + Holm-Bonferroni), controlled multivariate regression, right-censored cohorts, seasonal anomaly detection, and Kitagawa mix-vs-rate decomposition.',
   },
   {
     n: '03',
-    title: 'Drill-through & Excel',
-    body: 'Double-click any cell to see the rows behind it, then export a formatted .xlsx. Both in Pro; charts and sum pivots are free up to 2,500 rows.',
+    title: 'Proof-of-Work Studio & Memory',
+    body: 'Unlimited local rows on Free with clickable lineage, underlying rows, and offline HTML export. Pro adds Recursive Data Memory that learns your schemas to cut tokens on repeat work, plus Excel & Postgres.',
   },
 ] as const
 </script>
@@ -87,12 +88,11 @@ const capabilities = [
               </div>
               <div class="hero-meta-links">
                 <a href="#savings" class="hero-fine">
-                  Measured in Claude Code: {{ headline.cheaperThanPythonPct }}% cheaper than Python
-                  on a {{ headline.largeRows.toLocaleString('en-US') }}-row file ({{ headline.correct }}/{{ headline.questions }} exact).
-                  Benchmark ↓
+                  4-model hard DS benchmark: 75% → 96% accuracy (local Inkling 33% → 83%; Sonnet 100% &amp; cheaper than Python).
+                  Benchmarks ↓
                 </a>
-                <router-link to="/docs#why" class="hero-why-link">
-                  Why TinyPivot vs. chat artifacts →
+                <router-link to="/whitepaper" class="hero-why-link">
+                  Read the Trust Layer White Paper →
                 </router-link>
               </div>
             </div>
@@ -167,6 +167,17 @@ const capabilities = [
           </router-link>
         </div>
         <BenchmarkTable />
+      </div>
+      <div class="wrap savings-meter">
+        <p class="label">
+          Hard Data Science &amp; BI Trap Benchmark · Local &amp; Frontier Models
+        </p>
+        <TrustBenchmarkTable />
+        <p style="margin-top: 12px;">
+          <router-link to="/whitepaper" class="text-link">
+            Read the full White Paper, 6-trap methodology &amp; Recursive Memory results →
+          </router-link>
+        </p>
       </div>
       <div class="wrap savings-meter">
         <p class="label">

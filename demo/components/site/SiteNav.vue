@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import SiteMark from './SiteMark.vue'
 
 const links = [
+  { to: '/whitepaper', label: 'White Paper' },
   { to: '/docs', label: 'Docs' },
   { to: '/ui', label: 'UI library' },
   { to: '/pricing', label: 'Pricing' },

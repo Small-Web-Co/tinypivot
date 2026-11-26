@@ -17,8 +17,8 @@ The above copyright notice and this permission notice shall be included in all c
   - Data grid display with sorting, column filtering, keyboard navigation, cell selection, copy/paste, column resizing, and formatting
   - Free pivot tables (`sum` aggregation, totals, and calculated fields) with TinyPivot attribution visible
 - **TinyPivot Studio / MCP (`@smallwebco/tinypivot-mcp`):**
-  - Datasets up to **2,500 rows** (explicitly flagged if a source file exceeds 2,500 rows)
-  - Core charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), basic `sum` pivot tables, data grid, local read-only DuckDB SQL over files, Studio trace & local pull history, terminal cards, and the `Code` theme, with TinyPivot attribution visible
+  - Unlimited local dataset rows (bounded only by DuckDB memory limits)
+  - Core charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), basic `sum` pivot tables, data grid, local read-only DuckDB SQL over files, Studio IDE & Notebook with Proof-of-Work Lineage, offline HTML export, basic SQL guardrails & repair hints, `analyze(explain_change, ab_test)`, terminal cards, and the `Code` theme, with TinyPivot attribution visible
 
 THE FREE TIER SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
@@ -30,11 +30,13 @@ The source code for Pro and Team features is included in this repository for tra
 
 ### Commercial Features Include:
 - **TinyPivot Studio / MCP Pro & Team (`TP-MCPP-*` / `TP-MCPT-*`):**
-  - Unlimited dataset rows (beyond the 2,500-row Free Tier limit)
+  - Deep SQL & relational audits (join fan-out, chasm traps, partial trailing periods, silent NULL drops, outlier distortion, Turn-1 relational profiler, and closed-loop claim verification)
+  - Pro Data Science Shelf (`analyze`: SRM + Holm-Bonferroni A/B guards, controlled multivariate regression, right-censored cohort retention, seasonal anomaly & change-point detection)
+  - Recursive Data Memory (local schema learning from audits & Studio SQL edits)
   - All visual themes beyond `Code`
   - Double-click Drill-Through
   - Advanced aggregations (`countDistinct`, `median`, `stdDev`, `percentOfTotal`, etc.)
-  - Styled `.xlsx` Excel export
+  - Styled `.xlsx` Excel export and white-label offline HTML export
   - AST-validated read-only PostgreSQL connector (`query_postgres`)
   - Watermark / branding removal and multi-seat Team licensing
 - **TinyPivot UI Pro / Unlimited / Team (`TP-PRO*`):**

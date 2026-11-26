@@ -5,6 +5,7 @@ import type {
   ChartThemePreset,
   PivotConfig,
 } from '@smallwebco/tinypivot-core'
+import type { AnalyzeMethod } from './analyze.js'
 import type { TerminalFormatOptions } from './card.js'
 import type { AgentExtension } from './init.js'
 import type { PostgresConfig } from './postgres.js'
@@ -18,20 +19,24 @@ import { completable } from '@modelcontextprotocol/sdk/server/completable.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS, CHART_TYPES, resolveChartType } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
+import { runAnalysis } from './analyze.js'
+import { auditQueryResult, formatAuditWarnings, formatSqlRepairHint } from './audit.js'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
-import { formatHistoryList } from './history.js'
+import { formatHistoryList, formatSessionList } from './history.js'
 import { refreshAgentExtension } from './init.js'
 import { classifyMcpLicenseKey, isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { ROW_PAGE_SIZE } from './limits.js'
+import { extractSqlLineage } from './lineage.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
-import { formatProfile } from './profile.js'
+import { formatProfile, formatProLoadTraps } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, datasetView, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { agentLabel, Studio } from './studio.js'
 import { describeChartForText, formatDatasetSummary, formatPivotSummary } from './summary.js'
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
+import { hasFeature } from './tiers.js'
 
 export const APP_RESOURCE_URI = 'ui://tinypivot/app.html'
 export const APP_MIME_TYPE = 'text/html;profile=mcp-app'
@@ -43,7 +48,7 @@ const LOAD_DATA_ROW_GUIDE = 50
  * What the model is told once per session. Hosts send it with every request, so every word
  * here costs every user on every turn: keep it to what changes the model's behaviour.
  */
-export function buildInstructions({ reprintCards = true, claudeChannel = false }: { reprintCards?: boolean, claudeChannel?: boolean } = {}): string {
+export function buildInstructions({ reprintCards = true, claudeChannel = false, isPro = false }: { reprintCards?: boolean, claudeChannel?: boolean, isPro?: boolean } = {}): string {
   const cards = reprintCards
     ? 'In a terminal, show the returned ```text card verbatim with the Studio link, except in pi, which already shows it. Where TinyPivot shows its view in the chat, never repeat the card.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
@@ -54,6 +59,9 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false }
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     'On every data call pass why (one short sentence for TinyPivot Studio); when loading or querying, also ask (the user\'s request, verbatim).',
+    ...(hasFeature(isPro, 'audit_deep')
+      ? ['Fix [AUDIT] SQL warnings before answering. Use analyze (explain_change, ab_test, regression, cohort_retention, anomalies) for stats.']
+      : []),
     ...(claudeChannel ? ['Messages from TinyPivot Studio arrive as <channel source="tinypivot"> events: do what they ask, then answer with studio_reply.'] : []),
     cards,
   ].join(' ')
@@ -435,7 +443,7 @@ function formatLoadFileError(filePath: string, err: unknown): string {
   return `Failed to load file "${filePath}": ${message}. Supported direct formats are CSV, TSV, JSON, and JSONL; for Parquet or custom SQL transformations, try the query tool with DuckDB SQL.`
 }
 
-function formatQueryError(error: unknown, store: DatasetStore, sessionKey: string): string {
+function formatQueryError(error: unknown, store: DatasetStore, sessionKey: string, sql?: string, isPro = false): string {
   const message = error instanceof Error ? error.message : String(error)
   if (error instanceof QueryRejected) {
     return `${message} Pass a single read-only SELECT, WITH, DESCRIBE, or EXPLAIN statement.`
@@ -444,7 +452,8 @@ function formatQueryError(error: unknown, store: DatasetStore, sessionKey: strin
   const tableHint = tables.length > 0
     ? ` Loaded tables: ${tables.join(', ')}.`
     : ''
-  return `Query failed: ${message}.${tableHint} Call list_datasets to inspect loaded table and column names, or quote local file paths like FROM '/path/to/file.csv'.`
+  const repairHint = hasFeature(isPro, 'sql_repair_hints') && sql ? formatSqlRepairHint(message, sql, store, sessionKey) : ''
+  return `Query failed: ${message}.${tableHint} Call list_datasets to inspect loaded table and column names, or quote local file paths like FROM '/path/to/file.csv'.${repairHint}`
 }
 
 /**
@@ -507,7 +516,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const isPro = Boolean(licenseKey || demoToken)
   const tier: 'free' | 'pro' = isPro ? 'pro' : 'free'
   const store = options.store ?? new DatasetStore({
-    maxRowsPerDataset: isPro ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
+    maxRowsPerDataset: hasFeature(isPro, 'unlimited_rows') ? Number.POSITIVE_INFINITY : FREE_TIER_ROW_LIMIT,
   })
   /** A widget host that asked for the Studio once (open_tinypivot) keeps getting its link. */
   const notifyCompanion = () => {
@@ -529,7 +538,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.7.9',
+      version: '0.8.0',
     },
     {
       capabilities: {
@@ -537,7 +546,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         tools: {},
         ...(claudeChannel ? { experimental: { 'claude/channel': {} } } : {}),
       },
-      instructions: buildInstructions({ reprintCards, claudeChannel }),
+      instructions: buildInstructions({ reprintCards, claudeChannel, isPro }),
     },
   )
 
@@ -590,6 +599,17 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   }
 
   const studio = options.studio ?? new Studio(store)
+  const recalledMemoryKeys = new Set<string>()
+  const recallMemoryOnce = (tableHints: string[], columns?: string[]): string => {
+    if (!hasFeature(isPro, 'recursive_memory') || tableHints.length === 0)
+      return ''
+    const unseen = tableHints.filter(h => !recalledMemoryKeys.has(h.toLowerCase()))
+    if (unseen.length === 0)
+      return ''
+    for (const h of unseen)
+      recalledMemoryKeys.add(h.toLowerCase())
+    return studio.memory.formatRecall(unseen, columns)
+  }
   try {
     studio.history.prune()
   }
@@ -632,7 +652,19 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         annotations: STUDIO_REPLY_ANNOTATIONS,
       },
       async ({ text }) => {
-        studio.reply(text)
+        const step = studio.reply(text)
+        if (hasFeature(isPro, 'claim_gate') && step.claims?.length) {
+          const missing = step.claims.filter(c => c.status === 'not-found')
+          const checked = step.claims.filter(c => c.status !== 'unchecked')
+          if (missing.length > 0) {
+            return {
+              content: [{
+                type: 'text' as const,
+                text: `Shown in TinyPivot Studio. ⚠️ [CLAIM CHECK] ${missing.length} of ${checked.length} quoted numbers were not found in the session data (${missing.map(c => c.text).join(', ')}). Verify against the query output and send a corrected studio_reply if needed.`,
+              }],
+            }
+          }
+        }
         return { content: [{ type: 'text' as const, text: 'Shown in TinyPivot Studio.' }] }
       },
     )
@@ -788,17 +820,17 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     'load_file',
     {
       title: 'Load Data File into TinyPivot',
-      description: 'Chart or pivot a local CSV, TSV, JSON or JSONL file without reading it: the rows stay out of your context.',
+      description: 'Chart or pivot a local CSV/TSV/JSON/JSONL file without reading rows into context.',
       inputSchema: {
         filePath: z.string(),
         name: z.string().optional(),
         why: whyParam,
         ask: askParam,
-        where: z.array(rowFilterSchema).optional().describe('Keep only matching rows, e.g. [{"field":"year","equals":[2026]}]'),
+        where: z.array(rowFilterSchema).optional(),
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
         chartConfig: loadChartSchema.optional(),
-        keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
+        keepExisting: z.boolean().optional(),
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
@@ -825,7 +857,19 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         }
 
         studio.recordDatasetStep(ds, { actor: 'agent', tool: 'load_file', why, ask, file: ds.source, where })
-        return replyWithDataset(ds, sessionKey, 'load_file')
+        let proLoadNote = ''
+        if (hasFeature(isPro, 'profile_relational')) {
+          const peerDatasets = store.listMetadata(sessionKey).flatMap((m) => {
+            if (m.id === ds.id)
+              return []
+            const peer = store.get(m.id, sessionKey)
+            return peer ? [peer] : []
+          })
+          proLoadNote += formatProLoadTraps(ds, peerDatasets)
+        }
+        if (hasFeature(isPro, 'recursive_memory'))
+          proLoadNote += recallMemoryOnce([ds.source, ds.id], ds.columns.map(c => c.name))
+        return replyWithDataset(ds, sessionKey, 'load_file', proLoadNote)
       }
       catch (err) {
         return {
@@ -841,7 +885,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     'load_data',
     {
       title: 'Load JSON Rows into TinyPivot',
-      description: 'Chart or pivot rows you already have, up to about 50. Every row you pass is billed as output; for more, write a file and use load_file.',
+      description: 'Chart or pivot small inline rows (up to ~50; for larger sets use load_file).',
       inputSchema: {
         name: z.string(),
         why: whyParam,
@@ -851,7 +895,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
         chartConfig: loadChartSchema.optional(),
-        keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
+        keepExisting: z.boolean().optional(),
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
@@ -1040,7 +1084,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           name: z.string().optional(),
           viewMode: z.enum(VIEW_MODE_VALUES).optional(),
           pivotConfig: pivotConfigSchema.optional(),
-          keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
+          keepExisting: z.boolean().optional(),
         },
         annotations: READ_ONLY_REMOTE_ANNOTATIONS,
         _meta: INLINE_UI_META,
@@ -1051,7 +1095,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             isError: true,
             content: [{
               type: 'text',
-              text: 'Read-only PostgreSQL querying (`query_postgres`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). Free tier includes local CSV/TSV/JSON files and inline data up to 2,500 rows — or export via `psql --csv` and pass the file to `load_file`. Upgrade at https://tiny-pivot.com/pricing',
+              text: 'Read-only PostgreSQL querying (`query_postgres`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). Free tier includes unlimited local CSV/TSV/JSON/Parquet analysis — or export via `psql --csv` and pass the file to `load_file`. Upgrade at https://tiny-pivot.com/pricing',
             }],
           }
         }
@@ -1088,7 +1132,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     'query',
     {
       title: 'Query Files with SQL',
-      description: 'Run one read-only DuckDB SELECT over local CSV, Parquet or JSON files (FROM \'path\') and loaded datasets (tables named by dataset id), then chart or pivot the result. Rows stay out of your context.',
+      description: 'Run one read-only DuckDB SELECT over local files (FROM \'path\') and loaded datasets, then chart or pivot.',
       inputSchema: {
         sql: z.string(),
         why: whyParam,
@@ -1097,7 +1141,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         viewMode: z.enum(VIEW_MODE_VALUES).optional(),
         pivotConfig: pivotConfigSchema.optional(),
         chartConfig: loadChartSchema.optional(),
-        keepExisting: z.boolean().optional().describe('Keep earlier datasets loaded, to compare them'),
+        keepExisting: z.boolean().optional(),
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
@@ -1120,15 +1164,45 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           pivotConfig: pivotConfig ? normalizePivot(pivotConfig) : undefined,
           chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
         })
-        return replyWithDataset(dataset, sessionKey, 'query', truncated ? `\n_Result cut at ${dataset.rows.length.toLocaleString('en-US')} rows._` : '')
+        let auditBlock = ''
+        let memoryBlock = ''
+        const runBasicAudit = hasFeature(isPro, 'audit_basic')
+        const runDeepAudit = hasFeature(isPro, 'audit_deep')
+        if (runBasicAudit || runDeepAudit) {
+          const sqlSources = extractSqlLineage(sql).sources
+          if (hasFeature(isPro, 'recursive_memory'))
+            memoryBlock = recallMemoryOnce(sqlSources)
+          const warnings = await auditQueryResult({
+            sql,
+            dataset,
+            duck: studio.duck,
+            views: studio.queryViews(sessionKey),
+            deep: runDeepAudit,
+          })
+          auditBlock = formatAuditWarnings(warnings)
+          // Recursive learning (Pro): persist discovered traps into local schema memory for future inquiries.
+          if (hasFeature(isPro, 'recursive_memory') && warnings.length > 0 && sqlSources.length > 0) {
+            const targetSource = sqlSources[0]
+            for (const w of warnings) {
+              studio.memory.recordLesson({
+                tableHint: targetSource,
+                key: `audit:${w.kind}:${targetSource.toLowerCase()}`,
+                kind: 'audit',
+                summary: `${w.title}: ${w.detail}`,
+              })
+            }
+          }
+        }
+        const note = `${truncated ? `\n_Result cut at ${dataset.rows.length.toLocaleString('en-US')} rows._` : ''}${auditBlock}${memoryBlock}`
+        return replyWithDataset(dataset, sessionKey, 'query', note)
       }
       catch (error) {
-        return { isError: true, content: [{ type: 'text' as const, text: formatQueryError(error, store, sessionKey) }] }
+        return { isError: true, content: [{ type: 'text' as const, text: formatQueryError(error, store, sessionKey, sql, isPro) }] }
       }
     },
   )
 
-  // Column-level statistics, so the model can plan without reading rows.
+  // Column-level statistics (plus Pro relational grain, join-key fan-out & partial-period summary), so the model can plan without reading rows.
   server.registerTool(
     'profile',
     {
@@ -1145,8 +1219,88 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       const ds = store.get(datasetId, sessionKey)
       if (!ds)
         return datasetNotFoundError(datasetId, store, sessionKey)
+      const useRelational = hasFeature(isPro, 'profile_relational')
+      const peerDatasets = useRelational
+        ? store.listMetadata(sessionKey).flatMap((m) => {
+            if (m.id === ds.id)
+              return []
+            const peer = store.get(m.id, sessionKey)
+            return peer ? [peer] : []
+          })
+        : []
       studio.recordDatasetStep(ds, { actor: 'agent', tool: 'profile', why })
-      return { content: [{ type: 'text' as const, text: formatProfile(ds) }] }
+      return { content: [{ type: 'text' as const, text: formatProfile(ds, { isPro: useRelational, peerDatasets }) }] }
+    },
+  )
+
+  // Unified deterministic Data Science shelf: Free gets explain_change & basic ab_test; Pro adds SRM/Holm-Bonferroni, regression, cohort_retention & anomalies.
+  const PRO_ONLY_METHODS = new Set<AnalyzeMethod>(['regression', 'cohort_retention', 'anomalies'])
+  server.registerTool(
+    'analyze',
+    {
+      title: 'Statistical Analysis',
+      description: hasFeature(isPro, 'analyze_pro')
+        ? 'Exact 1-call stats on datasetId or filePath (auto-detects columns; params optional): explain_change, ab_test (+SRM/Holm), regression, cohort_retention, anomalies.'
+        : 'Exact 1-call stats on datasetId or filePath (auto-detects columns; params optional): explain_change, ab_test (Pro: regression, cohort_retention, anomalies).',
+      inputSchema: {
+        method: z.enum(['explain_change', 'ab_test', 'regression', 'cohort_retention', 'anomalies']),
+        datasetId: z.string().optional(),
+        filePath: z.string().optional(),
+        params: z.record(z.string(), z.unknown()).optional(),
+        why: whyParam,
+      },
+      annotations: READ_ONLY_LOCAL_ANNOTATIONS,
+      _meta: INLINE_UI_META,
+    },
+    async ({ method, datasetId, filePath, params, why }, extra) => {
+      const hasProAnalyze = hasFeature(isPro, 'analyze_pro')
+      if (PRO_ONLY_METHODS.has(method) && !hasProAnalyze) {
+        return {
+          isError: true,
+          content: [{
+            type: 'text' as const,
+            text: `\`analyze(method="${method}")\` requires TinyPivot Pro (TINYPIVOT_LICENSE_KEY). Free includes \`explain_change\` and basic \`ab_test\`; Pro unlocks SRM/Holm-Bonferroni guards, controlled multivariate \`regression\`, right-censored \`cohort_retention\`, and seasonal \`anomalies\`. Upgrade at https://tiny-pivot.com/pricing`,
+          }],
+        }
+      }
+      const { sessionKey } = resolveSessionContext(extra)
+      let ds = filePath ? undefined : store.get(datasetId, sessionKey)
+      if (filePath) {
+        try {
+          ds = await store.loadFromFile(filePath, undefined, { sessionKey, keepExisting: true })
+          studio.remember(ds, { kind: 'file', source: filePath })
+        }
+        catch (err) {
+          return { isError: true, content: [{ type: 'text' as const, text: formatLoadFileError(filePath, err) }] }
+        }
+      }
+      if (!ds)
+        return datasetNotFoundError(datasetId, store, sessionKey)
+      try {
+        const output = runAnalysis(ds, { ...(params ?? {}), method }, { proGuards: hasProAnalyze })
+        if (output.rows.length > 0) {
+          const outDs = store.register({
+            name: output.title,
+            source: `analyze:${method}:${ds.id}`,
+            ingestionMode: 'direct',
+            rows: output.rows,
+            viewMode: output.chartConfig ? 'chart' : 'grid',
+            chartConfig: output.chartConfig,
+            sessionKey,
+            keepExisting: true,
+          })
+          studio.remember(outDs, { kind: 'data', source: `analyze:${method}:${ds.id}` })
+          studio.recordDatasetStep(outDs, { actor: 'agent', tool: 'analyze', why: why ?? output.title })
+          return replyWithDataset(outDs, sessionKey, 'analyze', `\n\n${output.summaryText}`)
+        }
+        return { content: [{ type: 'text' as const, text: output.summaryText }] }
+      }
+      catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: error instanceof Error ? error.message : String(error) }],
+        }
+      }
     },
   )
 
@@ -1154,20 +1308,23 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   server.registerTool(
     'history',
     {
-      title: 'Saved Pulls',
-      description: 'List data pulled in earlier sessions, or reopen one by id at no cost: nothing is re-queried.',
+      title: 'Saved Pulls & Sessions',
+      description: 'List saved pulls or past sessions (`sessions: true`), or reopen a pull by id.',
       inputSchema: {
         open: z.string().optional(),
+        sessions: z.boolean().optional(),
         why: whyParam,
         limit: z.number().int().min(1).max(100).optional(),
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
-    async ({ open, why, limit }, extra) => {
+    async ({ open, sessions, why, limit }, extra) => {
       const { history } = studio
       if (!history.enabled)
         return { content: [{ type: 'text' as const, text: 'History is off (TINYPIVOT_HISTORY=0).' }] }
+      if (sessions && !open)
+        return { content: [{ type: 'text' as const, text: formatSessionList(history.listSessions(limit ?? 20)) }] }
       if (!open)
         return { content: [{ type: 'text' as const, text: formatHistoryList(history.list(limit ?? 15)) }] }
       const { sessionKey } = resolveSessionContext(extra, true)

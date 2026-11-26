@@ -1,6 +1,6 @@
 import type { StudioStep } from '../../packages/mcp/app/runs'
 import { describe, expect, it } from 'vitest'
-import { checkReport, claimSummary, lastStep, markClaims, runTitle, stageOf } from '../../packages/mcp/app/runs'
+import { checkReport, claimSummary, collectSessionOutputs, lastStep, markClaims, resolveActiveOutputIndex, runTitle, stageOf } from '../../packages/mcp/app/runs'
 import { checkClaims, extractNumbers } from '../../packages/mcp/src/claims'
 import { groupRuns } from '../../packages/mcp/src/runs'
 
@@ -167,5 +167,25 @@ describe('the report after checking a question', () => {
       { ok: true, text: '2 steps gave the same rows again' },
       { ok: true, text: 'The number in the answer was found in the data' },
     ])
+  })
+})
+
+describe('session outputs stepper', () => {
+  it('collects viewable outputs in order, carries dataset SQL forward, and resolves active output', () => {
+    const steps: StudioStep[] = [
+      step({ tool: 'load_file', datasetId: 'ds1', datasetName: 'Orders', view: 'table', editableSql: 'SELECT * FROM \'orders.csv\'' }),
+      step({ tool: 'configure_chart', datasetId: 'ds1', datasetName: 'Orders', view: 'bar chart', viewMode: 'chart' }),
+      step({ tool: 'reply', why: 'Total is 100.' }),
+      step({ tool: 'query', datasetId: 'ds2', datasetName: 'By Region', view: 'pivot', viewMode: 'pivot', editableSql: 'SELECT region, SUM(mrr) FROM ds1 GROUP BY 1' }),
+    ]
+    const outputs = collectSessionOutputs(steps, new Set(['ds1', 'ds2']))
+    expect(outputs.map(o => [o.index, o.label, o.kind, Boolean(o.sql)])).toEqual([
+      [1, 'Orders', 'table', true],
+      [2, 'Orders', 'bar', true],
+      [3, 'By Region', 'pivot', true],
+    ])
+    expect(resolveActiveOutputIndex(outputs, outputs[1].step.id, 'ds2')).toBe(1)
+    expect(resolveActiveOutputIndex(outputs, null, 'ds1')).toBe(1)
+    expect(resolveActiveOutputIndex(outputs, null, 'ds2')).toBe(2)
   })
 })

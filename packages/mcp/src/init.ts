@@ -734,7 +734,7 @@ export async function runInitCommand(args: string[]): Promise<InitSummary | null
     console.log('\nNext steps:')
     console.log('  1. Restart your AI client(s) so the tinypivot MCP server loads.')
     console.log('  2. Try asking: "Open TinyPivot" or "Chart revenue by region from sales.csv".')
-    console.log('  3. Free tier includes core charts, basic pivot, and up to 2,500 rows.')
+    console.log('  3. Free tier includes unlimited local rows, charts, SQL, Studio + lineage, and basic stats.')
     console.log('     Unlock unlimited rows, drill-through, Excel export, Postgres, & 10 themes at https://tiny-pivot.com/pricing')
   }
   console.log('')

@@ -1,18 +1,25 @@
 import type { ChartConfig, ChartSortOrder, ChartThemePreset, DataGridViewMode, DrillThroughResult, PivotConfig, Theme } from '@smallwebco/tinypivot-core'
 import type { NoteAttachment, StudioSnapshot } from '../src/studio-protocol'
+import type { SessionOutput, StudioStep } from './runs'
+import type { WorkbenchTable } from './SqlPane'
 import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps'
 import {
   CHART_THEME_PRESETS,
   isUnifiedTheme,
-
 } from '@smallwebco/tinypivot-core'
 import { DataGrid, enableDemoMode, setLicenseKey } from '@smallwebco/tinypivot-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { INTERACTIVE_ROW_LIMIT, ROW_PAGE_SIZE } from '../src/limits'
 import { rowAttachment, sliceAttachment, viewAttachment } from './attachments'
 import { postToStudio } from './companionApi'
+import { collectSessionOutputs, resolveActiveOutputIndex } from './runs'
+import { shownSql } from './sqlFormat'
+import { starterSql } from './SqlPane'
+import { StudioNotebook } from './StudioNotebook'
 import { StudioPanel } from './StudioPanel'
 import { StudioResizer, useStudioWidth } from './StudioResizer'
+import { StudioWorkspace } from './StudioWorkspace'
+import { useWorkspaceLayout } from './workspaceLayout'
 
 interface DatasetMeta {
   id: string
@@ -164,6 +171,14 @@ const CHART_SORT_OPTIONS: Array<{ value: ChartSortOrder, short: string, label: s
   { value: 'data', short: 'Grid', label: '⊞ Grid Order', desc: 'Matches active Data Grid sort' },
 ]
 
+/** Reads `/s/<sessionId>` from the browser URL so opening a saved session stays strictly isolated. */
+function readSessionFromPath(): string | null {
+  if (typeof window === 'undefined')
+    return null
+  const match = /^\/s\/([\w-]+)\/?$/.exec(window.location.pathname)
+  return match ? match[1] : null
+}
+
 export function McpApp() {
   const appRef = useRef<App | null>(null)
   const mainRef = useRef<HTMLElement | null>(null)
@@ -224,7 +239,12 @@ export function McpApp() {
   const [actionToast, setActionToast] = useState<ActionToast | null>(null)
   const [userSurfaceOverride, setUserSurfaceOverride] = useState(false)
   const [studio, setStudio] = useState<StudioSnapshot | null>(null)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => readSessionFromPath())
   const [studioOpen, setStudioOpen] = useState(true)
+  const workspace = useWorkspaceLayout()
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
+  const [sqlOverride, setSqlOverride] = useState<{ sql: string, fromStepId?: string, nonce: number } | null>(null)
+  const lastStepCountRef = useRef(0)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const showToast = useCallback((message: string, options?: { upgradeCta?: boolean, durationMs?: number }) => {
@@ -569,77 +589,87 @@ export function McpApp() {
     setGridTheme(next)
   }, [gridTheme])
 
+  const connectCompanionSession = useCallback(async (requestedSessionId: string | null, isActive: () => boolean) => {
+    eventSourceRef.current?.close()
+    eventSourceRef.current = null
+    setTransportMode('companion')
+    setInlineHeight(null) // Full 100vh browser companion window
+    const qs = requestedSessionId ? `?sessionId=${encodeURIComponent(requestedSessionId)}` : ''
+
+    void fetch(`/api/studio${qs}`)
+      .then(res => (res.ok ? res.json() as Promise<StudioSnapshot> : null))
+      .then((snapshot) => {
+        if (isActive() && snapshot) {
+          setStudio(snapshot)
+          lastStepCountRef.current = snapshot.steps.length
+        }
+      })
+      .catch(() => {})
+    try {
+      const res = await fetch(`/api/state${qs}`)
+      if (res.ok) {
+        const payload = await res.json() as ToolPayload
+        if (isActive())
+          await applyPayload(payload)
+      }
+      else if (isActive()) {
+        setLicenseReady(true)
+        setLoading(false)
+        setStatusNote(requestedSessionId ? 'No datasets loaded in this session yet.' : 'Waiting for data from your terminal agent…')
+      }
+    }
+    catch {
+      if (isActive()) {
+        setLicenseReady(true)
+        setLoading(false)
+        setStatusNote('Standalone preview (not connected to an MCP host or companion server).')
+      }
+      return
+    }
+
+    // Live SSE stream scoped strictly to this session (zero cross-session event bleed)
+    try {
+      const es = new EventSource(`/api/events${qs}`)
+      eventSourceRef.current = es
+      es.addEventListener('update', (ev) => {
+        if (!isActive())
+          return
+        try {
+          const payload = JSON.parse((ev as MessageEvent).data) as ToolPayload
+          void applyPayload(payload)
+        }
+        catch {}
+      })
+      es.addEventListener('studio', (ev) => {
+        if (!isActive())
+          return
+        try {
+          const next = JSON.parse((ev as MessageEvent).data) as StudioSnapshot
+          setStudio(next)
+          // When the agent (or user SQL) adds a new step, follow the newest output automatically.
+          if (next.steps.length > lastStepCountRef.current) {
+            setSelectedStepId(null)
+            setSqlOverride(null)
+          }
+          lastStepCountRef.current = next.steps.length
+        }
+        catch {}
+      })
+    }
+    catch {}
+  }, [applyPayload])
+
   useEffect(() => {
     let active = true
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined
-    let eventSource: EventSource | null = null
-
-    const startCompanionMode = async () => {
-      if (!active)
-        return
-      setTransportMode('companion')
-      setInlineHeight(null) // Full 100vh browser companion window
-      void fetch('/api/studio')
-        .then(res => (res.ok ? res.json() as Promise<StudioSnapshot> : null))
-        .then((snapshot) => {
-          if (active && snapshot)
-            setStudio(snapshot)
-        })
-        .catch(() => {})
-      try {
-        const res = await fetch('/api/state')
-        if (res.ok) {
-          const payload = await res.json() as ToolPayload
-          if (active)
-            await applyPayload(payload)
-        }
-        else if (active) {
-          setLicenseReady(true)
-          setLoading(false)
-          setStatusNote('Waiting for data from your terminal agent…')
-        }
-      }
-      catch {
-        if (active) {
-          setLicenseReady(true)
-          setLoading(false)
-          setStatusNote('Standalone preview (not connected to an MCP host or companion server).')
-        }
-        return
-      }
-
-      // Live SSE stream so terminal agent turns (Claude Code, OpenCode, pi, Ghostty) update instantly
-      try {
-        eventSource = new EventSource('/api/events')
-        eventSourceRef.current = eventSource
-        eventSource.addEventListener('update', (ev) => {
-          if (!active)
-            return
-          try {
-            const payload = JSON.parse((ev as MessageEvent).data) as ToolPayload
-            void applyPayload(payload)
-          }
-          catch {}
-        })
-        eventSource.addEventListener('studio', (ev) => {
-          if (!active)
-            return
-          try {
-            setStudio(JSON.parse((ev as MessageEvent).data) as StudioSnapshot)
-          }
-          catch {}
-        })
-      }
-      catch {}
-    }
 
     // If opened directly as a top-level browser tab (not inside an iframe), jump straight into Companion mode
     const isTopLevelWindow = typeof window !== 'undefined' && window.self === window.top
     if (isTopLevelWindow) {
-      void startCompanionMode()
+      void connectCompanionSession(activeSessionId, () => active)
       return () => {
         active = false
-        eventSource?.close()
+        eventSourceRef.current?.close()
       }
     }
 
@@ -702,16 +732,16 @@ export function McpApp() {
         }, 120)
       })
       .catch(() => {
-        void startCompanionMode()
+        void connectCompanionSession(activeSessionId, () => active)
       })
 
     return () => {
       active = false
       if (fallbackTimer)
         clearTimeout(fallbackTimer)
-      eventSource?.close()
+      eventSourceRef.current?.close()
     }
-  }, [applyHostDimensions, applyPayload, applyThemeFromHost, fetchAllRowsMcp])
+  }, [activeSessionId, applyHostDimensions, applyPayload, applyThemeFromHost, connectCompanionSession, fetchAllRowsMcp])
 
   const handleSwitchDataset = useCallback(async (nextId: string) => {
     if (!nextId)
@@ -721,7 +751,8 @@ export function McpApp() {
 
     if (transportMode === 'companion') {
       try {
-        const res = await fetch(`/api/state?datasetId=${encodeURIComponent(nextId)}`)
+        const sidParam = studio?.sessionId ? `&sessionId=${encodeURIComponent(studio.sessionId)}` : ''
+        const res = await fetch(`/api/state?datasetId=${encodeURIComponent(nextId)}${sidParam}`)
         if (res.ok) {
           const payload = await res.json() as ToolPayload
           await applyPayload(payload)
@@ -786,8 +817,7 @@ export function McpApp() {
     }
   }, [showToast])
 
-  const handleCopyMarkdown = useCallback(async () => {
-    const container = mainRef.current
+  const copyMarkdownFrom = useCallback(async (container: HTMLElement | null) => {
     if (!container)
       return
 
@@ -816,6 +846,141 @@ export function McpApp() {
     }
   }, [showToast])
 
+  const handleCopyMarkdown = useCallback(() => copyMarkdownFrom(mainRef.current), [copyMarkdownFrom])
+
+  // Derived Studio session state: tables for SQL autocomplete, browsable session outputs, active step SQL.
+  const loadedIds = useMemo(() => new Set(studio?.loadedIds ?? []), [studio?.loadedIds])
+  const sessionOutputs = useMemo(
+    () => (studio ? collectSessionOutputs(studio.steps, loadedIds) : []),
+    [studio, loadedIds],
+  )
+  const activeOutputIndex = useMemo(
+    () => resolveActiveOutputIndex(sessionOutputs, selectedStepId, datasetId),
+    [sessionOutputs, selectedStepId, datasetId],
+  )
+  const activeOutput = activeOutputIndex >= 0 ? sessionOutputs[activeOutputIndex] : undefined
+  const workbenchTables: WorkbenchTable[] = useMemo(() => {
+    if (!studio)
+      return []
+    return datasets.map((table) => {
+      const steps = [...studio.steps].reverse().filter(s => s.datasetId === table.id)
+      const withSql = steps.find(s => s.editableSql)
+      return {
+        id: table.id,
+        name: table.name,
+        columns: steps.find(s => s.columns?.length)?.columns ?? [],
+        sql: withSql ? shownSql(withSql) : undefined,
+        mine: steps.length > 0 && steps.every(s => s.actor === 'user'),
+      }
+    })
+  }, [datasets, studio])
+
+  const openStepInWorkspace = useCallback((step: StudioStep) => {
+    setSelectedStepId(step.id)
+    setSqlOverride(null)
+    if (step.viewMode === 'grid')
+      workspace.setOpen('data', true)
+    showOpening(`Opening ${step.rows ? `${step.rows.toLocaleString()} rows` : 'the step'}…`)
+    void postToStudio('/api/studio/show', { sessionId: studio?.sessionId, stepId: step.id }).catch((err) => {
+      showOpening(null)
+      showToast(err instanceof Error ? err.message : String(err))
+    })
+  }, [showOpening, showToast, studio?.sessionId, workspace])
+
+  const handleSelectOutput = useCallback((output: SessionOutput) => {
+    openStepInWorkspace(output.step)
+  }, [openStepInWorkspace])
+
+  const handleEditSql = useCallback((step: StudioStep) => {
+    setSelectedStepId(step.id)
+    setSqlOverride({ sql: shownSql(step), fromStepId: step.id, nonce: Date.now() })
+    workspace.setOpen('sql', true)
+  }, [workspace])
+
+  const handleNewSql = useCallback(() => {
+    setSqlOverride({ sql: starterSql(workbenchTables), fromStepId: undefined, nonce: Date.now() })
+    workspace.setOpen('sql', true)
+  }, [workbenchTables, workspace])
+
+  const handleOpenHistory = useCallback((id: string) => {
+    setSelectedStepId(null)
+    setSqlOverride(null)
+    showOpening('Reopening the pull…')
+    void postToStudio('/api/studio/open', { sessionId: studio?.sessionId, id }).catch((err) => {
+      showOpening(null)
+      showToast(err instanceof Error ? err.message : String(err))
+    })
+  }, [showOpening, showToast, studio?.sessionId])
+
+  const handleSelectSession = useCallback((nextSessionId: string) => {
+    if (!nextSessionId || nextSessionId === studio?.sessionId)
+      return
+    setRows([])
+    setDatasets([])
+    setDatasetId('')
+    setDatasetName('TinyPivot')
+    setSelectedStepId(null)
+    setSqlOverride(null)
+    setSelectedContext(null)
+    lastStepCountRef.current = 0
+    setLoading(true)
+    setStatusNote(`Opening isolated session ${nextSessionId}…`)
+    try {
+      window.history.replaceState(null, '', `/s/${encodeURIComponent(nextSessionId)}`)
+    }
+    catch {}
+    setActiveSessionId(nextSessionId)
+  }, [studio?.sessionId])
+
+  const handleTogglePinSession = useCallback(async (sessionId: string, pinned: boolean) => {
+    try {
+      await postToStudio('/api/studio/session/pin', { sessionId, pinned })
+      showToast(pinned ? 'Session pinned (kept forever)' : 'Session unpinned')
+    }
+    catch (err) {
+      showToast(err instanceof Error ? err.message : String(err))
+    }
+  }, [showToast])
+
+  const handleExportHtml = useCallback((sessionId: string) => {
+    const a = document.createElement('a')
+    a.href = `/api/studio/export-html?sessionId=${encodeURIComponent(sessionId)}`
+    a.download = `tinypivot-${sessionId}.html`
+    a.click()
+    showToast('Exported interactive HTML notebook')
+  }, [showToast])
+
+  const activeSqlText = sqlOverride
+    ? sqlOverride.sql
+    : activeOutput?.sql
+      ? shownSql({ ...activeOutput.step, editableSql: activeOutput.sql })
+      : starterSql(workbenchTables)
+  const activeSqlSyncKey = sqlOverride
+    ? `override:${sqlOverride.nonce}`
+    : `step:${activeOutput?.step.id ?? datasetId}:${activeOutput?.step.editedAt ?? ''}`
+  const activeSqlFromStepId = sqlOverride ? sqlOverride.fromStepId : activeOutput?.step.id
+  const studioVisualMode: 'chart' | 'pivot' = viewMode === 'pivot' ? 'pivot' : 'chart'
+  const layoutCustomized = !workspace.isDefault || studioWidth !== null
+
+  const handleRestoreRevision = useCallback(async (revisionIndex: number) => {
+    const stepId = activeSqlFromStepId
+    if (!stepId)
+      return
+    try {
+      await postToStudio('/api/studio/restore', { sessionId: studio?.sessionId, stepId, revisionIndex })
+      setSqlOverride(null)
+      showToast(`Restored step to v${revisionIndex + 1}`)
+    }
+    catch (err) {
+      showToast(err instanceof Error ? err.message : String(err))
+    }
+  }, [activeSqlFromStepId, showToast, studio?.sessionId])
+
+  const handleOpenStepInIde = useCallback((step: StudioStep) => {
+    workspace.setStudioView('ide')
+    openStepInWorkspace(step)
+  }, [openStepInWorkspace, workspace])
+
   /** Sends the selected row or slice, with the user's comment, into the host's chat (desktop and IDE hosts). */
   const handleSendToChat = useCallback(async () => {
     const app = appRef.current
@@ -842,8 +1007,8 @@ export function McpApp() {
     'tp-mcp-shell',
     `tp-theme-${visualTheme}`,
     (userSurfaceOverride || transportMode === 'companion') ? `tp-surface-${gridTheme === 'dark' ? 'dark' : 'light'}` : '',
-    !customizeOpen ? 'tp-mcp-focus' : '',
-    `tp-mcp-view-${viewMode}`,
+    !studio && !customizeOpen ? 'tp-mcp-focus' : '',
+    !studio ? `tp-mcp-view-${viewMode}` : 'tp-mcp-studio-mode',
   ].filter(Boolean).join(' ')
 
   if (studioStopped)
@@ -856,35 +1021,74 @@ export function McpApp() {
     >
       <header className="tp-mcp-bar">
         <div className="tp-mcp-bar-left">
-          <div className="tp-mcp-segmented" role="tablist" aria-label="View mode">
+          {!studio && (
+            <div className="tp-mcp-segmented" role="tablist" aria-label="View mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'chart'}
+                className={`tp-mcp-seg-btn ${viewMode === 'chart' ? 'active' : ''}`}
+                onClick={() => { if (viewMode !== 'chart') { setViewMode('chart'); trackLocalAction() } }}
+              >
+                Chart
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'pivot'}
+                className={`tp-mcp-seg-btn ${viewMode === 'pivot' ? 'active' : ''}`}
+                onClick={() => { if (viewMode !== 'pivot') { setViewMode('pivot'); trackLocalAction() } }}
+              >
+                Pivot
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'grid'}
+                className={`tp-mcp-seg-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                onClick={() => { if (viewMode !== 'grid') { setViewMode('grid'); trackLocalAction() } }}
+              >
+                Rows
+              </button>
+            </div>
+          )}
+
+          {studio && (
+            <div className="tp-mcp-segmented" role="tablist" aria-label="Studio workspace view">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace.layout.studioView === 'ide'}
+                className={`tp-mcp-seg-btn ${workspace.layout.studioView === 'ide' ? 'active' : ''}`}
+                title="Flexible 4-pane IDE: Agent History + SQL/JS + Chart/Pivot + Data Frame"
+                onClick={() => workspace.setStudioView('ide')}
+              >
+                IDE
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace.layout.studioView === 'notebook'}
+                className={`tp-mcp-seg-btn ${workspace.layout.studioView === 'notebook' ? 'active' : ''}`}
+                title="Continuous Notebook view: chronological train of thought with live cells"
+                onClick={() => workspace.setStudioView('notebook')}
+              >
+                Notebook
+              </button>
+            </div>
+          )}
+
+          {studio && workspace.layout.studioView === 'ide' && (
             <button
               type="button"
-              role="tab"
-              aria-selected={viewMode === 'chart'}
-              className={`tp-mcp-seg-btn ${viewMode === 'chart' ? 'active' : ''}`}
-              onClick={() => { if (viewMode !== 'chart') { setViewMode('chart'); trackLocalAction() } }}
+              className={`tp-mcp-pill ${studioOpen ? 'tp-mcp-pill-accent' : ''}`}
+              aria-pressed={studioOpen}
+              title="Show or hide the Agent Q&A history pane"
+              onClick={() => setStudioOpen(open => !open)}
             >
-              Chart
+              Agent
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'pivot'}
-              className={`tp-mcp-seg-btn ${viewMode === 'pivot' ? 'active' : ''}`}
-              onClick={() => { if (viewMode !== 'pivot') { setViewMode('pivot'); trackLocalAction() } }}
-            >
-              Pivot
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'grid'}
-              className={`tp-mcp-seg-btn ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => { if (viewMode !== 'grid') { setViewMode('grid'); trackLocalAction() } }}
-            >
-              Rows
-            </button>
-          </div>
+          )}
 
           {datasets.length > 1
             ? (
@@ -934,20 +1138,43 @@ export function McpApp() {
               Open Studio ↗
             </button>
           )}
-          {studio && (
-            <button
-              type="button"
-              className={`tp-mcp-pill ${studioOpen ? 'tp-mcp-pill-accent' : ''}`}
-              aria-pressed={studioOpen}
-              title="Show or hide the trace of steps, SQL and notes"
-              onClick={() => setStudioOpen(open => !open)}
-            >
-              Studio
-            </button>
-          )}
         </div>
 
         <div className="tp-mcp-bar-right">
+          {studio && (
+            <button
+              type="button"
+              className={`tp-mcp-btn ${studio.pinned ? 'active' : ''}`}
+              title={studio.pinned ? 'Pinned (kept forever) — click to unpin' : 'Pin this session so it is never pruned after 30 days'}
+              onClick={() => void handleTogglePinSession(studio.sessionId, !studio.pinned)}
+            >
+              {studio.pinned ? '★ Pinned' : '☆ Pin'}
+            </button>
+          )}
+          {studio && (
+            <button
+              type="button"
+              className="tp-mcp-btn"
+              title="Export this isolated session as a standalone offline HTML notebook"
+              onClick={() => handleExportHtml(studio.sessionId)}
+            >
+              Export .html
+            </button>
+          )}
+          {studio && layoutCustomized && (
+            <button
+              type="button"
+              className="tp-mcp-btn"
+              title="Restore default pane order, sizes, and visibility"
+              onClick={() => {
+                workspace.reset()
+                setStudioWidth(null)
+                showToast('Layout reset')
+              }}
+            >
+              Reset layout
+            </button>
+          )}
           {/* The savings estimate assumes the rows would otherwise be pasted, which overstates it, so the Studio leaves it out. */}
           {totalRows > 0 && !studio && (
             <div className="tp-mcp-savings-wrap">
@@ -1112,7 +1339,7 @@ export function McpApp() {
             )
           })()}
 
-          {totalRows > 0 && viewMode === 'chart' && (
+          {!studio && totalRows > 0 && viewMode === 'chart' && (
             <div className="tp-mcp-theme-wrap">
               <button
                 type="button"
@@ -1151,7 +1378,7 @@ export function McpApp() {
             </div>
           )}
 
-          {totalRows > 0 && viewMode !== 'chart' && (
+          {!studio && totalRows > 0 && viewMode !== 'chart' && (
             <button
               type="button"
               className="tp-mcp-btn"
@@ -1162,7 +1389,7 @@ export function McpApp() {
             </button>
           )}
 
-          {viewMode !== 'grid' && (
+          {!studio && viewMode !== 'grid' && (
             <button
               type="button"
               className={`tp-mcp-btn ${customizeOpen ? 'active' : ''}`}
@@ -1251,78 +1478,226 @@ export function McpApp() {
         </div>
       )}
 
+      {studio && studio.liveSessionId && studio.sessionId !== studio.liveSessionId && (
+        <div className="tp-session-banner" role="status">
+          <span>
+            <strong>Saved session</strong>
+            {' · '}
+            <code>{studio.sessionId}</code>
+            {' · isolated from live agent (zero dataset or chat bleed)'}
+          </span>
+          <button
+            type="button"
+            className="tp-mcp-btn tp-mcp-btn-primary"
+            onClick={() => handleSelectSession(studio.liveSessionId!)}
+          >
+            Return to live session
+          </button>
+        </div>
+      )}
+
       {statusNote && <div className="tp-mcp-status">{statusNote}</div>}
 
-      <div
-        ref={layoutRef}
-        className={studio && studioOpen ? 'tp-studio-layout' : 'tp-studio-layout is-closed'}
-        style={studioWidth ? { '--tp-studio-width': `${studioWidth}px` } as React.CSSProperties : undefined}
-      >
-        {studio && studioOpen && (
-          <StudioPanel
-            snapshot={studio}
-            tables={datasets.map(ds => ({ id: ds.id, name: ds.name }))}
-            activeDatasetId={datasetId}
-            attachment={selectedContext}
-            onAttachView={rows.length > 0 ? handleAttachView : undefined}
-            onClearAttachment={() => setSelectedContext(null)}
-            notify={message => showToast(message)}
-            busy={loading}
-            onOpening={showOpening}
-          />
-        )}
-        {studio && studioOpen && (
-          <StudioResizer current={() => layoutRef.current?.firstElementChild?.getBoundingClientRect().width ?? 0} onResize={setStudioWidth} />
-        )}
-        <main ref={mainRef} className="tp-mcp-grid-wrap">
-          {licenseReady && rows.length > 0
-            ? (
-                <DataGrid
-                  data={rows}
-                  loading={loading}
-                  theme={isUnifiedTheme(visualTheme) ? visualTheme : gridTheme}
-                  chartTheme={visualTheme}
-                  fontSize="sm"
-                  rowHeight={28}
-                  headerHeight={32}
-                  viewMode={viewMode}
-                  pivotConfig={pivotConfig}
-                  chartConfig={chartConfig}
-                  filterFields={filterFields}
-                  showPivot={true}
-                  enableExport={true}
-                  enableSearch={true}
-                  enablePagination={true}
-                  pageSize={100}
-                  enableColumnResize={true}
-                  enableClipboard={true}
-                  enableDrillDown={true}
-                  enableDrillThrough={true}
-                  enableVerticalResize={false}
-                  initialHeight={440}
-                  exportFilename={`${datasetId || 'tinypivot'}.csv`}
-                  onViewModeChange={setViewMode}
-                  onPivotConfigChange={(config) => { livePivotConfig.current = config }}
-                  onChartConfigChange={(config) => { liveChartConfig.current = config }}
-                  onChartThemeChange={preset => void handleVisualThemeChange(preset)}
-                  onCellClick={handleCellClick}
-                  onDrillThrough={handleDrillThrough}
-                />
-              )
-            : loading
-              ? (
-                  <div className="tp-mcp-empty">
-                    <strong>Loading TinyPivot…</strong>
-                  </div>
-                )
-              : (
-                  <div className="tp-mcp-empty">
-                    <strong>No dataset loaded yet</strong>
-                    <span>Ask your AI agent to load a CSV/JSON file, query Postgres, or pipe rows from another MCP tool.</span>
-                  </div>
-                )}
-        </main>
-      </div>
+      {studio && workspace.layout.studioView === 'notebook'
+        ? (
+            <StudioNotebook
+              snapshot={studio}
+              visualTheme={visualTheme}
+              gridTheme={gridTheme}
+              licenseReady={licenseReady}
+              attachment={selectedContext}
+              onAttachView={rows.length > 0 ? handleAttachView : undefined}
+              onClearAttachment={() => setSelectedContext(null)}
+              onCellClick={handleCellClick}
+              onDrillThrough={handleDrillThrough}
+              onOpenInIde={handleOpenStepInIde}
+              onTogglePinSession={(sid, pinned) => void handleTogglePinSession(sid, pinned)}
+              onExportHtml={handleExportHtml}
+              notify={message => showToast(message)}
+            />
+          )
+        : (() => {
+            const isRight = studio && studioOpen && workspace.layout.agentSide === 'right'
+            const layoutClass = [
+              'tp-studio-layout',
+              !(studio && studioOpen) ? 'is-closed' : '',
+              isRight ? 'is-agent-right' : '',
+            ].filter(Boolean).join(' ')
+
+            const studioPanelNode = studio && studioOpen && (
+              <StudioPanel
+                snapshot={studio}
+                activeDatasetId={datasetId}
+                activeStepId={activeOutput?.step.id ?? null}
+                attachment={selectedContext}
+                onAttachView={rows.length > 0 ? handleAttachView : undefined}
+                onClearAttachment={() => setSelectedContext(null)}
+                notify={message => showToast(message)}
+                busy={loading}
+                onOpenStep={openStepInWorkspace}
+                onEditSql={handleEditSql}
+                onNewSql={handleNewSql}
+                onOpenHistory={handleOpenHistory}
+                onSelectSession={handleSelectSession}
+                onTogglePinSession={(sid, pinned) => void handleTogglePinSession(sid, pinned)}
+                agentSide={workspace.layout.agentSide}
+                onToggleAgentSide={workspace.toggleAgentSide}
+              />
+            )
+
+            const studioResizerNode = studio && studioOpen && (
+              <StudioResizer
+                side={workspace.layout.agentSide}
+                current={() => {
+                  const el = isRight
+                    ? layoutRef.current?.lastElementChild
+                    : layoutRef.current?.firstElementChild
+                  return el?.getBoundingClientRect().width ?? 0
+                }}
+                onResize={setStudioWidth}
+              />
+            )
+
+            const mainNode = (
+              <main ref={mainRef} className="tp-mcp-grid-wrap">
+                {studio
+                  ? (
+                      <StudioWorkspace
+                        layout={workspace.layout}
+                        onToggleCollapse={workspace.toggleCollapse}
+                        onSetOpen={workspace.setOpen}
+                        onDockPane={workspace.dock}
+                        onStepRow={workspace.stepRow}
+                        onToggleSplit={workspace.toggleSplit}
+                        onResizeRows={workspace.resizeRows}
+                        onResizeCols={workspace.resizeCols}
+                        onResizeTablesWidth={workspace.setTablesWidth}
+                        onResetHeightWeights={workspace.resetHeightWeights}
+                        onResetWidthWeights={workspace.resetWidthWeights}
+                        outputs={sessionOutputs}
+                        activeOutputIndex={activeOutputIndex}
+                        onSelectOutput={handleSelectOutput}
+                        sessionId={studio.sessionId}
+                        sqlText={activeSqlText}
+                        sqlSyncKey={activeSqlSyncKey}
+                        sqlFromStepId={activeSqlFromStepId}
+                        stepEditedAt={activeOutput?.step.editedAt}
+                        stepRevisions={activeOutput?.step.revisions}
+                        activeStep={activeOutput?.step}
+                        allSteps={studio.steps}
+                        onOpenStepById={(stepId) => {
+                          const target = studio.steps.find(s => s.id === stepId)
+                          if (target)
+                            openStepInWorkspace(target)
+                        }}
+                        onRestoreRevision={handleRestoreRevision}
+                        tables={workbenchTables}
+                        onNewSql={handleNewSql}
+                        notify={message => showToast(message)}
+                        datasetId={datasetId}
+                        datasetName={datasetName}
+                        rows={rows}
+                        totalRows={totalRows}
+                        loading={loading}
+                        licenseReady={licenseReady}
+                        visualTheme={visualTheme}
+                        gridTheme={gridTheme}
+                        visualMode={studioVisualMode}
+                        onVisualModeChange={(next) => {
+                          if (viewMode !== next) {
+                            setViewMode(next)
+                            trackLocalAction()
+                          }
+                        }}
+                        customizeOpen={customizeOpen}
+                        onToggleCustomize={() => setCustomizeOpen(prev => !prev)}
+                        activeChartSort={activeChartSort}
+                        sortOptions={CHART_SORT_OPTIONS}
+                        onSelectChartSort={handleSelectChartSort}
+                        pivotConfig={pivotConfig}
+                        chartConfig={chartConfig}
+                        filterFields={filterFields}
+                        onPivotConfigChange={(config) => { livePivotConfig.current = config }}
+                        onChartConfigChange={(config) => { liveChartConfig.current = config }}
+                        onChartThemeChange={preset => void handleVisualThemeChange(preset)}
+                        onCellClick={handleCellClick}
+                        onDrillThrough={handleDrillThrough}
+                        onCopyMarkdown={container => void copyMarkdownFrom(container)}
+                      />
+                    )
+                  : licenseReady && rows.length > 0
+                    ? (
+                        <DataGrid
+                          data={rows}
+                          loading={loading}
+                          theme={isUnifiedTheme(visualTheme) ? visualTheme : gridTheme}
+                          chartTheme={visualTheme}
+                          fontSize="sm"
+                          rowHeight={28}
+                          headerHeight={32}
+                          viewMode={viewMode}
+                          pivotConfig={pivotConfig}
+                          chartConfig={chartConfig}
+                          filterFields={filterFields}
+                          showPivot={true}
+                          enableExport={true}
+                          enableSearch={true}
+                          enablePagination={true}
+                          pageSize={100}
+                          enableColumnResize={true}
+                          enableClipboard={true}
+                          enableDrillDown={true}
+                          enableDrillThrough={true}
+                          enableVerticalResize={false}
+                          initialHeight={440}
+                          exportFilename={`${datasetId || 'tinypivot'}.csv`}
+                          onViewModeChange={setViewMode}
+                          onPivotConfigChange={(config) => { livePivotConfig.current = config }}
+                          onChartConfigChange={(config) => { liveChartConfig.current = config }}
+                          onChartThemeChange={preset => void handleVisualThemeChange(preset)}
+                          onCellClick={handleCellClick}
+                          onDrillThrough={handleDrillThrough}
+                        />
+                      )
+                    : loading
+                      ? (
+                          <div className="tp-mcp-empty">
+                            <strong>Loading TinyPivot…</strong>
+                          </div>
+                        )
+                      : (
+                          <div className="tp-mcp-empty">
+                            <strong>No dataset loaded yet</strong>
+                            <span>Ask your AI agent to load a CSV/JSON file, query Postgres, or pipe rows from another MCP tool.</span>
+                          </div>
+                        )}
+              </main>
+            )
+
+            return (
+              <div
+                ref={layoutRef}
+                className={layoutClass}
+                style={studioWidth ? { '--tp-studio-width': `${studioWidth}px` } as React.CSSProperties : undefined}
+              >
+                {isRight
+                  ? (
+                      <>
+                        {mainNode}
+                        {studioResizerNode}
+                        {studioPanelNode}
+                      </>
+                    )
+                  : (
+                      <>
+                        {studioPanelNode}
+                        {studioResizerNode}
+                        {mainNode}
+                      </>
+                    )}
+              </div>
+            )
+          })()}
 
       {actionToast && (
         <div className="tp-mcp-toast" role="status" aria-live="polite">

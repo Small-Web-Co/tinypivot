@@ -121,12 +121,21 @@ export const routeDefinitions = [
     },
   },
   {
+    path: '/whitepaper',
+    name: 'whitepaper',
+    component: () => import('../pages/Whitepaper.vue'),
+    meta: {
+      title: 'The Trust Layer for AI Data Analysis — White Paper & Benchmarks | TinyPivot',
+      description: 'Empirical 4-model benchmark (Inkling 2 Mini, DeepSeek V4.1, Claude Haiku & Sonnet) proving TinyPivot Pro lifts hard Data Science accuracy from 75% to 96% while cutting cost and tokens.',
+    },
+  },
+  {
     path: '/pricing',
     name: 'pricing',
     component: () => import('../pages/Pricing.vue'),
     meta: {
       title: 'TinyPivot Pricing — MCP Server & React/Vue Library',
-      description: 'TinyPivot MCP is free up to 2,500 rows; Pro adds unlimited rows, drill-through and Excel export from $149/year or $399 lifetime. React & Vue licenses from $49 one-time.',
+      description: 'TinyPivot MCP is free with unlimited local rows, charts, DuckDB SQL, Studio & lineage. Pro adds deep SQL/statistical guardrails, full Data Science shelf, Recursive Data Memory, Excel export and Postgres from $149/year or $399 lifetime.',
     },
   },
   {

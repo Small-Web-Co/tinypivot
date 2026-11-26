@@ -1,5 +1,5 @@
 import type { ChartConfig, DataGridViewMode, PivotConfig } from '@smallwebco/tinypivot-core'
-import type { HistoryEntry } from './history.js'
+import type { HistoryEntry, SessionSummary } from './history.js'
 import type { RowFilter } from './store.js'
 
 /**
@@ -11,6 +11,16 @@ import type { RowFilter } from './store.js'
 export const STUDIO_HEADER = 'x-tinypivot'
 
 export type StepActor = 'agent' | 'user'
+
+export interface StepRevision {
+  at: string
+  actor: StepActor
+  sql?: string
+  datasetId?: string
+  rows?: number
+  fingerprint?: Fingerprint
+  note?: string
+}
 
 export interface TraceStep {
   id: string
@@ -24,6 +34,10 @@ export interface TraceStep {
   datasetName?: string
   rows?: number
   sql?: string
+  /** ISO timestamp when the user last edited this step's SQL in place. */
+  editedAt?: string
+  /** Prior versions preserved whenever this step's SQL is edited. */
+  revisions?: StepRevision[]
   file?: string
   where?: RowFilter[]
   /** What is shown, e.g. "line chart: sum(mrr) by month, split by year". */
@@ -105,8 +119,16 @@ export interface AgentHint {
   command?: string
 }
 
-/** What the browser Studio shows: the trace, saved pulls and how to reach the agent. */
+/** What the browser Studio shows: the trace, saved pulls, isolated session info and how to reach the agent. */
 export interface StudioSnapshot {
+  /** Which isolated session this snapshot belongs to. */
+  sessionId: string
+  /** The live agent's session id, or `null` when running standalone (`tinypivot-mcp studio`). */
+  liveSessionId: string | null
+  /** Whether this session is pinned (kept forever, exempt from 30-day automatic pruning). */
+  pinned: boolean
+  /** Saved sessions on disk that the user can open in full isolation. */
+  sessions: SessionSummary[]
   /**
    * Each step, with the SQL that reproduces it when there is one (file loads included), and that
    * SQL laid out by SQLFluff once it has been (absent without SQLFluff: the browser formats it).
@@ -114,7 +136,7 @@ export interface StudioSnapshot {
   steps: Array<TraceStep & { editableSql?: string, formattedSql?: string }>
   history: HistoryEntry[]
   historyEnabled: boolean
-  /** Ids of the datasets loaded right now, so a step can open its dataset directly. */
+  /** Ids of the datasets loaded right now in THIS isolated session, so a step can open its dataset directly. */
   loadedIds: string[]
   /** The agent the Studio talks to, and the ways it reaches it live right now (empty: the Studio cannot message it). */
   agent: { name?: string, live: string[], busy: boolean, hint?: AgentHint }

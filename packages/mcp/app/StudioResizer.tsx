@@ -44,18 +44,23 @@ export function useStudioWidth(): [number | null, (width: number | null) => void
 }
 
 interface StudioResizerProps {
+  /** Which edge of the window the Studio panel is docked on. */
+  side?: 'left' | 'right'
   /** The Studio's current width in pixels, as laid out. */
   current: () => number
   onResize: (width: number | null) => void
 }
 
-export function StudioResizer({ current, onResize }: StudioResizerProps) {
+export function StudioResizer({ side = 'left', current, onResize }: StudioResizerProps) {
   const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     if (!dragging)
       return
-    const move = (event: PointerEvent) => onResize(clampStudioWidth(event.clientX, window.innerWidth))
+    const move = (event: PointerEvent) => {
+      const rawWidth = side === 'right' ? window.innerWidth - event.clientX : event.clientX
+      onResize(clampStudioWidth(rawWidth, window.innerWidth))
+    }
     const stop = () => setDragging(false)
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', stop)
@@ -65,10 +70,11 @@ export function StudioResizer({ current, onResize }: StudioResizerProps) {
       window.removeEventListener('pointerup', stop)
       document.body.classList.remove('tp-resizing')
     }
-  }, [dragging, onResize])
+  }, [dragging, onResize, side])
 
   const onKeyDown = (event: React.KeyboardEvent) => {
-    const step = event.key === 'ArrowLeft' ? -KEY_STEP : event.key === 'ArrowRight' ? KEY_STEP : 0
+    const dir = side === 'right' ? -1 : 1
+    const step = event.key === 'ArrowLeft' ? -KEY_STEP * dir : event.key === 'ArrowRight' ? KEY_STEP * dir : 0
     if (!step)
       return
     event.preventDefault()

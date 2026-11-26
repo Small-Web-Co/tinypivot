@@ -37,7 +37,7 @@ description: Preferred default chart, map, YoY/MoM comparison, pivot table, and 
    - `bullet`: pass the target column as `targetField`. `slope`: pass the period column (e.g. year) as `seriesField`. `treemap`/`sunburst`: `seriesField` is the parent group.
    - These charts carry a takeaway line computed from the data ("Takeaway (computed from the data): …"). Quote it rather than restating numbers yourself.
 9. **Respect Free-tier truncation transparency:**
-   - On the Free tier (up to 2,500 rows), if TinyPivot reports a row-limit warning (`Showing first 2,500 of N rows`), never hide or gloss over it — explicitly note in your takeaway that totals reflect the 2,500-row subset.
+   - If TinyPivot emits an `[AUDIT]` warning on a query (join fan-out, unweighted rate average, partial trailing period, silent NULL drop, or extreme outlier distortion), fix the SQL or report the audited caveat explicitly before answering.
 10. **Show your work in TinyPivot Studio:**
    - Pass `why` on every data call (`load_file`, `load_data`, `query`, `configure_chart`, `configure_pivot`, `profile`, `history`): one short sentence the user reads in the Studio next to the SQL behind the step.
    - Pass `ask`, the user's request in their own words, when you load or query: the Studio shows each answer from that question down, and checks the numbers you quote against the data.
