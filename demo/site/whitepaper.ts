@@ -101,6 +101,25 @@ export const TRUST_BENCH_TOTALS = {
   proPct: 96,
 } as const
 
+export const whitepaperHeroStats = [
+  {
+    value: `${TRUST_BENCH_TOTALS.baselinePct}% → ${TRUST_BENCH_TOTALS.proPct}%`,
+    label: 'Combined accuracy across 4 models & 6 hard DS traps',
+  },
+  {
+    value: '33% → 83%',
+    label: 'Small Mac-local model (Inkling 2 Mini) lifted +50 pts',
+  },
+  {
+    value: '−40.4% cost',
+    label: 'Claude Sonnet Pro ($0.54) beat vanilla Python ($0.57) & Free ($0.91)',
+  },
+  {
+    value: '−47% tokens',
+    label: 'Recursive Data Memory on repeat schema inquiries',
+  },
+] as const
+
 export interface TrapCase {
   id: string
   name: string

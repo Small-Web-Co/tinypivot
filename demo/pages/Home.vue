@@ -9,6 +9,7 @@ import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
 import TokenReceipt from '../components/site/TokenReceipt.vue'
 import TrustBenchmarkTable from '../components/site/TrustBenchmarkTable.vue'
 import { benchmarkHeadline } from '../site/benchmark'
+import { whitepaperHeroStats } from '../site/whitepaper'
 
 // The showcase loads the real grid and chart library, so it is fetched in the
 // browser only and kept out of the prerendered HTML and the first bundle.
@@ -24,9 +25,9 @@ const facts = ['free · unlimited local rows', 'runs locally', 'no signup', 'no 
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  'Raw rows stay on your machine — unlimited local rows, ~200ms',
-  'Proof-of-Work Lineage, underlying source rows & offline HTML notebooks',
-  'Deterministic SQL & statistical guardrails — 75% → 96% across 4 models',
+  'Unlimited local rows on Free — 0 raw rows sent to the model (~200ms)',
+  'Deterministic SQL & DS guardrails — 75% → 96% across 4 local & frontier models',
+  'Lower token & dollar spend — Sonnet Pro beats vanilla Python ($0.54 vs $0.57); -47% on repeat schemas',
 ] as const
 
 const capabilities = [
@@ -56,17 +57,16 @@ const capabilities = [
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
-                Your Agentic IDE for Data Work.
+                The Trust Layer &amp; Data IDE for AI Agents.
               </p>
               <h1 class="display hero-title">
-                Interactive Data Analysis inside <em>your favorite Harness / Agent.</em>
+                Verified Data Analysis inside <em>your favorite AI Agent.</em>
               </h1>
               <p class="lede">
-                Built for the tools you already work in — Claude, Cursor, Antigravity and pi.
-                Trusted across 53,000+ npm downloads for interactive pivoting and D3.js charting, it gives you
-                <mark class="hl">local privacy</mark>, <mark class="hl">millisecond speed</mark>,
-                <mark class="hl">verified accuracy</mark>, and <mark class="hl">$0 exploration cost</mark>.
-                Spar with your data and save money by letting TinyPivot do the dirty work.
+                Built for Claude, Cursor, Antigravity, Codex and pi — trusted across 53,000+ npm downloads.
+                TinyPivot pairs local DuckDB + deterministic SQL &amp; statistical guardrails with D3.js charts and pivots for
+                <mark class="hl">verified accuracy</mark>, <mark class="hl">lower token cost</mark>,
+                <mark class="hl">local privacy</mark>, and <mark class="hl">Proof-of-Work lineage</mark>.
               </p>
               <ul class="hero-points">
                 <li v-for="point in heroPoints" :key="point">
@@ -147,43 +147,68 @@ const capabilities = [
     </section>
 
     <section id="savings" class="block savings" aria-labelledby="savings-title">
-      <div class="wrap savings-grid">
-        <div>
+      <div class="wrap savings-stack">
+        <header class="section-head savings-head">
           <p class="label">
-            Measured, not modelled
+            Measured, not modelled · Cost, Tokens &amp; Accuracy
           </p>
           <h2 id="savings-title" class="heading">
-            What a question <em>actually costs.</em>
+            Higher accuracy <em>and lower token cost.</em>
           </h2>
           <p class="lede">
-            The same three questions about the same data, asked in each setup. Most agents answer data questions by
-            writing Python; TinyPivot did the same work for {{ headline.cheaperThanPythonPct }}% less on the
-            {{ headline.largeRows.toLocaleString('en-US') }}-row file ({{ headline.cheaperThanPythonSmallPct }}% less on the small one),
-            with every figure right, and you get the chart and the SQL instead of a script to read.
-            Reading the rows into the chat costs about twice as much and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
+            Verification usually adds tokens. TinyPivot does the opposite: deterministic SQL audits and 1-call statistical
+            tools eliminate trial-and-error Python turns, while <strong>Recursive Data Memory</strong> cuts repeat schema
+            spend by <strong>47%</strong>. Across 6 hard Data Science traps on 4 local &amp; frontier models, Pro lifts
+            accuracy from <strong>75% → 96%</strong> and runs <strong>40.4% cheaper than Free on Claude Sonnet</strong>
+            ($0.54 vs. $0.57 for vanilla Python).
           </p>
-          <router-link to="/docs#savings" class="text-link">
-            Run the numbers for your own workload →
-          </router-link>
+        </header>
+
+        <dl class="savings-kpis">
+          <div v-for="stat in whitepaperHeroStats" :key="stat.label" class="savings-kpi">
+            <dt class="mono savings-kpi-val">
+              {{ stat.value }}
+            </dt>
+            <dd class="savings-kpi-lbl">
+              {{ stat.label }}
+            </dd>
+          </div>
+        </dl>
+
+        <div class="savings-trust">
+          <TrustBenchmarkTable />
+          <div class="savings-links">
+            <router-link to="/whitepaper" class="text-link">
+              Read the full White Paper, 6-trap methodology &amp; Recursive Memory results →
+            </router-link>
+            <router-link to="/docs#savings" class="text-link">
+              Run the token &amp; cost calculator for your workload →
+            </router-link>
+          </div>
         </div>
-        <BenchmarkTable />
-      </div>
-      <div class="wrap savings-meter">
-        <p class="label">
-          Hard Data Science &amp; BI Trap Benchmark · Local &amp; Frontier Models
-        </p>
-        <TrustBenchmarkTable />
-        <p style="margin-top: 12px;">
-          <router-link to="/whitepaper" class="text-link">
-            Read the full White Paper, 6-trap methodology &amp; Recursive Memory results →
-          </router-link>
-        </p>
-      </div>
-      <div class="wrap savings-meter">
-        <p class="label">
-          Where the tokens go when you paste rows
-        </p>
-        <TokenReceipt />
+
+        <div class="savings-everyday">
+          <div class="savings-everyday-col">
+            <p class="label">
+              Everyday BI · {{ headline.largeRows.toLocaleString('en-US') }}-row cost per question
+            </p>
+            <p class="savings-sub">
+              Most agents answer data questions by writing Python; TinyPivot did the same 3-question session for
+              <strong>{{ headline.cheaperThanPythonPct }}% less</strong> on the {{ headline.largeRows.toLocaleString('en-US') }}-row file
+              ({{ headline.cheaperThanPythonSmallPct }}% less on the small one) with every figure verified — while pasting rows cost ~2× more and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
+            </p>
+            <BenchmarkTable />
+          </div>
+          <div class="savings-everyday-col">
+            <p class="label">
+              Where the tokens go when you paste rows
+            </p>
+            <p class="savings-sub">
+              Raw rows stay in local DuckDB instead of re-entering LLM context on every follow-up turn.
+            </p>
+            <TokenReceipt />
+          </div>
+        </div>
       </div>
     </section>
 
@@ -362,23 +387,72 @@ const capabilities = [
   border-bottom: var(--line);
 }
 
-.savings-grid {
+.savings-stack {
+  display: grid;
+  gap: 28px;
+}
+
+.savings-head {
+  margin-bottom: 0;
+  max-width: 50rem;
+}
+
+.savings-kpis {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 32px;
+  gap: 12px;
+  margin: 0;
 }
 
-.savings-meter {
-  display: grid;
-  gap: 16px;
-  max-width: 560px;
-  margin-top: 40px;
+.savings-kpi {
+  padding: 14px 16px;
+  border: var(--line);
+  background: var(--ledger);
 }
 
-.savings-grid > div {
+.savings-kpi-val {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.savings-kpi-lbl {
+  margin: 4px 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.savings-trust {
   display: grid;
-  gap: 16px;
+  gap: 14px;
+}
+
+.savings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+}
+
+.savings-everyday {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  padding-top: 24px;
+  border-top: var(--line);
+}
+
+.savings-everyday-col {
+  display: grid;
+  gap: 12px;
   align-content: start;
+  min-width: 0;
+}
+
+.savings-sub {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--ink-muted);
 }
 
 .text-link {
@@ -487,6 +561,12 @@ const capabilities = [
   }
 }
 
+@media (min-width: 560px) {
+  .savings-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 1024px) {
   .hero-grid {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
@@ -494,10 +574,13 @@ const capabilities = [
     gap: 44px;
   }
 
-  .savings-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-    align-items: center;
-    gap: 64px;
+  .savings-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .savings-everyday {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 40px;
   }
 }
 </style>

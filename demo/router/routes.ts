@@ -98,8 +98,8 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot — Interactive Data Analysis inside your favorite Harness / Agent.',
-      description: 'Your Agentic IDE for Data Work. Built for Claude, Cursor, Antigravity & pi. Trusted across 53,000+ npm downloads for local privacy, millisecond speed, verified accuracy, D3.js charting and $0 exploration cost.',
+      title: 'TinyPivot — The Trust Layer & Data IDE for AI Agents',
+      description: 'Deterministic DuckDB SQL & statistical guardrails, 1-call Data Science shelf, Proof-of-Work Lineage, and Recursive Data Memory. 75% → 96% hard-trap accuracy, cheaper than Python, unlimited local rows on Free.',
     },
   },
   {

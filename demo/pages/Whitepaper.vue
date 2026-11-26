@@ -2,7 +2,7 @@
 import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TrustBenchmarkTable from '../components/site/TrustBenchmarkTable.vue'
-import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS } from '../site/whitepaper'
+import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroStats } from '../site/whitepaper'
 </script>
 
 <template>
@@ -24,21 +24,9 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, TRUST_BENCH_TOTAL
               tested it across four models from a Mac-local small model to frontier Claude Sonnet.
             </p>
             <div class="wp-stats">
-              <div class="wp-stat">
-                <span class="wp-stat-val mono">{{ TRUST_BENCH_TOTALS.baselinePct }}% → {{ TRUST_BENCH_TOTALS.proPct }}%</span>
-                <span class="wp-stat-lbl">Combined accuracy across 4 models &amp; 6 hard DS traps</span>
-              </div>
-              <div class="wp-stat">
-                <span class="wp-stat-val mono">33% → 83%</span>
-                <span class="wp-stat-lbl">Small Mac-local model (Inkling 2 Mini) lifted +50 pts</span>
-              </div>
-              <div class="wp-stat">
-                <span class="wp-stat-val mono">−40.4% cost</span>
-                <span class="wp-stat-lbl">Claude Sonnet Pro ($0.54) beat vanilla Python ($0.57) &amp; Free ($0.91)</span>
-              </div>
-              <div class="wp-stat">
-                <span class="wp-stat-val mono">−47% tokens</span>
-                <span class="wp-stat-lbl">Recursive Data Memory on repeat schema inquiries</span>
+              <div v-for="stat in whitepaperHeroStats" :key="stat.label" class="wp-stat">
+                <span class="wp-stat-val mono">{{ stat.value }}</span>
+                <span class="wp-stat-lbl">{{ stat.label }}</span>
               </div>
             </div>
           </div>
