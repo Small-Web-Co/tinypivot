@@ -95,13 +95,13 @@ const efficiencyItems: readonly EfficiencyItem[] = [
   },
   {
     id: 'deepseek-out',
-    label: 'DeepSeek V4.1 · Output Tokens',
-    metric: 'Total generated tokens across 18 tasks',
+    label: 'DeepSeek V4.1 · Output Tokens & API Cost†',
+    metric: '18 tasks · DeepSeek-Flash Peak rates ($0.30/$0.006/$1.20)',
     baselineVal: 35.8,
     proVal: 18.7,
-    baselineText: '35.8k (bare SQL)',
-    proText: '18.7k (TP Pro)',
-    delta: '−48% output tokens',
+    baselineText: '35.8k out · $0.059†',
+    proText: '18.7k out · $0.055†',
+    delta: '−48% out · −7% API†',
   },
   {
     id: 'sonnet-cost',

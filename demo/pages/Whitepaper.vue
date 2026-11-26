@@ -88,9 +88,9 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
             </h3>
             <p>
               On Mac-local <code>Inkling 2 Mini</code>, accuracy climbed <strong>78% (bare SQL) → 83% (TinyPivot Free, −19% faster) → 100% (TinyPivot Pro, +22.2 pts)</strong>
-              while cutting latency <strong>−44%</strong> (46.1s → 26.0s; <strong>3.8× faster</strong> on Hard DS) and output tokens <strong>−50%</strong>.
+              while cutting latency <strong>−44%</strong> (46.1s → 26.0s; <strong>3.8× faster</strong> on Hard DS) and output tokens <strong>−50%</strong> ($0 local; <strong>$0.046</strong> imputed small-fast API† across 18 tasks).
               On DGX Spark (<code>DeepSeek V4.1 Flash 1017</code>), <strong>TinyPivot Pro</strong> hit <strong>18/18 (100%)</strong> while cutting latency
-              <strong>−39%</strong> (25.7s → 15.6s; <strong>3.4× faster</strong> on Hard DS), turns <strong>−30%</strong> (4.94 → 3.44), and output tokens <strong>−48%</strong>.
+              <strong>−39%</strong> (25.7s → 15.6s; <strong>3.4× faster</strong> on Hard DS), turns <strong>−30%</strong> (4.94 → 3.44), output tokens <strong>−48%</strong>, and imputed DeepSeek-Flash API cost <strong>−7%</strong> ($0.055 vs. $0.059†).
             </p>
           </article>
           <article class="wp-finding">
@@ -109,9 +109,7 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
               3. Frontier Sonnet 5.5 &amp; Opus 5.5 hit 100% — faster on Hard DS &amp; lower warm cost
             </h3>
             <p>
-              On <code>Claude Sonnet 5.5</code>, <strong>TinyPivot Pro</strong> hit <strong>18/18 (100%)</strong> with zero Python/Bash while
-              running <strong>6% faster overall</strong> (18.8s vs. 20.0s; <strong>21% faster on Hard DS</strong>) at
-              <strong>$1.01 vs. $1.22</strong> warm-cache API-equiv (−17%) plus live Studio charts &amp; lineage.
+              On <code>Claude Sonnet 5.5</code>, both <strong>TinyPivot Free</strong> (<strong>18/18, −28% warm API*</strong> at $0.88) and <strong>TinyPivot Pro</strong> (<strong>18/18, zero Python/Bash</strong>) hit 100%, with Pro running <strong>6% faster overall</strong> (18.8s vs. 20.0s; <strong>21% faster on Hard DS</strong>) at <strong>$1.01 vs. $1.22</strong> warm-cache API-equiv (−17%) plus live Studio charts &amp; lineage.
               <code>Claude Opus 5.5</code> hit <strong>18/18 (100%)</strong> on both Free and Pro, running <strong>19% faster on Hard DS</strong>
               (2.8× faster on confounded OLS) at <strong>−39% warm API-equiv cost</strong> ($1.41 vs. $2.32).
             </p>

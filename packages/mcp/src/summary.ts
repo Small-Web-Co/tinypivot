@@ -8,6 +8,9 @@ import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-cha
 
 /** A grid this small is sent as its rows: the model needs the values, and they cost less than a re-query. */
 export const SMALL_GRID_MAX_ROWS = 25
+/** Narrow lookup tables (<= 3 columns, e.g. ID lists or key/value summaries) fit cheaply up to 60 rows. */
+const NARROW_GRID_MAX_ROWS = 60
+const NARROW_GRID_MAX_COLUMNS = 3
 const SMALL_GRID_MAX_COLUMNS = 12
 
 function tableCell(value: unknown): string {
@@ -26,18 +29,36 @@ function tableCell(value: unknown): string {
   return String(value).replace(/\|/g, '\\|').replace(/\n/g, ' ')
 }
 
-/** The rows of a small dataset, as a Markdown table. */
-function smallGridTable(dataset: StoredDataset, force = false): string | null {
-  if ((!force && dataset.viewMode !== 'grid') || dataset.rows.length > SMALL_GRID_MAX_ROWS || dataset.columns.length > SMALL_GRID_MAX_COLUMNS)
+/** The rows of a small dataset (or a compact preview for analytical SQL queries), as a Markdown table. */
+function smallGridTable(dataset: StoredDataset, force = false, allowPreview = false): string | null {
+  if (!force && dataset.viewMode !== 'grid')
     return null
-  const names = dataset.columns.map(column => column.name)
-  if (names.length === 0)
+  const allNames = dataset.columns.map(column => column.name)
+  if (allNames.length === 0)
     return null
-  return [
+
+  const rowLimit = allNames.length <= NARROW_GRID_MAX_COLUMNS ? NARROW_GRID_MAX_ROWS : SMALL_GRID_MAX_ROWS
+  const exceedsRows = dataset.rows.length > rowLimit
+  const exceedsCols = allNames.length > SMALL_GRID_MAX_COLUMNS
+  if (!allowPreview && (exceedsRows || exceedsCols))
+    return null
+
+  const names = exceedsCols ? allNames.slice(0, SMALL_GRID_MAX_COLUMNS) : allNames
+  const visibleRows = exceedsRows ? dataset.rows.slice(0, SMALL_GRID_MAX_ROWS) : dataset.rows
+  const lines = [
     `| ${names.join(' | ')} |`,
     `|${names.map(() => '---').join('|')}|`,
-    ...dataset.rows.map(row => `| ${names.map(name => tableCell(row[name])).join(' | ')} |`),
-  ].join('\n')
+    ...visibleRows.map(row => `| ${names.map(name => tableCell(row[name])).join(' | ')} |`),
+  ]
+  if (exceedsRows || exceedsCols) {
+    const parts: string[] = []
+    if (exceedsRows)
+      parts.push(`first ${visibleRows.length} of ${dataset.rows.length.toLocaleString('en-US')} rows`)
+    if (exceedsCols)
+      parts.push(`first ${names.length} of ${allNames.length} columns`)
+    lines.push('', `_(showing ${parts.join(', ')} — narrow with GROUP BY, LIMIT/OFFSET, or STRING_AGG(...) in SQL to inspect all)_`)
+  }
+  return lines.join('\n')
 }
 
 /** The fenced pivot table for a dataset that is in pivot view with a value to aggregate. */
@@ -128,9 +149,9 @@ export function formatDatasetSummary(
   options: TerminalFormatOptions = {},
 ): string {
   const cardOptions = { ...options, companionUrl: options.companionUrl ?? companionUrl }
-  // Analytical SQL queries (preferSmallTable) and grid views return exact rows directly;
+  // Analytical SQL queries (preferSmallTable) and grid views return exact rows directly (with a compact preview if large);
   // chart/pivot views render their card and fall back to a compact table when a small result has no chartable measure (e.g. DESCRIBE / ID lists).
-  const tableFallback = smallGridTable(dataset, true)
+  const tableFallback = smallGridTable(dataset, true, Boolean(options.preferSmallTable))
   const chartBlock = (options.preferSmallTable ? tableFallback : null)
     ?? smallGridTable(dataset)
     ?? datasetCard(dataset, cardOptions)

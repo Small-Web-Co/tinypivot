@@ -344,6 +344,17 @@ describe('query, profile and history tools', () => {
     expect(autoTable.isError).toBe(false)
     expect(autoTable.text).toContain('| n | fee_rate |')
     expect(autoTable.text).toContain('| 3 | 0.120132 |')
+
+    // Narrow lookup results > 25 rows (e.g. 34 matching fee IDs) return all rows up to 60; larger results return a 25-row preview with a SQL hint.
+    const narrow34 = await call('query', { sql: 'SELECT range AS fee_id FROM range(1, 35)' })
+    expect(narrow34.isError).toBe(false)
+    expect(narrow34.text).toContain('| 34 |')
+    expect(narrow34.text).not.toContain('showing first')
+
+    const large80 = await call('query', { sql: 'SELECT range AS fee_id FROM range(1, 81)' })
+    expect(large80.isError).toBe(false)
+    expect(large80.text).toContain('| 25 |')
+    expect(large80.text).toContain('showing first 25 of 80 rows')
   }, 30_000)
 
   it('lists every pull and reopens one without re-reading its source', async () => {
