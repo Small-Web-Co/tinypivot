@@ -169,9 +169,8 @@ import { dabstepBenchRows, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows 
     </div>
 
     <figcaption class="tbench-note">
-      <strong>Local overhead &amp; speed:</strong> DuckDB audits add ~5–15 ms per query (<code>analyze</code> ~10–40 ms) while TinyPivot Free tool schemas stay strictly <strong>&lt; 2,500 tokens</strong>. Across all 5 models, TinyPivot Pro ran <strong>26% faster overall</strong> (25.3s → 18.8s/task) and <strong>2.1× faster on Hard Data Science</strong> (39.7s → 19.1s/task) with −32% fewer Hard DS output tokens.
+      <strong>Local overhead &amp; fairness:</strong> DuckDB audits add ~5–15 ms per query (<code>analyze</code> ~10–40 ms) while TinyPivot Free tool schemas stay strictly <strong>&lt; 2,500 tokens</strong>. On Claude Code, <strong>TinyPivot Free</strong> runs additively alongside built-in <code>Bash</code> (matching real installs), while <strong>TinyPivot Pro</strong> ran MCP-only (<code>Bash</code> disabled) and still hit <strong>90/90 (100%)</strong> across all 5 models — <strong>25% faster overall</strong> (25.3s → 19.0s/task) and <strong>2.1× faster on Hard Data Science</strong> (39.7s → 19.3s/task) with −32% fewer Hard DS output tokens.
       <strong>*API-equivalent pricing:</strong> Claude 5.5 arms ran via local Claude Code subscription ($0 extra spend) with costs calculated from published Anthropic API token rates; Sonnet &amp; Opus <code>tp-pro</code> reflect warm-session prompt caching (90% cache-read discount on repeated tool schemas, matching real interactive sessions).
-      <strong>†Opus 5.5:</strong> Lone flagged item (<code>ds_confounded_ols</code>) caught confounding and exact +8 pp controlled lift in 21.5s vs. 61.4s vanilla (2.9× faster), differing only on phrasing regex.
     </figcaption>
   </figure>
 </template>

@@ -84,37 +84,36 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
         <div class="wp-findings">
           <article class="wp-finding">
             <h3 class="mono">
-              1. Local models run 39%–45% faster with half the output tokens
+              1. Local models hit 100% — 39%–44% faster with half the output tokens
             </h3>
             <p>
-              On a DGX Spark cluster (<code>DeepSeek V4.1 Flash 1017</code>), <strong>TinyPivot Pro</strong> hit
-              <strong>18/18 (100%)</strong> while cutting latency <strong>−39%</strong> (25.7s → 15.6s; <strong>3.4× faster</strong>
-              on Hard DS), turns <strong>−30%</strong> (4.94 → 3.44), and output tokens <strong>−48%</strong>.
-              On Mac-local <code>Inkling 2 Mini</code>, accuracy rose <strong>78% → 89% (+11.1 pts)</strong> while cutting
-              latency <strong>−45%</strong> (46.1s → 25.2s; <strong>4.0× faster</strong> on Hard DS) and output tokens <strong>−50%</strong>.
+              On Mac-local <code>Inkling 2 Mini</code>, accuracy climbed <strong>78% (bare SQL) → 83% (TinyPivot Free, −19% faster) → 100% (TinyPivot Pro, +22.2 pts)</strong>
+              while cutting latency <strong>−44%</strong> (46.1s → 26.0s; <strong>3.8× faster</strong> on Hard DS) and output tokens <strong>−50%</strong>.
+              On DGX Spark (<code>DeepSeek V4.1 Flash 1017</code>), <strong>TinyPivot Pro</strong> hit <strong>18/18 (100%)</strong> while cutting latency
+              <strong>−39%</strong> (25.7s → 15.6s; <strong>3.4× faster</strong> on Hard DS), turns <strong>−30%</strong> (4.94 → 3.44), and output tokens <strong>−48%</strong>.
             </p>
           </article>
           <article class="wp-finding">
             <h3 class="mono">
-              2. Claude Haiku 5.5 hits 100% — matching Sonnet &amp; Opus for pennies
+              2. Claude Haiku 5.5 climbs 83% → 89% Free → 100% Pro for pennies
             </h3>
             <p>
               Unhinted vanilla <code>Claude Haiku 5.5</code> missed whale outliers, subtle 20-segment SRM, and
-              right-censored cohorts (<strong>15/18, 83.3%</strong>). With <strong>TinyPivot Pro</strong>, Haiku jumped
-              <strong>+16.7 pts to 18/18 (100%)</strong>, ran <strong>5% faster</strong> (12.5s vs. 13.1s; 23% faster on Hard DS),
-              and cost just <strong>$0.083 API-equiv</strong> across all 18 tasks (+0.05¢/task over text-only Python).
+              right-censored cohorts (<strong>15/18, 83.3%</strong>). Adding <strong>TinyPivot Free</strong> lifted it to
+              <strong>16/18 (88.9%)</strong>, and <strong>TinyPivot Pro</strong> (even without Bash!) jumped <strong>+16.7 pts to 18/18 (100%)</strong>,
+              ran <strong>5% faster</strong> (12.5s vs. 13.1s; 23% faster on Hard DS), and cost just <strong>$0.083 API-equiv</strong> across all 18 tasks.
             </p>
           </article>
           <article class="wp-finding">
             <h3 class="mono">
-              3. Frontier Sonnet 5.5 &amp; Opus 5.5 cut Hard DS latency &amp; warm cost
+              3. Frontier Sonnet 5.5 &amp; Opus 5.5 hit 100% — faster on Hard DS &amp; lower warm cost
             </h3>
             <p>
-              On <code>Claude Sonnet 5.5</code>, <strong>TinyPivot Pro</strong> matched <strong>18/18 (100%)</strong> while
+              On <code>Claude Sonnet 5.5</code>, <strong>TinyPivot Pro</strong> hit <strong>18/18 (100%)</strong> with zero Python/Bash while
               running <strong>6% faster overall</strong> (18.8s vs. 20.0s; <strong>21% faster on Hard DS</strong>) at
               <strong>$1.01 vs. $1.22</strong> warm-cache API-equiv (−17%) plus live Studio charts &amp; lineage.
-              <code>Claude Opus 5.5</code> ran <strong>20% faster on Hard DS</strong> (2.9× faster on confounded OLS) at
-              <strong>−41% warm API-equiv cost</strong> ($1.38 vs. $2.32).
+              <code>Claude Opus 5.5</code> hit <strong>18/18 (100%)</strong> on both Free and Pro, running <strong>19% faster on Hard DS</strong>
+              (2.8× faster on confounded OLS) at <strong>−39% warm API-equiv cost</strong> ($1.41 vs. $2.32).
             </p>
           </article>
           <article class="wp-finding">

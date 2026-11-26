@@ -305,6 +305,8 @@ describe('pro Relational Profile & Deterministic explain_change', () => {
       const ds = new DatasetStore().register({ id: 'q', name: 'Q', source: sql, rows: [{ signup_month: '2026-01', users: 1 }] })
       const warnings = await auditQueryResult({ sql, dataset: ds, duck, views: [], deep: true })
       expect(warnings.some(w => w.kind === 'analyze_hint' && w.suggestion.includes('cohort_retention'))).toBe(true)
+      const rankWarnings = auditNonAdditiveSql('SELECT AVG(position) AS avg_pos FROM gsc_queries')
+      expect(rankWarnings.some(w => w.kind === 'non_additive_sql' && w.detail.includes('AVG(position)'))).toBe(true)
     }
     finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })

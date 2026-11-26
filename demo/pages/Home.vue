@@ -22,8 +22,8 @@ const facts = ['TinyPivot Free · unlimited rows', 'runs locally', 'no signup', 
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  '91% → 97% accuracy across 5 models & 18 unhinted BI/DS tasks (Haiku 83% → 100%)',
-  '2.1× faster Hard Data Science (−30% turns, −48% output tokens on DeepSeek)',
+  '91% → 100% accuracy across all 5 models × 18 unhinted BI/DS tasks (90/90 on Pro)',
+  '2.1× faster Hard Data Science (−30% turns, −48% to −50% local output tokens)',
   'Verified on official Adyen DABstep (77% → 80%) · < 2,500 Free schema tokens',
 ] as const
 
@@ -85,7 +85,7 @@ const capabilities = [
               </div>
               <div class="hero-meta-links">
                 <a href="#savings" class="hero-fine">
-                  5-model unhinted benchmark + official Adyen DABstep: 91% → 97% accuracy, 2.1× faster Hard DS, Haiku 83% → 100%.
+                  5-model unhinted benchmark + official Adyen DABstep: 91% → 100% accuracy (90/90 Pro), 2.1× faster Hard DS, Inkling 78% → 100%.
                   Benchmarks ↓
                 </a>
                 <router-link to="/whitepaper" class="hero-why-link">
@@ -179,8 +179,8 @@ const capabilities = [
               5-Model Unhinted Benchmark (270 Runs) + Official DABstep
             </h3>
             <p class="proof-body">
-              Head-to-head across Inkling 2 Mini (<strong>78% → 89%, −45% faster</strong>), DeepSeek V4.1 (<strong>100%, −39% faster, −30% turns</strong>),
-              Claude Haiku 5.5 (<strong>83% → 100%</strong>), Sonnet 5.5 (<strong>100%, −17% warm API*</strong>), Opus 5.5, and Adyen’s public <code>DABstep</code> Dev.
+              Head-to-head across Inkling 2 Mini (<strong>78% → 83% Free → 100% Pro, −44% faster</strong>), DeepSeek V4.1 (<strong>100%, −39% faster, −30% turns</strong>),
+              Claude Haiku 5.5 (<strong>83% → 89% → 100%</strong>), Sonnet 5.5 (<strong>100%, −17% warm API*</strong>), Opus 5.5 (<strong>100%</strong>), and Adyen’s public <code>DABstep</code> Dev.
             </p>
             <span class="text-link">Read the White Paper &amp; full benchmark tables →</span>
           </router-link>

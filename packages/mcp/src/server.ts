@@ -54,7 +54,7 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false, 
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
-    `For files use load_file, so the rows stay out of your context; to filter, join or aggregate files first, use query with SQL. Use load_data only for rows you already have, up to about ${LOAD_DATA_ROW_GUIDE}; write larger sets to a file first. history lists and reopens earlier pulls.`,
+    `For files use load_file to chart directly, or query (sql or queries[] batching up to 6 SELECTs over file paths directly) to filter, join or aggregate without loading rows into context. Use load_data only for <=${LOAD_DATA_ROW_GUIDE} inline rows. history lists and reopens pulls.`,
     `Chart types: ${CHART_TYPES.map(t => t.type).join(', ')}; names like map also work. slope: xAxisField the items, seriesField the two periods; treemap: seriesField the parent; bullet: targetField the target.`,
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
@@ -538,7 +538,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.8.1',
+      version: '0.8.2',
     },
     {
       capabilities: {

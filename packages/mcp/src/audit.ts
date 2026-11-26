@@ -34,7 +34,7 @@ export interface AuditWarning {
 
 const RATE_AVG_RE = /\bAVG\s*\(\s*(?:DISTINCT\s+)?(?:[\w"`]+\.)?["`]?([A-Z_][\w$]*)["`]?\s*\)/gi
 const RATE_SUM_RE = /\bSUM\s*\(\s*(?:DISTINCT\s+)?(?:[\w"`]+\.)?["`]?([A-Z_][\w$]*)["`]?\s*\)/gi
-const RATE_COL_RE = /(?:^|[^a-z])(?:share|pct|percent|percentage|rate|margin|ratio|bps|yield|arpu|aov|ltv|cac|roas|ctr|cvr|conversion|nps|avg|mean|median|index)(?:$|[^a-z])|%/i
+const RATE_COL_RE = /(?:^|[^a-z])(?:share|pct|percent|percentage|rate|margin|ratio|bps|yield|arpu|aov|ltv|cac|roas|ctr|cvr|conversion|nps|avg|mean|median|index|position|rank|ranking)(?:$|[^a-z])|%/i
 const UNIT_PRICE_RE = /(?:^|[^a-z])(?:unit_price|price_per|cost_per)(?:$|[^a-z])/i
 const CTE_DEF_RE = /\b(?:WITH|,)\s*(?:RECURSIVE\s+)?["`]?([A-Z_][\w$]*)["`]?\s+AS\s*\(/gi
 const JOIN_ON_RE = /\b((?:LEFT|RIGHT|FULL|INNER|CROSS|NATURAL|SEMI|ANTI)(?:\s+OUTER)?\s+)?JOIN\s+(?:'([^']+)'|"([^"]+)"|([A-Z_][\w.-]*))(?:\s+(?:AS\s+)?([A-Z_][\w$]*))?\s+(?:ON\s+([^\n;]+?)(?=\b(?:LEFT|RIGHT|FULL|INNER|CROSS|JOIN|WHERE|GROUP|HAVING|ORDER|LIMIT|QUALIFY|UNION|WINDOW)\b|;|$)|USING\s*\(([^)]+)\))/gi
@@ -103,8 +103,8 @@ export function auditNonAdditiveSql(sql: string): AuditWarning[] {
     warnings.push({
       kind: 'non_additive_sql',
       title: 'UNWEIGHTED AVERAGE OF RATES',
-      detail: `\`AVG(${col})\` weights every row equally regardless of volume (vulnerable to Simpson's paradox).`,
-      suggestion: `Prefer a volume-weighted ratio \`SUM(numerator) / NULLIF(SUM(denominator), 0)\` when numerator/denominator columns exist.`,
+      detail: `\`AVG(${col})\` weights every row equally regardless of volume/impressions (vulnerable to Simpson's paradox or Search Console position skew).`,
+      suggestion: `Prefer a volume-weighted ratio \`SUM(numerator) / NULLIF(SUM(denominator), 0)\` or weighted average \`SUM(${col} * weight) / NULLIF(SUM(weight), 0)\` (e.g. weighted by impressions) when denominator/weight columns exist.`,
     })
   }
 

@@ -15,12 +15,12 @@ TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinyp
 ## Verified 5-Model Benchmarks + Official Adyen DABstep (2026-11-26)
 
 1) **18-Task Unhinted Executive Benchmark** (6 Routine BI, 6 Relational Analytics, 6 Hard Data Science; 5 models × 3 arms = 270 runs; zero hints in prompts):
-- **Combined (90 model-tasks/arm):** Baseline **91.1% (82/90, 25.3s/task)** → TinyPivot Pro **96.7% (87/90, 18.8s/task — 26% faster)**; Routine BI **100% (30/30)**; Hard Data Science **80% → 93% (+13 pts), 2.1× faster (39.7s → 19.1s), −20% turns, −32% output tokens**.
-- **Inkling 2 Mini (Mac local, fast):** 14/18 (78%) → Pro **16/18 (89%, +11 pts)**, **−45% faster** (46.1s → 25.2s; 4.0× faster Hard DS), **−17% turns**, **−50% output tokens**.
-- **DeepSeek V4.1 Flash 1017 (DGX Spark):** 17/18 (94%) → Pro **18/18 (100%, +6 pts)**, **−39% faster** (25.7s → 15.6s; 3.4× faster Hard DS), **−30% turns** (4.94 → 3.44), **−48% output tokens**.
-- **Claude Haiku 5.5:** 15/18 (83%) → Pro **18/18 (100%, +17 pts)**, **−5% faster** (13.1s → 12.5s; −23% Hard DS), $0.083 API-equiv across 18 tasks.
-- **Claude Sonnet 5.5:** 18/18 (100%) parity, **−6% faster** (20.0s → 18.8s; −21% Hard DS), **$1.01 vs $1.22** warm-cache API-equiv (−17%) + live Studio charts & lineage.
-- **Claude Opus 5.5:** 17/18 (94%, lone flagged OLS task caught confounding + exact +8pp in 21.5s vs 61.4s vanilla — 2.9× faster), **−20% faster Hard DS**, **$1.38 vs $2.32** warm-cache API-equiv (−41%).
+- **Combined (90 model-tasks/arm):** Baseline **91.1% (82/90, 25.3s/task)** → TinyPivot Free **91.1% (82/90, 23.8s — 6% faster)** → TinyPivot Pro **100.0% (90/90, 19.0s — 25% faster)**; Routine BI **100% (30/30)**; Relational **100% (30/30)** on Free & Pro; Hard Data Science **80% → 100% (+20 pts), 2.1× faster (39.7s → 19.3s), −20% turns, −32% output tokens**.
+- **Inkling 2 Mini (Mac local, fast):** 14/18 (78%) → Free **15/18 (83%, −19% faster, −29% out)** → Pro **18/18 (100%, +22 pts)**, **−44% faster** (46.1s → 26.0s; 3.8× faster Hard DS), **−17% turns**, **−50% output tokens**.
+- **DeepSeek V4.1 Flash 1017 (DGX Spark):** 17/18 (94%) → Free **17/18 (94%)** → Pro **18/18 (100%, +6 pts)**, **−39% faster** (25.7s → 15.6s; 3.4× faster Hard DS), **−30% turns** (4.94 → 3.44), **−48% output tokens**.
+- **Claude Haiku 5.5:** 15/18 (83%) → Free **16/18 (89%)** → Pro **18/18 (100%, +17 pts)**, **−5% faster** (13.1s → 12.5s; −23% Hard DS), $0.083 API-equiv across 18 tasks.
+- **Claude Sonnet 5.5:** 18/18 (100%) → Free **16/18 (89%, −10% faster)** → Pro **18/18 (100%, no Bash needed)**, **−6% faster** (20.0s → 18.8s; −21% Hard DS), **$1.01 vs $1.22** warm-cache API-equiv (−17%) + live Studio charts & lineage.
+- **Claude Opus 5.5:** 18/18 (100%) → Free **18/18 (100%)** → Pro **18/18 (100%, no Bash needed)**, **−19% faster Hard DS** (2.8× faster OLS), **$1.41 vs $2.32** warm-cache API-equiv (−39%).
 - **Recursive Data Memory:** Cuts repeat schema inquiry tokens by **−47%** (32.5k → 17.1k tokens, 6 → 3 turns on Inkling).
 
 2) **Official Adyen / Hugging Face `adyen/DABstep` Dev** (10 labeled tasks over 22 MB `payments.csv` + `fees.json`, verbatim `question_scorer`, 3 Claude 5.5 models = 60 runs):
@@ -28,7 +28,7 @@ TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinyp
 
 ## Docs
 
-- [Technical White Paper & 5-Model + DABstep Benchmarks](https://tiny-pivot.com/whitepaper): Empirical evaluation across Inkling 2 Mini, DeepSeek V4.1 Flash, Claude Haiku 5.5, Sonnet 5.5, and Opus 5.5 (91% → 97% unhinted accuracy, 2.1× faster Hard Data Science, plus official Adyen DABstep Dev)
+- [Technical White Paper & 5-Model + DABstep Benchmarks](https://tiny-pivot.com/whitepaper): Empirical evaluation across Inkling 2 Mini, DeepSeek V4.1 Flash, Claude Haiku 5.5, Sonnet 5.5, and Opus 5.5 (91% → 100% unhinted accuracy on Pro, 2.1× faster Hard Data Science, plus official Adyen DABstep Dev)
 
 - [In-Agent Analytics (TinyPivot MCP Docs)](https://tiny-pivot.com/docs): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference
 - [Full AI-friendly developer reference](https://tiny-pivot.com/llms-full.txt): Complete install, quick-start code, all props, free vs Pro feature matrix, pricing, aggregations, theming, and AI Data Analyst setup for both Vue and React
