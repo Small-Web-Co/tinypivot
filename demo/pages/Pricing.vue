@@ -32,16 +32,16 @@ const { pendingPlan, error, startCheckout } = useCheckout()
           Pricing
         </p>
         <h1 class="display">
-          Free to start. <em>Pro</em> when the numbers matter.
+          TinyPivot Free to start. <em>Pro</em> when the numbers matter.
         </h1>
         <p v-if="product === 'mcp'" class="lede">
-          Unlimited local rows on Free with no signup or trial clock. Pro adds deep SQL &amp; statistical guardrails, the full Data Science shelf, Recursive Data Memory, white-label exports, and PostgreSQL.
+          Unlimited local rows in TinyPivot Free with no signup or trial clock. TinyPivot Pro adds deep SQL &amp; statistical guardrails, the full Data Science shelf, Recursive Data Memory, white-label exports, and PostgreSQL.
           <router-link to="/whitepaper" class="wp-inline-link">
             Read the 4-model benchmark →
           </router-link>
         </p>
         <p v-else class="lede">
-          Free core grid and pivot table with no signup or trial clock. Pro adds drill-through, all aggregations, 10 themes, and Excel export with a perpetual license.
+          TinyPivot Free core grid and pivot table with no signup or trial clock. TinyPivot Pro adds drill-through, all aggregations, 10 themes, and Excel export with a perpetual license.
         </p>
         <SegmentedControl v-model="product" :options="products" label="Product" class="product-switch" />
       </header>

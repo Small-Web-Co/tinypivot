@@ -99,7 +99,7 @@ export const routeDefinitions = [
     component: () => import('../pages/Home.vue'),
     meta: {
       title: 'TinyPivot — The Trust Layer & Data IDE for AI Agents',
-      description: 'Deterministic DuckDB SQL & statistical guardrails, 1-call Data Science shelf, Proof-of-Work Lineage, and Recursive Data Memory. 75% → 96% hard-trap accuracy, cheaper than Python, unlimited local rows on Free.',
+      description: 'Deterministic DuckDB SQL & statistical guardrails, 1-call Data Science shelf, Proof-of-Work Lineage, and Recursive Data Memory. 75% → 96% hard-trap accuracy, cheaper than Python, unlimited local rows in TinyPivot Free.',
     },
   },
   {
@@ -135,7 +135,7 @@ export const routeDefinitions = [
     component: () => import('../pages/Pricing.vue'),
     meta: {
       title: 'TinyPivot Pricing — MCP Server & React/Vue Library',
-      description: 'TinyPivot MCP is free with unlimited local rows, charts, DuckDB SQL, Studio & lineage. Pro adds deep SQL/statistical guardrails, full Data Science shelf, Recursive Data Memory, Excel export and Postgres from $149/year or $399 lifetime.',
+      description: 'TinyPivot Free includes unlimited local rows, charts, DuckDB SQL, Studio & lineage. TinyPivot Pro adds deep SQL/statistical guardrails, full Data Science shelf, Recursive Data Memory, Excel export and Postgres from $149/year or $399 lifetime.',
     },
   },
   {

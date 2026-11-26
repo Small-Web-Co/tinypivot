@@ -182,7 +182,7 @@ const { copiedKey, copy } = useCopy()
           <p class="docs-text">
             Measured in Claude Code on a {{ headline.largeRows.toLocaleString('en-US') }}-row dataset, TinyPivot cost
             <strong>{{ headline.cheaperThanPythonPct }}% less than writing Python</strong> ({{ headline.cheaperThanPythonSmallPct }}% less on the small file) with every figure verified, while pasting rows cost ~2× more and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
-            On our 6-task hard Data Science trap benchmark, TinyPivot Pro also ran <strong>40.4% cheaper than Free on Claude Sonnet</strong> ($0.54 vs. $0.57 vanilla Python) and cut repeat schema tokens by <strong>47%</strong> with Recursive Data Memory —
+            On our 6-task hard Data Science trap benchmark, TinyPivot Pro also ran <strong>40.4% cheaper than TinyPivot Free on Claude Sonnet</strong> ($0.54 vs. $0.57 vanilla Python) and cut repeat schema tokens by <strong>47%</strong> with Recursive Data Memory —
             <router-link to="/whitepaper">
               see full benchmark tables →
             </router-link>

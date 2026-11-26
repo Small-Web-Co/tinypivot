@@ -71,28 +71,28 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
       </table>
     </div>
 
-    <!-- Mobile stacked cards (zero horizontal clipping) -->
+    <!-- Mobile stacked cards: spacious 1-row-per-arm layout for phones -->
     <div class="tbench-cards">
       <article v-for="row in trustBenchRows" :key="row.id" class="tb-card">
         <div class="tb-card-head">
           <strong>{{ row.model }}</strong>
           <span class="sub">{{ row.hardware }} · vs {{ row.baselineLabel }}</span>
         </div>
-        <div class="tb-card-arms">
-          <div class="tb-arm">
+        <div class="tb-arm-rows">
+          <div class="tb-arm-row">
             <span class="tb-arm-lbl">Baseline</span>
             <span class="score">{{ row.baselineScore }} ({{ row.baselinePct }}%)</span>
-            <span class="sub">{{ row.baselineMeta }}</span>
+            <span class="tb-arm-meta">{{ row.baselineMeta }}</span>
           </div>
-          <div class="tb-arm">
-            <span class="tb-arm-lbl">Free</span>
+          <div class="tb-arm-row">
+            <span class="tb-arm-lbl">TinyPivot Free</span>
             <span class="score">{{ row.freeScore }} ({{ row.freePct }}%)</span>
-            <span class="sub">{{ row.freeMeta }}</span>
+            <span class="tb-arm-meta">{{ row.freeMeta }}</span>
           </div>
-          <div class="tb-arm col-pro">
-            <span class="tb-arm-lbl">Pro</span>
+          <div class="tb-arm-row col-pro">
+            <span class="tb-arm-lbl">TinyPivot Pro</span>
             <span class="score">{{ row.proScore }} ({{ row.proPct }}%)</span>
-            <span class="sub">{{ row.proMeta }}</span>
+            <span class="tb-arm-meta">{{ row.proMeta }}</span>
           </div>
         </div>
         <p class="tb-card-lift">
@@ -103,17 +103,17 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
         <div class="tb-card-head">
           <strong>Combined ({{ TRUST_BENCH_TOTALS.totalModelTasks }} tasks/arm)</strong>
         </div>
-        <div class="tb-card-arms">
-          <div class="tb-arm">
+        <div class="tb-total-strip">
+          <div class="tb-total-pill">
             <span class="tb-arm-lbl">Baseline</span>
             <span class="score">{{ TRUST_BENCH_TOTALS.baselinePassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.baselinePct }}%)</span>
           </div>
-          <div class="tb-arm">
-            <span class="tb-arm-lbl">Free</span>
+          <div class="tb-total-pill">
+            <span class="tb-arm-lbl">TinyPivot Free</span>
             <span class="score">{{ TRUST_BENCH_TOTALS.freePassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.freePct }}%)</span>
           </div>
-          <div class="tb-arm col-pro">
-            <span class="tb-arm-lbl">Pro</span>
+          <div class="tb-total-pill col-pro">
+            <span class="tb-arm-lbl">TinyPivot Pro</span>
             <span class="score">{{ TRUST_BENCH_TOTALS.proPassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.proPct }}%)</span>
           </div>
         </div>
@@ -121,9 +121,9 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
     </div>
 
     <figcaption class="tbench-note">
-      <strong>*Why billed cost and output tokens drop even when raw total tokens look higher:</strong>
-      On Claude, <em>raw tok</em> includes 90%-discounted prompt-cache reads of the MCP tool definitions, while 1-call <code>analyze</code> eliminates expensive output tokens spent writing &amp; debugging Python — making Sonnet Pro cheaper than vanilla Python ($0.54 vs. $0.57).
-      On local models, <code>bare-sql</code> exposes only 1 raw SQL tool (~300 schema tokens) vs. TinyPivot's full 10-tool Studio; Pro still cuts generated <em>out</em> tokens up to 21% vs. <code>bare-sql</code> and total tokens up to 14% vs. Free.
+      <strong>Local overhead &amp; speed:</strong> DuckDB audits add only ~5–15 ms per query (<code>analyze</code> ~10–40 ms); TinyPivot Pro ran <strong>10% faster than bare SQL</strong> and <strong>20% faster than TinyPivot Free</strong> on DeepSeek (2× faster on A/B &amp; regression).
+      <strong>*Cost vs. raw tokens:</strong> On Claude, <em>raw tok</em> includes 90%-discounted prompt-cache reads of MCP tool schemas, while 1-call <code>analyze</code> eliminates expensive output tokens spent writing &amp; debugging Python — making Sonnet Pro cheaper than vanilla Python ($0.54 vs. $0.57).
+      On local models, <code>bare-sql</code> exposes 1 raw SQL tool (~300 schema tokens) vs. TinyPivot's full 10-tool Studio; TinyPivot Pro still cuts generated <em>out</em> tokens up to 21% vs. <code>bare-sql</code> and total tokens up to 14% vs. TinyPivot Free.
     </figcaption>
   </figure>
 </template>
@@ -158,10 +158,10 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
 }
 
 .tb-card {
-  padding: 12px 14px;
+  padding: 14px;
   border-bottom: 1px solid var(--rule);
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .tb-card:last-child {
@@ -175,34 +175,55 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
 
 .tb-card-head strong {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   color: var(--ink);
 }
 
-.tb-card-arms {
+.tb-arm-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.tb-arm-row {
+  display: grid;
+  grid-template-columns: 7.5rem auto;
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+}
+
+.tb-arm-lbl {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+
+.tb-arm-meta {
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.tb-total-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
-.tb-arm {
-  padding: 7px 8px;
+.tb-total-pill {
+  padding: 8px;
   border: 1px solid var(--rule);
-  min-width: 0;
-}
-
-.tb-arm-lbl {
-  display: block;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-muted);
-  margin-bottom: 2px;
+  display: grid;
+  gap: 2px;
 }
 
 .tb-card-lift {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.74rem;
   line-height: 1.45;
   color: var(--ink);
 }

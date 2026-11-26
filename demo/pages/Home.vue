@@ -16,15 +16,15 @@ onMounted(() => {
   isMounted.value = true
 })
 
-const facts = ['free · unlimited local rows', 'runs locally', 'no signup', 'no API key']
+const facts = ['TinyPivot Free · unlimited rows', 'runs locally', 'no signup', 'no API key']
 
 // The hero's fine print comes from the measured benchmark shown in the savings section.
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  'Unlimited local rows on Free — 0 raw rows sent to the model (~200ms)',
-  'Deterministic SQL & DS guardrails — 75% → 96% across 4 local & frontier models',
-  'Lower token & dollar spend — Sonnet Pro beats vanilla Python ($0.54 vs $0.57); -47% on repeat schemas',
+  '75% → 96% accuracy on hard SQL & Data Science traps',
+  'Cheaper & faster than vanilla Python (−47% repeat tokens)',
+  'Local DuckDB, Proof-of-Work lineage & offline HTML notebooks',
 ] as const
 
 const capabilities = [
@@ -41,7 +41,7 @@ const capabilities = [
   {
     n: '03',
     title: 'Proof-of-Work Studio & Memory',
-    body: 'Unlimited local rows on Free with clickable lineage, underlying rows, and offline HTML export. Pro adds Recursive Data Memory that learns your schemas to cut tokens on repeat work, plus Excel & Postgres.',
+    body: 'Unlimited local rows in TinyPivot Free with clickable lineage, underlying rows, and offline HTML export. TinyPivot Pro adds Recursive Data Memory that learns your schemas to cut tokens on repeat work, plus Excel & Postgres.',
   },
 ] as const
 </script>

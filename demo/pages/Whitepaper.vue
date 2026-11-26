@@ -84,9 +84,9 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
             </h3>
             <p>
               On a local Mac model (<code>Inkling 2 Mini</code>, fast non-thinking mode), accuracy jumped from
-              <strong>2/6 (33%)</strong> on bare SQL and Free to <strong>5/6 (83%)</strong> on Pro — matching
+              <strong>2/6 (33%)</strong> on bare SQL and TinyPivot Free to <strong>5/6 (83%)</strong> on TinyPivot Pro — matching
               frontier Claude Sonnet running vanilla Python/Bash. On the confounded-discount task, both bare SQL
-              and Free failed after 9 turns while Pro solved it in 5 turns (29s, −46% tokens vs. Free).
+              and TinyPivot Free failed after 9 turns while TinyPivot Pro solved it in 5 turns (29s, 2× faster, −46% tokens vs. TinyPivot Free).
             </p>
           </article>
           <article class="wp-finding">
@@ -96,18 +96,19 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
             <p>
               Normally, verification layers add turns and cost. On Claude Sonnet, TinyPivot Pro achieved
               <strong>6/6 (100%)</strong> vs. <strong>5/6 (83%)</strong> for vanilla Python/Bash while costing
-              <strong>$0.5407 vs. $0.5677</strong> (−4.8% cheaper than Python, −40.4% cheaper than Free).
+              <strong>$0.5407 vs. $0.5677</strong> (−4.8% cheaper than Python, −40.4% cheaper than TinyPivot Free).
               Adding zero-param column auto-inference to <code>analyze</code> alone cut Sonnet Pro tokens by 26%.
             </p>
           </article>
           <article class="wp-finding">
             <h3 class="mono">
-              3. DeepSeek V4.1 hits 100% with −41% tokens on A/B
+              3. DeepSeek V4.1 hits 100% — 10% faster &amp; −21% output tokens
             </h3>
             <p>
-              On a local DGX Spark cluster (<code>DeepSeek V4.1 Flash 1017</code>), Pro lifted accuracy from
-              <strong>83% → 100%</strong> and cut total tokens <strong>−14.1%</strong> vs. Free. On the broken
-              A/B test, Pro solved it in 3 turns / 14.5k tokens / 18.2s — <strong>−41% fewer tokens and 60% faster
+              On a local DGX Spark cluster (<code>DeepSeek V4.1 Flash 1017</code>), TinyPivot Pro lifted accuracy from
+              <strong>83% → 100%</strong>, ran <strong>10% faster than bare SQL</strong> (36.2s vs. 40.0s; 20% faster than TinyPivot Free),
+              and cut output tokens <strong>−21%</strong> vs. bare SQL (−14.1% total vs. TinyPivot Free). On the broken
+              A/B test, TinyPivot Pro solved it in 3 turns / 14.5k tokens / 18.2s — <strong>−41% fewer tokens and 60% faster
                 than bare DuckDB SQL</strong>.
             </p>
           </article>
@@ -118,7 +119,7 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
             <p>
               Every time an <code>[AUDIT]</code> warning catches a trap or a human edits SQL in TinyPivot Studio,
               a compact schema-fingerprinted lesson is stored locally. On repeat inquiries against the same schema,
-              <code>Inkling 2 Mini</code> dropped from 6 turns / 32.5k tokens (Free) to 4 turns / 22.7k (Pro cold)
+              <code>Inkling 2 Mini</code> dropped from 6 turns / 32.5k tokens (TinyPivot Free) to 4 turns / 22.7k (Pro cold)
               to <strong>3 turns / 17.1k tokens (−47%)</strong> with Recursive Memory warm.
             </p>
           </article>
@@ -178,7 +179,7 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
     <section class="block">
       <div class="wrap wp-prose">
         <p class="label">
-          05 · Why Free Includes Unlimited Local Rows
+          05 · Why TinyPivot Free Includes Unlimited Local Rows
         </p>
         <h2 class="heading">
           Never truncate <em>a trust tool.</em>
@@ -200,12 +201,12 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
           <InstallBox
             source="whitepaper"
             prominent
-            action-label="Try TinyPivot MCP free · unlimited local rows"
+            action-label="Try TinyPivot Free · unlimited local rows"
             action-meta="10s setup"
           />
           <div class="wp-cta-links">
             <router-link to="/pricing" class="btn btn-solid">
-              Compare Free vs. Pro
+              Compare TinyPivot Free vs. Pro
             </router-link>
             <router-link to="/docs" class="btn">
               Read MCP Docs
