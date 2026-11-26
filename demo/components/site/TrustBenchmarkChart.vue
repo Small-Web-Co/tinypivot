@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
+import { categoryBenchRows, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
 
-type MetricTab = 'accuracy' | 'efficiency'
+type MetricTab = 'accuracy' | 'efficiency' | 'categories'
 const activeTab = ref<MetricTab>('accuracy')
 
 interface BarGroup {
@@ -10,7 +10,7 @@ interface BarGroup {
   label: string
   sub: string
   baseline: number
-  free: number
+  free: number | null
   pro: number
   delta: string
 }
@@ -20,18 +20,12 @@ const accuracyGroups = computed<BarGroup[]>(() => [
     const diff = row.proPct - row.baselinePct
     return {
       id: row.id,
-      label: row.id === 'inkling'
-        ? 'Inkling 2 Mini'
-        : row.id === 'deepseek'
-          ? 'DeepSeek V4.1'
-          : row.id === 'haiku'
-            ? 'Claude Haiku 4.5'
-            : 'Claude Sonnet',
+      label: row.shortLabel,
       sub: row.hardware,
       baseline: row.baselinePct,
       free: row.freePct,
       pro: row.proPct,
-      delta: diff > 0 ? `+${diff} pts` : '100% parity',
+      delta: diff > 0 ? `+${diff} pts` : diff === 0 ? '100% parity' : `${diff} pts†`,
     }
   }),
   {
@@ -44,6 +38,18 @@ const accuracyGroups = computed<BarGroup[]>(() => [
     delta: `+${TRUST_BENCH_TOTALS.proPct - TRUST_BENCH_TOTALS.baselinePct} pts`,
   },
 ])
+
+const categoryGroups = computed<BarGroup[]>(() =>
+  categoryBenchRows.map(c => ({
+    id: c.id,
+    label: c.label,
+    sub: c.sub,
+    baseline: c.baselinePct,
+    free: c.id === 'dabstep' ? null : c.freePct,
+    pro: c.proPct,
+    delta: c.delta,
+  })),
+)
 
 interface EfficiencyItem {
   id: string
@@ -58,34 +64,54 @@ interface EfficiencyItem {
 
 const efficiencyItems: readonly EfficiencyItem[] = [
   {
-    id: 'sonnet-cost',
-    label: 'Claude Sonnet · Total Cost',
-    metric: 'USD across 6 traps',
-    baselineVal: 0.5677,
-    proVal: 0.5407,
-    baselineText: '$0.57 (Python)',
-    proText: '$0.54 (TP Pro)',
-    delta: '−4.8% vs Python',
+    id: 'hard-ds-speed',
+    label: 'All 5 Models · Hard Data Science Latency',
+    metric: 'Avg seconds per task across 30 runs/arm',
+    baselineVal: 39.7,
+    proVal: 19.1,
+    baselineText: '39.7s (Baseline)',
+    proText: '19.1s (TP Pro)',
+    delta: '2.1× faster (−52%)',
+  },
+  {
+    id: 'inkling-speed',
+    label: 'Inkling 2 Mini · Avg Latency & Output',
+    metric: 'Mac local · 18 unhinted tasks',
+    baselineVal: 46.1,
+    proVal: 25.2,
+    baselineText: '46.1s · 24.7k out',
+    proText: '25.2s · 12.2k out',
+    delta: '−45% faster · −50% out',
   },
   {
     id: 'deepseek-speed',
-    label: 'DeepSeek V4.1 · Avg Speed',
-    metric: 'Seconds per task',
-    baselineVal: 40.0,
-    proVal: 36.2,
-    baselineText: '40.0s (bare SQL)',
-    proText: '36.2s (TP Pro)',
-    delta: '10% faster',
+    label: 'DeepSeek V4.1 · Avg Latency & Turns',
+    metric: 'DGX Spark · 18 unhinted tasks',
+    baselineVal: 25.7,
+    proVal: 15.6,
+    baselineText: '25.7s · 4.94 turns',
+    proText: '15.6s · 3.44 turns',
+    delta: '−39% faster · −30% turns',
   },
   {
     id: 'deepseek-out',
     label: 'DeepSeek V4.1 · Output Tokens',
-    metric: 'Generated tokens across 6 traps',
-    baselineVal: 19.9,
-    proVal: 15.7,
-    baselineText: '19.9k (bare SQL)',
-    proText: '15.7k (TP Pro)',
-    delta: '−21% output',
+    metric: 'Total generated tokens across 18 tasks',
+    baselineVal: 35.8,
+    proVal: 18.7,
+    baselineText: '35.8k (bare SQL)',
+    proText: '18.7k (TP Pro)',
+    delta: '−48% output tokens',
+  },
+  {
+    id: 'sonnet-cost',
+    label: 'Claude Sonnet 5.5 · API-Equiv Cost',
+    metric: 'Published API pricing (warm cache*) · 18 tasks',
+    baselineVal: 1.2202,
+    proVal: 1.0134,
+    baselineText: '$1.22 (Python · 20.0s)',
+    proText: '$1.01 (TP Pro · 18.8s)',
+    delta: '−17% cost · −6% faster',
   },
   {
     id: 'inkling-mem',
@@ -93,9 +119,9 @@ const efficiencyItems: readonly EfficiencyItem[] = [
     metric: 'Recursive Data Memory warm vs cold',
     baselineVal: 32.5,
     proVal: 17.1,
-    baselineText: '32.5k (cold)',
-    proText: '17.1k (warm)',
-    delta: '−47% tokens',
+    baselineText: '32.5k (cold · 6 turns)',
+    proText: '17.1k (warm · 3 turns)',
+    delta: '−47% tokens · −50% turns',
   },
 ]
 </script>
@@ -116,7 +142,7 @@ const efficiencyItems: readonly EfficiencyItem[] = [
           :aria-selected="activeTab === 'accuracy'"
           @click="activeTab = 'accuracy'"
         >
-          Accuracy (%)
+          Accuracy (5 Models)
         </button>
         <button
           type="button"
@@ -125,7 +151,16 @@ const efficiencyItems: readonly EfficiencyItem[] = [
           :aria-selected="activeTab === 'efficiency'"
           @click="activeTab = 'efficiency'"
         >
-          Speed, Tokens &amp; Cost
+          Speed, Turns &amp; Tokens
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tbchart-tab"
+          :aria-selected="activeTab === 'categories'"
+          @click="activeTab = 'categories'"
+        >
+          Categories &amp; DABstep
         </button>
       </div>
     </div>
@@ -137,7 +172,7 @@ const efficiencyItems: readonly EfficiencyItem[] = [
         <span><i class="swatch swatch-pro" /> TinyPivot Pro</span>
       </div>
 
-      <div class="col-chart">
+      <div class="col-chart col-chart-6">
         <div
           v-for="g in accuracyGroups"
           :key="g.id"
@@ -152,7 +187,7 @@ const efficiencyItems: readonly EfficiencyItem[] = [
                 <div class="col-bar bar-base" :style="{ height: `${g.baseline}%` }" />
               </div>
             </div>
-            <div class="col-bar-wrap">
+            <div v-if="g.free !== null" class="col-bar-wrap">
               <span class="col-val mono">{{ g.free }}%</span>
               <div class="col-track">
                 <div class="col-bar bar-free" :style="{ height: `${g.free}%` }" />
@@ -173,7 +208,7 @@ const efficiencyItems: readonly EfficiencyItem[] = [
       </div>
     </div>
 
-    <div v-else class="tbchart-body">
+    <div v-else-if="activeTab === 'efficiency'" class="tbchart-body">
       <div class="tbchart-legend mono">
         <span><i class="swatch swatch-base" /> Baseline (Lower is better)</span>
         <span><i class="swatch swatch-pro" /> TinyPivot Pro</span>
@@ -208,6 +243,49 @@ const efficiencyItems: readonly EfficiencyItem[] = [
         </div>
       </div>
     </div>
+
+    <div v-else class="tbchart-body">
+      <div class="tbchart-legend mono">
+        <span><i class="swatch swatch-base" /> Baseline</span>
+        <span><i class="swatch swatch-free" /> TinyPivot Free (Bench v2)</span>
+        <span><i class="swatch swatch-pro" /> TinyPivot Pro</span>
+      </div>
+
+      <div class="col-chart col-chart-4">
+        <div
+          v-for="g in categoryGroups"
+          :key="g.id"
+          class="col-group"
+          :class="{ 'col-group-total': g.id === 'dabstep' }"
+        >
+          <span class="col-delta mono">{{ g.delta }}</span>
+          <div class="col-bars" :class="{ 'col-bars-2': g.free === null }">
+            <div class="col-bar-wrap">
+              <span class="col-val mono">{{ g.baseline }}%</span>
+              <div class="col-track">
+                <div class="col-bar bar-base" :style="{ height: `${g.baseline}%` }" />
+              </div>
+            </div>
+            <div v-if="g.free !== null" class="col-bar-wrap">
+              <span class="col-val mono">{{ g.free }}%</span>
+              <div class="col-track">
+                <div class="col-bar bar-free" :style="{ height: `${g.free}%` }" />
+              </div>
+            </div>
+            <div class="col-bar-wrap">
+              <span class="col-val col-val-pro mono">{{ g.pro }}%</span>
+              <div class="col-track">
+                <div class="col-bar bar-pro" :style="{ height: `${g.pro}%` }" />
+              </div>
+            </div>
+          </div>
+          <div class="col-x">
+            <strong>{{ g.label }}</strong>
+            <span>{{ g.sub }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </figure>
 </template>
 
@@ -231,17 +309,18 @@ const efficiencyItems: readonly EfficiencyItem[] = [
 }
 
 .tbchart-tabs {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   border: var(--line);
   background: var(--paper-sunk, var(--ledger));
 }
 
 .tbchart-tab {
-  padding: 6px 12px;
+  padding: 6px 10px;
   border: 0;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -299,19 +378,18 @@ const efficiencyItems: readonly EfficiencyItem[] = [
 .col-chart {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .col-group {
   display: grid;
   gap: 8px;
-  padding: 12px 10px 10px;
+  padding: 10px 8px;
   border: 1px solid var(--rule);
   background: var(--paper-raised, var(--paper));
 }
 
 .col-group-total {
-  grid-column: 1 / -1;
   background: var(--ledger);
   border-color: var(--ink);
 }
@@ -322,15 +400,22 @@ const efficiencyItems: readonly EfficiencyItem[] = [
   border: 1px solid #1d7a4f;
   background: rgba(29, 122, 79, 0.1);
   color: #145a39;
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 700;
 }
 
 .col-bars {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
   align-items: end;
+}
+
+.col-bars-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 110px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .col-bar-wrap {
@@ -340,7 +425,7 @@ const efficiencyItems: readonly EfficiencyItem[] = [
 }
 
 .col-val {
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   color: var(--ink-muted);
 }
 
@@ -351,8 +436,8 @@ const efficiencyItems: readonly EfficiencyItem[] = [
 
 .col-track {
   width: 100%;
-  max-width: 34px;
-  height: 112px;
+  max-width: 30px;
+  height: 108px;
   display: flex;
   align-items: flex-end;
   background: rgba(0, 0, 0, 0.04);
@@ -373,14 +458,14 @@ const efficiencyItems: readonly EfficiencyItem[] = [
 
 .col-x strong {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--ink);
 }
 
 .col-x span {
   display: block;
   margin-top: 2px;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   color: var(--ink-muted);
 }
 
@@ -447,18 +532,24 @@ const efficiencyItems: readonly EfficiencyItem[] = [
   border: 1px solid var(--ink);
 }
 
-@media (min-width: 760px) {
-  .col-chart {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
+@media (min-width: 680px) {
+  .col-chart-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .col-group-total {
-    grid-column: auto;
+  .col-chart-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .eff-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 980px) {
+  .col-chart-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
   }
 }
 </style>

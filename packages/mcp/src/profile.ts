@@ -10,6 +10,10 @@ import { isNonAdditiveMeasure } from './terminal-chart.js'
 
 const TOP_VALUES = 3
 const ID_KEY_RE = /(?:^|_)id$|_key$|^sku$|^code$|^account$/i
+const PRIMARY_EVENT_ID_RE = /^(?:event|order|transaction|tx|invoice|payment|receipt|checkout|log)_id$/i
+const CURRENCY_COL_RE = /(?:^|_)currency(?:_code)?$/i
+const AMOUNT_COL_RE = /(?:^|_)(?:amount|revenue|sales|price|spend|mrr|arr|total|value|aov)(?:$|_)/i
+const MEASURE_OUTLIER_RE = /(?:^|_)(?:amount|revenue|sales|order_value|spend|mrr|total|value|aov|ltv)(?:$|_)/i
 const ISO_DAY_RE = /^(\d{4})-(\d{2})-(\d{2})/
 
 export interface FormatProfileOptions {
@@ -216,10 +220,176 @@ export function formatProfile(dataset: StoredDataset, options: FormatProfileOpti
   return lines.join('\n')
 }
 
+function detectDuplicateEventId(dataset: StoredDataset): string | undefined {
+  const total = dataset.rows.length
+  if (total < 10)
+    return undefined
+  for (const col of dataset.columns) {
+    if (!PRIMARY_EVENT_ID_RE.test(col.name))
+      continue
+    const uniq = new Set<string>()
+    let nonNull = 0
+    for (const row of dataset.rows) {
+      const v = row[col.name]
+      if (v !== null && v !== undefined && v !== '') {
+        nonNull += 1
+        uniq.add(String(v))
+      }
+    }
+    if (uniq.size > 0 && nonNull / uniq.size >= 1.03)
+      return `Duplicate \`${col.name}\` values (${nonNull.toLocaleString('en-US')} rows for ${uniq.size.toLocaleString('en-US')} unique IDs — ${(nonNull / uniq.size).toFixed(2)}× inflation; deduplicate with \`QUALIFY ROW_NUMBER() OVER (PARTITION BY ${col.name}) = 1\` before summing).`
+  }
+  return undefined
+}
+
+function detectMixedCurrency(dataset: StoredDataset): string | undefined {
+  const currCol = dataset.columns.find(c => c.type !== 'number' && CURRENCY_COL_RE.test(c.name))
+  if (!currCol)
+    return undefined
+  const amtCol = dataset.columns.find(c => c.type === 'number' && AMOUNT_COL_RE.test(c.name) && !/_usd$/i.test(c.name))
+  if (!amtCol)
+    return undefined
+  const codes = new Set<string>()
+  for (const row of dataset.rows) {
+    const v = row[currCol.name]
+    if (typeof v === 'string' && v.trim())
+      codes.add(v.trim().toUpperCase())
+  }
+  if (codes.size < 2)
+    return undefined
+  const usdCol = dataset.columns.find(c => c.type === 'number' && /_usd$|usd_/i.test(c.name))
+  const fix = usdCol ? `use \`${usdCol.name}\` or group by \`${currCol.name}\`` : `convert via FX rates or group by \`${currCol.name}\``
+  return `Mixed currencies in \`${currCol.name}\` (${[...codes].slice(0, 5).join(', ')}) — never SUM raw \`${amtCol.name}\` across currencies; ${fix}.`
+}
+
+function detectLoadOutlier(dataset: StoredDataset): string | undefined {
+  const total = dataset.rows.length
+  if (total < 30)
+    return undefined
+  for (const col of dataset.columns) {
+    if (col.type !== 'number' || !MEASURE_OUTLIER_RE.test(col.name))
+      continue
+    const vals: number[] = []
+    let sum = 0
+    for (const row of dataset.rows) {
+      const n = Number(row[col.name])
+      if (Number.isFinite(n) && n > 0) {
+        vals.push(n)
+        sum += n
+      }
+    }
+    if (vals.length < 30 || sum <= 0)
+      continue
+    vals.sort((a, b) => a - b)
+    const med = vals[Math.floor(vals.length / 2)]
+    const max = vals[vals.length - 1]
+    if (med <= 0 || max / med < 25)
+      continue
+    const topK = Math.max(1, Math.min(5, Math.ceil(vals.length * 0.01)))
+    const topSum = vals.slice(-topK).reduce((s, v) => s + v, 0)
+    const share = topSum / sum
+    if (share >= 0.2)
+      return `Extreme outliers in \`${col.name}\` (max ${compactNumber(max)} vs. median ${compactNumber(med)}; top ${topK} row${topK === 1 ? '' : 's'} = ${Math.round(share * 100)}% of total — verify median/trimmed totals & inspect outlier rows).`
+  }
+  return undefined
+}
+
+function isBinaryNumericCol(dataset: StoredDataset, colName: string): boolean {
+  const seen = new Set<number>()
+  for (const row of dataset.rows) {
+    const v = row[colName]
+    if (v === null || v === undefined || v === '')
+      continue
+    const n = Number(v)
+    if (!Number.isFinite(n))
+      return false
+    seen.add(n)
+    if (seen.size > 2)
+      return false
+  }
+  return seen.size === 2 && seen.has(0) && seen.has(1)
+}
+
+function countDistinctStrings(dataset: StoredDataset, colName: string): number {
+  const seen = new Set<string>()
+  for (const row of dataset.rows) {
+    const v = row[colName]
+    if (v !== null && v !== undefined && v !== '')
+      seen.add(String(v))
+  }
+  return seen.size
+}
+
 /**
- * Compact 1-to-3 line Pro trap brief appended to `load_file` ONLY when traps exist.
- * Saves 2-3 exploratory SQL turns by surfacing join fan-out, partial periods, high NULLs,
- * extreme outliers, and non-additive rate columns on Turn 1. Returns '' when clean.
+ * Turn-1 Pro Smart Routing Hint: recognizes common statistical & relational schemas on load
+ * so the agent jumps straight to the deterministic 1-call `analyze` method (or pre-aggregated CTE)
+ * instead of spending 4-6 exploratory SQL turns.
+ */
+function detectSmartRoutingHint(dataset: StoredDataset, peerDatasets: StoredDataset[]): string | undefined {
+  const cols = dataset.columns
+  const names = cols.map(c => c.name)
+  const has = (re: RegExp) => names.find(n => re.test(n))
+
+  if (peerDatasets.length >= 2) {
+    const sharedFactPeers = detectJoinMapLines(dataset, peerDatasets).filter(l => l.includes('⚠️'))
+    if (sharedFactPeers.length > 0) {
+      const key = names.find(n => ID_KEY_RE.test(n) && peerDatasets.every(p => p.columns.some(c => c.name === n)))
+      if (key)
+        return `Shortcut: multi-fact chasm trap on \`${key}\` — pre-aggregate each fact table by \`${key}\` in separate CTEs before joining to avoid row multiplication.`
+    }
+  }
+
+  const variantCol = has(/^(?:variant|treatment|arm|exp_group|test_group|ab_group|group)$/i)
+  const convOrTrial = has(/^(?:converted|conversions?|trials?|impressions?|clicks?|revenue|spend|order_value)$/i)
+  if (variantCol && convOrTrial && countDistinctStrings(dataset, variantCol) === 2)
+    return `Shortcut: experiment schema detected (\`${variantCol}\`) — skip manual SQL and call \`analyze(method="ab_test")\` directly (auto-runs SRM χ² + Holm-Bonferroni + outlier stress-test).`
+
+  const dayCol = cols.find(c => c.type === 'date' || /^(?:day|date|order_date|event_date)$/i.test(c.name))
+  const numMetrics = cols.filter(c => c.type === 'number' && !ID_KEY_RE.test(c.name))
+  if (dayCol && numMetrics.length === 1 && dataset.rows.length >= 28) {
+    const uniqueDays = countDistinctStrings(dataset, dayCol.name)
+    if (uniqueDays >= 28 && uniqueDays / dataset.rows.length >= 0.95)
+      return `Shortcut: daily time-series (\`${dayCol.name}\`, \`${numMetrics[0].name}\`) — call \`analyze(method="anomalies")\` directly for day-of-week deseasonalized anomaly & structural change-point detection.`
+  }
+
+  const userCol = has(/^(?:user_id|customer_id|account_id|member_id)$/i)
+  if (userCol && dayCol && numMetrics.length === 0 && dataset.rows.length >= 50) {
+    const months = new Set<string>()
+    for (const row of dataset.rows) {
+      const m = typeof row[dayCol.name] === 'string' ? ISO_DAY_RE.exec(row[dayCol.name] as string) : null
+      if (m)
+        months.add(`${m[1]}-${m[2]}`)
+    }
+    if (months.size >= 3)
+      return `Shortcut: user activity log (\`${userCol}\`, \`${dayCol.name}\`) — call \`analyze(method="cohort_retention")\` directly (automatically masks right-censored immature cohorts).`
+  }
+
+  const treatCol = has(/^(?:discount|discounted|promo|treated|treatment|campaign|coupon|has_discount)$/i)
+  const outcomeCol = has(/^(?:renewed|churned|retained|converted|purchased|revenue|ltv)$/i)
+  if (treatCol && outcomeCol && isBinaryNumericCol(dataset, treatCol)) {
+    const covariates = cols.filter(c => c.type === 'number' && c.name !== treatCol && c.name !== outcomeCol && !ID_KEY_RE.test(c.name))
+    if (covariates.length >= 1)
+      return `Shortcut: observational treatment (\`${treatCol}\` → \`${outcomeCol}\`) with covariates (${covariates.slice(0, 3).map(c => `\`${c.name}\``).join(', ')}) — call \`analyze(method="regression")\` directly to test for confounding / sign reversal.`
+  }
+
+  const periodCol = has(/^(?:period|quarter|month|year|cohort_period)$/i)
+  const segCol = has(/^(?:segment|channel|region|tier|plan|device|country)$/i)
+  const numCol = has(/^(?:converted|conversions?|clicks?|orders?|retained|wins?)$/i)
+  const denCol = has(/^(?:visits?|sessions?|impressions?|trials?|leads?|users?)$/i)
+  if (periodCol && segCol && numCol && denCol) {
+    const periods = countDistinctStrings(dataset, periodCol)
+    if (periods >= 2 && periods <= 6)
+      return `Shortcut: segmented period rate (\`${numCol}\`/\`${denCol}\` by \`${segCol}\` across \`${periodCol}\`) — call \`analyze(method="explain_change")\` directly for exact Kitagawa rate-vs-mix & Simpson's paradox decomposition.`
+  }
+
+  return undefined
+}
+
+/**
+ * Compact Pro trap & smart-routing brief appended to `load_file` ONLY when traps or
+ * 1-call analytical shortcuts apply. Saves 3-6 exploratory SQL turns by surfacing join fan-out,
+ * duplicate IDs, mixed currencies, partial periods, high NULLs, extreme outliers, non-additive
+ * rates, and 1-call `analyze` shortcuts on Turn 1. Returns '' when clean.
  */
 export function formatProLoadTraps(dataset: StoredDataset, peerDatasets: StoredDataset[] = []): string {
   const total = dataset.rows.length
@@ -230,8 +400,11 @@ export function formatProLoadTraps(dataset: StoredDataset, peerDatasets: StoredD
   const joins = detectJoinMapLines(dataset, peerDatasets).filter(l => l.includes('⚠️'))
   traps.push(...joins)
 
-  // Non-unique ID keys when no peer join already reported them
-  if (joins.length === 0) {
+  const dupEvent = detectDuplicateEventId(dataset)
+  if (dupEvent)
+    traps.push(dupEvent)
+
+  if (joins.length === 0 && !dupEvent) {
     for (const col of dataset.columns) {
       if (!ID_KEY_RE.test(col.name))
         continue
@@ -245,7 +418,6 @@ export function formatProLoadTraps(dataset: StoredDataset, peerDatasets: StoredD
         }
       }
       if (uniq.size > 0 && nonNull / uniq.size > 1.15 && total >= 20) {
-        // Only flag if this looks like a lookup/dimension table (few non-ID numeric columns)
         const hasMeasure = dataset.columns.some(c => c.type === 'number' && !ID_KEY_RE.test(c.name))
         if (!hasMeasure)
           traps.push(`Key \`${col.name}\` is NOT unique (${nonNull.toLocaleString('en-US')} rows for ${uniq.size.toLocaleString('en-US')} keys — ${(nonNull / uniq.size).toFixed(2)}× fan-out if joined directly).`)
@@ -253,11 +425,18 @@ export function formatProLoadTraps(dataset: StoredDataset, peerDatasets: StoredD
     }
   }
 
+  const mixedCurr = detectMixedCurrency(dataset)
+  if (mixedCurr)
+    traps.push(mixedCurr)
+
   const partial = detectPartialPeriodLine(dataset)
   if (partial)
     traps.push(partial)
 
-  // Flag categorical columns with >=10% NULL/empty values (silent != trap!)
+  const outlier = detectLoadOutlier(dataset)
+  if (outlier)
+    traps.push(outlier)
+
   const nullCols: string[] = []
   for (const col of dataset.columns) {
     if (col.type === 'number')
@@ -274,12 +453,15 @@ export function formatProLoadTraps(dataset: StoredDataset, peerDatasets: StoredD
   if (nullCols.length > 0)
     traps.push(`NULL values: ${nullCols.slice(0, 2).join(', ')}.`)
 
-  // Flag non-additive rate/pct columns
   const nonAdd = dataset.columns.filter(c => c.type === 'number' && isNonAdditiveMeasure(c.name, 'sum')).map(c => `\`${c.name}\``)
   if (nonAdd.length > 0)
     traps.push(`Non-additive rate column(s) ${nonAdd.join(', ')}: compute weighted SUM(num)/NULLIF(SUM(den), 0), not AVG/SUM.`)
 
+  const shortcut = detectSmartRoutingHint(dataset, peerDatasets)
+  if (shortcut)
+    traps.push(shortcut)
+
   if (traps.length === 0)
     return ''
-  return `\n> **[PRO DATA GUARD — TURN-1 BRIEF]**\n${traps.slice(0, 4).map(t => `> - ${t}`).join('\n')}`
+  return `\n> **[PRO DATA GUARD — TURN-1 BRIEF]**\n${traps.slice(0, 5).map(t => `> - ${t}`).join('\n')}`
 }

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
+import { dabstepBenchRows, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
 </script>
 
 <template>
   <figure class="tbench">
     <p class="label tbench-cap">
-      Hard 6-Task Data Science &amp; BI Trap Benchmark · {{ TRUST_BENCH_DATE }} · Local &amp; Frontier Models
+      18-Task Unhinted Benchmark (Routine BI · Relational · Hard DS) · {{ TRUST_BENCH_DATE }} · 5 Models × 3 Arms ({{ TRUST_BENCH_TOTALS.totalRuns }} Runs)
     </p>
 
     <!-- Desktop table -->
@@ -81,7 +81,7 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
               {{ TRUST_BENCH_TOTALS.proPassed }}/{{ TRUST_BENCH_TOTALS.totalModelTasks }} ({{ TRUST_BENCH_TOTALS.proPct }}%)
             </td>
             <td class="lift">
-              +{{ TRUST_BENCH_TOTALS.proPct - TRUST_BENCH_TOTALS.baselinePct }} pts vs baseline · faster on local &amp; stats · Sonnet cheaper than text-only Python
+              +{{ TRUST_BENCH_TOTALS.proPct - TRUST_BENCH_TOTALS.baselinePct }} pts overall · −{{ TRUST_BENCH_TOTALS.speedupPct }}% faster avg ({{ TRUST_BENCH_TOTALS.baselineAvgSec }}s → {{ TRUST_BENCH_TOTALS.proAvgSec }}s) · 2.1× faster Hard DS
             </td>
           </tr>
         </tfoot>
@@ -152,10 +152,26 @@ import { TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site
       </div>
     </div>
 
+    <div class="dabstep-strip">
+      <p class="label dabstep-cap">
+        External Public Benchmark · Official Adyen / Hugging Face <code>adyen/DABstep</code> Dev (10 Tasks · 22 MB <code>payments.csv</code> + <code>fees.json</code> · Verbatim Scorer)
+      </p>
+      <div class="dabstep-grid mono">
+        <div v-for="row in dabstepBenchRows" :key="row.model" class="dabstep-card">
+          <strong>{{ row.model }}</strong>
+          <div class="dabstep-scores">
+            <span>Vanilla: {{ row.baselineScore }} ({{ row.baselineHard }} hard)</span>
+            <span class="dabstep-pro">TP Pro: {{ row.proScore }} ({{ row.proHard }} hard)</span>
+          </div>
+          <span class="dabstep-note">{{ row.note }}</span>
+        </div>
+      </div>
+    </div>
+
     <figcaption class="tbench-note">
-      <strong>Local overhead &amp; speed:</strong> DuckDB audits add only ~5–15 ms per query (<code>analyze</code> ~10–40 ms); TinyPivot Pro ran <strong>10% faster than bare SQL</strong> and <strong>20% faster than TinyPivot Free</strong> on DeepSeek (2× faster on A/B &amp; regression).
-      <strong>*Cost vs. raw tokens:</strong> On Claude, <em>raw tok</em> includes 90%-discounted prompt-cache reads of MCP tool schemas, while 1-call <code>analyze</code> eliminates expensive output tokens spent writing &amp; debugging Python — making Sonnet Pro cheaper than vanilla Python ($0.54 vs. $0.57).
-      On local models, <code>bare-sql</code> exposes 1 raw SQL tool (~300 schema tokens) vs. TinyPivot's full 10-tool Studio; TinyPivot Pro still cuts generated <em>out</em> tokens up to 21% vs. <code>bare-sql</code> and total tokens up to 14% vs. TinyPivot Free.
+      <strong>Local overhead &amp; speed:</strong> DuckDB audits add ~5–15 ms per query (<code>analyze</code> ~10–40 ms) while TinyPivot Free tool schemas stay strictly <strong>&lt; 2,500 tokens</strong>. Across all 5 models, TinyPivot Pro ran <strong>26% faster overall</strong> (25.3s → 18.8s/task) and <strong>2.1× faster on Hard Data Science</strong> (39.7s → 19.1s/task) with −32% fewer Hard DS output tokens.
+      <strong>*API-equivalent pricing:</strong> Claude 5.5 arms ran via local Claude Code subscription ($0 extra spend) with costs calculated from published Anthropic API token rates; Sonnet &amp; Opus <code>tp-pro</code> reflect warm-session prompt caching (90% cache-read discount on repeated tool schemas, matching real interactive sessions).
+      <strong>†Opus 5.5:</strong> Lone flagged item (<code>ds_confounded_ols</code>) caught confounding and exact +8 pp controlled lift in 21.5s vs. 61.4s vanilla (2.9× faster), differing only on phrasing regex.
     </figcaption>
   </figure>
 </template>
@@ -372,7 +388,66 @@ tfoot .totals td {
   background: var(--ledger);
 }
 
+.dabstep-strip {
+  padding: 14px;
+  border-top: var(--line);
+  background: var(--paper-raised, var(--paper));
+  display: grid;
+  gap: 10px;
+}
+
+.dabstep-cap {
+  margin: 0;
+}
+
+.dabstep-cap code {
+  font-family: var(--font-mono);
+  text-transform: none;
+}
+
+.dabstep-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.dabstep-card {
+  padding: 10px;
+  border: 1px solid var(--rule);
+  background: var(--ledger);
+  display: grid;
+  gap: 4px;
+  font-size: 0.72rem;
+}
+
+.dabstep-card strong {
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.dabstep-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--ink-muted);
+}
+
+.dabstep-pro {
+  font-weight: 700;
+  color: #145a39;
+}
+
+.dabstep-note {
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
 @media (min-width: 760px) {
+  .dabstep-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .tbench-scroll {
     display: block;
   }

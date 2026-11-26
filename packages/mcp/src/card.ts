@@ -48,6 +48,8 @@ export interface TerminalFormatOptions {
    * TinyPivot view in the chat (`widget`), or TinyPivot's pi extension (`pi`).
    */
   shownBy?: 'widget' | 'pi'
+  /** Prefer a compact exact Markdown table over a 1-metric chart when rows/columns fit (used by analytical SQL queries without explicit chartConfig). */
+  preferSmallTable?: boolean
 }
 
 function codePointDisplayWidth(cp: number): number {

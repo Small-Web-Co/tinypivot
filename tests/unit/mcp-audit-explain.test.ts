@@ -261,9 +261,53 @@ describe('pro Relational Profile & Deterministic explain_change', () => {
       expect(trapBlock).toContain('PRO DATA GUARD')
       expect(trapBlock).toContain('discount_code')
       expect(trapBlock).toContain('margin_pct')
+
+      // Duplicate event IDs, mixed currency, and Turn-1 smart routing shortcut
+      const dupCurr = store.register({
+        id: 'dup_curr',
+        name: 'DupCurr',
+        source: 'tx.csv',
+        rows: [
+          ...Array.from({ length: 12 }, (_, idx) => ({
+            event_id: `E${idx % 8}`,
+            currency: idx % 2 === 0 ? 'USD' : 'JPY',
+            amount: idx % 2 === 0 ? 50 : 7500,
+          })),
+        ],
+      })
+      const dupCurrBrief = formatProLoadTraps(dupCurr)
+      expect(dupCurrBrief).toContain('Duplicate `event_id`')
+      expect(dupCurrBrief).toContain('Mixed currencies')
+
+      const abDs = store.register({
+        id: 'ab',
+        name: 'AB',
+        source: 'exp.csv',
+        rows: [
+          { variant: 'control', converted: 10, trials: 100 },
+          { variant: 'treatment', converted: 12, trials: 100 },
+        ],
+      })
+      expect(formatProLoadTraps(abDs)).toContain('analyze(method="ab_test")')
     }
     finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
   })
+
+  it('routes raw SQL queries on cohort files to Pro analyze(cohort_retention) via audit warnings', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tp-audit-route-'))
+    try {
+      const cohortCsv = path.join(tmpDir, 'cohorts.csv')
+      fs.writeFileSync(cohortCsv, 'user_id,signup_month,activity_month\nu1,2026-01,2026-01\nu1,2026-01,2026-02\nu2,2026-02,2026-02\n')
+      const duck = new DuckDbRunner()
+      const sql = `SELECT signup_month, COUNT(DISTINCT user_id) AS users FROM '${cohortCsv}' GROUP BY 1`
+      const ds = new DatasetStore().register({ id: 'q', name: 'Q', source: sql, rows: [{ signup_month: '2026-01', users: 1 }] })
+      const warnings = await auditQueryResult({ sql, dataset: ds, duck, views: [], deep: true })
+      expect(warnings.some(w => w.kind === 'analyze_hint' && w.suggestion.includes('cohort_retention'))).toBe(true)
+    }
+    finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  }, 30_000)
 })

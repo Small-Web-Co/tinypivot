@@ -290,6 +290,24 @@ export function runAbTest(dataset: StoredDataset, input: AnalyzeInput, options: 
       lines.push(`- **SRM Check (Pro)**: Passed (${fmt(100 - actualSplitPct, 1)}% / ${fmt(actualSplitPct, 1)}%, χ² = ${fmt(chiSq, 2)}, p = ${fmtP(srmP)}).`)
     }
 
+    // A2) Continuous metric whale-outlier sensitivity check (top 1% trimmed Welch test)
+    const contCol = !overall.isProportion ? (input.metric ?? input.successField) : undefined
+    if (contCol && overall.nControl >= 30 && overall.nTreat >= 30) {
+      const allPos = dataset.rows.map(r => toNum(r[contCol])).filter(v => Number.isFinite(v)).sort((a, b) => a - b)
+      const cap99 = allPos[Math.min(allPos.length - 1, Math.floor(allPos.length * 0.99))]
+      const med = allPos[Math.floor(allPos.length / 2)] ?? 0
+      const maxVal = allPos[allPos.length - 1] ?? 0
+      if (Number.isFinite(cap99) && maxVal > Math.max(10, med * 10)) {
+        const trimC = controlRows.filter(r => toNum(r[contCol]) <= cap99)
+        const trimT = treatRows.filter(r => toNum(r[contCol]) <= cap99)
+        const trimmed = computeAbStats(trimC, trimT, input)
+        if ((overall.pValue < 0.05 && trimmed.pValue >= 0.05) || Math.abs(overall.relLiftPct - trimmed.relLiftPct) >= 15) {
+          flags.push('outlier_sensitive')
+          lines.push(`- **⚠️ OUTLIER SENSITIVITY (Pro)**: Raw lift (${overall.relLiftPct >= 0 ? '+' : ''}${fmt(overall.relLiftPct, 1)}%, p=${fmtP(overall.pValue)}) is driven by extreme whale rows above p99 (${fmt(cap99, 1)}; max ${fmt(maxVal, 1)}). **Excluding top 1% outliers:** control ${fmt(trimmed.controlRateOrMean)} → treatment ${fmt(trimmed.treatRateOrMean)} (${trimmed.relLiftPct >= 0 ? '+' : ''}${fmt(trimmed.relLiftPct, 1)}%, **p = ${fmtP(trimmed.pValue)}**).`)
+        }
+      }
+    }
+
     // B) Segment slicing + Holm-Bonferroni multiple-testing correction
     const segCol = input.segmentField ?? dataset.columns.find((c) => {
       if (c.name === variantField || c.type !== 'string' || /id$/i.test(c.name))
@@ -566,7 +584,7 @@ export function runRegression(dataset: StoredDataset, input: AnalyzeInput): Anal
   if (confoundingReversal && naiveBeta !== undefined) {
     const ctrlBeta = fit.beta[primaryIdx]
     lines.push(
-      `- **⚠️ CONFOUNDING / SIGN REVERSAL DETECTED on \`${primaryFeature}\`**: Unadjusted (naive) effect is **${naiveBeta >= 0 ? '+' : ''}${fmt(naiveBeta, 4)}**, but after controlling for ${predictors.filter(p => p !== primaryFeature).map(p => `\`${p}\``).join(', ')} the controlled effect **flips sign to ${ctrlBeta >= 0 ? '+' : ''}${fmt(ctrlBeta, 4)}** (p = ${fmtP(fit.pValues[primaryIdx])})! Do NOT report the naive bivariate correlation as the true effect.`,
+      `- **⚠️ CONFOUNDING / SIGN REVERSAL DETECTED on \`${primaryFeature}\`**: Unadjusted (naive) effect is **${naiveBeta >= 0 ? '+' : ''}${fmt(naiveBeta, 4)}**, but after controlling for ${predictors.filter(p => p !== primaryFeature).map(p => `\`${p}\``).join(', ')} the controlled effect **flips sign to a ${ctrlBeta >= 0 ? 'positive' : 'negative'} ${ctrlBeta >= 0 ? '+' : ''}${fmt(ctrlBeta, 4)}** (p = ${fmtP(fit.pValues[primaryIdx])})! Do NOT report the naive bivariate correlation as the true effect.`,
     )
   }
   for (const r of rows.slice(0, 8)) {

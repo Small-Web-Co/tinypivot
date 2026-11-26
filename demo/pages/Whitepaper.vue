@@ -20,9 +20,11 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
             </h1>
             <p class="lede">
               LLMs are great at writing SQL and Python — until a silent many-to-many join doubles revenue,
-              an unweighted average hides Simpson’s paradox, or a broken 54/46 A/B test gets shipped as a win.
+              whale outliers invert a regional ranking, or a broken 52.5/47.5 A/B test gets shipped as a win.
               We built a local, deterministic DuckDB + statistical verification layer inside TinyPivot MCP and
-              tested it across four models from a Mac-local small model to frontier Claude Sonnet.
+              tested it across five models (from a Mac-local model and DGX Spark to Claude Haiku 5.5, Sonnet 5.5,
+              and Opus 5.5) on 18 unhinted BI &amp; Data Science tasks plus the official Adyen/Hugging Face
+              <code>adyen/DABstep</code> benchmark.
             </p>
             <div class="wp-stats">
               <div v-for="stat in whitepaperHeroStats" :key="stat.label" class="wp-stat">
@@ -62,17 +64,17 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            02 · Empirical Proof (4 Models × 3 Arms)
+            02 · Empirical Proof (5 Models × 18 Unhinted Tasks + Official DABstep)
           </p>
           <h2 class="heading">
-            Higher accuracy <em>and</em> fewer tokens.
+            Higher accuracy, <em>fewer turns</em> &amp; 2.1× faster Data Science.
           </h2>
           <p class="lede">
-            We first tested simple single-table SQL traps — and threw them out because modern 2026 models already
-            ace textbook SQL. Instead, we built six enterprise-scale (2,000 to 20,000 row) Data Science and
-            multi-table BI traps with exact mathematical ground-truth oracles, then ran every model head-to-head
-            across Baseline (<code>bare-sql</code> or <code>Python/Bash</code>), <strong>TinyPivot Free</strong>,
-            and <strong>TinyPivot Pro</strong>.
+            Every prompt is written the way a real stakeholder asks — <strong>zero hints</strong> about traps,
+            outliers, or statistical checks. We evaluated 18 realistic tasks spanning <strong>Routine BI</strong> (6),
+            <strong>Relational Analytics</strong> (6), and <strong>Hard Data Science</strong> (6) across 5 models
+            (270 runs), plus the external <strong>Adyen / Hugging Face <code>adyen/DABstep</code> Dev</strong>
+            benchmark (10 official tasks over a 22 MB payments ledger, 60 runs scored with Adyen’s verbatim scorer).
           </p>
         </header>
 
@@ -82,47 +84,49 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
         <div class="wp-findings">
           <article class="wp-finding">
             <h3 class="mono">
-              1. Small local models jump +50 points
+              1. Local models run 39%–45% faster with half the output tokens
             </h3>
             <p>
-              On a local Mac model (<code>Inkling 2 Mini</code>, fast non-thinking mode), accuracy jumped from
-              <strong>2/6 (33%)</strong> on bare SQL and TinyPivot Free to <strong>5/6 (83%)</strong> on TinyPivot Pro — matching
-              frontier Claude Sonnet running vanilla Python/Bash. On the confounded-discount task, both bare SQL
-              and TinyPivot Free failed after 9 turns while TinyPivot Pro solved it in 5 turns (29s, 2× faster, −46% tokens vs. TinyPivot Free).
+              On a DGX Spark cluster (<code>DeepSeek V4.1 Flash 1017</code>), <strong>TinyPivot Pro</strong> hit
+              <strong>18/18 (100%)</strong> while cutting latency <strong>−39%</strong> (25.7s → 15.6s; <strong>3.4× faster</strong>
+              on Hard DS), turns <strong>−30%</strong> (4.94 → 3.44), and output tokens <strong>−48%</strong>.
+              On Mac-local <code>Inkling 2 Mini</code>, accuracy rose <strong>78% → 89% (+11.1 pts)</strong> while cutting
+              latency <strong>−45%</strong> (46.1s → 25.2s; <strong>4.0× faster</strong> on Hard DS) and output tokens <strong>−50%</strong>.
             </p>
           </article>
           <article class="wp-finding">
             <h3 class="mono">
-              2. Frontier Sonnet beats Python on accuracy &amp; cost
+              2. Claude Haiku 5.5 hits 100% — matching Sonnet &amp; Opus for pennies
             </h3>
             <p>
-              Normally, verification layers add turns and cost. On Claude Sonnet, TinyPivot Pro achieved
-              <strong>6/6 (100%)</strong> vs. <strong>5/6 (83%)</strong> for vanilla Python/Bash while costing
-              <strong>$0.5407 vs. $0.5677</strong> (−4.8% cheaper than Python, −40.4% cheaper than TinyPivot Free).
-              Adding zero-param column auto-inference to <code>analyze</code> alone cut Sonnet Pro tokens by 26%.
+              Unhinted vanilla <code>Claude Haiku 5.5</code> missed whale outliers, subtle 20-segment SRM, and
+              right-censored cohorts (<strong>15/18, 83.3%</strong>). With <strong>TinyPivot Pro</strong>, Haiku jumped
+              <strong>+16.7 pts to 18/18 (100%)</strong>, ran <strong>5% faster</strong> (12.5s vs. 13.1s; 23% faster on Hard DS),
+              and cost just <strong>$0.083 API-equiv</strong> across all 18 tasks (+0.05¢/task over text-only Python).
             </p>
           </article>
           <article class="wp-finding">
             <h3 class="mono">
-              3. DeepSeek V4.1 hits 100% — 10% faster &amp; −21% output tokens
+              3. Frontier Sonnet 5.5 &amp; Opus 5.5 cut Hard DS latency &amp; warm cost
             </h3>
             <p>
-              On a local DGX Spark cluster (<code>DeepSeek V4.1 Flash 1017</code>), TinyPivot Pro lifted accuracy from
-              <strong>83% → 100%</strong>, ran <strong>10% faster than bare SQL</strong> (36.2s vs. 40.0s; 20% faster than TinyPivot Free),
-              and cut output tokens <strong>−21%</strong> vs. bare SQL (−14.1% total vs. TinyPivot Free). On the broken
-              A/B test, TinyPivot Pro solved it in 3 turns / 14.5k tokens / 18.2s — <strong>−41% fewer tokens and 60% faster
-                than bare DuckDB SQL</strong>.
+              On <code>Claude Sonnet 5.5</code>, <strong>TinyPivot Pro</strong> matched <strong>18/18 (100%)</strong> while
+              running <strong>6% faster overall</strong> (18.8s vs. 20.0s; <strong>21% faster on Hard DS</strong>) at
+              <strong>$1.01 vs. $1.22</strong> warm-cache API-equiv (−17%) plus live Studio charts &amp; lineage.
+              <code>Claude Opus 5.5</code> ran <strong>20% faster on Hard DS</strong> (2.9× faster on confounded OLS) at
+              <strong>−41% warm API-equiv cost</strong> ($1.38 vs. $2.32).
             </p>
           </article>
           <article class="wp-finding">
             <h3 class="mono">
-              4. Recursive Data Memory compounds over time
+              4. Verified on external Adyen/Hugging Face DABstep + Recursive Memory
             </h3>
             <p>
-              Every time an <code>[AUDIT]</code> warning catches a trap or a human edits SQL in TinyPivot Studio,
-              a compact schema-fingerprinted lesson is stored locally. On repeat inquiries against the same schema,
-              <code>Inkling 2 Mini</code> dropped from 6 turns / 32.5k tokens (TinyPivot Free) to 4 turns / 22.7k (Pro cold)
-              to <strong>3 turns / 17.1k tokens (−47%)</strong> with Recursive Memory warm.
+              On the public <code>adyen/DABstep</code> Dev benchmark (22 MB <code>payments.csv</code> + 1,000 nested JSON fee rules),
+              <strong>TinyPivot Pro</strong> lifted 3-model accuracy from <strong>76.7% → 80.0%</strong> (Hard tasks
+              <strong>76.2% → 81.0%</strong>, Haiku <strong>60% → 70%</strong>) using Adyen’s verbatim scorer. And on repeat
+              inquiries against the same schema, local <strong>Recursive Data Memory</strong> cuts Inkling tokens a further
+              <strong>−47%</strong> (6 → 3 turns).
             </p>
           </article>
         </div>
@@ -133,7 +137,7 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            03 · The Six Hard Traps
+            03 · The 18 Unhinted Tasks (Routine BI · Relational · Hard DS)
           </p>
           <h2 class="heading">
             What we tested <em>under the hood.</em>

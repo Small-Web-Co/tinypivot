@@ -339,6 +339,11 @@ describe('query, profile and history tools', () => {
     // The query result is the active dataset: one row holding 3 orders worth 1,950.
     expect(profile.text).toContain('`n` number · 3 to 3')
     expect(profile.text).toContain('`mrr` number · 1,950 to 1,950')
+    // Even without explicit viewMode: 'grid', small analytical SQL queries return exact rows and preserve high decimal precision.
+    const autoTable = await call('query', { sql: `SELECT count(*) AS n, 0.120132 AS fee_rate FROM ${id}` })
+    expect(autoTable.isError).toBe(false)
+    expect(autoTable.text).toContain('| n | fee_rate |')
+    expect(autoTable.text).toContain('| 3 | 0.120132 |')
   }, 30_000)
 
   it('lists every pull and reopens one without re-reading its source', async () => {

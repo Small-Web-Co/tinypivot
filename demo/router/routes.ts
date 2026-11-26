@@ -99,7 +99,7 @@ export const routeDefinitions = [
     component: () => import('../pages/Home.vue'),
     meta: {
       title: 'TinyPivot — The Trust Layer & Data IDE for AI Agents',
-      description: 'Deterministic DuckDB SQL & statistical guardrails, 1-call Data Science shelf, Proof-of-Work Lineage, and Recursive Data Memory. 75% → 96% hard-trap accuracy, cheaper than Python, unlimited local rows in TinyPivot Free.',
+      description: 'Deterministic DuckDB SQL & statistical guardrails, 1-call Data Science shelf, Proof-of-Work Lineage, and Recursive Data Memory. 91% → 97% accuracy across 5 models, 2.1× faster Hard Data Science, verified on official Adyen DABstep, unlimited local rows in TinyPivot Free.',
     },
   },
   {
@@ -126,7 +126,7 @@ export const routeDefinitions = [
     component: () => import('../pages/Whitepaper.vue'),
     meta: {
       title: 'The Trust Layer for AI Data Analysis — White Paper & Benchmarks | TinyPivot',
-      description: 'Empirical 4-model benchmark (Inkling 2 Mini, DeepSeek V4.1, Claude Haiku & Sonnet) proving TinyPivot Pro lifts hard Data Science accuracy from 75% to 96% while cutting cost and tokens.',
+      description: 'Empirical 5-model unhinted benchmark (270 runs across Inkling 2 Mini, DeepSeek V4.1, Claude Haiku/Sonnet/Opus 5.5) plus official Adyen DABstep Dev proving TinyPivot Pro hits 97% accuracy and 2.1× faster Hard Data Science.',
     },
   },
   {

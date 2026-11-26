@@ -20,7 +20,10 @@ export type AuditKind
     | 'empty_filter'
     | 'null_exclusion'
     | 'outlier_distortion'
+    | 'duplicate_ids'
+    | 'mixed_currency'
     | 'chart_reaggregation'
+    | 'analyze_hint'
 
 export interface AuditWarning {
   kind: AuditKind
@@ -516,7 +519,7 @@ async function auditExtremeOutliers(sql: string, duck: DuckDbRunner, views: Quer
           kind: 'outlier_distortion',
           title: 'EXTREME OUTLIER DISTORTION',
           detail: `${extremeCount} extreme row${extremeCount === 1 ? '' : 's'} in \`${primarySource}.${col}\` (median magnitude ${Math.round(med).toLocaleString('en-US')}) contribute ${Math.round(extremeSum).toLocaleString('en-US')} to \`SUM(${col})\` (excluding them: ${Math.round(cleanSum).toLocaleString('en-US')}).${sampleNote}`,
-          suggestion: `Report both headline and outlier-excluded totals before attributing trends to organic performance.`,
+          suggestion: `Report both raw and outlier-excluded totals per group (e.g. excluding rows above the outlier threshold) before attributing trends to organic performance.`,
         })
       }
     }
@@ -525,7 +528,109 @@ async function auditExtremeOutliers(sql: string, duck: DuckDbRunner, views: Quer
   return warnings
 }
 
-/** Runs SQL audit checks on a finished query result (`deep: true` adds Pro join fan-out, partial-period, NULL & outlier checks). Returns [] when clean. */
+const AUDIT_EVENT_ID_RE = /^(?:event|order|transaction|tx|invoice|payment|receipt|checkout|log)_id$/i
+const AUDIT_CURRENCY_RE = /(?:^|_)currency(?:_code)?$/i
+
+/** Checks primary source for duplicate event/order IDs or mixed-currency SUMs when the SQL didn't deduplicate or split by currency. */
+async function auditDuplicateAndCurrency(sql: string, duck: DuckDbRunner, views: QueryView[]): Promise<AuditWarning[]> {
+  const cleaned = stripComments(sql)
+  if (!/\b(?:SUM|COUNT|AVG)\s*\(/i.test(cleaned))
+    return []
+  const lineage = extractSqlLineage(sql)
+  const primarySource = lineage.sources[0]
+  if (!primarySource)
+    return []
+
+  const isFile = /\.(?:csv|tsv|parquet|json|jsonl|xlsx)$/i.test(primarySource) || primarySource.includes('/')
+  const sourceExpr = quoteTableRef(primarySource, isFile)
+  const warnings: AuditWarning[] = []
+  try {
+    const sample = await duck.run(`SELECT * FROM ${sourceExpr} LIMIT 1`, views, 1)
+    const cols = Object.keys(sample.rows[0] ?? {})
+
+    // 1) Duplicate event/order IDs if SQL didn't use DISTINCT / ROW_NUMBER / GROUP BY <id>
+    const eventIdCol = cols.find(c => AUDIT_EVENT_ID_RE.test(c))
+    const hasDedup = /\b(?:DISTINCT|ROW_NUMBER\s*\(|QUALIFY)\b/i.test(cleaned)
+    if (eventIdCol && !hasDedup && !new RegExp(`\\bGROUP\\s+BY[^;]*\\b${eventIdCol}\\b`, 'i').test(cleaned)) {
+      const qId = quoteIdentifier(eventIdCol)
+      const probe = await duck.run(`SELECT COUNT(*) AS n, COUNT(DISTINCT ${qId}) AS u FROM ${sourceExpr}`, views, 5)
+      const n = Number(probe.rows[0]?.n ?? 0)
+      const u = Number(probe.rows[0]?.u ?? 0)
+      if (u > 0 && n / u >= 1.03) {
+        warnings.push({
+          kind: 'duplicate_ids',
+          title: 'DUPLICATE EVENT / ORDER IDS',
+          detail: `\`${primarySource}.${eventIdCol}\` has ${n.toLocaleString('en-US')} rows for only ${u.toLocaleString('en-US')} unique IDs (${(n / u).toFixed(2)}× inflation), and this query does not deduplicate.`,
+          suggestion: `Deduplicate in a CTE (\`SELECT * FROM ${sourceExpr} QUALIFY ROW_NUMBER() OVER (PARTITION BY ${qId}) = 1\`) before summing.`,
+        })
+      }
+    }
+
+    // 2) Mixed currencies summed together without grouping/filtering by currency or using a USD column
+    const currCol = cols.find(c => AUDIT_CURRENCY_RE.test(c))
+    if (currCol && !new RegExp(`\\b${currCol}\\b`, 'i').test(cleaned)) {
+      const summedCols = [...cleaned.matchAll(RATE_SUM_RE)].map(m => m[1]).filter((c): c is string => Boolean(c) && !/_usd$|usd_/i.test(c))
+      if (summedCols.length > 0) {
+        const qCurr = quoteIdentifier(currCol)
+        const probe = await duck.run(`SELECT COUNT(DISTINCT ${qCurr}) AS c, STRING_AGG(DISTINCT CAST(${qCurr} AS VARCHAR), ', ') AS codes FROM ${sourceExpr}`, views, 5)
+        const count = Number(probe.rows[0]?.c ?? 0)
+        if (count >= 2) {
+          const usdCol = cols.find(c => /_usd$|usd_/i.test(c))
+          warnings.push({
+            kind: 'mixed_currency',
+            title: 'MIXED CURRENCIES SUMMED',
+            detail: `\`${primarySource}.${currCol}\` mixes ${count} currencies (${String(probe.rows[0]?.codes ?? '')}), so \`SUM(${summedCols[0]})\` adds incompatible currency units.`,
+            suggestion: usdCol
+              ? `Use \`SUM(${usdCol})\` or group/filter by \`${currCol}\`.`
+              : `Convert via FX rates or group/filter by \`${currCol}\` before summing.`,
+          })
+        }
+      }
+    }
+
+    // 3) Smart Pro routing to 1-call deterministic `analyze(...)` when raw SQL touches cohorts, experiments, or dense daily time series
+    if (isFile) {
+      const hasCohortCol = cols.some(c => /(?:signup|cohort|join)_(?:month|date|week)|^cohort$/i.test(c))
+      const hasActivityCol = cols.some(c => /(?:activity|active|period)_(?:month|date|week)|^months_since$/i.test(c))
+      const hasVariantCol = cols.some(c => /^(?:variant|treatment|ab_group|experiment_group|test_group)$/i.test(c))
+      const dateCol = cols.find(c => /^(?:date|order_date|day|dt|metric_date)$/i.test(c))
+      if (hasCohortCol && hasActivityCol) {
+        warnings.push({
+          kind: 'analyze_hint',
+          title: 'COHORT RIGHT-CENSORING RISK',
+          detail: `\`${primarySource}\` is a cohort activity table — recent cohorts may not have matured to later periods (dragging naive retention averages toward 0%).`,
+          suggestion: `Call \`analyze(method="cohort_retention", filePath="${primarySource}")\` for exact matured retention with automatic right-censoring guards.`,
+        })
+      }
+      else if (hasVariantCol) {
+        warnings.push({
+          kind: 'analyze_hint',
+          title: 'EXPERIMENT VALIDITY CHECK (SRM / HOLM / WHALES)',
+          detail: `\`${primarySource}\` is an A/B experiment table — raw SQL can miss Sample Ratio Mismatch (SRM), Holm-Bonferroni multiple-testing inflation, or whale-skewed revenue.`,
+          suggestion: `Call \`analyze(method="ab_test", filePath="${primarySource}")\` for exact 1-call SRM, Holm-Bonferroni, and top-1% trimmed whale checks.`,
+        })
+      }
+      else if (dateCol && cols.length <= 6 && !hasCohortCol) {
+        const qDate = quoteIdentifier(dateCol)
+        const dProbe = await duck.run(`SELECT COUNT(*) AS n, COUNT(DISTINCT TRY_CAST(${qDate} AS DATE)) AS d FROM ${sourceExpr}`, views, 5)
+        const nRows = Number(dProbe.rows[0]?.n ?? 0)
+        const dDays = Number(dProbe.rows[0]?.d ?? 0)
+        if (dDays >= 45 && nRows <= dDays * 1.1) {
+          warnings.push({
+            kind: 'analyze_hint',
+            title: 'SEASONALITY & REGIME-SHIFT CHECK',
+            detail: `\`${primarySource}\` is a ${dDays}-day daily time series — day-of-week seasonality can mask or shift structural break dates in raw SQL.`,
+            suggestion: `Call \`analyze(method="anomalies", filePath="${primarySource}")\` to remove day-of-week seasonality and pinpoint exact structural change-point dates.`,
+          })
+        }
+      }
+    }
+  }
+  catch {}
+  return warnings
+}
+
+/** Runs SQL audit checks on a finished query result (`deep: true` adds Pro join fan-out, partial-period, NULL, outlier, duplicate-ID & mixed-currency checks). Returns [] when clean. */
 export async function auditQueryResult(options: {
   sql: string
   dataset: StoredDataset
@@ -543,13 +648,14 @@ export async function auditQueryResult(options: {
     const filterOnly = dataset.rows.length === 0 ? await auditFiltersAndNulls(sql, dataset, duck, views) : []
     return [...staticWarnings, ...filterOnly.filter(w => w.kind === 'empty_filter')]
   }
-  const [joinWarnings, periodWarnings, filterWarnings, outlierWarnings] = await Promise.all([
+  const [joinWarnings, periodWarnings, filterWarnings, outlierWarnings, dupCurrWarnings] = await Promise.all([
     auditJoinFanout(sql, duck, views),
     auditPartialTrailingPeriod(sql, dataset, duck, views),
     auditFiltersAndNulls(sql, dataset, duck, views),
     auditExtremeOutliers(sql, duck, views),
+    auditDuplicateAndCurrency(sql, duck, views),
   ])
-  return [...staticWarnings, ...joinWarnings, ...periodWarnings, ...filterWarnings, ...outlierWarnings]
+  return [...staticWarnings, ...joinWarnings, ...periodWarnings, ...filterWarnings, ...outlierWarnings, ...dupCurrWarnings]
 }
 
 /** Formats non-empty audit warnings into a concise, high-signal block for the LLM. */

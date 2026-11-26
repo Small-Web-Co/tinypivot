@@ -153,7 +153,7 @@ const { copiedKey, copy } = useCopy()
           <p class="docs-text">
             TinyPivot also runs deterministic SQL &amp; statistical guardrails on every query (join fan-out, chasm traps, non-additive rate averages, partial trailing periods, silent NULL drops, extreme outliers) and tracks clickable Proof-of-Work Lineage back to underlying source rows.
             <router-link to="/whitepaper">
-              Read the Trust Layer White Paper &amp; 4-model benchmarks →
+              Read the Trust Layer White Paper &amp; 5-model + DABstep benchmarks →
             </router-link>
           </p>
         </section>
@@ -182,7 +182,7 @@ const { copiedKey, copy } = useCopy()
           <p class="docs-text">
             Measured in Claude Code on a {{ headline.largeRows.toLocaleString('en-US') }}-row dataset, TinyPivot cost
             <strong>{{ headline.cheaperThanPythonPct }}% less than writing Python</strong> ({{ headline.cheaperThanPythonSmallPct }}% less on the small file) with every figure verified, while pasting rows cost ~2× more and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
-            On our 6-task hard Data Science trap benchmark, TinyPivot Pro also ran <strong>40.4% cheaper than TinyPivot Free on Claude Sonnet</strong> ($0.54 vs. $0.57 vanilla Python) and cut repeat schema tokens by <strong>47%</strong> with Recursive Data Memory —
+            On our 18-task unhinted BI &amp; Data Science benchmark across 5 models (270 runs), TinyPivot Pro lifted overall accuracy from <strong>91% → 97%</strong> (Haiku 5.5 <strong>83% → 100%</strong>), ran <strong>2.1× faster on Hard Data Science</strong> (39.7s → 19.1s), cut DeepSeek output tokens by <strong>48%</strong>, and cut repeat schema tokens by <strong>47%</strong> with Recursive Data Memory —
             <router-link to="/whitepaper">
               see full benchmark tables →
             </router-link>

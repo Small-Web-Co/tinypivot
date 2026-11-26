@@ -7,14 +7,14 @@
   },
   "metadata": {
     "description": "TinyPivot — Data Analysis Studio, Charts, Pivot Tables, Terminal Cards & Live TUI for Claude Code and Claude Desktop.",
-    "version": "0.8.0"
+    "version": "0.8.1"
   },
   "plugins": [
     {
       "name": "tinypivot",
       "source": "./packages/mcp",
       "description": "Interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, live Ghostty TUI, and Excel export inside Claude for CSV, JSON, API/MCP outputs, and any database.",
-      "version": "0.8.0",
+      "version": "0.8.1",
       "author": {
         "name": "Small Web, LLC",
         "url": "https://tiny-pivot.com"

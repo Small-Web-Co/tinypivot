@@ -22,9 +22,9 @@ const facts = ['TinyPivot Free · unlimited rows', 'runs locally', 'no signup', 
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  '75% → 96% accuracy on hard SQL & Data Science traps',
-  'Cheaper & faster than vanilla Python (−47% repeat tokens)',
-  'Local DuckDB, Proof-of-Work lineage & offline HTML notebooks',
+  '91% → 97% accuracy across 5 models & 18 unhinted BI/DS tasks (Haiku 83% → 100%)',
+  '2.1× faster Hard Data Science (−30% turns, −48% output tokens on DeepSeek)',
+  'Verified on official Adyen DABstep (77% → 80%) · < 2,500 Free schema tokens',
 ] as const
 
 const capabilities = [
@@ -85,7 +85,7 @@ const capabilities = [
               </div>
               <div class="hero-meta-links">
                 <a href="#savings" class="hero-fine">
-                  4-model hard DS benchmark: 75% → 96% accuracy (local Inkling 33% → 83%; Sonnet 100% &amp; cheaper than Python).
+                  5-model unhinted benchmark + official Adyen DABstep: 91% → 97% accuracy, 2.1× faster Hard DS, Haiku 83% → 100%.
                   Benchmarks ↓
                 </a>
                 <router-link to="/whitepaper" class="hero-why-link">
@@ -176,11 +176,11 @@ const capabilities = [
               Proof 01 · Technical White Paper
             </p>
             <h3 class="proof-title">
-              4-Model Hard Data Science &amp; BI Trap Benchmark
+              5-Model Unhinted Benchmark (270 Runs) + Official DABstep
             </h3>
             <p class="proof-body">
-              Head-to-head across Inkling 2 Mini (<strong>33% → 83%</strong>), DeepSeek V4.1 (<strong>83% → 100%</strong>, −14.1% tokens),
-              Claude Haiku 4.5 (−29.3% cost), and Claude Sonnet (<strong>100% at $0.54</strong> vs. $0.57 vanilla Python).
+              Head-to-head across Inkling 2 Mini (<strong>78% → 89%, −45% faster</strong>), DeepSeek V4.1 (<strong>100%, −39% faster, −30% turns</strong>),
+              Claude Haiku 5.5 (<strong>83% → 100%</strong>), Sonnet 5.5 (<strong>100%, −17% warm API*</strong>), Opus 5.5, and Adyen’s public <code>DABstep</code> Dev.
             </p>
             <span class="text-link">Read the White Paper &amp; full benchmark tables →</span>
           </router-link>

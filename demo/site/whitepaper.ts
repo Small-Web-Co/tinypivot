@@ -1,6 +1,11 @@
 /**
  * Empirical data and editorial copy for the TinyPivot Trust Layer White Paper (/whitepaper).
- * All figures come directly from reproducible multi-model benchmarks run on 2026-11-26.
+ * All figures come directly from reproducible benchmarks run on 2026-11-26:
+ *  1) 18-Task Unhinted Executive Benchmark (Routine BI, Relational Analytics & Hard Data Science)
+ *     across 5 models × 3 arms (270 runs total).
+ *  2) Official Adyen / Hugging Face `adyen/DABstep` Dev Benchmark (10 official labeled tasks
+ *     over 22 MB `payments.csv` + `fees.json`) across 3 Claude 5.5 models (60 runs total),
+ *     scored with Adyen's verbatim `question_scorer`.
  */
 
 export interface TrustBenchImpact {
@@ -12,6 +17,7 @@ export interface TrustBenchImpact {
 
 export interface TrustBenchModelRow {
   id: string
+  shortLabel: string
   model: string
   hardware: string
   baselineLabel: string
@@ -36,139 +42,275 @@ export const TRUST_BENCH_DATE = '2026-11-26'
 export const trustBenchRows: readonly TrustBenchModelRow[] = [
   {
     id: 'inkling',
+    shortLabel: 'Inkling 2 Mini',
     model: 'Inkling 2 Mini (fast)',
     hardware: 'Small local (Mac)',
     baselineLabel: 'Bare DuckDB SQL',
-    baselineScore: '2/6',
-    baselinePct: 33,
-    baselineMeta: '74.3s/task · 7.7 turns · 15.4k out (115k tot)',
-    baselineShort: '74.3s · 15.4k out',
-    freeScore: '2/6',
-    freePct: 33,
-    freeMeta: '80.1s/task · 7.7 turns · 13.9k out (302k tot)',
-    freeShort: '80.1s · 13.9k out',
-    proScore: '5/6',
-    proPct: 83,
-    proMeta: '80.9s/task · 6.7 turns · 14.6k out (298k tot)',
-    proShort: '80.9s · 14.6k out',
-    proHighlight: '+50 pts accuracy vs bare SQL (matches Sonnet on Python) · 2× faster on A/B & OLS · −5% output tok',
+    baselineScore: '14/18',
+    baselinePct: 78,
+    baselineMeta: '46.1s/task · 5.11 turns · 24.7k out',
+    baselineShort: '46.1s · 5.1t',
+    freeScore: '13/18',
+    freePct: 72,
+    freeMeta: '38.3s/task · 5.11 turns · 18.3k out',
+    freeShort: '38.3s · 5.1t',
+    proScore: '16/18',
+    proPct: 89,
+    proMeta: '25.2s/task · 4.22 turns · 12.2k out',
+    proShort: '25.2s · 4.2t',
+    proHighlight: '+11.1 pts accuracy · 45% faster overall (4.0× faster on Hard DS) · −17% turns · −50% output tokens',
     impact: {
-      accuracy: '+50 pts (33% → 83%)',
-      speed: '2× faster A/B & OLS (−1 turn)',
-      tokens: '−5% out vs SQL (−47% w/ mem)',
+      accuracy: '+11.1 pts (78% → 89%)',
+      speed: '45% faster (4.0× Hard DS)',
+      tokens: '−50% out · −17% turns',
       cost: '$0 local (Mac)',
     },
   },
   {
     id: 'deepseek',
+    shortLabel: 'DeepSeek V4.1',
     model: 'DeepSeek V4.1 Flash 1017',
     hardware: 'Local cluster (DGX Spark)',
     baselineLabel: 'Bare DuckDB SQL',
-    baselineScore: '5/6',
-    baselinePct: 83,
-    baselineMeta: '40.0s/task · 6.5 turns · 19.9k out (135k tot)',
-    baselineShort: '40.0s · 19.9k out',
-    freeScore: '5/6',
-    freePct: 83,
-    freeMeta: '45.1s/task · 6.7 turns · 21.4k out (273k tot)',
-    freeShort: '45.1s · 21.4k out',
-    proScore: '6/6',
+    baselineScore: '17/18',
+    baselinePct: 94,
+    baselineMeta: '25.7s/task · 4.94 turns · 35.8k out',
+    baselineShort: '25.7s · 4.9t',
+    freeScore: '17/18',
+    freePct: 94,
+    freeMeta: '27.0s/task · 5.00 turns · 35.3k out',
+    freeShort: '27.0s · 5.0t',
+    proScore: '18/18',
     proPct: 100,
-    proMeta: '36.2s/task · 6.5 turns · 15.7k out (234k tot)',
-    proShort: '36.2s · 15.7k out',
-    proHighlight: '+17 pts vs bare SQL · 10% faster overall (60% faster on A/B) · −21% output tok',
+    proMeta: '15.6s/task · 3.44 turns · 18.7k out',
+    proShort: '15.6s · 3.4t',
+    proHighlight: '100% accuracy (+5.6 pts) · 39% faster (3.4× faster on Hard DS) · −30% turns · −48% output tokens',
     impact: {
-      accuracy: '+17 pts (83% → 100%)',
-      speed: '10% faster (40.0s → 36.2s)',
-      tokens: '−21% output vs bare SQL',
+      accuracy: '+5.6 pts (94% → 100%)',
+      speed: '39% faster (3.4× Hard DS)',
+      tokens: '−48% out · −30% turns',
       cost: '$0 local (DGX Spark)',
     },
   },
   {
     id: 'haiku',
-    model: 'Claude Haiku 4.5',
+    shortLabel: 'Haiku 5.5',
+    model: 'Claude Haiku 5.5',
     hardware: 'Fast cloud',
     baselineLabel: 'Python / Bash',
-    baselineScore: '6/6',
-    baselinePct: 100,
-    baselineMeta: '$0.0379 · 681k raw tok*',
-    baselineShort: '$0.0379 · text',
-    freeScore: '6/6',
-    freePct: 100,
-    freeMeta: '$0.0673 · 1,192k raw tok*',
-    freeShort: '$0.0673 · charts',
-    proScore: '6/6',
+    baselineScore: '15/18',
+    baselinePct: 83,
+    baselineMeta: '13.1s/task · 3.94 turns · $0.074 API*',
+    baselineShort: '13.1s · $0.074',
+    freeScore: '16/18',
+    freePct: 89,
+    freeMeta: '14.6s/task · 6.33 turns · $0.122 API*',
+    freeShort: '14.6s · $0.122',
+    proScore: '18/18',
     proPct: 100,
-    proMeta: '$0.0476 · 25.0s/task · 1,064k raw tok*',
-    proShort: '$0.0476 · 25.0s',
-    proHighlight: '100% parity + live Studio charts & lineage for +0.16¢/task vs text-only Python (cheaper on 3/6 tasks)',
+    proMeta: '12.5s/task · 5.61 turns · $0.083 API*',
+    proShort: '12.5s · $0.083',
+    proHighlight: '+16.7 pts accuracy (83% → 100%, matches Sonnet/Opus) · 5% faster overall (23% faster on Hard DS)',
     impact: {
-      accuracy: '100% parity + charts & lineage',
-      speed: '25.0s avg (17.8s on A/B)',
-      tokens: 'Cheaper on 3/6 tasks vs Python',
-      cost: '+0.16¢/task vs text Python',
+      accuracy: '+16.7 pts (83% → 100%)',
+      speed: '5% faster (23% Hard DS)',
+      tokens: '−12% out on Hard DS',
+      cost: '+0.05¢/task vs Python*',
     },
   },
   {
     id: 'sonnet',
-    model: 'Claude Sonnet',
-    hardware: 'Frontier cloud',
+    shortLabel: 'Sonnet 5.5',
+    model: 'Claude Sonnet 5.5',
+    hardware: 'Balanced frontier',
     baselineLabel: 'Python / Bash',
-    baselineScore: '5/6',
-    baselinePct: 83,
-    baselineMeta: '$0.5677 · 505k raw tok*',
-    baselineShort: '$0.5677 · text',
-    freeScore: '6/6',
-    freePct: 100,
-    freeMeta: '$0.9072 · 968k raw tok*',
-    freeShort: '$0.9072 · charts',
-    proScore: '6/6',
+    baselineScore: '18/18',
+    baselinePct: 100,
+    baselineMeta: '20.0s/task · 3.89 turns · $1.22 API*',
+    baselineShort: '20.0s · $1.22',
+    freeScore: '16/18',
+    freePct: 89,
+    freeMeta: '18.5s/task · 5.67 turns · $1.55 API*',
+    freeShort: '18.5s · $1.55',
+    proScore: '18/18',
     proPct: 100,
-    proMeta: '$0.5407 · 31.6s/task · 748k raw tok*',
-    proShort: '$0.5407 · 31.6s',
-    proHighlight: '+17 pts vs Python (100% vs 83%) · 4.8% cheaper than text-only Python + live Studio charts & lineage',
+    proMeta: '18.8s/task · 5.11 turns · $1.01 API*',
+    proShort: '18.8s · $1.01',
+    proHighlight: '100% parity + live Studio charts & lineage · 6% faster overall (21% faster on Hard DS) · −17% warm API*',
     impact: {
-      accuracy: '+17 pts (83% → 100% vs Python)',
-      speed: '31.6s avg (18.3s on A/B)',
-      tokens: '−44% A/B · −36% Kitagawa cost',
-      cost: '−4.8% vs Python ($0.54 vs $0.57)',
+      accuracy: '100% parity + lineage',
+      speed: '6% faster (21% Hard DS)',
+      tokens: '6/6 Hard DS in 25.9s',
+      cost: '−17% warm API* ($1.01)',
+    },
+  },
+  {
+    id: 'opus',
+    shortLabel: 'Opus 5.5',
+    model: 'Claude Opus 5.5',
+    hardware: 'Flagship frontier',
+    baselineLabel: 'Python / Bash',
+    baselineScore: '18/18',
+    baselinePct: 100,
+    baselineMeta: '21.5s/task · 3.61 turns · $2.32 API*',
+    baselineShort: '21.5s · $2.32',
+    freeScore: '16/18',
+    freePct: 89,
+    freeMeta: '22.2s/task · 4.61 turns · $2.93 API*',
+    freeShort: '22.2s · $2.93',
+    proScore: '17/18',
+    proPct: 94,
+    proMeta: '22.0s/task · 4.28 turns · $1.38 API*',
+    proShort: '22.0s · $1.38',
+    proHighlight: '20% faster on Hard DS (2.9× faster on OLS) · −41% warm API* · lone miss caught confounding + exact +8pp',
+    impact: {
+      accuracy: '94% (18/18 math exact†)',
+      speed: '20% faster Hard DS',
+      tokens: '−17% out on Hard DS',
+      cost: '−41% warm API* ($1.38)',
     },
   },
 ]
 
 export const TRUST_BENCH_TOTALS = {
-  tasksPerModel: 6,
-  models: 4,
-  totalModelTasks: 24,
-  baselinePassed: 18,
-  baselinePct: 75,
-  freePassed: 19,
-  freePct: 79,
-  proPassed: 23,
-  proPct: 96,
+  tasksPerModel: 18,
+  models: 5,
+  totalModelTasks: 90,
+  totalRuns: 270,
+  baselinePassed: 82,
+  baselinePct: 91,
+  baselineAvgSec: 25.3,
+  freePassed: 78,
+  freePct: 87,
+  freeAvgSec: 24.1,
+  proPassed: 87,
+  proPct: 97,
+  proAvgSec: 18.8,
+  speedupPct: 26,
+  hardDsBasePct: 80,
+  hardDsProPct: 93,
+  hardDsBaseSec: 39.7,
+  hardDsProSec: 19.1,
+  hardDsSpeedupPct: 52,
 } as const
+
+export interface CategoryBenchRow {
+  id: string
+  label: string
+  sub: string
+  baselinePct: number
+  freePct: number
+  proPct: number
+  baselineMeta: string
+  proMeta: string
+  delta: string
+}
+
+export const categoryBenchRows: readonly CategoryBenchRow[] = [
+  {
+    id: 'routine_bi',
+    label: 'Routine BI',
+    sub: '30 model-tasks/arm',
+    baselinePct: 93,
+    freePct: 97,
+    proPct: 100,
+    baselineMeta: '28/30 · 17.7s',
+    proMeta: '30/30 · 17.4s',
+    delta: '100% (+7 pts)',
+  },
+  {
+    id: 'relational',
+    label: 'Relational Analytics',
+    sub: '30 model-tasks/arm',
+    baselinePct: 100,
+    freePct: 93,
+    proPct: 97,
+    baselineMeta: '30/30 · 18.6s',
+    proMeta: '29/30 · 19.9s',
+    delta: '97% + lineage',
+  },
+  {
+    id: 'hard_ds',
+    label: 'Hard Data Science',
+    sub: '30 model-tasks/arm',
+    baselinePct: 80,
+    freePct: 70,
+    proPct: 93,
+    baselineMeta: '24/30 · 39.7s',
+    proMeta: '28/30 · 19.1s',
+    delta: '+13 pts · 2.1× faster',
+  },
+  {
+    id: 'dabstep',
+    label: 'adyen/DABstep Dev',
+    sub: '30 official runs/arm',
+    baselinePct: 77,
+    freePct: 0,
+    proPct: 80,
+    baselineMeta: '23/30 (Hard 76%)',
+    proMeta: '24/30 (Hard 81%)',
+    delta: '+3 pts (Haiku +10)',
+  },
+]
+
+export interface DabstepBenchRow {
+  model: string
+  baselineScore: string
+  baselineHard: string
+  proScore: string
+  proHard: string
+  note: string
+}
+
+export const dabstepBenchRows: readonly DabstepBenchRow[] = [
+  {
+    model: 'Claude Haiku 5.5',
+    baselineScore: '6/10 (60%)',
+    baselineHard: '4/7',
+    proScore: '7/10 (70%)',
+    proHard: '5/7',
+    note: '+10 pts · solved hard fee-rule tasks #1464 & #1753 that vanilla Haiku missed',
+  },
+  {
+    model: 'Claude Sonnet 5.5',
+    baselineScore: '9/10 (90%)',
+    baselineHard: '6/7',
+    proScore: '9/10 (90%)',
+    proHard: '6/7',
+    note: '90% parity · faster & cheaper on hard task #1464 (11.0s vs 11.6s)',
+  },
+  {
+    model: 'Claude Opus 5.5',
+    baselineScore: '8/10 (80%)',
+    baselineHard: '6/7',
+    proScore: '8/10 (80%)',
+    proHard: '6/7',
+    note: '80% parity · faster overall (16.6s vs 16.7s); −37% faster on hard task #2697',
+  },
+]
 
 export const whitepaperHeroStats = [
   {
-    value: `${TRUST_BENCH_TOTALS.baselinePct}% → ${TRUST_BENCH_TOTALS.proPct}%`,
-    label: 'Combined accuracy across 4 models & 6 hard DS traps',
+    value: '91% → 97%',
+    label: 'Overall accuracy across 5 models × 18 unhinted tasks (270 runs)',
   },
   {
-    value: '33% → 83%',
-    label: 'Small Mac-local model (Inkling 2 Mini) lifted +50 pts',
+    value: '2.1× faster',
+    label: 'Hard Data Science avg latency cut −52% (39.7s → 19.1s) with −32% output tokens',
   },
   {
-    value: '−40.4% cost',
-    label: 'Claude Sonnet Pro ($0.54) beat vanilla Python ($0.57) & TinyPivot Free ($0.91)',
+    value: '83% → 100%',
+    label: 'Claude Haiku 5.5 lifted +16.7 pts to match Sonnet & Opus at $0.083/18 tasks',
   },
   {
-    value: '−47% tokens',
-    label: 'Recursive Data Memory on repeat schema inquiries',
+    value: '77% → 80%',
+    label: 'Official Adyen DABstep Dev external benchmark (Haiku 60% → 70%, Hard 76% → 81%)',
   },
 ] as const
 
 export interface TrapCase {
   id: string
+  category: 'Routine BI' | 'Relational' | 'Hard Data Science'
   name: string
   trap: string
   failureMode: string
@@ -177,46 +319,52 @@ export interface TrapCase {
 
 export const hardTrapCases: readonly TrapCase[] = [
   {
-    id: 'ab_srm_phacking',
-    name: '01 · Broken A/B Test (SRM + P-Hacking)',
-    trap: '12-segment experiment with a broken 54/46 traffic split (χ² = 76.8, p < 10⁻¹⁷) and one noisy segment at raw p = 0.021.',
-    failureMode: 'Models celebrate a fake segment winner and recommend shipping on broken randomization.',
-    tinypivotGuard: 'analyze(ab_test) runs automatic SRM χ² + Holm-Bonferroni correction across all 12 segments on Turn 1.',
+    id: 'routine_bi_suite',
+    category: 'Routine BI',
+    name: '01 · Everyday BI & Data Quality (6 Unhinted Tasks)',
+    trap: 'Executive KPI summaries, 6-day partial April month, 40% NULL discount_code anti-joins, 2 whale orders ($500k) inverting East vs. West, 1.35× duplicate event IDs, and mixed USD/EUR/GBP/JPY currencies.',
+    failureMode: 'Without hints, fast and local models miss whale-skewed groups, drop NULL rows on !=, or report partial months as revenue crashes.',
+    tinypivotGuard: 'TinyPivot Pro hit 30/30 (100%) across all 5 models via silent-when-clean DuckDB audit probes for partial periods, NULL exclusions, duplicate IDs, mixed currencies, and extreme outliers.',
+  },
+  {
+    id: 'relational_suite',
+    category: 'Relational',
+    name: '02 · Multi-Table Relational Analytics (6 Unhinted Tasks)',
+    trap: '2.25× dimension fan-out, 3-table multi-fact chasm traps, unweighted conversion-rate averages, Kitagawa mix-vs-rate Simpson’s paradox, Search Console impression-weighted CTR/position, and survivorship-biased LTV.',
+    failureMode: 'Standard SQL executes cleanly while multiplying totals 2×–8× or reversing directional conclusions.',
+    tinypivotGuard: 'Pro join-key uniqueness probes, non-additive SQL guards, and 1-call analyze(explain_change) keep totals exact and cut DeepSeek Kitagawa runs from 4t/20.4s to 2t/9.2s.',
+  },
+  {
+    id: 'ab_srm_20seg',
+    category: 'Hard Data Science',
+    name: '03 · Subtle 52.5/47.5 SRM & 20-Segment P-Hacking',
+    trap: 'Two A/B suites (obvious 54/46 + subtle 52.5/47.5 SRM across 20 segments) where raw p = 0.01–0.02 segments collapse under Holm-Bonferroni correction.',
+    failureMode: 'Baseline Inkling, DeepSeek, and Haiku all failed the subtle 20-segment SRM check and risked shipping broken experiments.',
+    tinypivotGuard: 'analyze(ab_test) runs automatic χ² SRM + Holm-Bonferroni correction on Turn 1 — lifting all 5 models to 10/10 (100%) in 2–4 turns (4.6× faster on DeepSeek).',
   },
   {
     id: 'confounded_discount',
-    name: '02 · Confounded Discount Causal Reversal',
-    trap: '2,000 accounts where discounts target at-risk accounts: naive SQL shows discounts hurt renewal by −19.1 pp, while true controlled lift is +8.0 pp.',
-    failureMode: 'Small/fast models take the naive −19 pp difference at face value and tell leadership to kill discounts.',
-    tinypivotGuard: 'analyze(regression) fits controlled OLS, compares naive vs. controlled slope, and flags CONFOUNDING / SIGN REVERSAL.',
+    category: 'Hard Data Science',
+    name: '04 · Confounded Discount Causal Reversal',
+    trap: '2,000 accounts where discounts target at-risk customers: naive SQL shows −19.1 pp renewal drop while true controlled OLS lift is +8.0 pp.',
+    failureMode: 'Naive aggregations invert the causal sign, or agents spend 6–9 turns (61s on Opus, 113s on Inkling) hand-rolling OLS in Python/SQL.',
+    tinypivotGuard: 'analyze(regression) fits controlled OLS in 1 call, flagging CONFOUNDING / SIGN REVERSAL — 2.9× faster on Opus, 3.5× faster on DeepSeek, 8.9× faster on Inkling.',
   },
   {
     id: 'right_censored_cohorts',
-    name: '03 · Right-Censored Cohort Retention',
-    trap: '6 monthly cohorts where the 3 newest cohorts have not existed 3 months yet; true matured M3 retention is flat at 40.4%.',
-    failureMode: 'Naive SQL averages 0% / partial trailing cells into M3 and alarms on a fake retention collapse.',
-    tinypivotGuard: 'analyze(cohort_retention) masks immature cells as null and averages matured cohorts only.',
+    category: 'Hard Data Science',
+    name: '05 · Right-Censored Cohort Retention',
+    trap: '6 monthly cohorts where the 3 newest cohorts have not existed 3 months yet; true matured M3 retention is flat at ~40%, not collapsing.',
+    failureMode: 'Haiku baseline and unguided SQL average immature trailing cohorts as 0% and alarm leadership on a fake retention cliff.',
+    tinypivotGuard: 'Pro SQL audit routes cohort tables directly to analyze(cohort_retention), masking immature cells as null — 4.3× faster on DeepSeek, 7.4× faster on Inkling.',
   },
   {
-    id: 'seasonal_changepoint',
-    name: '04 · Hidden Structural Break in Seasonality',
-    trap: '90 days of daily orders with a 62% weekend drop hiding a permanent −16.5% regime shift starting 2026-02-18.',
-    failureMode: 'Weekday/weekend variance swamps simple min/max or rolling checks, missing the exact start date.',
-    tinypivotGuard: 'analyze(anomalies) strips day-of-week seasonality, runs MAD z-scores, and scans every split date for a Welch t-stat break.',
-  },
-  {
-    id: 'chasm_trap_join',
-    name: '05 · 3-Table Multi-Fact Chasm Trap',
-    trap: 'Joining accounts + orders + support_tickets directly multiplies both revenue and ticket counts 6×–8×.',
-    failureMode: 'Standard 3-way SQL silently explodes totals without throwing an error.',
-    tinypivotGuard: 'Pro [AUDIT] probes joined key uniqueness in DuckDB and flags join fan-out before the model answers.',
-  },
-  {
-    id: 'kitagawa_simpson',
-    name: '06 · Simpson’s Paradox (Kitagawa Mix vs. Rate)',
-    trap: '18,000 funnel rows where blended conversion fell −1.99 pp even though both segments improved (+0.52 pp rate effect vs. −2.51 pp mix shift).',
-    failureMode: 'Models either miss the exact pp attribution or misattribute the drop to segment performance.',
-    tinypivotGuard: 'analyze(explain_change) computes exact Kitagawa mix-vs-rate decomposition and flags Simpson’s paradox.',
+    id: 'seasonal_whale_ds',
+    category: 'Hard Data Science',
+    name: '06 · Seasonal Structural Breaks & Whale Revenue A/B',
+    trap: '90-day daily series with a 62% weekend drop hiding a −16.5% shift on 2026-02-18, plus a revenue A/B test where 3 whale orders create a fake +$12k lift.',
+    failureMode: 'Weekend variance hides exact break dates; standard t-tests on raw revenue get fooled by top-0.1% whale orders.',
+    tinypivotGuard: 'analyze(anomalies) removes day-of-week seasonality to pinpoint 2026-02-18, and analyze(ab_test) adds automatic top-1% trimmed Welch whale checks.',
   },
 ]
 
@@ -224,12 +372,12 @@ export const architecturePillars = [
   {
     n: '01',
     title: 'Silent-When-Clean SQL Audit Oracle',
-    body: 'Runs lightweight DuckDB probes (~5–15 ms) after each query. Completely silent when SQL is clean; emits actionable [AUDIT] blocks with exact corrected metrics (daily run-rates, excluded NULL totals, top outlier IDs, fan-out multipliers) only when a real BI trap triggers.',
+    body: 'Runs lightweight DuckDB probes (~5–15 ms) after each query. Completely silent when SQL is clean; emits actionable [AUDIT] blocks (fan-out multipliers, partial-period daily run-rates, excluded NULL totals, duplicate event IDs, mixed currencies, extreme outliers, and 1-call analyze routing hints) only when a real trap triggers.',
   },
   {
     n: '02',
-    title: 'Zero-Param 1-Call Data Science Shelf',
-    body: 'Exposes five deterministic statistical engines through a single compact MCP tool (analyze) so tool schemas stay under 2,500 tokens. Auto-infers columns and aliases — cutting Claude Sonnet Pro tokens by 26% in a single Auto-Research iteration.',
+    title: 'Exact-Table Batch SQL + 1-Call Data Science Shelf',
+    body: 'Analytical SQL queries return exact, high-precision row-aligned tables automatically (with query.queries[] batching up to 6 SELECTs per call), while five deterministic statistical engines live behind one compact analyze tool — keeping TinyPivot Free strictly under 2,500 schema tokens.',
   },
   {
     n: '03',

@@ -50,7 +50,7 @@ const LOAD_DATA_ROW_GUIDE = 50
  */
 export function buildInstructions({ reprintCards = true, claudeChannel = false, isPro = false }: { reprintCards?: boolean, claudeChannel?: boolean, isPro?: boolean } = {}): string {
   const cards = reprintCards
-    ? 'In a terminal, show the returned ```text card verbatim with the Studio link, except in pi, which already shows it. Where TinyPivot shows its view in the chat, never repeat the card.'
+    ? 'In a terminal, show the ```text card verbatim with the Studio link only when a chart/pivot was asked for (never in pi or inline views); else give concise findings and the Studio link.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
@@ -60,7 +60,7 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false, 
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     'On every data call pass why (one short sentence for TinyPivot Studio); when loading or querying, also ask (the user\'s request, verbatim).',
     ...(hasFeature(isPro, 'audit_deep')
-      ? ['Fix [AUDIT] SQL warnings before answering. Use analyze (explain_change, ab_test, regression, cohort_retention, anomalies) for stats.']
+      ? ['Skip Read/load_file when analyzing files: pass multiple read-only SELECTs in query.queries[] (exact tables returned) over file paths directly, or call analyze(method, filePath) in 1 call for A/B tests, confounding/regression, cohorts, seasonality/anomalies, or mix-vs-rate. Fix any [AUDIT] or [PRO DATA GUARD] warnings before answering.']
       : []),
     ...(claudeChannel ? ['Messages from TinyPivot Studio arrive as <channel source="tinypivot"> events: do what they ask, then answer with studio_reply.'] : []),
     cards,
@@ -538,7 +538,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.8.0',
+      version: '0.8.1',
     },
     {
       capabilities: {
@@ -582,9 +582,15 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   }
 
   /** The shared ending of every tool that loads a dataset: the card for the model, the payload for the widget. */
-  const replyWithDataset = async (ds: StoredDataset, sessionKey: string, tool: string, note = '') => {
+  const replyWithDataset = async (
+    ds: StoredDataset,
+    sessionKey: string,
+    tool: string,
+    note = '',
+    formatOverrides: Partial<TerminalFormatOptions> = {},
+  ) => {
     const liveCompanionUrl = await resolveCompanionUrlForTool()
-    const summaryText = `${formatDatasetSummary(ds, liveCompanionUrl, cardFormat())}${note}`
+    const summaryText = `${formatDatasetSummary(ds, liveCompanionUrl, { ...cardFormat(), ...formatOverrides })}${note}`
     const payload = buildAppPayload(ds, store, { licenseKey, demoToken, summaryText, sessionKey })
     recordTelemetry({
       event: 'tool_call',
@@ -1126,15 +1132,27 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     )
   }
 
+  function formatCompactTable(columns: string[], rows: Record<string, unknown>[], maxRows = 25): string {
+    if (columns.length === 0)
+      return '_(no columns)_'
+    const shown = rows.slice(0, maxRows)
+    const header = `| ${columns.join(' | ')} |`
+    const sep = `| ${columns.map(() => '---').join(' | ')} |`
+    const body = shown.map(r => `| ${columns.map(c => String(r[c] ?? '')).join(' | ')} |`)
+    const more = rows.length > maxRows ? `\n_(+${rows.length - maxRows} more rows)_` : ''
+    return `${header}\n${sep}\n${body.join('\n')}${more}`
+  }
+
   // 7. List loaded datasets (and Postgres tables if configured)
   // SQL over local files and earlier pulls, through an embedded DuckDB downloaded on first use.
   server.registerTool(
     'query',
     {
       title: 'Query Files with SQL',
-      description: 'Run one read-only DuckDB SELECT over local files (FROM \'path\') and loaded datasets, then chart or pivot.',
+      description: 'Read-only DuckDB SELECT over local files or datasets, then chart or pivot.',
       inputSchema: {
-        sql: z.string(),
+        sql: z.string().optional(),
+        queries: z.array(z.string()).optional(),
         why: whyParam,
         ask: askParam,
         name: z.string().optional(),
@@ -1146,14 +1164,52 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
-    async ({ sql, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
+    async ({ sql, queries, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
       const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
+      const activeStatements = queries?.length
+        ? queries.map(q => q.trim()).filter(Boolean).slice(0, 6)
+        : (sql?.trim() ? [sql.trim()] : [])
+      const primarySql = activeStatements[activeStatements.length - 1] ?? ''
       try {
+        if (activeStatements.length === 0)
+          return { isError: true, content: [{ type: 'text' as const, text: 'SQL query is empty.' }] }
         if (await withinBudget(studio.duck.prepare(), DUCKDB_WAIT_MS) === 'pending') {
           return { content: [{ type: 'text' as const, text: 'DuckDB is downloading for its first use (about 20 MB, once). Run the same query again in a minute.' }] }
         }
+        const priorStatements = activeStatements.slice(0, -1)
+
+        const runBasicAudit = hasFeature(isPro, 'audit_basic')
+        const runDeepAudit = hasFeature(isPro, 'audit_deep')
+        const views = studio.queryViews(sessionKey)
+        const priorBlocks: string[] = []
+        const allWarnings: Awaited<ReturnType<typeof auditQueryResult>> = []
+
+        for (let idx = 0; idx < priorStatements.length; idx++) {
+          const stmt = priorStatements[idx]
+          const res = await studio.duck.run(stmt, views, 50)
+          priorBlocks.push(`\n### Batch Query ${idx + 1}/${activeStatements.length} (${res.rows.length} row${res.rows.length === 1 ? '' : 's'})\n${formatCompactTable(res.columns, res.rows)}`)
+          if (runBasicAudit || runDeepAudit) {
+            const tempDs: StoredDataset = {
+              id: `batch_${idx + 1}`,
+              name: `Batch ${idx + 1}`,
+              source: stmt,
+              ingestionMode: 'direct',
+              rawBytes: 0,
+              estimatedDatasetTokens: 0,
+              rows: res.rows,
+              columns: res.columns.map(c => ({ name: c, type: 'string' as const, sampleValues: [], distinctCount: 0 })),
+              sourceTotalRows: res.rows.length,
+              truncatedForFreeTier: false,
+              viewMode: 'grid',
+              loadedAt: new Date().toISOString(),
+            }
+            const w = await auditQueryResult({ sql: stmt, dataset: tempDs, duck: studio.duck, views, deep: runDeepAudit })
+            allWarnings.push(...w)
+          }
+        }
+
         const { dataset, truncated } = await studio.runQuery({
-          sql,
+          sql: primarySql,
           name,
           why,
           ask,
@@ -1166,24 +1222,23 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         })
         let auditBlock = ''
         let memoryBlock = ''
-        const runBasicAudit = hasFeature(isPro, 'audit_basic')
-        const runDeepAudit = hasFeature(isPro, 'audit_deep')
         if (runBasicAudit || runDeepAudit) {
-          const sqlSources = extractSqlLineage(sql).sources
+          const sqlSources = [...new Set(activeStatements.flatMap(s => extractSqlLineage(s).sources))]
           if (hasFeature(isPro, 'recursive_memory'))
             memoryBlock = recallMemoryOnce(sqlSources)
           const warnings = await auditQueryResult({
-            sql,
+            sql: primarySql,
             dataset,
             duck: studio.duck,
             views: studio.queryViews(sessionKey),
             deep: runDeepAudit,
           })
-          auditBlock = formatAuditWarnings(warnings)
-          // Recursive learning (Pro): persist discovered traps into local schema memory for future inquiries.
-          if (hasFeature(isPro, 'recursive_memory') && warnings.length > 0 && sqlSources.length > 0) {
+          allWarnings.push(...warnings)
+          const dedupedWarnings = [...new Map(allWarnings.map(w => [`${w.kind}:${w.title}`, w])).values()]
+          auditBlock = formatAuditWarnings(dedupedWarnings)
+          if (hasFeature(isPro, 'recursive_memory') && dedupedWarnings.length > 0 && sqlSources.length > 0) {
             const targetSource = sqlSources[0]
-            for (const w of warnings) {
+            for (const w of dedupedWarnings) {
               studio.memory.recordLesson({
                 tableHint: targetSource,
                 key: `audit:${w.kind}:${targetSource.toLowerCase()}`,
@@ -1193,11 +1248,13 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             }
           }
         }
-        const note = `${truncated ? `\n_Result cut at ${dataset.rows.length.toLocaleString('en-US')} rows._` : ''}${auditBlock}${memoryBlock}`
-        return replyWithDataset(dataset, sessionKey, 'query', note)
+        const batchNote = priorBlocks.length > 0 ? `\n${priorBlocks.join('\n')}` : ''
+        const note = `${batchNote}${truncated ? `\n_Result cut at ${dataset.rows.length.toLocaleString('en-US')} rows._` : ''}${auditBlock}${memoryBlock}`
+        const preferSmallTable = !viewMode && !chartConfig && !pivotConfig
+        return replyWithDataset(dataset, sessionKey, 'query', note, { preferSmallTable })
       }
       catch (error) {
-        return { isError: true, content: [{ type: 'text' as const, text: formatQueryError(error, store, sessionKey, sql, isPro) }] }
+        return { isError: true, content: [{ type: 'text' as const, text: formatQueryError(error, store, sessionKey, primarySql, isPro) }] }
       }
     },
   )

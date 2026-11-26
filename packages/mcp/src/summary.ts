@@ -8,18 +8,27 @@ import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-cha
 
 /** A grid this small is sent as its rows: the model needs the values, and they cost less than a re-query. */
 export const SMALL_GRID_MAX_ROWS = 25
-const SMALL_GRID_MAX_COLUMNS = 10
+const SMALL_GRID_MAX_COLUMNS = 12
 
 function tableCell(value: unknown): string {
   if (value === null || value === undefined)
     return ''
-  const text = typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 4 }) : String(value)
-  return text.replace(/\|/g, '\\|').replace(/\n/g, ' ')
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value))
+      return String(value)
+    if (Number.isInteger(value))
+      return value.toLocaleString('en-US')
+    // Preserve high precision for small rates, fees, p-values, and deltas; keep clean formatting for large figures
+    if (Math.abs(value) < 1000)
+      return value.toLocaleString('en-US', { maximumFractionDigits: 14 })
+    return value.toLocaleString('en-US', { maximumFractionDigits: 4 })
+  }
+  return String(value).replace(/\|/g, '\\|').replace(/\n/g, ' ')
 }
 
-/** The rows of a small dataset in grid view, as a Markdown table. */
-function smallGridTable(dataset: StoredDataset): string | null {
-  if (dataset.viewMode !== 'grid' || dataset.rows.length > SMALL_GRID_MAX_ROWS || dataset.columns.length > SMALL_GRID_MAX_COLUMNS)
+/** The rows of a small dataset, as a Markdown table. */
+function smallGridTable(dataset: StoredDataset, force = false): string | null {
+  if ((!force && dataset.viewMode !== 'grid') || dataset.rows.length > SMALL_GRID_MAX_ROWS || dataset.columns.length > SMALL_GRID_MAX_COLUMNS)
     return null
   const names = dataset.columns.map(column => column.name)
   if (names.length === 0)
@@ -119,8 +128,14 @@ export function formatDatasetSummary(
   options: TerminalFormatOptions = {},
 ): string {
   const cardOptions = { ...options, companionUrl: options.companionUrl ?? companionUrl }
-  // A dataset opened in pivot view answers with the pivot table; anything else gets its chart.
-  const chartBlock = smallGridTable(dataset) ?? datasetCard(dataset, cardOptions)
+  // Analytical SQL queries (preferSmallTable) and grid views return exact rows directly;
+  // chart/pivot views render their card and fall back to a compact table when a small result has no chartable measure (e.g. DESCRIBE / ID lists).
+  const tableFallback = smallGridTable(dataset, true)
+  const chartBlock = (options.preferSmallTable ? tableFallback : null)
+    ?? smallGridTable(dataset)
+    ?? datasetCard(dataset, cardOptions)
+    ?? tableFallback
+  const renderedAsTable = chartBlock !== null && chartBlock === tableFallback
   const rowHeadline = dataset.truncatedForFreeTier
     ? `**${dataset.rows.length.toLocaleString()} of ${dataset.sourceTotalRows.toLocaleString()} rows (Free tier limit)**`
     : `**${dataset.rows.length.toLocaleString()} rows**`
@@ -146,9 +161,11 @@ export function formatDatasetSummary(
 
   if (chartBlock) {
     parts.push('', chartBlock)
-    const note = cardNote(companionUrl, options)
-    if (note)
-      parts.push(note)
+    if (!renderedAsTable) {
+      const note = cardNote(companionUrl, options)
+      if (note)
+        parts.push(note)
+    }
   }
 
   parts.push('', formatColumnNotes(dataset.columns))
