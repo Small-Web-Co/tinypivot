@@ -130,4 +130,5 @@ export {
   resolveCompanionUrl,
   runTuiCommand,
 } from './tui.js'
-export { QueryRefused, readOnlyStatementError, type WarehouseConnector, type WarehouseQueryResult } from './warehouse.js'
+export { auditWarehouseQuery } from './warehouse-audit.js'
+export { backtickName, plainName, QueryRefused, readOnlyStatementError, type SqlDialect, type WarehouseConnector, type WarehouseQueryResult } from './warehouse.js'

@@ -11,6 +11,24 @@ export interface WarehouseQueryResult {
   note?: string
 }
 
+/** The little dialect the Pro audit probes need to write portable SQL for a database. */
+export interface SqlDialect {
+  /** A column name as this database reads it in a probe. */
+  quoteName: (name: string) => string
+  /** A median aggregate of `expr`; omitted when the database has none, which skips the outlier audit. */
+  median?: (expr: string) => string
+}
+
+/** Backticked names, for BigQuery, Databricks, ClickHouse and MySQL. */
+export function backtickName(name: string): string {
+  return `\`${name.replace(/`/g, '``')}\``
+}
+
+/** Names left as the query wrote them, for Postgres and Snowflake: quoting would make them case-sensitive and stop matching. */
+export function plainName(name: string): string {
+  return name
+}
+
 export interface WarehouseConnector {
   /** Short id, also the history kind of its pulls. */
   id: 'postgres' | 'bigquery' | 'snowflake' | 'databricks' | 'mysql' | 'clickhouse'
@@ -24,6 +42,8 @@ export interface WarehouseConnector {
   freeAlternative: string
   /** The most rows one query returns. */
   maxRows: number
+  /** How audit probes name columns and take a median here. */
+  dialect: SqlDialect
   /** Tables the model may query, as it should name them in SQL. */
   listTables: () => Promise<string[]>
   /** Checks the SQL is a single read-only SELECT within limits, then runs it. Throws with a reason if not. */

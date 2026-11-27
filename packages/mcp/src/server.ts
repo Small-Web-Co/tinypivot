@@ -20,7 +20,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS, CHART_TYPES, resolveChartType } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
 import { runAnalysis } from './analyze.js'
-import { auditChartReaggregation, auditNonAdditiveSql, auditQueryResult, formatAuditWarnings, formatProGuardTeaser, formatSqlRepairHint, peekDeepAuditCount } from './audit.js'
+import { auditQueryResult, formatAuditWarnings, formatProGuardTeaser, formatSqlRepairHint, peekDeepAuditCount } from './audit.js'
 import { bigQueryConfigFromEnv, bigQueryConnector } from './bigquery.js'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { clickHouseConfigFromEnv, clickHouseConnector } from './clickhouse.js'
@@ -42,6 +42,7 @@ import { describeChartForText, formatDatasetSummary, formatPivotSummary } from '
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
 import { hasFeature } from './tiers.js'
+import { auditWarehouseQuery } from './warehouse-audit.js'
 import { truncationNote } from './warehouse.js'
 
 export const APP_RESOURCE_URI = 'ui://tinypivot/app.html'
@@ -1127,7 +1128,9 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           })
           studio.remember(ds, { kind: warehouse.id, source: sql })
           studio.recordDatasetStep(ds, { actor: 'agent', tool: warehouse.toolName, why, ask, sql })
-          const warnings = hasFeature(isPro, 'audit_basic') ? [...auditNonAdditiveSql(sql), ...auditChartReaggregation(ds)] : []
+          const warnings = hasFeature(isPro, 'audit_basic')
+            ? await auditWarehouseQuery({ sql, dataset: ds, warehouse, deep: hasFeature(isPro, 'audit_deep') })
+            : []
           const note = `${res.note ? `\n_${res.note}_` : ''}${res.truncated ? truncationNote(warehouse) : ''}${formatAuditWarnings(warnings)}`
           return replyWithDataset(ds, sessionKey, warehouse.toolName, note)
         }

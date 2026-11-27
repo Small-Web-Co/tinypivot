@@ -6,7 +6,7 @@ import { formatBytes } from './bigquery.js'
 import { clickHouseClientConfigFile, readTextFile } from './config-files.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { maskSql, QueryRefused, readOnlyStatementError } from './warehouse.js'
+import { backtickName, maskSql, QueryRefused, readOnlyStatementError } from './warehouse.js'
 
 /**
  * Read-only ClickHouse over HTTP, through ClickHouse's official Node client. ClickHouse enforces the
@@ -448,6 +448,7 @@ export function clickHouseConnector(config: ClickHouseConfig, createClient: Clic
     sqlHint: `ClickHouse SQL, one read-only SELECT without SETTINGS or FORMAT${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}. Names are case-sensitive.`,
     freeAlternative: 'export with `clickhouse client --query "SELECT …" --format CSVWithNames > result.csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
+    dialect: { quoteName: backtickName, median: expr => `median(${expr})` },
     listTables: () => withSession(s => listTables(s, config)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }

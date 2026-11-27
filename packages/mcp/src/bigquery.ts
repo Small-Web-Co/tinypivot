@@ -2,7 +2,7 @@ import type { RuntimePackage } from './runtime-package.js'
 import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { listFromEnv, QueryRefused } from './warehouse.js'
+import { backtickName, listFromEnv, QueryRefused } from './warehouse.js'
 
 /**
  * Read-only BigQuery, through Google's official client. Every query is dry-run first: BigQuery
@@ -194,6 +194,7 @@ export function bigQueryConnector(config: BigQueryConfig, createClient: BigQuery
     sqlHint: `GoogleSQL, one read-only SELECT; name tables \`dataset.table\` (project ${config.projectId}) or \`project.dataset.table\`.`,
     freeAlternative: 'export with `bq query --format=csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
+    dialect: { quoteName: backtickName, median: expr => `APPROX_QUANTILES(${expr}, 2)[OFFSET(1)]` },
     listTables: async () => listTables(await getClient(), config),
     query: async sql => runQuery(await getClient(), config, sql),
   }
