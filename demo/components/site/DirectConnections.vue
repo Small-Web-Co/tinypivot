@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CONNECT_COMMAND } from '../../site/install'
-import { WAREHOUSE_BENCH, WAREHOUSE_BENEFITS, WAREHOUSE_SETUP_URL, warehouseHighlights, WAREHOUSES } from '../../site/warehouses'
+import { WAREHOUSE_BENEFITS, WAREHOUSE_SETUP_URL, warehouseHighlights, warehouseModels, WAREHOUSES } from '../../site/warehouses'
+import { WAREHOUSE_STUDY } from '../../site/whitepaper'
 import CopyCommand from './CopyCommand.vue'
 import StatHighlights from './StatHighlights.vue'
 
@@ -38,8 +39,12 @@ const highlights = warehouseHighlights()
     </div>
 
     <p class="foot">
-      Measured with {{ WAREHOUSE_BENCH.model }} on {{ WAREHOUSE_BENCH.questions }} trap questions over BigQuery, two runs each.
-      Time is the average per question; cost is all {{ WAREHOUSE_BENCH.runs }} runs at API prices. Every connector is tested against a live warehouse.
+      Measured with {{ warehouseModels }} on {{ WAREHOUSE_STUDY.questions }} questions over 2.7 million rows in BigQuery, two runs each.
+      Time is the average per question; cost is at API prices. Every connector is tested against a live warehouse.
+      <router-link to="/whitepaper#warehouses" class="text-link">
+        Method and results →
+      </router-link>
+      ·
       <a :href="WAREHOUSE_SETUP_URL" class="text-link" target="_blank" rel="noopener">
         Setup for each warehouse →
       </a>

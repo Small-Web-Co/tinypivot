@@ -4,7 +4,9 @@ import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TrustBenchmarkChart from '../components/site/TrustBenchmarkChart.vue'
 import TrustBenchmarkTable from '../components/site/TrustBenchmarkTable.vue'
-import { architecturePillars, TRUST_BENCH_DATE, whitepaperHeroStats } from '../site/whitepaper'
+import WarehouseBenchmark from '../components/site/WarehouseBenchmark.vue'
+import { WAREHOUSES } from '../site/warehouses'
+import { architecturePillars, TRUST_BENCH_DATE, WAREHOUSE_STUDY, warehouseArms, warehouseFindings, whitepaperHeroStats } from '../site/whitepaper'
 
 // The page reads top to bottom: what is tested → why it matters → how → results → how it works → tiers.
 const contents = [
@@ -13,9 +15,15 @@ const contents = [
   { id: 'method', title: 'How we tested', why: 'The two test tracks and the three setups we compare.' },
   { id: 'internal', title: 'Results on our own tasks', why: 'Full control, so TinyPivot’s effect is isolated.' },
   { id: 'external', title: 'Results on public benchmarks', why: 'Problems we didn’t write, next to published leaders.' },
+  { id: 'warehouses', title: 'Results on a live warehouse', why: 'Querying BigQuery directly, against the command line and exporting first.' },
   { id: 'architecture', title: 'How it works', why: 'The four pieces behind the results.' },
   { id: 'tiers', title: 'Free vs Pro', why: 'What each tier includes, and how to try it.' },
 ] as const
+
+/** A section's number, "06", from its place in the contents. */
+function sectionNo(id: typeof contents[number]['id']): string {
+  return String(contents.findIndex(c => c.id === id) + 1).padStart(2, '0')
+}
 
 const arms = [
   {
@@ -119,7 +127,7 @@ const takeaways = [
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            01 · What TinyPivot is
+            {{ sectionNo('products') }} · What TinyPivot is
           </p>
           <h2 class="heading">
             Two products, <em>one engine.</em>
@@ -158,7 +166,7 @@ const takeaways = [
       <div class="wrap">
         <div class="wp-prose">
           <p class="label">
-            02 · The problem
+            {{ sectionNo('problem') }} · The problem
           </p>
           <h2 class="heading">
             The mistakes that matter <em>don’t throw errors.</em>
@@ -185,7 +193,7 @@ const takeaways = [
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            03 · How we tested
+            {{ sectionNo('method') }} · How we tested
           </p>
           <h2 class="heading">
             Two tracks, <em>three setups.</em>
@@ -238,7 +246,7 @@ const takeaways = [
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            04 · Results · our own tasks
+            {{ sectionNo('internal') }} · Results · our own tasks
           </p>
           <h2 class="heading">
             Every model reached <em>100% with TinyPivot Pro.</em>
@@ -295,7 +303,7 @@ const takeaways = [
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            05 · Results · independent public benchmarks
+            {{ sectionNo('external') }} · Results · independent public benchmarks
           </p>
           <h2 class="heading">
             It holds up on problems <em>we didn’t write.</em>
@@ -311,12 +319,72 @@ const takeaways = [
       </div>
     </section>
 
+    <!-- Direct warehouse connections -->
+    <section id="warehouses" class="block">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            {{ sectionNo('warehouses') }} · Results · direct warehouse connections
+          </p>
+          <h2 class="heading">
+            The same answers, <em>found faster.</em>
+          </h2>
+          <p class="lede">
+            Querying BigQuery directly did not make Claude more accurate: every setup answered all {{ WAREHOUSE_STUDY.totalRuns }} runs correctly.
+            It made it faster than the agent driving the bq command line itself, and much faster than exporting first, for a little more API spend than the command line.
+          </p>
+        </header>
+
+        <div class="wp-prose wp-warehouse-method">
+          <p>
+            We built a fake Acme warehouse in BigQuery: 2.7 million orders (203 MB), 3.1 million shipments, 400,000 customers and
+            35,000 days of campaign stats. The {{ WAREHOUSE_STUDY.questions }} questions are ones you can’t answer by looking at rows: the
+            table is far bigger than the command line’s 100-row preview and TinyPivot’s 5,000-row result limit, and each question hides
+            a trap such as a join that double-counts, a 12-day month, missing values or mixed currencies. We worked out every expected answer in
+            BigQuery ourselves, and a script scores each reply against it, with tolerances and the caveats a correct answer must mention.
+            Prompts never hint at the trap.
+          </p>
+          <p>
+            Claude Haiku and Claude Sonnet each answered every question twice in each setup, run headless through Claude Code with
+            TinyPivot MCP 0.9.1, on {{ WAREHOUSE_STUDY.date }}.
+          </p>
+        </div>
+
+        <div class="wp-arms">
+          <p class="label">
+            The three setups
+          </p>
+          <dl class="wp-arms-list">
+            <div v-for="arm in warehouseArms" :key="arm.id" class="wp-arm">
+              <dt class="mono">
+                {{ arm.name }}
+              </dt>
+              <dd>{{ arm.body }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <WarehouseBenchmark class="wp-warehouse-table" />
+
+        <div class="wp-takeaways">
+          <p class="label">
+            What the results show
+          </p>
+          <ul class="wp-list">
+            <li v-for="f in warehouseFindings" :key="f">
+              {{ f }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
     <!-- 06: Architecture -->
     <section id="architecture" class="block wp-arch-section">
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            06 · How it works
+            {{ sectionNo('architecture') }} · How it works
           </p>
           <h2 class="heading">
             Four small pieces, <em>all on your machine.</em>
@@ -347,7 +415,7 @@ const takeaways = [
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            07 · Free vs Pro
+            {{ sectionNo('tiers') }} · Free vs Pro
           </p>
           <h2 class="heading">
             Free never cuts off your data. <em>Pro adds the deep checks.</em>
@@ -369,7 +437,7 @@ const takeaways = [
             <p>
               Everything in Free, plus the deep checks (double-counting joins, half-finished periods, dropped missing values, outliers),
               the full statistics shelf, cross-file join discovery, memory between sessions, answer verification, 10 themes,
-              white-label HTML and Excel export, and direct PostgreSQL.
+              white-label HTML and Excel export, and direct read-only queries to {{ WAREHOUSES.join(', ') }}.
             </p>
           </article>
         </div>
@@ -568,6 +636,14 @@ const takeaways = [
   background: var(--ledger);
   border-top: var(--line);
   border-bottom: var(--line);
+}
+
+.wp-warehouse-method {
+  margin-top: 8px;
+}
+
+.wp-warehouse-table {
+  margin-top: 24px;
 }
 
 .wp-arch-section {

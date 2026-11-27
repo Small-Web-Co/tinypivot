@@ -8,6 +8,7 @@
  *  B) EXTERNAL PUBLIC BENCHMARKS —
  *     1) MIT KramaBench (ICLR 2026) controlled same-model A/B across 4 multi-file data lakes (62 tasks).
  *     2) Official 450-task blind Adyen / Hugging Face `adyen/DABstep` leaderboard + 10-task Dev A/B.
+ *  C) DIRECT WAREHOUSE STUDY — 8 questions over 2.7M fake orders in BigQuery, Claude Haiku and Sonnet × 3 setups (96 runs).
  */
 
 export interface TrustBenchImpact {
@@ -965,3 +966,125 @@ export const architecturePillars = [
     body: 'Every chart and pivot links back to editable SQL (with lossless revision history), clickable Underlying Source Rows, order-independent SHA-256 Data Hashes, claim-checked prose, and zero-CDN Offline HTML Notebooks — or pass --no-studio (TINYPIVOT_NO_STUDIO=1) for zero-popup headless CI and benchmarks.',
   },
 ] as const
+
+/**
+ * Direct warehouse connections: 8 questions over fake Acme tables in BigQuery, Claude Haiku and Claude Sonnet,
+ * three setups, 2 runs each (analysis/warehouse-benchmark, suite `hard`). Every run was answered correctly.
+ */
+export type WarehouseArmId = 'cli' | 'export' | 'direct'
+
+export interface WarehouseArmResult {
+  correct: number
+  /** Average seconds per question. */
+  avgSec: number
+  /** API price of all the cell's runs, USD. */
+  cost: number
+}
+
+export const WAREHOUSE_STUDY = {
+  date: '2026-11-27',
+  questions: 8,
+  reps: 2,
+  /** Runs per model in one setup: questions × reps. */
+  runsPerArm: 16,
+  totalRuns: 96,
+  /** API price of all 96 runs. */
+  totalCost: 6.88,
+} as const
+
+export const warehouseArms: readonly { id: WarehouseArmId, name: string, body: string }[] = [
+  {
+    id: 'cli',
+    name: 'bq command line',
+    body: 'The agent with a shell and Google’s bq command line, and no TinyPivot. It can write any SQL it likes.',
+  },
+  {
+    id: 'export',
+    name: 'Export, then TinyPivot',
+    body: 'Shell plus TinyPivot Pro, told to export what it needs with bq and analyse the file in TinyPivot: the route TinyPivot Free has.',
+  },
+  {
+    id: 'direct',
+    name: 'TinyPivot direct',
+    body: 'TinyPivot Pro’s query_bigquery and nothing else: no shell, no files. The SQL runs in BigQuery and only the result comes back.',
+  },
+]
+
+export const warehouseResults: readonly { model: string, arms: Record<WarehouseArmId, WarehouseArmResult> }[] = [
+  {
+    model: 'Claude Haiku',
+    arms: {
+      cli: { correct: 16, avgSec: 37.4, cost: 0.111 },
+      export: { correct: 16, avgSec: 89.7, cost: 0.1622 },
+      direct: { correct: 16, avgSec: 26.8, cost: 0.1271 },
+    },
+  },
+  {
+    model: 'Claude Sonnet',
+    arms: {
+      cli: { correct: 16, avgSec: 44.4, cost: 2.0469 },
+      export: { correct: 16, avgSec: 63.0, cost: 2.3015 },
+      direct: { correct: 16, avgSec: 32.1, cost: 2.1331 },
+    },
+  },
+]
+
+export const warehouseFindings = [
+  'Accuracy was level: all 96 runs were correct, in every setup, on both models. Given a shell, both models wrote SQL that added the rows up inside BigQuery, so neither the 100-row preview nor any row limit came into play.',
+  'TinyPivot direct was the fastest setup on both models: 26.8s a question against 37.4s on the command line for Haiku, and 32.1s against 44.4s for Sonnet.',
+  'It was not the cheapest. It cost 15% more than the command line on Haiku and 4% more on Sonnet, and the agent took more steps (7.1 against 5.8 on Haiku, 6.7 against 4.1 on Sonnet).',
+  'Exporting first was the slowest and most expensive setup, with exports of up to 113 MB: 89.7s a question on Haiku and 63.0s on Sonnet. It was still correct every time.',
+  'An earlier run of six easier trap questions on Haiku found the same: 12 of 12 correct in every setup, direct 28% faster. In that run the export setup wasn’t told to export and its agent never opened TinyPivot, so this run tells it to.',
+  'Limits: two Claude models, eight questions and two runs each is a small sample, and both models write good SQL. Smaller or local models, which may lean on reading raw rows, were not tested here.',
+] as const
+
+export const warehouseTasks: readonly { id: string, title: string, prompt: string, trap: string }[] = [
+  {
+    id: 'median_order',
+    title: 'A median over 606k orders',
+    prompt: 'What was the median order amount for completed orders placed by North America customers in 2026, and what share of those orders were over $500?',
+    trap: 'Needs all 605,766 rows. A 100-row command-line preview or a 5,000-row sample gives a believable but wrong share.',
+  },
+  {
+    id: 'ship_fanout',
+    title: 'A three-table join that double-counts',
+    prompt: 'For completed orders placed in Q3 2026 by North America customers that were shipped (at least in part) by Bluejay Freight, what was total order revenue by customer segment, and the grand total?',
+    trap: 'Orders, customers and shipments. An order can have up to three shipments, so a plain join to shipments overstates revenue by 19%.',
+  },
+  {
+    id: 'partial_month',
+    title: 'A 12-day month',
+    prompt: 'Show monthly completed order revenue for North America customers from January 2026 through the latest month in the data, and explain how the latest month compares with the month before.',
+    trap: 'The data stops on November 12. November looks 61% down on October; per day it is flat.',
+  },
+  {
+    id: 'null_promo',
+    title: 'Missing values a filter drops',
+    prompt: 'How many completed 2026 orders from North America customers did not use the SAVE10 promo code, and what was their total revenue?',
+    trap: 'Most orders have no promo code (NULL), and promo_code != \'SAVE10\' silently drops them: 84,565 orders instead of 520,653.',
+  },
+  {
+    id: 'weighted_rate',
+    title: 'An average of daily rates',
+    prompt: 'Using campaign_daily for Q3 2026: what was the conversion rate (conversions ÷ sessions) and cost per conversion for each channel, what was the conversion rate across all channels combined, and which channel converts best?',
+    trap: 'Tiny affiliate campaigns convert 12–20% a day. Averaging the stored daily rate puts Affiliate first at 14.6%; weighted by sessions it is 2.3%, and Search leads.',
+  },
+  {
+    id: 'fx_revenue',
+    title: 'Three currencies in one column',
+    prompt: 'What was Acme’s total completed order revenue in October 2026, in US dollars, and how much came from each region?',
+    trap: 'EMEA amounts are in euros and pounds. Converting needs the monthly fx_rates table; a plain sum is 4% low.',
+  },
+  {
+    id: 'cohort',
+    title: 'A first-order cohort over 2.7M orders',
+    prompt: 'Of the customers whose first-ever order was placed in Q1 2026 (January–March), what percentage placed at least one more order in Q3 2026 (July–September)? Count orders of any status.',
+    trap: 'Needs each customer’s first order across the whole history. Counting everyone who ordered in Q1 gives 31.7% instead of 39.6%.',
+  },
+  {
+    id: 'top_share',
+    title: 'The top 1% of 119k customers',
+    prompt: 'Among North America customers who placed completed orders in 2026, what share of their 2026 completed revenue came from the top 1% of those customers by 2026 revenue?',
+    trap: 'Needs a revenue total for each of 119,478 customers, far more rows than an agent can read.',
+  },
+]
