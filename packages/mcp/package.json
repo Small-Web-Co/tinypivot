@@ -88,6 +88,7 @@
     "@lezer/highlight": "^1.2.5",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "codemirror": "^6.0.2",
+    "smol-toml": "^1.9.1",
     "sql-formatter": "^15.10.0",
     "zod": "^4.0.0"
   },

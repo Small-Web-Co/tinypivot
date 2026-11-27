@@ -13,7 +13,7 @@ export interface WarehouseQueryResult {
 
 export interface WarehouseConnector {
   /** Short id, also the history kind of its pulls. */
-  id: 'postgres' | 'bigquery' | 'snowflake'
+  id: 'postgres' | 'bigquery' | 'snowflake' | 'databricks' | 'mysql' | 'clickhouse'
   /** Name shown to people and the model: `PostgreSQL`, `BigQuery`. */
   label: string
   /** The MCP tool that queries it, e.g. `query_bigquery`. */
