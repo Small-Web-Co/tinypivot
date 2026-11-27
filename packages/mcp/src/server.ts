@@ -31,6 +31,7 @@ import { refreshAgentExtension } from './init.js'
 import { classifyMcpLicenseKey, isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { extractSqlLineage } from './lineage.js'
+import { mysqlConfigFromEnv, mysqlConnector } from './mysql.js'
 import { postgresConfigFromEnv, postgresConnector } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile, formatProLoadTraps, profileDirectory } from './profile.js'
@@ -1679,11 +1680,13 @@ export function warehousesFromEnv(env: NodeJS.ProcessEnv = process.env): Warehou
   const snowflake = snowflakeConfigFromEnv(env)
   const databricks = databricksConfigFromEnv(env)
   const clickhouse = clickHouseConfigFromEnv(env)
+  const mysql = mysqlConfigFromEnv(env)
   return [
     ...(postgres ? [postgresConnector(postgres)] : []),
     ...(bigquery ? [bigQueryConnector(bigquery)] : []),
     ...(snowflake ? [snowflakeConnector(snowflake)] : []),
     ...(databricks ? [databricksConnector(databricks)] : []),
     ...(clickhouse ? [clickHouseConnector(clickhouse)] : []),
+    ...(mysql ? [mysqlConnector(mysql)] : []),
   ]
 }

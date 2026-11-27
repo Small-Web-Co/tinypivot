@@ -14,7 +14,7 @@ describe('finding warehouse sign-ins a person already has', () => {
     vi.stubEnv('HOME', home)
     vi.stubEnv('USERPROFILE', home)
     vi.stubEnv('XDG_CONFIG_HOME', path.join(home, '.config'))
-    for (const name of ['CLOUDSDK_CONFIG', 'GOOGLE_APPLICATION_CREDENTIALS', 'GOOGLE_CLOUD_PROJECT', 'SNOWFLAKE_HOME', 'SNOWFLAKE_DEFAULT_CONNECTION_NAME', 'DATABRICKS_CONFIG_FILE'])
+    for (const name of ['CLICKHOUSE_CLIENT_CONFIG', 'MYSQL_OPTION_FILE', 'CLOUDSDK_CONFIG', 'GOOGLE_APPLICATION_CREDENTIALS', 'GOOGLE_CLOUD_PROJECT', 'SNOWFLAKE_HOME', 'SNOWFLAKE_DEFAULT_CONNECTION_NAME', 'DATABRICKS_CONFIG_FILE'])
       vi.stubEnv(name, '')
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
@@ -37,6 +37,8 @@ describe('finding warehouse sign-ins a person already has', () => {
     await write('.config/gcloud/configurations/config_work', '[core]\nproject = acme-analytics\naccount = analyst@example.com\n')
     await write('.snowflake/connections.toml', '[default]\naccount = "acme-xy12345"\nuser = "ANALYST"\n')
     await write('.databrickscfg', '[DEFAULT]\nhost = https://acme.cloud.databricks.com\ntoken = dapi-test\n')
+    await write('.clickhouse-client/config.xml', '<config><host>ch.acme.internal</host><password>ch-secret</password></config>')
+    await write('.my.cnf', '[client]\nuser = reader\npassword = my-secret\n[mysql]\ndatabase = acme\n')
   }
 
   it('finds gcloud, Snowflake CLI and Databricks CLI sign-ins, pointing at them without secrets', async () => {
@@ -46,8 +48,11 @@ describe('finding warehouse sign-ins a person already has', () => {
       ['bigquery', { TINYPIVOT_BIGQUERY_PROJECT: 'acme-analytics' }],
       ['snowflake', { TINYPIVOT_SNOWFLAKE_CONNECTION: 'default' }],
       ['databricks', { TINYPIVOT_DATABRICKS_PROFILE: 'DEFAULT' }],
+      ['clickhouse', { TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG: '1' }],
+      ['mysql', { TINYPIVOT_MYSQL_DATABASE: 'acme' }],
     ])
-    expect(JSON.stringify(found)).not.toContain('dapi-test')
+    for (const secret of ['dapi-test', 'ch-secret', 'my-secret'])
+      expect(JSON.stringify(found)).not.toContain(secret)
   })
 
   it('finds nothing on a machine with no sign-ins, and ignores a gcloud project without credentials', async () => {
@@ -61,7 +66,7 @@ describe('finding warehouse sign-ins a person already has', () => {
     await runInitCommand(['--targets=cursor', '--no-rules'])
     const cursor = JSON.parse(await fs.readFile(path.join(home, '.cursor', 'mcp.json'), 'utf8'))
     expect(cursor.mcpServers.tinypivot.env).toBeUndefined()
-    expect(vi.mocked(console.log).mock.calls.flat().join('\n')).toContain('init --connect=bigquery,snowflake,databricks')
+    expect(vi.mocked(console.log).mock.calls.flat().join('\n')).toContain('init --connect=bigquery,snowflake,databricks,clickhouse,mysql')
   })
 
   it('init --connect writes only the chosen pointers', async () => {

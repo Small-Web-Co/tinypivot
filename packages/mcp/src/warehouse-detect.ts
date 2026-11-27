@@ -1,6 +1,7 @@
 import type { WarehouseConnector } from './warehouse.js'
 import os from 'node:os'
-import { databricksConfigFile, detectGcloudProject, readIniFile, readSnowflakeConnections } from './config-files.js'
+import path from 'node:path'
+import { databricksConfigFile, detectGcloudProject, mysqlOptionFile, readIniFile, readSnowflakeConnections, readTextFile } from './config-files.js'
 
 /**
  * Warehouse sign-ins a person already has on this machine, found by `init` so it can offer to
@@ -40,8 +41,25 @@ function detectDatabricks(env: NodeJS.ProcessEnv, home: string): DetectedWarehou
     : undefined
 }
 
+function detectMysql(env: NodeJS.ProcessEnv, home: string): DetectedWarehouse | undefined {
+  const file = mysqlOptionFile(env, home)
+  const groups = readIniFile(file) ?? {}
+  const merged = { ...groups.client, ...groups.mysql }
+  return merged.user && merged.database
+    ? { id: 'mysql', label: 'MySQL', found: `database ${merged.database} in ${file}`, env: { TINYPIVOT_MYSQL_DATABASE: merged.database } }
+    : undefined
+}
+
+function detectClickHouse(env: NodeJS.ProcessEnv, home: string): DetectedWarehouse | undefined {
+  const file = env.CLICKHOUSE_CLIENT_CONFIG || path.join(home, '.clickhouse-client', 'config.xml')
+  const host = readTextFile(file)?.match(/<host>([^<]+)<\/host>/)?.[1]
+  return host
+    ? { id: 'clickhouse', label: 'ClickHouse', found: `host ${host} in ${file}`, env: { TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG: '1' } }
+    : undefined
+}
+
 export function detectWarehouses(env: NodeJS.ProcessEnv = process.env, home = os.homedir()): DetectedWarehouse[] {
-  return [detectBigQuery, detectSnowflake, detectDatabricks].flatMap((detect) => {
+  return [detectBigQuery, detectSnowflake, detectDatabricks, detectClickHouse, detectMysql].flatMap((detect) => {
     try {
       const found = detect(env, home)
       return found ? [found] : []
@@ -53,4 +71,4 @@ export function detectWarehouses(env: NodeJS.ProcessEnv = process.env, home = os
   })
 }
 
-export const CONNECTABLE_WAREHOUSES = ['bigquery', 'snowflake', 'databricks'] as const
+export const CONNECTABLE_WAREHOUSES = ['bigquery', 'snowflake', 'databricks', 'clickhouse', 'mysql'] as const

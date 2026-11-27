@@ -44,7 +44,7 @@ Options:
 
 - `--targets=claude,claude-desktop,cursor,opencode,antigravity,antigravity-cli,pi,codex` — configure specific harnesses
 - `--license=TP-...` — include your `TINYPIVOT_LICENSE_KEY` in the generated MCP config
-- `--connect` (or `--connect=bigquery,snowflake,databricks`) — let your agent query warehouses you are already signed in to with their own CLIs (Pro). `init` always lists the sign-ins it finds; only this flag connects them, and only a project, connection or profile name is written, never a secret
+- `--connect` (or `--connect=bigquery,snowflake,databricks,clickhouse,mysql`) — let your agent query warehouses you are already signed in to with their own CLIs (Pro). `init` always lists the sign-ins it finds; only this flag connects them, and only a project, connection or profile name is written, never a secret
 - `--local` — wire a local build (`node .../dist/cli.js`) for local development
 - `--no-rules` — skip adding the auto-use TinyPivot rule to `~/.claude/CLAUDE.md`
 - `--dry-run` — preview changes without modifying files
@@ -127,7 +127,7 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 
 TinyPivot works with any data your agent can reach. Use whichever workflow matches your stack:
 
-- **Direct Snowflake, BigQuery, Databricks, ClickHouse and PostgreSQL (Pro):** TinyPivot runs read-only SQL in the warehouse itself, so totals are computed where the data lives and only the result comes back. Every step's SQL shows in the Studio and can be re-checked there. See [Direct connections](#direct-connections-pro) below.
+- **Direct Snowflake, BigQuery, Databricks, ClickHouse, MySQL and PostgreSQL (Pro):** TinyPivot runs read-only SQL in the warehouse itself, so totals are computed where the data lives and only the result comes back. Every step's SQL shows in the Studio and can be re-checked there. See [Direct connections](#direct-connections-pro) below.
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, or Postgres (CLI / file handoff — 0 raw rows in LLM context):** Export query output to `.csv`, `.tsv`, `.json`, or `.jsonl` via `bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, or `psql` and pass the path to `load_file` (or pipe stdout straight into `npx @smallwebco/tinypivot-mcp@latest --open`).
 - **Any MCP Server or API (Stripe, GitHub, BigQuery MCP, Snowflake MCP, REST APIs):** Pipe structured JSON rows (up to `~50` rows already in memory) directly into `load_data` with `chartConfig` / `pivotConfig` in a single call — no temp CSV required (for larger sets, write a file and use `load_file`).
@@ -136,7 +136,7 @@ TinyPivot works with any data your agent can reach. Use whichever workflow match
 
 Each tool appears only when its settings are present.
 
-**No new sign-in if you already use your warehouse's CLI.** TinyPivot reuses the sign-in your tools already keep: gcloud's application default credentials and project, the Snowflake CLI's `connections.toml`, the Databricks CLI's `~/.databrickscfg`. Run `npx @smallwebco/tinypivot-mcp@latest init`: it lists the sign-ins it finds and the `--connect` command that switches them on. Someone with no sign-in yet gets a browser sign-in on their first query (Google, Snowflake SSO, Databricks OAuth).
+**No new sign-in if you already use your warehouse's CLI.** TinyPivot reuses the sign-in your tools already keep: gcloud's application default credentials and project, the Snowflake CLI's `connections.toml`, the Databricks CLI's `~/.databrickscfg`, `clickhouse client`'s config and your MySQL `~/.my.cnf`. Run `npx @smallwebco/tinypivot-mcp@latest init`: it lists the sign-ins it finds and the `--connect` command that switches them on. Someone with no sign-in yet gets a browser sign-in on their first query (Google, Snowflake SSO, Databricks OAuth).
 
 **BigQuery** (`query_bigquery`): set `TINYPIVOT_BIGQUERY_PROJECT`. Credentials come from Google's usual sources: `gcloud auth application-default login`, or `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account key. Google's client library downloads once into `~/.cache/tinypivot` on the first query.
 
@@ -189,6 +189,16 @@ Each tool appears only when its settings are present.
 - Queries carry `log_comment = 'tinypivot'`, a `tinypivot-…` query id and the application name `TinyPivot`, so they are easy to find in `system.query_log`.
 - Results return up to 5,000 rows. The result is streamed and reading stops after that, so a large result is never downloaded whole.
 
+**MySQL and MariaDB** (`query_mysql`, preview: please report problems on GitHub): set `TINYPIVOT_MYSQL_URL` (`mysql://user:password@host:3306/database`), or set `TINYPIVOT_MYSQL_DATABASE` to reuse the sign-in in your MySQL option file (`~/.my.cnf`, or the file in `TINYPIVOT_MYSQL_OPTION_FILE`): TinyPivot reads its `[client]` and `[mysql]` groups (and MariaDB's client groups) on the first query, never copying the password. TLS follows the usual names, as URL parameters or in the option file: `ssl-mode` (`REQUIRED`, `VERIFY_CA`, `VERIFY_IDENTITY`), `ssl-ca`, `ssl-cert`, `ssl-key`, and MariaDB's `ssl` / `ssl-verify-server-cert`. The mysql2 driver downloads once into `~/.cache/tinypivot` on the first query.
+
+- **Use a user with SELECT-only grants.** That is the strongest guard. TinyPivot adds three more:
+  1. A text check, read the way MySQL reads SQL (`#` comments, executable `/*! */` comments, backslash escapes): one `SELECT`, no write words, no `INTO OUTFILE`, `LOAD_FILE()`, locking reads or optimizer hints.
+  2. Running it alone (multiple statements off) inside `START TRANSACTION READ ONLY`, which the server enforces, then rolling back.
+  3. A 60-second statement limit (`MAX_EXECUTION_TIME` on MySQL, `max_statement_time` on MariaDB).
+- `TINYPIVOT_MYSQL_ALLOWED` limits queries to listed `database` or `database.table` entries (comma-separated). Every name in the SQL is checked against the tables the user can see, so a column or alias that shares a blocked table's name is refused too.
+- Connections identify as `program_name=TinyPivot`, so they are easy to spot in the process list.
+- Results return up to 5,000 rows; TinyPivot stops reading at the cap instead of downloading the rest.
+
 **PostgreSQL** (`query_postgres`): set `DATABASE_URL`, and optionally `TINYPIVOT_ALLOWED_TABLES`. Queries are parsed and validated as a single read-only `SELECT`, then run in a read-only transaction with a 15-second timeout.
 
 ## Free vs. Pro
@@ -210,7 +220,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Visual themes | `Code` theme (Dark & Light) | All 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`) |
 | Drill-Through modals | — | Included |
 | Formatted `.xlsx` Excel export | — | Included |
-| Direct Snowflake, BigQuery, Databricks, ClickHouse & PostgreSQL (`query_snowflake`, `query_bigquery`, `query_databricks`, `query_clickhouse`, `query_postgres`) | — | Included |
+| Direct Snowflake, BigQuery, Databricks, ClickHouse, MySQL & PostgreSQL (`query_snowflake`, `query_bigquery`, `query_databricks`, `query_clickhouse`, `query_mysql`, `query_postgres`) | — | Included |
 | Watermark-free UI, HTML & terminal cards | — | Included |
 
 > **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the full Internal + External (MIT KramaBench & Adyen DABstep) benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper) or download the [Official PDF White Paper](https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf).
@@ -232,6 +242,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `query_databricks` | *(Optional Pro)* Runs one read-only Databricks SQL `SELECT` after a text check and an `EXPLAIN` plan check (no write or DDL steps) and opens the result in TinyPivot. Listed when `TINYPIVOT_DATABRICKS_PROFILE` or `TINYPIVOT_DATABRICKS_HOST` is set. |
 | `query_clickhouse` | *(Optional Pro)* Runs one read-only ClickHouse `SELECT` with server-enforced `readonly`, scan and time limits, and opens the result in TinyPivot. Listed when `TINYPIVOT_CLICKHOUSE_URL` is set (or `TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG=1`). |
 | `query_bigquery` | *(Optional Pro)* Runs one read-only GoogleSQL `SELECT` in BigQuery (dry-run checked, scan-capped) and opens the result in TinyPivot. Listed when `TINYPIVOT_BIGQUERY_PROJECT` is set. |
+| `query_mysql` | *(Optional Pro)* Runs one read-only MySQL/MariaDB `SELECT` inside a server-enforced read-only transaction with a statement time limit, and opens the result in TinyPivot. Listed when `TINYPIVOT_MYSQL_URL` or `TINYPIVOT_MYSQL_DATABASE` is set. |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
 | `profile` | Describes each column of a loaded dataset (null share, ranges, top values, Pro relational grain), or pass `dirPath` to scan an entire local folder of CSV/JSON/Parquet/XLSX schemas (collapsing partitioned file series like `data-2021..2024.csv` with a DuckDB glob hint and surfacing multi-sheet `.xlsx` headers & preamble notes) + nearby docs (and Pro cross-file shared join keys) in 1 call. |
@@ -249,6 +260,7 @@ Data tools take an optional `why`: one sentence the agent writes about each step
 - `TINYPIVOT_SNOWFLAKE_ACCOUNT`, `TINYPIVOT_SNOWFLAKE_USER` — Optional Snowflake account for direct read-only `query_snowflake` (Pro); sign-in, session and limit settings are under [Direct connections](#direct-connections-pro)
 - `TINYPIVOT_DATABRICKS_PROFILE` or `TINYPIVOT_DATABRICKS_HOST` — Optional Databricks workspace for direct read-only `query_databricks` (Pro); see [Direct connections](#direct-connections-pro)
 - `TINYPIVOT_CLICKHOUSE_URL` — Optional ClickHouse endpoint for direct read-only `query_clickhouse` (Pro); see [Direct connections](#direct-connections-pro)
+- `TINYPIVOT_MYSQL_URL` or `TINYPIVOT_MYSQL_DATABASE` — Optional MySQL/MariaDB for direct read-only `query_mysql` (Pro); sign-in, TLS and allowlist settings are under [Direct connections](#direct-connections-pro)
 - `TINYPIVOT_BIGQUERY_PROJECT` — Optional Google Cloud project for direct read-only `query_bigquery` (Pro); `TINYPIVOT_BIGQUERY_MAX_GB`, `TINYPIVOT_BIGQUERY_ALLOWED` and `TINYPIVOT_BIGQUERY_LOCATION` tune it (see [Direct connections](#direct-connections-pro))
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
 - `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; when it is taken, the Studio uses a free port and the tool replies link to it)

@@ -63,6 +63,7 @@ export {
 } from './license.js'
 export { buildStepLineage, extractSqlLineage, type LineageNode, type SqlLineageInfo, type StepLineage } from './lineage.js'
 export { computeSchemaKey, DataMemoryStore, defaultMemoryPath, type LearnedLesson, normalizeTableHint, type SchemaMemoryEntry } from './memory.js'
+export { mysqlConfigFromEnv, mysqlConnector } from './mysql.js'
 export { buildPiExtensionSource } from './pi-extension.js'
 export {
   executeReadOnlyPostgresQuery,
