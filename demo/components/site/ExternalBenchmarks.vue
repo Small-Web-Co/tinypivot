@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import {
   dabstepLeaderboardBars,
   dabstepSampleTasks,
@@ -6,23 +7,36 @@ import {
   kramaLeaderboardBars,
   kramaSampleTasks,
 } from '../../site/whitepaper'
+
+type DabMetric = 'hard' | 'easy'
+const dabMetric = ref<DabMetric>('hard')
+
+const dabColumns = computed(() => {
+  const list = dabstepLeaderboardBars.map(item => ({
+    ...item,
+    activeScore: dabMetric.value === 'hard' ? item.score : (item.easyScore ?? item.score),
+  }))
+  return dabMetric.value === 'hard'
+    ? list
+    : [...list].sort((a, b) => b.activeScore - a.activeScore)
+})
 </script>
 
 <template>
   <div class="ext-stack">
     <!-- External Benchmark 1: MIT KramaBench (ICLR 2026) -->
-    <figure class="ext-panel" aria-label="External Benchmark 1: MIT KramaBench (ICLR 2026) Leaderboard Comparison">
+    <figure class="ext-panel" aria-label="External Benchmark 1: MIT KramaBench (ICLR 2026) Side-by-Side Column Chart">
       <div class="ext-head">
         <div>
           <span class="ext-badge mono">EXTERNAL PUBLIC BENCHMARK 01 · CONTROLLED SAME-MODEL A/B</span>
           <h3>
-            <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a> — Multi-File Data Lakes
+            <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a> — Direct Comparison vs. Published Leaders
           </h3>
           <p class="ext-sub">
             62 real-world tasks across 4 multi-file data lakes (Environment, Wildfire, Archaeology, Biomedical · <code>.csv</code>, <code>.xlsx</code>, <code>.json</code>, <code>.gpkg</code>),
             scored verbatim with MIT’s deterministic metrics (<a href="https://github.com/mitdbg/Kramabench" target="_blank" rel="noopener"><code>mitdbg/Kramabench</code></a> ·
             <a href="https://openreview.net/forum?id=fZfUdeCC5X" target="_blank" rel="noopener">ICLR 2026 Paper</a>).
-            Bars compare 4-domain weighted scores across our controlled A/B runs and published public leaders on <code>kramabench.org</code>.
+            Side-by-side columns compare 4-domain weighted scores across our controlled A/B runs and the published leaders on <code>kramabench.org</code>.
           </p>
         </div>
       </div>
@@ -31,29 +45,54 @@ import {
         <span><i class="sw sw-tp" /> TinyPivot Pro (v0.8.5)</span>
         <span><i class="sw sw-base" /> Same-Model Vanilla Baseline</span>
         <span><i class="sw sw-leader" /> Published Leaderboard Leaders</span>
+        <span><i class="sw-dash" /> Dashed line: Published #1 RADAR (71.2%)</span>
       </div>
 
-      <div class="lb-bars">
-        <div
-          v-for="item in kramaLeaderboardBars"
-          :key="item.id"
-          class="lb-row"
-          :class="`lb-row-${item.kind}`"
-        >
-          <div class="lb-meta">
-            <div class="lb-title-line">
-              <strong>{{ item.label }}</strong>
-              <span class="lb-model mono">{{ item.model }}</span>
+      <div class="col-scroll">
+        <div class="col-stage">
+          <div class="col-plot-wrap">
+            <div class="grid-line" style="bottom: 100%">
+              <span class="mono">100%</span>
             </div>
-            <span class="lb-note">{{ item.note }}</span>
+            <div class="grid-line" style="bottom: 50%">
+              <span class="mono">50%</span>
+            </div>
+            <div class="ref-line" style="bottom: 71.2%">
+              <span class="ref-axis mono">71.2%</span>
+            </div>
+            <div class="col-bars-row col-grid-7">
+              <div
+                v-for="item in kramaLeaderboardBars"
+                :key="item.id"
+                class="vcol-bar-cell"
+                :class="`vcol-${item.kind}`"
+              >
+                <div class="vcol-head" :style="{ bottom: `calc(${item.score}% + 4px)` }">
+                  <span
+                    v-if="item.badge"
+                    class="vcol-badge mono"
+                    :class="`badge-${item.kind}`"
+                  >{{ item.badge }}</span>
+                  <span class="vcol-val mono" :class="{ 'val-tp': item.kind === 'tinypivot' }">{{ item.score.toFixed(1) }}%</span>
+                </div>
+                <div
+                  class="vcol-bar"
+                  :class="`fill-${item.kind}`"
+                  :style="{ height: `${item.score}%` }"
+                  :title="`${item.label} (${item.model}): ${item.score.toFixed(1)}% — ${item.note}`"
+                />
+              </div>
+            </div>
           </div>
-          <div class="lb-bar-col">
-            <div class="lb-track">
-              <div class="lb-fill" :class="`fill-${item.kind}`" :style="{ width: `${item.score}%` }" />
-            </div>
-            <div class="lb-val-line mono">
-              <strong :class="{ 'val-tp': item.kind === 'tinypivot' }">{{ item.score.toFixed(1) }}%</strong>
-              <span v-if="item.secondary" class="lb-sec">{{ item.secondary }}</span>
+          <div class="col-labels-row col-grid-7">
+            <div
+              v-for="item in kramaLeaderboardBars"
+              :key="`${item.id}-lbl`"
+              class="vcol-foot"
+              :class="`vcol-${item.kind}`"
+            >
+              <strong class="vcol-name">{{ item.shortLabel }}</strong>
+              <span class="vcol-mod mono">{{ item.shortModel }}</span>
             </div>
           </div>
         </div>
@@ -94,55 +133,111 @@ import {
     </figure>
 
     <!-- External Benchmark 2: Adyen / Hugging Face DABstep (450 Blind Tasks) -->
-    <figure class="ext-panel" aria-label="External Benchmark 2: Official 450-Task Adyen DABstep Leaderboard">
-      <div class="ext-head">
+    <figure class="ext-panel" aria-label="External Benchmark 2: Official 450-Task Adyen DABstep Side-by-Side Column Chart">
+      <div class="ext-head ext-head-split">
         <div>
           <span class="ext-badge mono">EXTERNAL PUBLIC BENCHMARK 02 · OFFICIAL 450-TASK BLIND LEADERBOARD</span>
           <h3>
-            <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener">Adyen / Hugging Face <code>adyen/DABstep</code></a> — Financial Multi-Step Reasoning
+            <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener">Adyen / Hugging Face <code>adyen/DABstep</code></a> — Side-by-Side vs. Validated Top 5
           </h3>
           <p class="ext-sub">
             450 blind questions (72 Easy, 378 Hard) over a 22 MB payments ledger (<code>payments.csv</code>, 138k rows) + 1,000 nested JSON fee rules,
             scored blindly by Adyen and published in <code>adyen/DABstep</code> <code>data/task_scores/</code>.
-            Bars rank by <strong>Hard-Level Accuracy (%)</strong> — the leaderboard’s primary metric.
+            Toggle between <strong>Hard Accuracy</strong> (primary ranking) and <strong>Easy Accuracy</strong>.
           </p>
+        </div>
+        <div class="ext-tabs" role="tablist" aria-label="DABstep accuracy split">
+          <button
+            type="button"
+            role="tab"
+            class="ext-tab mono"
+            :aria-selected="dabMetric === 'hard'"
+            @click="dabMetric = 'hard'"
+          >
+            Hard (Primary)
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="ext-tab mono"
+            :aria-selected="dabMetric === 'easy'"
+            @click="dabMetric = 'easy'"
+          >
+            Easy (72 Tasks)
+          </button>
         </div>
       </div>
 
       <div class="ext-legend mono">
         <span><i class="sw sw-tp" /> TinyPivot Pro (Live Adyen Submissions)</span>
-        <span><i class="sw sw-leader" /> Validated Leaderboard Top Leaders</span>
+        <span><i class="sw sw-leader" /> Validated Leaderboard Top 5</span>
         <span><i class="sw sw-base" /> Official Adyen Reference Baseline</span>
+        <span>
+          <i class="sw-dash" />
+          {{ dabMetric === 'hard' ? 'Dashed line: Adyen ReACT Baseline (19.8%)' : 'Dashed line: Adyen ReACT Baseline (81.9%)' }}
+        </span>
       </div>
 
-      <div class="lb-bars">
-        <div
-          v-for="item in dabstepLeaderboardBars"
-          :key="item.id"
-          class="lb-row"
-          :class="`lb-row-${item.kind}`"
-        >
-          <div class="lb-meta">
-            <div class="lb-title-line">
-              <strong>{{ item.label }}</strong>
-              <span class="lb-model mono">{{ item.model }}</span>
+      <div class="col-scroll">
+        <div class="col-stage">
+          <div class="col-plot-wrap">
+            <div class="grid-line" style="bottom: 100%">
+              <span class="mono">100%</span>
             </div>
-            <span class="lb-note">{{ item.note }}</span>
+            <div class="grid-line" style="bottom: 50%">
+              <span class="mono">50%</span>
+            </div>
+            <div
+              class="ref-line"
+              :style="{ bottom: dabMetric === 'hard' ? '19.8%' : '81.9%' }"
+            >
+              <span class="ref-axis mono">
+                {{ dabMetric === 'hard' ? '19.8%' : '81.9%' }}
+              </span>
+            </div>
+            <div class="col-bars-row col-grid-9">
+              <div
+                v-for="item in dabColumns"
+                :key="item.id"
+                class="vcol-bar-cell"
+                :class="`vcol-${item.kind}`"
+              >
+                <div class="vcol-head" :style="{ bottom: `calc(${item.activeScore}% + 4px)` }">
+                  <span
+                    v-if="item.badge"
+                    class="vcol-badge mono"
+                    :class="`badge-${item.kind}`"
+                  >{{ dabMetric === 'easy' && item.id === 'dab-sonnet-tp' ? '#1 Easy!' : item.badge }}</span>
+                  <span class="vcol-val mono" :class="{ 'val-tp': item.kind === 'tinypivot' }">{{ item.activeScore.toFixed(1) }}%</span>
+                </div>
+                <div
+                  class="vcol-bar"
+                  :class="`fill-${item.kind}`"
+                  :style="{ height: `${item.activeScore}%` }"
+                  :title="`${item.label} (${item.model}): ${item.secondary}`"
+                />
+              </div>
+            </div>
           </div>
-          <div class="lb-bar-col">
-            <div class="lb-track">
-              <div class="lb-fill" :class="`fill-${item.kind}`" :style="{ width: `${item.score}%` }" />
-            </div>
-            <div class="lb-val-line mono">
-              <strong :class="{ 'val-tp': item.kind === 'tinypivot' }">{{ item.score.toFixed(1) }}% Hard</strong>
-              <span v-if="item.secondary" class="lb-sec">{{ item.secondary }}</span>
+          <div class="col-labels-row col-grid-9">
+            <div
+              v-for="item in dabColumns"
+              :key="`${item.id}-lbl`"
+              class="vcol-foot"
+              :class="`vcol-${item.kind}`"
+            >
+              <strong class="vcol-name">{{ item.shortLabel }}</strong>
+              <span class="vcol-mod mono">{{ item.shortModel }}</span>
+              <span class="vcol-sub mono">
+                {{ dabMetric === 'hard' ? `Easy ${item.easyScore?.toFixed(1)}%` : `Hard ${item.score.toFixed(1)}%` }}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       <p class="ext-disclosure mono">
-        <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy / 68.8% Hard score reflects strong base-model reasoning alongside TinyPivot’s DuckDB workflow (our controlled 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and <strong>+10 pts on Haiku 5.5</strong>, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and MIT KramaBench A/B (77.3% → 80.9%, Haiku +6.1 pts) isolate TinyPivot’s direct lift.
+        <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy (#1) / 68.8% Hard (#3-equiv, ahead of GPT-5 57.7% &amp; Google DS-STAR 45.2%) reflects strong base-model reasoning paired with TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and <strong>+10 pts on Haiku 5.5</strong>, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and MIT KramaBench A/B (77.3% → 80.9%, Haiku +6.1 pts) isolate TinyPivot’s direct lift.
       </p>
 
       <details class="sample-drawer">
@@ -188,6 +283,14 @@ import {
   border-bottom: var(--line);
 }
 
+.ext-head-split {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px 18px;
+}
+
 .ext-badge {
   display: inline-block;
   padding: 2px 7px;
@@ -214,6 +317,7 @@ import {
 
 .ext-sub {
   margin: 0;
+  max-width: 72ch;
   font-size: 0.88rem;
   line-height: 1.5;
   color: var(--ink-muted);
@@ -227,6 +331,30 @@ import {
   background: var(--ledger);
   font-family: var(--font-mono);
   font-size: 0.84em;
+}
+
+.ext-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border: var(--line);
+  background: var(--paper-sunk, var(--ledger));
+}
+
+.ext-tab {
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.ext-tab[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .ext-legend {
@@ -268,79 +396,171 @@ import {
   background: #33312d;
 }
 
-.lb-bars {
+.sw-dash {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed #c44a1d;
+}
+
+/* Side-by-side vertical column chart */
+.col-scroll {
+  overflow-x: auto;
+  padding: 18px 18px 16px 46px;
+  background: var(--paper);
+}
+
+.col-stage {
+  min-width: 660px;
+}
+
+.col-plot-wrap {
+  position: relative;
+  height: 190px;
+  margin-top: 44px;
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed rgba(0, 0, 0, 0.14);
+  pointer-events: none;
+}
+
+.grid-line span {
+  position: absolute;
+  left: -34px;
+  top: -7px;
+  font-size: 0.58rem;
+  color: var(--ink-muted);
+}
+
+.ref-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1.5px dashed #c44a1d;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ref-axis {
+  position: absolute;
+  left: -40px;
+  top: -7px;
+  color: #b03d14;
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.col-bars-row,
+.col-labels-row {
+  position: relative;
+  z-index: 3;
   display: grid;
+  gap: 8px;
 }
 
-.lb-row {
-  display: grid;
-  gap: 8px 16px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--rule);
-  align-items: center;
+.col-bars-row {
+  height: 100%;
+  align-items: end;
 }
 
-.lb-row-tinypivot {
-  background: rgba(29, 122, 79, 0.07);
+.col-grid-7 {
+  grid-template-columns: repeat(7, minmax(80px, 1fr));
 }
 
-.lb-title-line {
+.col-grid-9 {
+  grid-template-columns: repeat(9, minmax(66px, 1fr));
+}
+
+.vcol-bar-cell {
+  position: relative;
+  height: 100%;
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
+  align-items: flex-end;
+  justify-content: center;
 }
 
-.lb-title-line strong {
-  font-size: 0.86rem;
+.vcol-tinypivot {
+  background: rgba(29, 122, 79, 0.06);
+}
+
+.vcol-head {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.vcol-badge {
+  padding: 1px 4px;
+  font-size: 0.54rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid var(--rule);
+  background: var(--ledger);
+  color: var(--ink-muted);
+}
+
+.badge-tinypivot {
+  border-color: #1d7a4f;
+  background: #e2f2e9;
+  color: #145a39;
+}
+
+.vcol-val {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.vcol-bar {
+  width: 68%;
+  max-width: 54px;
+  min-height: 4px;
+  border: 1px solid var(--ink);
+  border-bottom: 0;
+  transition: height 0.25s ease;
+}
+
+.vcol-foot {
+  padding: 8px 3px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.vcol-name {
+  font-size: 0.72rem;
+  line-height: 1.15;
   color: var(--ink);
 }
 
-.lb-model {
-  font-size: 0.7rem;
+.vcol-mod {
+  font-size: 0.6rem;
+  line-height: 1.15;
   color: var(--ink-muted);
 }
 
-.lb-note {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: var(--ink-muted);
-}
-
-.lb-bar-col {
-  display: grid;
-  gap: 5px;
-}
-
-.lb-track {
-  height: 14px;
-  background: rgba(0, 0, 0, 0.06);
-  border: 1px solid var(--rule);
-}
-
-.lb-fill {
-  height: 100%;
-  border-right: 1px solid var(--ink);
-}
-
-.lb-val-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  font-size: 0.72rem;
+.vcol-sub {
+  font-size: 0.56rem;
+  color: #145a39;
 }
 
 .val-tp {
   color: #145a39;
   font-weight: 700;
-}
-
-.lb-sec {
-  font-size: 0.66rem;
-  color: var(--ink-muted);
 }
 
 .ext-cards {
@@ -471,10 +691,6 @@ import {
 }
 
 @media (min-width: 780px) {
-  .lb-row {
-    grid-template-columns: minmax(260px, 1.05fr) minmax(280px, 1.25fr);
-  }
-
   .ext-cards {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

@@ -306,8 +306,12 @@ export const categoryBenchRows: readonly CategoryBenchRow[] = [
 export interface LeaderboardBarItem {
   id: string
   label: string
+  shortLabel: string
   model: string
+  shortModel: string
+  badge?: string
   score: number
+  easyScore?: number
   secondary?: string
   kind: 'tinypivot' | 'baseline' | 'leader'
   note: string
@@ -322,7 +326,10 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'kb-sonnet-tp',
     label: 'TinyPivot Pro (v0.8.5)',
+    shortLabel: 'TinyPivot Pro',
     model: 'Claude Sonnet 5.5',
+    shortModel: 'Sonnet 5.5',
+    badge: '+1.1 vs Van.',
     score: 83.8,
     secondary: 'Env 95.0% · Bio 100% (16% faster)',
     kind: 'tinypivot',
@@ -331,7 +338,10 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'kb-sonnet-van',
     label: 'Vanilla Claude Code (Same Model)',
+    shortLabel: 'Vanilla Base',
     model: 'Claude Sonnet 5.5',
+    shortModel: 'Sonnet 5.5',
+    badge: 'Same Model',
     score: 82.6,
     secondary: 'Env 90.0% · Bio 100% (31.3s)',
     kind: 'baseline',
@@ -340,7 +350,10 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'kb-haiku-tp',
     label: 'TinyPivot Pro (v0.8.5)',
+    shortLabel: 'TinyPivot Pro',
     model: 'Claude Haiku 5.5',
+    shortModel: 'Haiku 5.5',
+    badge: '+6.1 vs Van.',
     score: 78.0,
     secondary: 'Bio 88.9% (+22.2 · 2.14× faster) · 10% faster overall',
     kind: 'tinypivot',
@@ -349,7 +362,10 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'kb-haiku-van',
     label: 'Vanilla Claude Code (Same Model)',
+    shortLabel: 'Vanilla Base',
     model: 'Claude Haiku 5.5',
+    shortModel: 'Haiku 5.5',
+    badge: 'Same Model',
     score: 71.9,
     secondary: 'Bio 66.7% (67.7s) · Env 78.0%',
     kind: 'baseline',
@@ -358,7 +374,10 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'kb-radar',
     label: 'Published #1 · RADAR (arXiv:2609.32528)',
+    shortLabel: 'RADAR',
     model: 'DeepSeek-V4-Flash',
+    shortModel: 'DeepSeek-V4',
+    badge: 'Pub #1',
     score: 71.2,
     secondary: '6-domain overall: 73.7% · Env 83.3% · Bio 66.7%',
     kind: 'leader',
@@ -367,7 +386,10 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'kb-smolagents',
     label: 'Published #3 Public / #1 Obscured · smolagents DR',
+    shortLabel: 'smolagents DR',
     model: 'Claude-3-7',
+    shortModel: 'Claude-3-7',
+    badge: '#1 Obsc.',
     score: 54.2,
     secondary: '6-domain overall: 55.8% · Env 60.6% · Bio 38.9%',
     kind: 'leader',
@@ -376,7 +398,10 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'kb-talktask',
     label: 'Published #2 · TalkTask',
+    shortLabel: 'TalkTask',
     model: 'DeepSeek-V4.1-Flash',
+    shortModel: 'DeepSeek-V4.1',
+    badge: 'Pub #2',
     score: 53.2,
     secondary: '6-domain overall: 56.7% (45.0% obscured)',
     kind: 'leader',
@@ -424,8 +449,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-kgmon',
     label: 'Validated #1 · NVIDIA KGMON Data Explorer',
+    shortLabel: 'KGMON',
     model: 'Claude Haiku 4.5 (multi-agent)',
+    shortModel: 'NVIDIA · #1',
+    badge: 'Val #1',
     score: 90.0,
+    easyScore: 87.5,
     secondary: 'Easy: 87.5% · Hard: 90.0%',
     kind: 'leader',
     note: 'Specialized multi-agent + domain workflow',
@@ -433,8 +462,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-datapilot',
     label: 'Validated #2 · DataPilot (OceanBase)',
+    shortLabel: 'DataPilot',
     model: 'Qwen3',
+    shortModel: 'Qwen3 · #2',
+    badge: 'Val #2',
     score: 87.6,
+    easyScore: 86.1,
     secondary: 'Easy: 86.1% · Hard: 87.6%',
     kind: 'leader',
     note: 'Validated #2 on adyen/DABstep',
@@ -442,8 +475,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-sonnet-tp',
     label: 'TinyPivot Pro (Live Adyen Score)',
+    shortLabel: 'TinyPivot Pro',
     model: 'Claude Sonnet 5.5',
+    shortModel: 'Sonnet 5.5',
+    badge: '#3-eq · #1 Easy',
     score: 68.8,
+    easyScore: 97.2,
     secondary: 'Easy: 97.2% (#1!) · Hard: 68.8% (#3-equiv) · Total: 73.3%',
     kind: 'tinypivot',
     note: 'General-purpose MCP, zero domain hacks — ahead of GPT-5 (57.7%) & Google DS-STAR (45.2%)',
@@ -451,8 +488,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-gg',
     label: 'Validated #3 · gg-agent-gpt5-1104-1',
+    shortLabel: 'gg-agent',
     model: 'Doubao',
+    shortModel: 'Doubao · #3',
+    badge: 'Val #3',
     score: 63.0,
+    easyScore: 88.9,
     secondary: 'Easy: 88.9% · Hard: 63.0%',
     kind: 'leader',
     note: 'Validated #3 on adyen/DABstep',
@@ -460,8 +501,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-cambio',
     label: 'Validated #4 · CambioML energent.ai DS Agent',
+    shortLabel: 'CambioML',
     model: 'GPT-5',
+    shortModel: 'GPT-5 · #4',
+    badge: 'Val #4',
     score: 57.7,
+    easyScore: 94.4,
     secondary: 'Easy: 94.4% · Hard: 57.7%',
     kind: 'leader',
     note: 'Validated #4 on adyen/DABstep',
@@ -469,8 +514,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-dsstar',
     label: 'Validated #5 · Google Cloud DS-STAR',
+    shortLabel: 'DS-STAR',
     model: 'Gemini-2.5-Pro',
+    shortModel: 'Google · #5',
+    badge: 'Val #5',
     score: 45.2,
+    easyScore: 87.5,
     secondary: 'Easy: 87.5% · Hard: 45.2%',
     kind: 'leader',
     note: 'Google Research data-science agent',
@@ -478,8 +527,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-haiku-tp',
     label: 'TinyPivot Pro (Live Adyen Score)',
+    shortLabel: 'TinyPivot Pro',
     model: 'Claude Haiku 5.5',
+    shortModel: 'Haiku 5.5',
+    badge: '~2× ReACT',
     score: 38.6,
+    easyScore: 88.9,
     secondary: 'Easy: 88.9% · Hard: 38.6% · Total: 46.7%',
     kind: 'tinypivot',
     note: '~2× Claude 4 Sonnet ReACT; Dev A/B showed +10 pts same-model lift (60% → 70%)',
@@ -487,8 +540,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-deepseek-tp',
     label: 'TinyPivot Pro (Live Adyen Score · Local)',
+    shortLabel: 'TinyPivot Pro',
     model: 'DeepSeek V4.1 (DGX Spark)',
+    shortModel: 'DeepSeek Local',
+    badge: '$0 Local',
     score: 24.3,
+    easyScore: 90.3,
     secondary: 'Easy: 90.3% · Hard: 24.3% · Total: 34.9% ($0 cloud)',
     kind: 'tinypivot',
     note: '100% local open-weights — beats Claude 4 ReACT Hard & exceeds KGMON/DataPilot Easy %',
@@ -496,8 +553,12 @@ export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
     id: 'dab-react',
     label: 'Official Baseline · Claude 4 Sonnet ReACT',
+    shortLabel: 'Adyen ReACT',
     model: 'Claude 4 Sonnet',
+    shortModel: 'Claude 4 Base',
+    badge: 'Baseline',
     score: 19.8,
+    easyScore: 81.9,
     secondary: 'Easy: 81.9% · Hard: 19.8%',
     kind: 'baseline',
     note: 'Adyen reference ReACT baseline',

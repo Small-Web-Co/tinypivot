@@ -29,23 +29,49 @@ const wp = await import(`file://${tmpModPath}?t=${Date.now()}`)
 
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-function renderBars(items, suffix = '%') {
-  return items.map((item) => {
-    const color = item.kind === 'tinypivot' ? '#1d7a4f' : item.kind === 'baseline' ? '#9e9788' : '#2e2c28'
-    const bg = item.kind === 'tinypivot' ? 'background:#edf6f0;' : ''
-    const valColor = item.kind === 'tinypivot' ? 'color:#145a39;font-weight:700;' : 'color:#222;font-weight:600;'
-    return `
-      <div class="lb-row" style="${bg}">
-        <div class="lb-left">
-          <div class="lb-name">${esc(item.label)} <span class="lb-mod">${esc(item.model)}</span></div>
-          <div class="lb-note">${esc(item.note)}</div>
+function renderColumnChart(items, refLine) {
+  const cols = items.length
+  return `
+    <div class="col-wrap">
+      <div class="col-legend mono">
+        <span><i class="sw" style="background:#1d7a4f;"></i> TinyPivot Pro</span>
+        <span><i class="sw" style="background:#b9b3a4;"></i> Same-Model / Reference Baseline</span>
+        <span><i class="sw" style="background:#33312d;"></i> Published Leaders</span>
+        ${refLine ? `<span><i class="sw-dash"></i> ${esc(refLine.label)}</span>` : ''}
+      </div>
+      <div class="col-plot-wrap">
+        <div class="grid-line" style="bottom:100%;"><span class="y-tick mono">100%</span></div>
+        <div class="grid-line" style="bottom:50%;"><span class="y-tick mono">50%</span></div>
+        ${refLine ? `<div class="ref-line" style="bottom:${refLine.pct}%;"><span class="ref-axis mono">${refLine.pct.toFixed(1)}%</span></div>` : ''}
+        <div class="col-bars-row" style="grid-template-columns:repeat(${cols}, 1fr);">
+          ${items.map((item) => {
+            const color = item.kind === 'tinypivot' ? '#1d7a4f' : item.kind === 'baseline' ? '#b9b3a4' : '#33312d'
+            const bg = item.kind === 'tinypivot' ? 'background:#edf6f0;' : ''
+            const valStyle = item.kind === 'tinypivot' ? 'color:#145a39;font-weight:700;' : 'color:#222;font-weight:600;'
+            const badgeStyle = item.kind === 'tinypivot' ? 'border-color:#1d7a4f;background:#dff0e6;color:#145a39;' : ''
+            return `
+              <div class="vcol-bar-cell" style="${bg}">
+                <div class="vcol-head" style="bottom:calc(${item.score}% + 3px);">
+                  ${item.badge ? `<span class="vcol-badge mono" style="${badgeStyle}">${esc(item.badge)}</span>` : ''}
+                  <span class="vcol-val mono" style="${valStyle}">${item.score.toFixed(1)}%</span>
+                </div>
+                <div class="vcol-bar" style="height:${item.score}%;background:${color};"></div>
+              </div>`
+          }).join('')}
         </div>
-        <div class="lb-right">
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, item.score)}%;background:${color};"></div></div>
-          <div class="lb-val"><span style="${valColor}">${item.score.toFixed(1)}${suffix}</span>${item.secondary ? ` <span class="lb-sec">· ${esc(item.secondary)}</span>` : ''}</div>
-        </div>
-      </div>`
-  }).join('')
+      </div>
+      <div class="col-labels-row" style="grid-template-columns:repeat(${cols}, 1fr);">
+        ${items.map((item) => {
+          const bg = item.kind === 'tinypivot' ? 'background:#edf6f0;' : ''
+          return `
+            <div class="vcol-foot" style="${bg}">
+              <div class="vcol-name">${esc(item.shortLabel || item.label)}</div>
+              <div class="vcol-mod mono">${esc(item.shortModel || item.model)}</div>
+              ${item.easyScore != null ? `<div class="vcol-sub mono">Easy ${item.easyScore.toFixed(1)}%</div>` : ''}
+            </div>`
+        }).join('')}
+      </div>
+    </div>`
 }
 
 const html = `<!doctype html>
@@ -206,22 +232,27 @@ const html = `<!doctype html>
     font-size: 8pt;
     font-weight: 700;
   }
-  .lb-row {
-    display: grid;
-    grid-template-columns: 1.05fr 1.15fr;
-    gap: 10px;
-    padding: 6px 10px;
-    border-bottom: 1px solid #e2ddd0;
-    align-items: center;
-  }
-  .lb-row:last-child { border-bottom: 0; }
-  .lb-name { font-size: 8pt; font-weight: 700; color: #161513; }
-  .lb-mod { font-family: ui-monospace, Menlo, monospace; font-size: 6.8pt; font-weight: 400; color: #5b554a; }
-  .lb-note { font-size: 6.9pt; color: #5b554a; margin-top: 1px; }
-  .bar-track { height: 9px; background: #ece8de; border: 1px solid #cbc5b7; }
-  .bar-fill { height: 100%; }
-  .lb-val { font-family: ui-monospace, Menlo, monospace; font-size: 7pt; margin-top: 2px; }
-  .lb-sec { color: #5b554a; }
+  .col-wrap { padding: 8px 10px 10px 34px; }
+  .col-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 6.5pt; color: #5b554a; margin: 0 0 6px -24px; }
+  .col-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .sw { display: inline-block; width: 8px; height: 8px; border: 1px solid #161513; }
+  .sw-dash { display: inline-block; width: 12px; height: 0; border-top: 1.5px dashed #c44a1d; }
+  .col-plot-wrap { position: relative; height: 148px; margin-top: 32px; border-bottom: 1.2px solid #161513; }
+  .grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(0,0,0,0.14); }
+  .y-tick { position: absolute; left: -28px; top: -5px; font-size: 5.5pt; color: #7a7366; }
+  .ref-line { position: absolute; left: 0; right: 0; border-top: 1.2px dashed #c44a1d; z-index: 2; }
+  .ref-axis { position: absolute; left: -30px; top: -5px; color: #b03d14; font-size: 5.5pt; font-weight: 700; }
+  .col-bars-row, .col-labels-row { position: relative; z-index: 3; display: grid; gap: 5px; }
+  .col-bars-row { height: 100%; align-items: end; }
+  .vcol-bar-cell { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .vcol-head { position: absolute; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; z-index: 4; }
+  .vcol-badge { font-size: 5.2pt; font-weight: 700; padding: 0 3px; border: 1px solid #c9c3b6; background: #f5f2ea; color: #5b554a; white-space: nowrap; }
+  .vcol-val { font-size: 6.7pt; white-space: nowrap; }
+  .vcol-bar { width: 64%; max-width: 40px; min-height: 3px; border: 1px solid #161513; border-bottom: 0; }
+  .vcol-foot { padding: 5px 2px 3px; text-align: center; }
+  .vcol-name { font-size: 6.7pt; font-weight: 700; line-height: 1.15; color: #161513; }
+  .vcol-mod { font-size: 5.5pt; line-height: 1.15; color: #5b554a; margin-top: 1px; }
+  .vcol-sub { font-size: 5.3pt; color: #145a39; margin-top: 1px; }
   .pillars {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -350,12 +381,12 @@ const html = `<!doctype html>
 
   <div class="lb-box">
     <div class="lb-head mono">EXTERNAL 01 · MIT KRAMABENCH (ICLR 2026) — 4 MULTI-FILE DATA LAKES (62 TASKS) · https://kramabench.org/</div>
-    ${renderBars(wp.kramaLeaderboardBars, '%')}
+    ${renderColumnChart(wp.kramaLeaderboardBars, { pct: 71.2, label: 'Published #1 RADAR · 71.2%' })}
   </div>
 
   <div class="lb-box">
     <div class="lb-head mono">EXTERNAL 02 · OFFICIAL 450-TASK BLIND ADYEN DABSTEP LEADERBOARD (HARD ACCURACY %) · huggingface.co/spaces/adyen/DABstep</div>
-    ${renderBars(wp.dabstepLeaderboardBars, '% Hard')}
+    ${renderColumnChart(wp.dabstepLeaderboardBars, { pct: 19.8, label: 'Adyen ReACT Baseline · 19.8%' })}
   </div>
   <p class="footnote">
     <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy / 68.8% Hard score is strongly driven by base-model reasoning paired with TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and +10 pts on Haiku, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and MIT KramaBench A/B (77.3% → 80.9%, Haiku +6.1 pts) isolate TinyPivot’s direct lift.
