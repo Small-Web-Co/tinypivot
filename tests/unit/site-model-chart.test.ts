@@ -12,15 +12,16 @@ describe('home model comparison chart', () => {
   })
 
   it('scales bars to the largest value in each column', () => {
-    expect(row('inkling').cells.time.alone?.pct).toBe(100)
-    expect(row('opus').cells.cost.alone?.pct).toBe(100)
-    expect(row('haiku').cells.cost.pro?.pct).toBeLessThan(5)
+    expect(row('inkling').cells.time.alone.pct).toBe(100)
+    expect(row('opus').cells.cost.alone.pct).toBe(100)
+    expect(row('haiku').cells.cost.pro.pct).toBeLessThan(5)
   })
 
-  it('reports local models as free to run instead of imputed API prices', () => {
-    const cost = row('deepseek').cells.cost
-    expect(cost.alone).toBeNull()
-    expect(cost.note).toContain('$0')
+  it('prices local models at API rates and marks them as imputed', () => {
+    expect(row('deepseek').cells.cost).toMatchObject({ change: '6% less', better: true })
+    expect(row('deepseek').cells.cost.pro.text).toBe('5.5¢†')
+    expect(row('inkling').cells.cost).toMatchObject({ change: '70% more', better: false })
+    expect(row('haiku').cells.cost.pro.text).toBe('8.3¢')
   })
 
   it('labels slowdowns and cost increases honestly', () => {
@@ -31,7 +32,8 @@ describe('home model comparison chart', () => {
 
   it('never overstates the highlights', () => {
     expect(percentChange(46.1, 26.0)).toBe(-43)
-    expect(formatCost(0.083)).toBe('8¢')
+    expect(formatCost(0.083)).toBe('8.3¢')
+    expect(formatCost(0.45)).toBe('45¢')
     expect(formatCost(2.32)).toBe('$2.32')
     expect(modelChartHighlights().map(h => h.value)).toEqual(['78% → 100%', '43% less time', 'under 4% of the cost'])
   })

@@ -14,17 +14,14 @@ export interface MetricBar {
 }
 
 export interface MetricCell {
-  /** Null when the measure does not apply, such as cloud cost for a model run locally. */
-  alone: MetricBar | null
-  pro: MetricBar | null
+  alone: MetricBar
+  pro: MetricBar
   /** Short change label, e.g. "+22 pts" or "39% less". Empty when nothing changed. */
   change: string
   /** Whether the change is an improvement; null when there is no change or no bars. */
   better: boolean | null
   /** Whether the number went up; null when there is no change. */
   rose: boolean | null
-  /** Shown in place of bars when `alone`/`pro` are null. */
-  note?: string
 }
 
 export interface ModelChartRow {
@@ -47,10 +44,16 @@ export function percentChange(before: number, after: number): number {
   return Math.trunc(((after - before) / before) * 100)
 }
 
-/** "$2.32", or "8¢" under a dollar. */
+/** "$2.32", "45¢", or "8.3¢" under a dime, so small local-model costs keep their difference. */
 export function formatCost(usd: number): string {
-  return usd < 1 ? `${Math.round(usd * 100)}¢` : `$${usd.toFixed(2)}`
+  if (usd >= 1)
+    return `$${usd.toFixed(2)}`
+  const cents = usd * 100
+  return cents < 10 ? `${cents.toFixed(1)}¢` : `${Math.round(cents)}¢`
 }
+
+/** Marks costs imputed at API rates for models that ran on the tester's own hardware. */
+export const IMPUTED_MARK = '†'
 
 function lowerIsBetterCell(before: number, after: number, max: number, format: (n: number) => string): MetricCell {
   const change = percentChange(before, after)
@@ -76,8 +79,7 @@ function accuracyCell(row: TrustBenchModelRow): MetricCell {
 
 export function buildModelChartRows(rows: readonly TrustBenchModelRow[] = trustBenchRows): ModelChartRow[] {
   const maxSec = Math.max(...rows.flatMap(r => [r.baselineSec, r.proSec]))
-  const cloud = rows.filter(r => !r.local)
-  const maxCost = Math.max(...cloud.flatMap(r => [r.baselineCost, r.proCost]))
+  const maxCost = Math.max(...rows.flatMap(r => [r.baselineCost, r.proCost]))
   const seconds = (n: number) => `${n.toFixed(1)}s`
 
   return rows.map(row => ({
@@ -87,9 +89,7 @@ export function buildModelChartRows(rows: readonly TrustBenchModelRow[] = trustB
     cells: {
       accuracy: accuracyCell(row),
       time: lowerIsBetterCell(row.baselineSec, row.proSec, maxSec, seconds),
-      cost: row.local
-        ? { alone: null, pro: null, change: '', better: null, rose: null, note: '$0 · runs on your hardware' }
-        : lowerIsBetterCell(row.baselineCost, row.proCost, maxCost, formatCost),
+      cost: lowerIsBetterCell(row.baselineCost, row.proCost, maxCost, n => row.local ? `${formatCost(n)}${IMPUTED_MARK}` : formatCost(n)),
     },
   }))
 }

@@ -38,26 +38,21 @@ const hovered = ref<string | null>(null)
 
         <div v-for="col in metricColumns" :key="col.id" class="mc-cell" role="cell">
           <span class="mc-cell-title mono">{{ col.title }}</span>
-          <template v-if="row.cells[col.id].alone && row.cells[col.id].pro">
-            <div class="mc-bar-row" :title="`${row.model} alone: ${row.cells[col.id].alone!.text}`">
-              <span class="mc-track"><span class="mc-fill mc-alone" :style="{ width: `${row.cells[col.id].alone!.pct}%` }" /></span>
-              <span class="mc-val mono">{{ row.cells[col.id].alone!.text }}</span>
-            </div>
-            <div class="mc-bar-row" :title="`${row.model} with TinyPivot Pro: ${row.cells[col.id].pro!.text}`">
-              <span class="mc-track"><span class="mc-fill mc-pro" :style="{ width: `${row.cells[col.id].pro!.pct}%` }" /></span>
-              <span class="mc-val mc-val-pro mono">{{ row.cells[col.id].pro!.text }}</span>
-            </div>
-            <span
-              v-if="row.cells[col.id].change"
-              class="mc-change mono"
-              :class="{ 'mc-better': row.cells[col.id].better === true, 'mc-worse': row.cells[col.id].better === false }"
-            >
-              <span v-if="row.cells[col.id].rose !== null" class="mc-arrow" aria-hidden="true">{{ row.cells[col.id].rose ? '▲' : '▼' }}</span>{{ row.cells[col.id].change }}
-            </span>
-          </template>
-          <p v-else class="mc-note mono">
-            {{ row.cells[col.id].note }}
-          </p>
+          <div class="mc-bar-row" :title="`${row.model} alone: ${row.cells[col.id].alone.text}`">
+            <span class="mc-track"><span class="mc-fill mc-alone" :style="{ width: `${row.cells[col.id].alone.pct}%` }" /></span>
+            <span class="mc-val mono">{{ row.cells[col.id].alone.text }}</span>
+          </div>
+          <div class="mc-bar-row" :title="`${row.model} with TinyPivot Pro: ${row.cells[col.id].pro.text}`">
+            <span class="mc-track"><span class="mc-fill mc-pro" :style="{ width: `${row.cells[col.id].pro.pct}%` }" /></span>
+            <span class="mc-val mc-val-pro mono">{{ row.cells[col.id].pro.text }}</span>
+          </div>
+          <span
+            v-if="row.cells[col.id].change"
+            class="mc-change mono"
+            :class="{ 'mc-better': row.cells[col.id].better === true, 'mc-worse': row.cells[col.id].better === false }"
+          >
+            <span v-if="row.cells[col.id].rose !== null" class="mc-arrow" aria-hidden="true">{{ row.cells[col.id].rose ? '▲' : '▼' }}</span>{{ row.cells[col.id].change }}
+          </span>
         </div>
       </div>
     </div>
@@ -203,14 +198,6 @@ const hovered = ref<string | null>(null)
   color: var(--minus);
 }
 
-.mc-note {
-  margin: 2px 0 0;
-  padding: 6px 8px;
-  border: 1px dashed var(--rule);
-  font-size: 0.66rem;
-  color: var(--ink-muted);
-}
-
 @media (min-width: 860px) {
   .mc-row {
     grid-template-columns: 11rem repeat(3, minmax(0, 1fr));
@@ -228,8 +215,7 @@ const hovered = ref<string | null>(null)
   }
 
   .mc-val,
-  .mc-change,
-  .mc-note {
+  .mc-change {
     font-size: 0.72rem;
   }
 

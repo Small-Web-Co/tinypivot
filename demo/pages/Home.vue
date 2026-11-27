@@ -274,8 +274,9 @@ const capabilities = [
         <ModelComparisonChart />
         <p class="small-foot">
           Small and open-weight models gain the most: TinyPivot does the exact maths and the checking, so the model only has to
-          reason. Opus and Sonnet were already at 100% and stayed there. Cost is the API price; models on your own hardware cost
-          nothing to run, and their API-equivalent prices are in the white paper.
+          reason. Opus and Sonnet were already at 100% and stayed there. Cost is the API price for all
+          {{ TRUST_BENCH_TOTALS.tasksPerModel }} tasks. †Inkling and DeepSeek ran on our own hardware for $0; their cost is what the
+          same tokens would cost at each model's API rates.
           <router-link to="/whitepaper#internal" class="text-link">
             Every run, task and prompt →
           </router-link>
