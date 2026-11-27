@@ -231,11 +231,13 @@ describe('query_bigquery tool', () => {
     const studio = new Studio(new DatasetStore(), { history: new HistoryStore({ dir }), duck: noLocalDuck })
     const rows = [{ region: 'EMEA', mrr: 120 }]
     const { client, jobs } = await connect(signer.signLicense('MCPP'), { rows }, studio)
-    await client.callTool({ name: 'query_bigquery', arguments: { sql: 'SELECT region, SUM(mrr) AS mrr FROM sales.orders GROUP BY 1', why: 'MRR by region' } })
+    const sql = 'SELECT region, SUM(mrr) AS mrr FROM sales.orders GROUP BY 1'
+    await client.callTool({ name: 'query_bigquery', arguments: { sql, why: 'MRR by region' } })
 
     const step = studio.recentSteps().at(-1)!
     expect(step).toMatchObject({ tool: 'query_bigquery', rows: 1 })
     expect(await studio.verifyStep(step.id)).toEqual([{ kind: 'rerun', ok: true, detail: 'Same 1 rows, same values.' }])
-    expect(jobs.filter(job => !job.dryRun)).toHaveLength(2)
+    // The query and its re-check; Pro audit probes are separate jobs.
+    expect(jobs.filter(job => !job.dryRun && job.query === sql)).toHaveLength(2)
   })
 })

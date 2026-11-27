@@ -139,6 +139,19 @@ describe('snowflake connector', () => {
     expect(fake.closed()).toBe(2)
   })
 
+  it('keeps the session (and its sign-in) after a SQL error Snowflake reports', async () => {
+    const fake = fakeSession({ fail: Object.assign(new Error('invalid identifier AMOUNTS'), { sqlState: '42000' }) })
+    let opened = 0
+    const connector = snowflakeConnector(CONFIG, async () => {
+      opened += 1
+      return fake.session
+    })
+    await expect(connector.query('SELECT amounts FROM orders')).rejects.toThrow('invalid identifier')
+    await expect(connector.query('SELECT amounts FROM orders')).rejects.toThrow('invalid identifier')
+    expect(opened).toBe(1)
+    expect(fake.closed()).toBe(0)
+  })
+
   it('lists tables from the allowlist, or from the database\'s information schema', async () => {
     const fake = fakeSession({ rows: [{ NAME: 'ACME.SALES.ORDERS' }, { NAME: 'ACME.SALES.REFUNDS' }] })
     expect(await snowflakeConnector({ ...CONFIG, allowed: ['ACME.SALES.ORDERS'] }, async () => fake.session).listTables()).toEqual(['ACME.SALES.ORDERS'])

@@ -6,7 +6,7 @@ import os from 'node:os'
 import { expandHome, mysqlOptionFile, readIniFile } from './config-files.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { listFromEnv, QueryRefused, readOnlyStatementError } from './warehouse.js'
+import { backtickName, listFromEnv, QueryRefused, readOnlyStatementError } from './warehouse.js'
 
 /**
  * Read-only MySQL and MariaDB, through the pure-JS mysql2 driver. Each query passes a text check
@@ -761,6 +761,8 @@ export function mysqlConnector(config: MysqlConfig, createSession: MysqlSessionF
     sqlHint: `MySQL or MariaDB SQL, one read-only SELECT${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}; quote names with backticks.`,
     freeAlternative: 'export with `mysql --batch -e "SELECT …" > result.tsv` and pass the file to `load_file`',
     maxRows: config.maxRows,
+    // MySQL has no median aggregate, so the outlier audit is skipped here.
+    dialect: { quoteName: backtickName },
     listTables: () => withSession(prepared => listTables(prepared.session, config)),
     query: sql => withSession(async (prepared) => {
       const result = await runQuery(prepared, config, sql)

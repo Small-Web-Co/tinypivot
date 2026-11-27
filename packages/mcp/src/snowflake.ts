@@ -7,7 +7,7 @@ import { formatBytes } from './bigquery.js'
 import { expandHome, readSnowflakeConnections } from './config-files.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage, runtimePackageDir } from './runtime-package.js'
-import { listFromEnv, QueryRefused, readOnlyStatementError } from './warehouse.js'
+import { listFromEnv, plainName, QueryRefused, readOnlyStatementError, sessionSurvives } from './warehouse.js'
 
 /**
  * Read-only Snowflake, through Snowflake's official Node driver. Each query passes three checks
@@ -366,8 +366,8 @@ export function snowflakeConnector(config: SnowflakeConfig, createSession: Snowf
       return await work(current)
     }
     catch (error) {
-      // A refused query leaves the session healthy; anything else may have broken it.
-      if (!(error instanceof QueryRefused)) {
+      // A refusal or a SQL error leaves the session healthy (keeping a browser sign-in); anything else may have broken it.
+      if (!sessionSurvives(error)) {
         session = undefined
         await current.close().catch(() => {})
       }
@@ -382,6 +382,7 @@ export function snowflakeConnector(config: SnowflakeConfig, createSession: Snowf
     sqlHint: `Snowflake SQL, one read-only SELECT${where ? `; unqualified tables resolve in ${where}` : '; name tables database.schema.table'}.`,
     freeAlternative: 'export with `snowsql -o output_format=csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
+    dialect: { quoteName: plainName, median: expr => `MEDIAN(${expr})` },
     listTables: () => withSession(s => listTables(s, config)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }

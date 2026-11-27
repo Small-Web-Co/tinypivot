@@ -11,6 +11,24 @@ export interface WarehouseQueryResult {
   note?: string
 }
 
+/** The little dialect the Pro audit probes need to write portable SQL for a database. */
+export interface SqlDialect {
+  /** A column name as this database reads it in a probe. */
+  quoteName: (name: string) => string
+  /** A median aggregate of `expr`; omitted when the database has none, which skips the outlier audit. */
+  median?: (expr: string) => string
+}
+
+/** Backticked names, for BigQuery, Databricks, ClickHouse and MySQL. */
+export function backtickName(name: string): string {
+  return `\`${name.replace(/`/g, '``')}\``
+}
+
+/** Names left as the query wrote them, for Postgres and Snowflake: quoting would make them case-sensitive and stop matching. */
+export function plainName(name: string): string {
+  return name
+}
+
 export interface WarehouseConnector {
   /** Short id, also the history kind of its pulls. */
   id: 'postgres' | 'bigquery' | 'snowflake' | 'databricks' | 'mysql' | 'clickhouse'
@@ -24,6 +42,8 @@ export interface WarehouseConnector {
   freeAlternative: string
   /** The most rows one query returns. */
   maxRows: number
+  /** How audit probes name columns and take a median here. */
+  dialect: SqlDialect
   /** Tables the model may query, as it should name them in SQL. */
   listTables: () => Promise<string[]>
   /** Checks the SQL is a single read-only SELECT within limits, then runs it. Throws with a reason if not. */
@@ -36,6 +56,18 @@ export class QueryRefused extends Error {}
 /** What to tell the model when a result was cut: aggregate where the data lives instead. */
 export function truncationNote(connector: Pick<WarehouseConnector, 'label' | 'maxRows'>): string {
   return `\n_Result cut at ${connector.maxRows.toLocaleString('en-US')} rows, so totals over it would be wrong. Aggregate in the ${connector.label} SQL (GROUP BY, SUM, COUNT) so the full table is counted where it lives._`
+}
+
+/**
+ * Whether a session can be reused after this error: a refusal, or a SQL error the database itself
+ * reported (it carries a SQLSTATE), such as a typo or a timeout. Anything else (a dropped
+ * connection, an expired sign-in) may have broken the session, so it is replaced.
+ */
+export function sessionSurvives(error: unknown): boolean {
+  if (error instanceof QueryRefused)
+    return true
+  const reported = error as { sqlState?: unknown, response?: { status?: { sqlState?: unknown } } } | null
+  return typeof (reported?.sqlState ?? reported?.response?.status?.sqlState) === 'string'
 }
 
 /** Statement words that change data, objects or access, refused anywhere in a query. */

@@ -6,7 +6,7 @@ import os from 'node:os'
 import { databricksConfigFile, readIniFile } from './config-files.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { QueryRefused, readOnlyStatementError } from './warehouse.js'
+import { backtickName, QueryRefused, readOnlyStatementError, sessionSurvives } from './warehouse.js'
 
 /**
  * Read-only Databricks SQL, through Databricks' official Node driver. Each query passes two checks
@@ -450,8 +450,8 @@ export function databricksConnector(config: DatabricksConfig, createSession: Dat
       return await work(current)
     }
     catch (error) {
-      // A refused query leaves the session healthy; anything else may have broken it.
-      if (!(error instanceof QueryRefused)) {
+      // A refusal or a SQL error leaves the session healthy (keeping a browser sign-in); anything else may have broken it.
+      if (!sessionSurvives(error)) {
         session = undefined
         await current.close().catch(() => {})
       }
@@ -466,6 +466,7 @@ export function databricksConnector(config: DatabricksConfig, createSession: Dat
     sqlHint: `Databricks SQL, one read-only SELECT${where ? `; unqualified tables resolve in ${where}` : '; name tables catalog.schema.table'}.`,
     freeAlternative: 'download the result as CSV from the Databricks SQL editor and pass the file to `load_file`',
     maxRows: config.maxRows,
+    dialect: { quoteName: backtickName, median: expr => `percentile_approx(${expr}, 0.5)` },
     listTables: () => withSession(s => listTables(s, config)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }

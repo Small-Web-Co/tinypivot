@@ -3,7 +3,7 @@ import type { WarehouseConnector } from './warehouse.js'
 import { validateSQL } from '@smallwebco/tinypivot-server'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { listFromEnv } from './warehouse.js'
+import { listFromEnv, plainName } from './warehouse.js'
 
 export interface PostgresConfig {
   connectionString: string
@@ -140,6 +140,7 @@ export function postgresConnector(config: PostgresConfig): WarehouseConnector {
     sqlHint: 'Postgres SQL, one read-only SELECT.',
     freeAlternative: 'export with `psql --csv` and pass the file to `load_file`',
     maxRows: config.maxRows ?? DEFAULT_MAX_ROWS,
+    dialect: { quoteName: plainName, median: expr => `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${expr})` },
     listTables: () => listPostgresTables(config),
     query: async (sql) => {
       const res = await executeReadOnlyPostgresQuery(config, sql)
