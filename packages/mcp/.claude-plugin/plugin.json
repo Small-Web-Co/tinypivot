@@ -1,7 +1,7 @@
 {
   "name": "tinypivot",
   "displayName": "TinyPivot",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Data analysis studio inside Claude — turn CSV, TSV, JSON, JSONL, API/MCP outputs, and SQL results from any database into interactive charts, deterministic pivot tables, data grids, screenshot-ready terminal cards, and Excel exports.",
   "author": {
     "name": "Small Web, LLC",
