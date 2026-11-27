@@ -34,6 +34,8 @@ export interface SqlDialect {
   approxCountDistinct?: (expr: string) => string
   /** An aggregate returning up to `limit` distinct non-NULL string values separated by `, `. */
   sampleDistinct?: (expr: string, limit: number) => string
+  /** Formats a date/timestamp expression as `YYYY-MM` for warehouse cohort & period analysis. */
+  yearMonth?: (expr: string) => string
 }
 
 /** Backticked names, for BigQuery, Databricks, ClickHouse and MySQL. */

@@ -479,6 +479,7 @@ export function clickHouseConnector(config: ClickHouseConfig, createClient: Clic
       median: expr => `median(${expr})`,
       approxCountDistinct: expr => `uniq(${expr})`,
       sampleDistinct: (expr, limit) => `arrayStringConcat(groupUniqArray(${limit})(toString(${expr})), ', ')`,
+      yearMonth: expr => `formatDateTime(toDate(${expr}), '%Y-%m')`,
     },
     listTables: () => withSession(s => listTables(s, config)),
     describeTables: tables => withSession(s => describeClickHouseTables(s, config, tables)),

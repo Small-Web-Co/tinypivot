@@ -269,6 +269,7 @@ export function bigQueryConnector(config: BigQueryConfig, createClient: BigQuery
       median: expr => `APPROX_QUANTILES(${expr}, 2)[OFFSET(1)]`,
       approxCountDistinct: expr => `APPROX_COUNT_DISTINCT(${expr})`,
       sampleDistinct: (expr, limit) => `STRING_AGG(DISTINCT CAST(${expr} AS STRING), ', ' LIMIT ${limit})`,
+      yearMonth: expr => `FORMAT_DATE('%Y-%m', CAST(${expr} AS DATE))`,
     },
     listTables: async () => listTables(await getClient(), config),
     describeTables: async tables => describeTables(await getClient(), config, tables),

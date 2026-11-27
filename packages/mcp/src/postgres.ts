@@ -170,6 +170,7 @@ export function postgresConnector(config: PostgresConfig): WarehouseConnector {
       quoteName: plainName,
       median: expr => `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${expr})`,
       sampleDistinct: (expr, limit) => `ARRAY_TO_STRING((ARRAY_AGG(DISTINCT CAST(${expr} AS TEXT)))[1:${limit}], ', ')`,
+      yearMonth: expr => `TO_CHAR(CAST(${expr} AS DATE), 'YYYY-MM')`,
     },
     listTables: () => listPostgresTables(config),
     describeTables: tables => describePostgresTables(config, tables),

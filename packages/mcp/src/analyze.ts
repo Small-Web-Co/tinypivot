@@ -85,14 +85,14 @@ function normalCdf(z: number): number {
   return 0.5 * (1 + sign * erf)
 }
 
-function twoSidedNormalP(z: number): number {
+export function twoSidedNormalP(z: number): number {
   if (!Number.isFinite(z))
     return 1
   return Math.max(0, Math.min(1, 2 * (1 - normalCdf(Math.abs(z)))))
 }
 
 /** Two-sided p-value for a t-statistic with df degrees of freedom (Cornish-Fisher / normal approximation for df>=30, exact Beta series for small df). */
-function twoSidedTP(tStat: number, df: number): number {
+export function twoSidedTP(tStat: number, df: number): number {
   if (!Number.isFinite(tStat) || df <= 0)
     return 1
   const absT = Math.abs(tStat)
@@ -104,7 +104,7 @@ function twoSidedTP(tStat: number, df: number): number {
 }
 
 /** Chi-squared survival function for df = 1: P(X^2 >= x) = 2 * (1 - Phi(sqrt(x))). */
-function chiSq1P(chiSq: number): number {
+export function chiSq1P(chiSq: number): number {
   if (!Number.isFinite(chiSq) || chiSq <= 0)
     return 1
   return twoSidedNormalP(Math.sqrt(chiSq))
@@ -471,31 +471,31 @@ function buildDesignMatrix(
   return { names, xRows, yVals }
 }
 
-function fitOls(xRows: number[][], yVals: number[]): { beta: number[], se: number[], tStats: number[], pValues: number[], r2: number, adjR2: number, xtxInv: number[][] } {
-  const n = xRows.length
-  const p = xRows[0].length
+export interface OlsFit {
+  beta: number[]
+  se: number[]
+  tStats: number[]
+  pValues: number[]
+  r2: number
+  adjR2: number
+  xtxInv: number[][]
+}
+
+/** Fits exact multivariate OLS from sufficient statistics (n, X^T X, X^T y, sum(y), sum(y^2)). */
+export function fitOlsFromSufficientStats(
+  n: number,
+  xtxInput: number[][],
+  xty: number[],
+  sumY: number,
+  sumYY: number,
+): OlsFit {
+  const p = xty.length
   if (n <= p + 1)
     throw new Error(`Too few valid rows (${n}) for ${p} regression parameters.`)
 
-  const xtx = Array.from({ length: p }, () => Array.from<number>({ length: p }).fill(0))
-  const xty = Array.from<number>({ length: p }).fill(0)
-  for (let i = 0; i < n; i++) {
-    const xi = xRows[i]
-    const yi = yVals[i]
-    for (let a = 0; a < p; a++) {
-      xty[a] += xi[a] * yi
-      for (let b = a; b < p; b++)
-        xtx[a][b] += xi[a] * xi[b]
-    }
-  }
-  for (let a = 0; a < p; a++) {
-    for (let b = 0; b < a; b++)
-      xtx[a][b] = xtx[b][a]
-  }
-
+  const xtx = xtxInput.map(row => [...row])
   let xtxInv = invertMatrix(xtx)
   if (!xtxInv) {
-    // Tiny ridge jitter for exact collinearity recovery
     for (let a = 0; a < p; a++)
       xtx[a][a] += 1e-8
     xtxInv = invertMatrix(xtx)
@@ -509,17 +509,11 @@ function fitOls(xRows: number[][], yVals: number[]): { beta: number[], se: numbe
       beta[a] += xtxInv[a][b] * xty[b]
   }
 
-  const yMean = yVals.reduce((s, v) => s + v, 0) / n
-  let sse = 0
-  let sst = 0
-  for (let i = 0; i < n; i++) {
-    let pred = 0
-    for (let a = 0; a < p; a++)
-      pred += xRows[i][a] * beta[a]
-    const resid = yVals[i] - pred
-    sse += resid * resid
-    sst += (yVals[i] - yMean) * (yVals[i] - yMean)
-  }
+  let betaXty = 0
+  for (let a = 0; a < p; a++)
+    betaXty += beta[a] * xty[a]
+  const sse = Math.max(0, sumYY - betaXty)
+  const sst = Math.max(0, sumYY - (sumY * sumY) / n)
   const df = n - p
   const sigma2 = sse / Math.max(1, df)
   const se = beta.map((_, a) => Math.sqrt(Math.max(1e-18, sigma2 * xtxInv![a][a])))
@@ -530,34 +524,45 @@ function fitOls(xRows: number[][], yVals: number[]): { beta: number[], se: numbe
   return { beta, se, tStats, pValues, r2, adjR2, xtxInv }
 }
 
-/** 2) Controlled Multivariate OLS Regression with Confounding Sign-Reversal Detection (Pro). */
-export function runRegression(dataset: StoredDataset, input: AnalyzeInput): AnalyzeOutput {
-  const target = input.target ?? input.metric
-  if (!target)
-    throw new Error('regression requires `target` (numeric outcome column).')
-  const features = input.features ?? []
-  const controls = input.controls ?? []
-  const allCols = [...new Set([...features, ...controls])].filter(c => c !== target)
-  const predictors = allCols.length > 0
-    ? allCols
-    : dataset.columns.filter(c => c.name !== target && !/id$|date/i.test(c.name)).slice(0, 6).map(c => c.name)
+function fitOls(xRows: number[][], yVals: number[]): OlsFit {
+  const n = xRows.length
+  const p = xRows[0].length
+  const xtx = Array.from({ length: p }, () => Array.from<number>({ length: p }).fill(0))
+  const xty = Array.from<number>({ length: p }).fill(0)
+  let sumY = 0
+  let sumYY = 0
+  for (let i = 0; i < n; i++) {
+    const xi = xRows[i]
+    const yi = yVals[i]
+    sumY += yi
+    sumYY += yi * yi
+    for (let a = 0; a < p; a++) {
+      xty[a] += xi[a] * yi
+      for (let b = a; b < p; b++)
+        xtx[a][b] += xi[a] * xi[b]
+    }
+  }
+  for (let a = 0; a < p; a++) {
+    for (let b = 0; b < a; b++)
+      xtx[a][b] = xtx[b][a]
+  }
+  return fitOlsFromSufficientStats(n, xtx, xty, sumY, sumYY)
+}
 
-  if (predictors.length === 0)
-    throw new Error('regression requires at least one feature or control column.')
-
-  const { names, xRows, yVals } = buildDesignMatrix(dataset, target, predictors)
-  const fit = fitOls(xRows, yVals)
-  const flags: string[] = []
-
-  // Compare naive bivariate slope vs controlled slope for the primary feature(s)
-  const primaryFeature = features[0] ?? predictors[0]
+export function buildRegressionOutput(params: {
+  target: string
+  names: string[]
+  primaryFeature: string
+  predictors: string[]
+  n: number
+  fit: OlsFit
+  naiveBeta?: number
+}): AnalyzeOutput {
+  const { target, names, primaryFeature, predictors, n, fit, naiveBeta } = params
   const primaryIdx = names.indexOf(primaryFeature)
-  let naiveBeta: number | undefined
+  const flags: string[] = []
   let confoundingReversal = false
-  if (primaryIdx > 0 && predictors.length >= 2) {
-    const naiveX = xRows.map(r => [1, r[primaryIdx]])
-    const naiveFit = fitOls(naiveX, yVals)
-    naiveBeta = naiveFit.beta[1]
+  if (primaryIdx > 0 && naiveBeta !== undefined) {
     const ctrlBeta = fit.beta[primaryIdx]
     if (Math.abs(naiveBeta) > 1e-6 && Math.abs(ctrlBeta) > 1e-6 && Math.sign(naiveBeta) !== Math.sign(ctrlBeta)) {
       confoundingReversal = true
@@ -579,7 +584,7 @@ export function runRegression(dataset: StoredDataset, input: AnalyzeInput): Anal
   rows.sort((a, b) => Math.abs(Number(b.t_stat)) - Math.abs(Number(a.t_stat)))
 
   const lines: string[] = [
-    `### Controlled Multivariate Regression (OLS): \`${target}\` (n = ${yVals.length.toLocaleString('en-US')}, R² = ${fmt(fit.r2, 3)}, adj R² = ${fmt(fit.adjR2, 3)})`,
+    `### Controlled Multivariate Regression (OLS): \`${target}\` (n = ${n.toLocaleString('en-US')}, R² = ${fmt(fit.r2, 3)}, adj R² = ${fmt(fit.adjR2, 3)})`,
   ]
   if (confoundingReversal && naiveBeta !== undefined) {
     const ctrlBeta = fit.beta[primaryIdx]
@@ -607,64 +612,82 @@ export function runRegression(dataset: StoredDataset, input: AnalyzeInput): Anal
   }
 }
 
+/** 2) Controlled Multivariate OLS Regression with Confounding Sign-Reversal Detection (Pro). */
+export function runRegression(dataset: StoredDataset, input: AnalyzeInput): AnalyzeOutput {
+  const target = input.target ?? input.metric
+  if (!target)
+    throw new Error('regression requires `target` (numeric outcome column).')
+  const features = input.features ?? []
+  const controls = input.controls ?? []
+  const allCols = [...new Set([...features, ...controls])].filter(c => c !== target)
+  const predictors = allCols.length > 0
+    ? allCols
+    : dataset.columns.filter(c => c.name !== target && !/id$|date/i.test(c.name)).slice(0, 6).map(c => c.name)
+
+  if (predictors.length === 0)
+    throw new Error('regression requires at least one feature or control column.')
+
+  const { names, xRows, yVals } = buildDesignMatrix(dataset, target, predictors)
+  const fit = fitOls(xRows, yVals)
+  const primaryFeature = features[0] ?? predictors[0]
+  const primaryIdx = names.indexOf(primaryFeature)
+  let naiveBeta: number | undefined
+  if (primaryIdx > 0 && predictors.length >= 2) {
+    const naiveX = xRows.map(r => [1, r[primaryIdx]])
+    naiveBeta = fitOls(naiveX, yVals).beta[1]
+  }
+  return buildRegressionOutput({ target, names, primaryFeature, predictors, n: yVals.length, fit, naiveBeta })
+}
+
 function monthIndex(ym: string): number {
   const [y, m] = ym.split('-').map(Number)
   return y * 12 + (m - 1)
 }
 
-/** 3) Right-Censored Monthly Cohort Retention Matrix (Pro). */
-export function runCohortRetention(dataset: StoredDataset, input: AnalyzeInput): AnalyzeOutput {
-  const entityField = input.entityField ?? dataset.columns.find(c => /user|customer|account|member/i.test(c.name))?.name
-  const dateField = input.dateField ?? dataset.columns.find(c => c.type === 'date' || /date|month|_at$/i.test(c.name))?.name
-  if (!entityField || !dateField)
-    throw new Error('cohort_retention requires `entityField` and `dateField`.')
+export interface CohortRetentionCount {
+  cohort: string
+  activeMonth: string
+  activeEntities: number
+}
 
-  const entityMonths = new Map<string, Set<string>>()
-  const explicitCohort = new Map<string, string>()
+/** Builds a right-censored monthly cohort retention matrix from pre-aggregated `(cohort, activeMonth, activeEntities)` counts. */
+export function buildCohortRetentionFromCounts(params: {
+  entityField: string
+  counts: CohortRetentionCount[]
+}): AnalyzeOutput {
+  const { entityField, counts } = params
+  if (counts.length === 0)
+    throw new Error('No valid YYYY-MM cohort observations found.')
+
   let maxMonth = ''
-
-  for (const row of dataset.rows) {
-    const ent = String(row[entityField] ?? '').trim()
-    const rawDate = String(row[dateField] ?? '').trim()
-    if (!ent || !rawDate)
+  const byCohort = new Map<string, Map<string, number>>()
+  for (const c of counts) {
+    if (!c.cohort || !c.activeMonth)
       continue
-    const m = /^(\d{4}-\d{2})/.exec(rawDate)
-    if (!m)
-      continue
-    const ym = m[1]
-    if (ym > maxMonth)
-      maxMonth = ym
-    const set = entityMonths.get(ent) ?? new Set<string>()
-    set.add(ym)
-    entityMonths.set(ent, set)
-    if (input.cohortField && row[input.cohortField]) {
-      const cm = /^(\d{4}-\d{2})/.exec(String(row[input.cohortField]))
-      if (cm)
-        explicitCohort.set(ent, cm[1])
-    }
+    if (c.activeMonth > maxMonth)
+      maxMonth = c.activeMonth
+    const map = byCohort.get(c.cohort) ?? new Map<string, number>()
+    map.set(c.activeMonth, (map.get(c.activeMonth) ?? 0) + c.activeEntities)
+    byCohort.set(c.cohort, map)
   }
 
-  if (!maxMonth || entityMonths.size === 0)
+  const sortedCohorts = [...byCohort.keys()].sort()
+  if (!maxMonth || sortedCohorts.length === 0)
     throw new Error('No valid YYYY-MM dates found for cohort retention.')
 
   const maxIdx = monthIndex(maxMonth)
-  const cohorts = new Map<string, Set<string>>()
-  for (const [ent, months] of entityMonths.entries()) {
-    const first = explicitCohort.get(ent) ?? [...months].sort()[0]
-    const set = cohorts.get(first) ?? new Set<string>()
-    set.add(ent)
-    cohorts.set(first, set)
-  }
-
-  const sortedCohorts = [...cohorts.keys()].sort()
   const maxOffset = Math.min(12, Math.max(...sortedCohorts.map(c => maxIdx - monthIndex(c))))
   const rows: Record<string, unknown>[] = []
   const maturedByOffset = new Map<number, number[]>()
   const rightCensoredCohorts: string[] = []
+  let totalEntities = 0
 
   for (const cohort of sortedCohorts) {
-    const members = cohorts.get(cohort)!
-    const baseN = members.size
+    const months = byCohort.get(cohort)!
+    const baseN = months.get(cohort) ?? Math.max(...months.values(), 0)
+    if (baseN <= 0)
+      continue
+    totalEntities += baseN
     const cIdx = monthIndex(cohort)
     const row: Record<string, unknown> = { cohort, cohort_size: baseN }
     let hasImmature = false
@@ -674,16 +697,9 @@ export function runCohortRetention(dataset: StoredDataset, input: AnalyzeInput):
         hasImmature = true
         continue
       }
-      let active = 0
-      for (const ent of members) {
-        const months = entityMonths.get(ent)!
-        for (const ym of months) {
-          if (monthIndex(ym) - cIdx === off) {
-            active += 1
-            break
-          }
-        }
-      }
+      const targetIdx = cIdx + off
+      const targetYm = `${Math.floor(targetIdx / 12)}-${String((targetIdx % 12) + 1).padStart(2, '0')}`
+      const active = months.get(targetYm) ?? 0
       const pct = Number(((active / baseN) * 100).toFixed(1))
       row[`M${off}`] = pct
       const list = maturedByOffset.get(off) ?? []
@@ -706,7 +722,7 @@ export function runCohortRetention(dataset: StoredDataset, input: AnalyzeInput):
   }
 
   const lines = [
-    `### Right-Censored Cohort Retention (${sortedCohorts.length} cohorts, ${entityMonths.size.toLocaleString('en-US')} unique \`${entityField}\`, data through \`${maxMonth}\`)`,
+    `### Right-Censored Cohort Retention (${sortedCohorts.length} cohorts, ${totalEntities.toLocaleString('en-US')} unique \`${entityField}\`, data through \`${maxMonth}\`)`,
     `- **Unbiased Matured Retention**: ${avgSummary.join(' · ')}`,
   ]
   if (rightCensoredCohorts.length > 0) {
@@ -715,7 +731,6 @@ export function runCohortRetention(dataset: StoredDataset, input: AnalyzeInput):
     )
   }
 
-  // Pick the highest offset with >= 2 matured cohorts for the chart
   const chartOff = Math.min(3, maxOffset)
   return {
     method: 'cohort_retention',
@@ -730,6 +745,49 @@ export function runCohortRetention(dataset: StoredDataset, input: AnalyzeInput):
     },
     flags,
   }
+}
+
+/** 3) Right-Censored Monthly Cohort Retention Matrix (Pro). */
+export function runCohortRetention(dataset: StoredDataset, input: AnalyzeInput): AnalyzeOutput {
+  const entityField = input.entityField ?? dataset.columns.find(c => /user|customer|account|member/i.test(c.name))?.name
+  const dateField = input.dateField ?? dataset.columns.find(c => c.type === 'date' || /date|month|_at$/i.test(c.name))?.name
+  if (!entityField || !dateField)
+    throw new Error('cohort_retention requires `entityField` and `dateField`.')
+
+  const entityMonths = new Map<string, Set<string>>()
+  const explicitCohort = new Map<string, string>()
+
+  for (const row of dataset.rows) {
+    const ent = String(row[entityField] ?? '').trim()
+    const rawDate = String(row[dateField] ?? '').trim()
+    if (!ent || !rawDate)
+      continue
+    const m = /^(\d{4}-\d{2})/.exec(rawDate)
+    if (!m)
+      continue
+    const set = entityMonths.get(ent) ?? new Set<string>()
+    set.add(m[1])
+    entityMonths.set(ent, set)
+    if (input.cohortField && row[input.cohortField]) {
+      const cm = /^(\d{4}-\d{2})/.exec(String(row[input.cohortField]))
+      if (cm)
+        explicitCohort.set(ent, cm[1])
+    }
+  }
+
+  const pairCounts = new Map<string, number>()
+  for (const [ent, months] of entityMonths.entries()) {
+    const cohort = explicitCohort.get(ent) ?? [...months].sort()[0]
+    for (const ym of months) {
+      const key = `${cohort}\0${ym}`
+      pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1)
+    }
+  }
+  const counts: CohortRetentionCount[] = [...pairCounts.entries()].map(([key, activeEntities]) => {
+    const [cohort, activeMonth] = key.split('\0')
+    return { cohort, activeMonth, activeEntities }
+  })
+  return buildCohortRetentionFromCounts({ entityField, counts })
 }
 
 /** 4) Seasonally-Adjusted (Day-of-Week) Robust Anomaly & Structural Change-Point Detector (Pro). */

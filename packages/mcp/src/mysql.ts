@@ -790,6 +790,7 @@ export function mysqlConnector(config: MysqlConfig, createSession: MysqlSessionF
     dialect: {
       quoteName: backtickName,
       sampleDistinct: (expr, limit) => `SUBSTRING_INDEX(GROUP_CONCAT(DISTINCT CAST(${expr} AS CHAR) ORDER BY 1 SEPARATOR ', '), ', ', ${limit})`,
+      yearMonth: expr => `DATE_FORMAT(CAST(${expr} AS DATE), '%Y-%m')`,
     },
     listTables: () => withSession(prepared => listTables(prepared.session, config)),
     describeTables: tables => withSession(prepared => describeMysqlTables(prepared.session, config, tables)),

@@ -495,6 +495,7 @@ export function databricksConnector(config: DatabricksConfig, createSession: Dat
       median: expr => `percentile_approx(${expr}, 0.5)`,
       approxCountDistinct: expr => `APPROX_COUNT_DISTINCT(${expr})`,
       sampleDistinct: (expr, limit) => `CONCAT_WS(', ', SLICE(COLLECT_SET(CAST(${expr} AS STRING)), 1, ${limit}))`,
+      yearMonth: expr => `DATE_FORMAT(CAST(${expr} AS DATE), 'yyyy-MM')`,
     },
     listTables: () => withSession(s => listTables(s, config)),
     describeTables: tables => withSession(s => describeDatabricksTables(s, config, tables)),

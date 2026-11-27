@@ -43,6 +43,7 @@ import { describeChartForText, formatDatasetSummary, formatPivotSummary } from '
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
 import { hasFeature } from './tiers.js'
+import { runWarehouseAnalysis } from './warehouse-analyze.js'
 import { auditWarehouseQuery } from './warehouse-audit.js'
 import { formatWarehouseSqlRepairHint } from './warehouse-hints.js'
 import { createWarehouseSessionCache, listCachedSchemas, loadWarehouseSchemas, profileWarehouse } from './warehouse-profile.js'
@@ -73,7 +74,7 @@ export function buildInstructions({
     ? 'In a terminal, show the ```text card verbatim with the Studio link only when a chart/pivot was asked for (never in pi or inline views); else give concise findings and the Studio link.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
   const warehouseLine = warehouses.length > 0 && hasFeature(isPro, 'audit_deep')
-    ? `For ${warehouses.map(w => `${w.label} (\`${w.toolName}\`)`).join(', ')}: call \`profile(warehouse="${warehouses[0].id}", tables=["<dataset_or_table>"])\` ONCE first (pass the dataset/schema name from the question to get exact schemas, row counts, distinct values, date ranges, and NULL/fan-out/currency traps — skip INFORMATION_SCHEMA and SELECT * LIMIT probes), then answer in 1 call via \`${warehouses[0].toolName}\` (supports \`sql\` or \`queries[]\` up to 6 SELECTs). Fix any [AUDIT] warnings before answering.`
+    ? `For ${warehouses.map(w => `${w.label} (\`${w.toolName}\`)`).join(', ')}: call \`profile(warehouse="${warehouses[0].id}", tables=["<dataset_or_table>"])\` ONCE first (pass the dataset/schema name from the question to get exact schemas, row counts, distinct values, date ranges, and NULL/fan-out/currency traps — skip INFORMATION_SCHEMA and SELECT * LIMIT probes), then answer in 1 call via \`${warehouses[0].toolName}\` (supports \`sql\` or \`queries[]\` up to 6 SELECTs) or \`analyze(method, warehouse="${warehouses[0].id}", table="...")\`. Fix any [AUDIT] warnings before answering.`
     : ''
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
@@ -1427,26 +1428,34 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
-  // Unified deterministic Data Science shelf: Free gets explain_change & basic ab_test; Pro adds SRM/Holm-Bonferroni, regression, cohort_retention & anomalies.
+  // Unified deterministic Data Science shelf: Free gets explain_change & basic ab_test; Pro adds SRM/Holm-Bonferroni, regression, cohort_retention, anomalies & direct warehouse SQL pushdown.
   const PRO_ONLY_METHODS = new Set<AnalyzeMethod>(['regression', 'cohort_retention', 'anomalies'])
   server.registerTool(
     'analyze',
     {
       title: 'Statistical Analysis',
       description: hasFeature(isPro, 'analyze_pro')
-        ? '1-call stats on datasetId/filePath (auto-detects cols): explain_change, ab_test (+SRM/Holm), regression, cohort_retention, anomalies.'
+        ? (warehouses.length > 0
+            ? `1-call stats on datasetId, filePath, or warehouse+table (SQL-aggregated, no row cap): explain_change, ab_test (+SRM/Holm), regression, cohort_retention, anomalies.`
+            : '1-call stats on datasetId/filePath (auto-detects cols): explain_change, ab_test (+SRM/Holm), regression, cohort_retention, anomalies.')
         : '1-call stats on datasetId/filePath: explain_change, ab_test (Pro: regression, cohort_retention, anomalies).',
       inputSchema: {
         method: z.enum(['explain_change', 'ab_test', 'regression', 'cohort_retention', 'anomalies']),
         datasetId: z.string().optional(),
         filePath: z.string().optional(),
+        ...(warehouses.length > 0
+          ? {
+              warehouse: z.string().optional(),
+              table: z.string().optional(),
+            }
+          : {}),
         params: z.record(z.string(), z.unknown()).optional(),
         why: whyParam,
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
-    async ({ method, datasetId, filePath, params, why }, extra) => {
+    async ({ method, datasetId, filePath, warehouse: warehouseArg, table, params, why }, extra) => {
       const hasProAnalyze = hasFeature(isPro, 'analyze_pro')
       if (PRO_ONLY_METHODS.has(method) && !hasProAnalyze) {
         return {
@@ -1458,6 +1467,62 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         }
       }
       const { sessionKey } = resolveSessionContext(extra)
+
+      if (warehouseArg || (table && warehouses.length === 1)) {
+        const target = warehouseArg
+          ? warehouses.find(w => w.id === warehouseArg.toLowerCase() || w.toolName === warehouseArg.toLowerCase() || w.label.toLowerCase() === warehouseArg.toLowerCase())
+          : warehouses[0]
+        if (!target) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `Warehouse "${warehouseArg}" is not configured. Configured warehouses: ${warehouses.map(w => w.id).join(', ') || 'none'}.` }],
+          }
+        }
+        if (!isPro) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `Running \`analyze\` directly on ${target.label} requires TinyPivot Pro (TINYPIVOT_LICENSE_KEY). On Free, ${target.freeAlternative}. Upgrade at https://tiny-pivot.com/pricing` }],
+          }
+        }
+        if (!table) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `Pass \`table\` (e.g. \`dataset.table\`) with \`warehouse="${target.id}"\`.` }],
+          }
+        }
+        try {
+          const output = await runWarehouseAnalysis({
+            warehouse: target,
+            table,
+            input: { ...(params ?? {}), method },
+            cache: warehouseCaches.get(target.id)!,
+            proGuards: hasProAnalyze,
+          })
+          if (output.rows.length > 0) {
+            const outDs = store.register({
+              name: output.title,
+              source: `analyze:${method}:${target.id}:${table}`,
+              ingestionMode: 'direct',
+              rows: output.rows,
+              viewMode: output.chartConfig ? 'chart' : 'grid',
+              chartConfig: output.chartConfig,
+              sessionKey,
+              keepExisting: true,
+            })
+            studio.remember(outDs, { kind: target.id, source: `analyze:${method}:${table}` })
+            studio.recordDatasetStep(outDs, { actor: 'agent', tool: 'analyze', why: why ?? output.title })
+            return replyWithDataset(outDs, sessionKey, 'analyze', `\n\n${output.summaryText}`)
+          }
+          return { content: [{ type: 'text' as const, text: output.summaryText }] }
+        }
+        catch (error) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `${target.label} analyze failed: ${error instanceof Error ? error.message : String(error)}` }],
+          }
+        }
+      }
+
       let ds = filePath ? undefined : store.get(datasetId, sessionKey)
       if (filePath) {
         try {

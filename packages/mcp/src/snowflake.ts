@@ -413,6 +413,7 @@ export function snowflakeConnector(config: SnowflakeConfig, createSession: Snowf
       median: expr => `MEDIAN(${expr})`,
       approxCountDistinct: expr => `APPROX_COUNT_DISTINCT(${expr})`,
       sampleDistinct: (expr, limit) => `ARRAY_TO_STRING(ARRAY_SLICE(ARRAY_AGG(DISTINCT TO_VARCHAR(${expr})), 0, ${limit}), ', ')`,
+      yearMonth: expr => `TO_CHAR(CAST(${expr} AS DATE), 'YYYY-MM')`,
     },
     listTables: () => withSession(s => listTables(s, config)),
     describeTables: tables => withSession(s => describeSnowflakeTables(s, config, tables)),

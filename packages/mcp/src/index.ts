@@ -130,6 +130,7 @@ export {
   resolveCompanionUrl,
   runTuiCommand,
 } from './tui.js'
+export { runWarehouseAnalysis } from './warehouse-analyze.js'
 export { auditWarehouseQuery } from './warehouse-audit.js'
 export { formatWarehouseSqlRepairHint } from './warehouse-hints.js'
 export {
