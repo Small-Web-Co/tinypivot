@@ -1,6 +1,6 @@
 # TinyPivot — Developer & In-Agent Analytics Reference
 
-> Updated for TinyPivot MCP v0.8.6 & TinyPivot React/Vue v1.4.9.
+> Updated for TinyPivot MCP v0.9.0 & TinyPivot React/Vue v1.4.9.
 
 TinyPivot is **one deterministic analytics engine** shipped in two complementary forms:
 1. **TinyPivot MCP (`@smallwebco/tinypivot-mcp`)** — Data analysis studio for AI agents: TinyPivot Studio on localhost, an MCP App, a native Claude plugin, framed terminal cards and a live Ghostty TUI.
@@ -51,9 +51,10 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 ### Works With Any Database (Not Postgres-Only)
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, PostgreSQL:**
-  - Large results (`>500` rows): export via your SQL CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`) to CSV/TSV/JSON/JSONL and pass the path to `load_file` — **0 raw rows enter LLM context**, or pipe stdout directly to `npx @smallwebco/tinypivot-mcp@latest --open`.
+  - With Pro and a direct connection set up, use its `query_*` tool: the warehouse computes the totals and no export is needed.
+  - Otherwise, for large results (`>500` rows): export via your SQL CLI (`bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, `psql`) to CSV/TSV/JSON/JSONL and pass the path to `load_file` — **0 raw rows enter LLM context**, or pipe stdout directly to `npx @smallwebco/tinypivot-mcp@latest --open`.
   - Small in-memory results (up to `~50` rows from another MCP server, API, or aggregated query): pass flat JSON objects directly to `load_data` with `chartConfig`/`pivotConfig` in 1 call (write larger sets to a file and use `load_file` so raw rows aren't billed as output tokens).
-- **Optional Direct PostgreSQL Connector (Pro):** Set `DATABASE_URL` (+ optional `TINYPIVOT_ALLOWED_TABLES`) to run AST-validated read-only `SELECT` queries directly via `query_postgres`.
+- **Direct warehouse connectors (Pro):** read-only SQL that runs in the warehouse via `query_bigquery`, `query_snowflake`, `query_databricks`, `query_clickhouse`, `query_mysql` and `query_postgres` (Snowflake, Databricks, ClickHouse and MySQL are in preview). `npx @smallwebco/tinypivot-mcp@latest init --connect` reuses existing sign-ins (gcloud, Snowflake and Databricks CLI configs, `~/.my.cnf`, `clickhouse client` config) and writes only pointers, never secrets. Each connector refuses anything but one SELECT, uses the warehouse's own checks (BigQuery dry run, Snowflake and Databricks query plans, ClickHouse readonly mode, MySQL read-only transactions, Postgres AST validation) and caps rows at 5,000. In a BigQuery benchmark (Claude Haiku, 6 trap questions, 2 runs each) the direct connection was 28% faster per question than exporting first or driving the bq CLI, at equal accuracy.
 
 ### Empirical 5-Model Trust & Data Science Benchmarks + Official DABstep (2026-11-26)
 
@@ -87,7 +88,7 @@ Full white paper and methodology: `https://tiny-pivot.com/whitepaper` · Officia
 
 ### Honest, Cache-Aware Token Savings
 
-- **`load_file` and `query_postgres` (direct ingestion):** Raw rows stream locally to the UI iframe and Companion IDE at **0 LLM tokens**; only a short summary (a few hundred tokens: the chart card plus column notes) returns to the model.
+- **`load_file` and the `query_*` warehouse tools (direct ingestion):** Raw rows stream locally to the UI iframe and Companion IDE at **0 LLM tokens**; only a short summary (a few hundred tokens: the chart card plus column notes) returns to the model.
 - **Zero-token local exploration:** Every click inside the UI — switching Chart ↔ Pivot ↔ Data, sorting, filtering, changing themes, or double-click Drill-Through — runs locally in the browser/iframe for **$0** instead of burning another LLM round-trip.
 - **Honest accounting:** Inline `load_data` calls (where rows already entered context) report `0` ingestion bypass savings rather than inflating numbers.
 
@@ -101,6 +102,7 @@ Full white paper and methodology: `https://tiny-pivot.com/whitepaper` · Officia
 - `query` — Runs local DuckDB SQL (`sql` or `queries[]` up to 6 SELECTs) across files and loaded tables with deterministic trap auditing; named queries persist as DuckDB views across turns.
 - `profile` — Inspects column schemas, distributions, and (on Pro) relational grain & join fan-out maps, OR pass `dirPath` to scan a local folder of CSV/JSON/Parquet/XLSX schemas (collapsing partitioned file series like `data-2021..2024.csv` with a DuckDB glob hint and surfacing multi-sheet `.xlsx` headers & preamble notes) + docs (+ Pro cross-file join keys) in 1 call.
 - `analyze` — Deterministic 1-call Data Science shelf: `explain_change` (Kitagawa mix-vs-rate + Simpson's Paradox) and `ab_test` on Free; full SRM χ² + Holm-Bonferroni, controlled multivariate `regression`, right-censored `cohort_retention`, and seasonal `anomalies` + change-points on Pro.
+- `query_bigquery`, `query_snowflake`, `query_databricks`, `query_clickhouse`, `query_mysql` — *(Optional Pro)* read-only SQL run in that warehouse, listed when its settings are present.
 - `query_postgres` — *(Optional Pro)* AST-validated read-only `SELECT` against `DATABASE_URL`.
 - `list_datasets` — Lists loaded datasets, row counts, and inferred schemas.
 
@@ -111,7 +113,7 @@ MCP licenses (`TP-MCPP-*` / `TP-MCPT-*`) are separate from the React/Vue UI Libr
 | Plan | Price | Key Capabilities |
 |---|---|---|
 | **MCP Free** | $0 (no account) | **Unlimited local rows** (CSV, TSV, JSON, Parquet up to DuckDB memory cap), core charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`), Basic Pivot (`sum`), Data Grid (sort/filter/CSV/Markdown), Terminal Cards & Live Ghostty TUI, TinyPivot Studio IDE + Proof-of-Work Lineage, offline HTML export (with subtle TinyPivot footer), basic SQL guardrails (`non_additive_sql`, `empty_filter`, `chart_reaggregation`), `analyze(explain_change, ab_test)` |
-| **MCP Pro** | **$149/yr** or **$399 Local Lifetime** | Deep relational & statistical SQL guardrails (`join_fanout`, `partial_period`, `null_exclusion`, `outlier_distortion`), Turn-1 relational trap brief on `load_file`, full Data Science shelf (`ab_test` SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, seasonal `anomalies`), **Recursive Data Memory** (learns traps & Studio SQL fixes across sessions), closed-loop claim verification, all 10 editorial themes, double-click Drill-Through, all 9+ aggregations & calculated fields, white-label HTML & styled `.xlsx` Excel export, direct read-only `query_postgres` |
+| **MCP Pro** | **$149/yr** or **$399 Local Lifetime** | Deep relational & statistical SQL guardrails (`join_fanout`, `partial_period`, `null_exclusion`, `outlier_distortion`), Turn-1 relational trap brief on `load_file`, full Data Science shelf (`ab_test` SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, seasonal `anomalies`), **Recursive Data Memory** (learns traps & Studio SQL fixes across sessions), closed-loop claim verification, all 10 editorial themes, double-click Drill-Through, all 9+ aggregations & calculated fields, white-label HTML & styled `.xlsx` Excel export, direct read-only warehouse connectors (`query_bigquery`, `query_snowflake`, `query_databricks`, `query_clickhouse`, `query_mysql`, `query_postgres`) |
 | **MCP Team (5 seats)** | **$699/yr** | All MCP Pro features for 5 team seats (`TP-MCPT-*`) |
 
 ### Frequently Asked Questions (Quick Answers for Agents & Developers)

@@ -57,9 +57,16 @@ export const harnesses: HarnessSetup[] = [
     code: `${INIT_COMMAND} --targets=antigravity-cli\n\n# Or add it by hand:\nagy mcp add tinypivot -- npx -y ${MCP_SPEC}`,
   },
   {
+    id: 'warehouses',
+    label: 'Direct warehouses (Pro)',
+    summary: 'Read-only SQL that runs in Snowflake, BigQuery, Databricks, ClickHouse, MySQL or Postgres, so totals cover every row. init --connect reuses the sign-ins your warehouse tools already keep (gcloud, the Snowflake and Databricks CLIs, ~/.my.cnf, clickhouse client) and saves only a pointer to them, never a password.',
+    filename: 'shell',
+    code: `# Find warehouse sign-ins on this machine and switch them on:\n${INIT_COMMAND} --connect\n\n# Or choose which ones:\n${INIT_COMMAND} --connect=bigquery,snowflake`,
+  },
+  {
     id: 'postgres',
     label: 'Direct Postgres (Pro)',
-    summary: 'Read-only connector with SQL validation and a table allowlist. Every other database works by piping CSV or JSON.',
+    summary: 'Read-only connector with SQL validation and a table allowlist. Any other source works by handing TinyPivot an export or rows from its own MCP server.',
     filename: 'mcp config',
     code: npxServer({
       DATABASE_URL: 'postgresql://readonly:pass@localhost:5432/analytics',
@@ -79,6 +86,11 @@ export const tools = [
   { name: 'profile', role: 'Dataset or folder scan', desc: 'Profiles a loaded dataset (null share, ranges, top values, Pro relational grain), or pass dirPath to scan a local folder of CSV/JSON/Parquet/XLSX schemas, docs, and Pro cross-file join keys in 1 call.' },
   { name: 'analyze', role: '1-call Data Science', desc: 'Deterministic statistical shelf on datasetId or filePath: explain_change and ab_test on Free; SRM + Holm-Bonferroni, controlled regression, right-censored cohorts, and seasonal anomalies on Pro.' },
   { name: 'history', role: 'Every pull, kept', desc: 'Lists earlier pulls and reopens any of them without re-querying. Saved locally for 30 days.' },
+  { name: 'query_bigquery', role: 'Pro · BigQuery', desc: 'Read-only GoogleSQL run in BigQuery: dry-run checked, capped by bytes scanned, optionally limited to listed datasets.' },
+  { name: 'query_snowflake', role: 'Pro · Snowflake', desc: 'Read-only SQL run in Snowflake after its query plan is checked for writes, capped by bytes scanned and a 60-second timeout. Preview.' },
+  { name: 'query_databricks', role: 'Pro · Databricks', desc: 'Read-only Databricks SQL, refused if its EXPLAIN plan holds any write step, with a 60-second timeout. Preview.' },
+  { name: 'query_clickhouse', role: 'Pro · ClickHouse', desc: 'Read-only SQL with ClickHouse enforcing readonly mode, a read cap and a time limit on every query. Preview.' },
+  { name: 'query_mysql', role: 'Pro · MySQL & MariaDB', desc: 'One SELECT inside a server-enforced read-only transaction with a statement time limit. Preview.' },
   { name: 'query_postgres', role: 'Pro · Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
 ] as const
 

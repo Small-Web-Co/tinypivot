@@ -1,6 +1,6 @@
 {
   "name": "tinypivot",
-  "version": "0.8.6",
+  "version": "0.9.0",
   "description": "Data analysis studio for AI agents: turn CSV, JSON, API/MCP outputs, and SQL results into charts, pivot tables, data grids, terminal cards, and Excel exports, with a live Studio that shows every step.",
   "author": {
     "name": "Small Web, LLC",
