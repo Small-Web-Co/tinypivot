@@ -327,11 +327,12 @@ const takeaways = [
             {{ sectionNo('warehouses') }} · Results · direct warehouse connections
           </p>
           <h2 class="heading">
-            The same answers, <em>found faster.</em>
+            Faster and cheaper on Claude — <em>and 88% → 100% on local models.</em>
           </h2>
           <p class="lede">
-            Querying BigQuery directly did not make Claude more accurate: every setup answered all {{ WAREHOUSE_STUDY.totalRuns }} runs correctly.
-            It made it faster than the agent driving the bq command line itself, and much faster than exporting first, for a little more API spend than the command line.
+            With 1-call warehouse profiling, batched queries[], cached trap audits and SQL repair hints, direct BigQuery queries
+            cut Claude’s wall-clock time by 46% and API spend by 20–25% versus the bq command line (and 71% faster than exporting first).
+            On small local models (Inkling 2 Mini and DeepSeek V4.1 Flash), accuracy rose from 88% to 100% while cutting turns in half.
           </p>
         </header>
 
@@ -345,8 +346,9 @@ const takeaways = [
             Prompts never hint at the trap.
           </p>
           <p>
-            Claude Haiku and Claude Sonnet each answered every question twice in each setup, run headless through Claude Code with
-            TinyPivot MCP 0.9.1, on {{ WAREHOUSE_STUDY.date }}.
+            Claude Haiku and Claude Sonnet each answered every question twice in each setup via Claude Code (96 runs, cold-cache API spend),
+            and Inkling 2 Mini and DeepSeek V4.1 Flash answered the same questions twice across bare SQL, pre-exported local Parquet files
+            and TinyPivot Pro direct (96 local runs), on {{ WAREHOUSE_STUDY.date }}.
           </p>
         </div>
 

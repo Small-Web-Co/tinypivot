@@ -1,6 +1,6 @@
 import type { WarehouseArmId, WarehouseArmResult } from './whitepaper'
 import { percentChange } from './modelChart'
-import { WAREHOUSE_STUDY, warehouseResults } from './whitepaper'
+import { WAREHOUSE_LOCAL_STUDY, warehouseLocalResults, warehouseResults } from './whitepaper'
 
 /** Direct warehouse connections (Pro): what they are for, and the measured gain behind the claim. */
 
@@ -15,8 +15,8 @@ export const WAREHOUSE_BENEFITS = [
     body: 'The warehouse does the maths on the whole table. No 100-row command-line preview, no sampled export, nothing quietly cut off.',
   },
   {
-    title: 'Nothing to export',
-    body: 'No CSV copies on laptops to keep in sync. The agent sees the result, never the raw table.',
+    title: '1-call schema & trap brief',
+    body: 'profile() reads 0-scan metadata plus one aggregate probe per table to surface schemas, filter values, date ranges, join fan-out, NULL shares and mixed currencies before the first query.',
   },
   {
     title: 'The sign-in you already have',
@@ -24,7 +24,7 @@ export const WAREHOUSE_BENEFITS = [
   },
   {
     title: 'Read-only, with a spend cap',
-    body: 'One SELECT at a time, checked by the warehouse\'s own dry run or query plan before it runs, with a scan cap, a table allowlist and a tag on every query.',
+    body: 'Checked by the warehouse\'s own dry run or query plan before it runs, with a scan cap, a table allowlist, batched queries[] and a tag on every query.',
   },
 ] as const
 
@@ -37,21 +37,23 @@ export function warehouseTotal(arm: WarehouseArmId): WarehouseArmResult {
   return { correct: sum('correct'), avgSec: sum('avgSec') / warehouseResults.length, cost: sum('cost') }
 }
 
-/** How much more direct queries cost than the agent driving the bq command line, per model, in whole percent. */
-export function directExtraCostPct(): number[] {
+/** Percent cost change of direct queries vs the agent driving the bq command line, per Claude model (negative means cheaper). */
+export function directCostDeltaPct(): number[] {
   return warehouseResults.map(({ arms }) => Math.round(((arms.direct.cost - arms.cli.cost) / arms.cli.cost) * 100))
 }
 
 export function warehouseHighlights() {
   const [cli, exported, direct] = (['cli', 'export', 'direct'] as const).map(warehouseTotal)
-  const extraCost = directExtraCostPct()
-  const runs = WAREHOUSE_STUDY.runsPerArm * warehouseResults.length
+  const costSavings = directCostDeltaPct().map(pct => -pct)
+  const localSql = warehouseLocalResults.reduce((s, r) => s + r.arms.sql.correct, 0)
+  const localDirect = warehouseLocalResults.reduce((s, r) => s + r.arms.direct.correct, 0)
+  const localTotal = WAREHOUSE_LOCAL_STUDY.runsPerArm * warehouseLocalResults.length
   return [
-    { value: `${-percentChange(cli.avgSec, direct.avgSec)}% faster`, label: 'per question than the agent driving the bq command line itself' },
+    { value: `${-percentChange(cli.avgSec, direct.avgSec)}% faster`, label: `per question than the bq command line on Claude (${Math.min(...costSavings)}–${Math.max(...costSavings)}% less API spend)` },
     { value: `${-percentChange(exported.avgSec, direct.avgSec)}% faster`, label: 'than exporting to a file first and analysing that, the route TinyPivot Free has' },
     {
-      value: `${direct.correct} / ${runs} correct`,
-      label: `as in every other setup: the gain is time, not accuracy, at ${Math.min(...extraCost)}–${Math.max(...extraCost)}% more API spend than the command line`,
+      value: `${Math.round((localSql / localTotal) * 100)}% → ${Math.round((localDirect / localTotal) * 100)}%`,
+      label: `on small local models (Inkling 2 Mini & DeepSeek V4.1 Flash, ${localDirect}/${localTotal} correct vs ${localSql}/${localTotal} bare SQL, turns cut in half)`,
     },
   ]
 }

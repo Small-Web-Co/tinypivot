@@ -414,7 +414,7 @@ async function auditPartialTrailingPeriod(
   }
 }
 
-function levenshtein(a: string, b: string): number {
+export function levenshtein(a: string, b: string): number {
   const m = a.length
   const n = b.length
   const dp = Array.from({ length: n + 1 }, (_, j) => j)

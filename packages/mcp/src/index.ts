@@ -131,4 +131,23 @@ export {
   runTuiCommand,
 } from './tui.js'
 export { auditWarehouseQuery } from './warehouse-audit.js'
-export { backtickName, plainName, QueryRefused, readOnlyStatementError, type SqlDialect, type WarehouseConnector, type WarehouseQueryResult } from './warehouse.js'
+export { formatWarehouseSqlRepairHint } from './warehouse-hints.js'
+export {
+  buildTableProfileSql,
+  createWarehouseSessionCache,
+  loadWarehouseSchemas,
+  profileWarehouse,
+  type WarehouseSessionCache,
+} from './warehouse-profile.js'
+export {
+  backtickName,
+  mapWarehouseWork,
+  plainName,
+  QueryRefused,
+  readOnlyStatementError,
+  type SqlDialect,
+  type WarehouseColumnSchema,
+  type WarehouseConnector,
+  type WarehouseQueryResult,
+  type WarehouseTableSchema,
+} from './warehouse.js'

@@ -11,12 +11,29 @@ export interface WarehouseQueryResult {
   note?: string
 }
 
-/** The little dialect the Pro audit probes need to write portable SQL for a database. */
+export interface WarehouseColumnSchema {
+  name: string
+  type: string
+}
+
+export interface WarehouseTableSchema {
+  /** Table name as written in SQL (`dataset.table` or `db.schema.table`). */
+  name: string
+  /** Approximate or exact row count from warehouse metadata, when available without scanning. */
+  rowCount?: number
+  columns: WarehouseColumnSchema[]
+}
+
+/** The little dialect the Pro audit and profile probes need to write portable SQL for a database. */
 export interface SqlDialect {
   /** A column name as this database reads it in a probe. */
   quoteName: (name: string) => string
   /** A median aggregate of `expr`; omitted when the database has none, which skips the outlier audit. */
   median?: (expr: string) => string
+  /** Fast approximate distinct count for profiling multi-million-row tables; falls back to `COUNT(DISTINCT ...)`. */
+  approxCountDistinct?: (expr: string) => string
+  /** An aggregate returning up to `limit` distinct non-NULL string values separated by `, `. */
+  sampleDistinct?: (expr: string, limit: number) => string
 }
 
 /** Backticked names, for BigQuery, Databricks, ClickHouse and MySQL. */
@@ -42,12 +59,30 @@ export interface WarehouseConnector {
   freeAlternative: string
   /** The most rows one query returns. */
   maxRows: number
-  /** How audit probes name columns and take a median here. */
+  /** Whether this connector safely executes multiple queries concurrently (true for BigQuery, Postgres, ClickHouse). */
+  concurrent?: boolean
+  /** How audit and profile probes name columns, take a median, and sample distinct values. */
   dialect: SqlDialect
   /** Tables the model may query, as it should name them in SQL. */
   listTables: () => Promise<string[]>
+  /** Column schemas (and optional metadata row counts) for matching tables without scanning row data. */
+  describeTables?: (tables?: string[]) => Promise<WarehouseTableSchema[]>
   /** Checks the SQL is a single read-only SELECT within limits, then runs it. Throws with a reason if not. */
   query: (sql: string) => Promise<WarehouseQueryResult>
+}
+
+/** Runs `work` over `items` in parallel when the connector supports concurrency, or sequentially for single-session connectors. */
+export async function mapWarehouseWork<T, R>(
+  items: T[],
+  concurrent: boolean | undefined,
+  work: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (concurrent)
+    return Promise.all(items.map((item, i) => work(item, i)))
+  const out: R[] = []
+  for (let i = 0; i < items.length; i++)
+    out.push(await work(items[i], i))
+  return out
 }
 
 /** A query the connector refused before running it: the connection is fine, the SQL is not. */

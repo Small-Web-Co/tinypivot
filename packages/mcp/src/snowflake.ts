@@ -1,5 +1,5 @@
 import type { RuntimePackage } from './runtime-package.js'
-import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
+import type { WarehouseConnector, WarehouseQueryResult, WarehouseTableSchema } from './warehouse.js'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -350,6 +350,32 @@ export function toSnowflakePlainValue(value: unknown): unknown {
   return toPlainValue(isBigInteger ? BigInt(String(value)) : value)
 }
 
+async function describeSnowflakeTables(session: SnowflakeSessionLike, config: SnowflakeConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
+  if (!config.database)
+    return []
+  const db = `"${config.database.replace(/"/g, '""')}"`
+  const schemaFilter = config.schema ? ` AND table_schema = '${config.schema.replace(/'/g, '\'\'').toUpperCase()}'` : ''
+  const { rows } = await session.run(
+    `SELECT table_catalog || '.' || table_schema || '.' || table_name AS tbl, column_name AS col, data_type AS dtype
+     FROM ${db}.information_schema.columns WHERE table_schema <> 'INFORMATION_SCHEMA'${schemaFilter}
+     ORDER BY 1, ordinal_position LIMIT 1000`,
+    1000,
+  )
+  const filters = requested?.map(t => t.replace(/"/g, '').toLowerCase())
+  const byTable = new Map<string, WarehouseTableSchema>()
+  for (const row of rows) {
+    const tbl = String(row.TBL ?? row.tbl ?? '')
+    if (!tbl || !isAllowedObject(tbl, config.allowed))
+      continue
+    if (filters?.length && !filters.some(f => tbl.toLowerCase() === f || tbl.toLowerCase().endsWith(`.${f}`) || tbl.toLowerCase().startsWith(`${f}.`)))
+      continue
+    const entry = byTable.get(tbl) ?? { name: tbl, columns: [] }
+    entry.columns.push({ name: String(row.COL ?? row.col ?? ''), type: String(row.DTYPE ?? row.dtype ?? '') })
+    byTable.set(tbl, entry)
+  }
+  return [...byTable.values()].slice(0, 20)
+}
+
 export function snowflakeConnector(config: SnowflakeConfig, createSession: SnowflakeSessionFactory = officialSession): WarehouseConnector {
   let session: Promise<SnowflakeSessionLike> | undefined
   const getSession = () => {
@@ -379,11 +405,17 @@ export function snowflakeConnector(config: SnowflakeConfig, createSession: Snowf
     id: 'snowflake',
     label: 'Snowflake',
     toolName: 'query_snowflake',
-    sqlHint: `Snowflake SQL, one read-only SELECT${where ? `; unqualified tables resolve in ${where}` : '; name tables database.schema.table'}.`,
+    sqlHint: `Snowflake SQL (SELECT/WITH, sql or queries[])${where ? `; unqualified tables resolve in ${where}` : '; name tables database.schema.table'}.`,
     freeAlternative: 'export with `snowsql -o output_format=csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
-    dialect: { quoteName: plainName, median: expr => `MEDIAN(${expr})` },
+    dialect: {
+      quoteName: plainName,
+      median: expr => `MEDIAN(${expr})`,
+      approxCountDistinct: expr => `APPROX_COUNT_DISTINCT(${expr})`,
+      sampleDistinct: (expr, limit) => `ARRAY_TO_STRING(ARRAY_SLICE(ARRAY_AGG(DISTINCT TO_VARCHAR(${expr})), 0, ${limit}), ', ')`,
+    },
     listTables: () => withSession(s => listTables(s, config)),
+    describeTables: tables => withSession(s => describeSnowflakeTables(s, config, tables)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }
 }

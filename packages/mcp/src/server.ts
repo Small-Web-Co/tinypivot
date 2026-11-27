@@ -44,7 +44,9 @@ import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
 import { hasFeature } from './tiers.js'
 import { auditWarehouseQuery } from './warehouse-audit.js'
-import { truncationNote } from './warehouse.js'
+import { formatWarehouseSqlRepairHint } from './warehouse-hints.js'
+import { createWarehouseSessionCache, listCachedSchemas, loadWarehouseSchemas, profileWarehouse } from './warehouse-profile.js'
+import { mapWarehouseWork, truncationNote } from './warehouse.js'
 
 export const APP_RESOURCE_URI = 'ui://tinypivot/app.html'
 export const APP_MIME_TYPE = 'text/html;profile=mcp-app'
@@ -56,10 +58,23 @@ const LOAD_DATA_ROW_GUIDE = 50
  * What the model is told once per session. Hosts send it with every request, so every word
  * here costs every user on every turn: keep it to what changes the model's behaviour.
  */
-export function buildInstructions({ reprintCards = true, claudeChannel = false, isPro = false }: { reprintCards?: boolean, claudeChannel?: boolean, isPro?: boolean } = {}): string {
+export function buildInstructions({
+  reprintCards = true,
+  claudeChannel = false,
+  isPro = false,
+  warehouses = [],
+}: {
+  reprintCards?: boolean
+  claudeChannel?: boolean
+  isPro?: boolean
+  warehouses?: Pick<WarehouseConnector, 'id' | 'label' | 'toolName'>[]
+} = {}): string {
   const cards = reprintCards
     ? 'In a terminal, show the ```text card verbatim with the Studio link only when a chart/pivot was asked for (never in pi or inline views); else give concise findings and the Studio link.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
+  const warehouseLine = warehouses.length > 0 && hasFeature(isPro, 'audit_deep')
+    ? `For ${warehouses.map(w => `${w.label} (\`${w.toolName}\`)`).join(', ')}: call \`profile(warehouse="${warehouses[0].id}", tables=["<dataset_or_table>"])\` ONCE first (pass the dataset/schema name from the question to get exact schemas, row counts, distinct values, date ranges, and NULL/fan-out/currency traps — skip INFORMATION_SCHEMA and SELECT * LIMIT probes), then answer in 1 call via \`${warehouses[0].toolName}\` (supports \`sql\` or \`queries[]\` up to 6 SELECTs). Fix any [AUDIT] warnings before answering.`
+    : ''
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
     `Use load_file to chart files, or query (sql or queries[] up to 6 SELECTs over files) to filter/join/aggregate without loading rows into context. load_data is only for <=${LOAD_DATA_ROW_GUIDE} inline rows; history lists/reopens pulls.`,
@@ -67,7 +82,8 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false, 
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
     'On every data call pass why (one short sentence for TinyPivot Studio); when loading or querying, also ask (the user\'s request, verbatim).',
-    ...(hasFeature(isPro, 'audit_deep')
+    ...(warehouseLine ? [warehouseLine] : []),
+    ...(hasFeature(isPro, 'audit_deep') && warehouses.length === 0
       ? ['Skip Read/load_file when analyzing files: pass multiple read-only SELECTs in query.queries[] (exact tables returned) over file paths directly, or call analyze(method, filePath) in 1 call for A/B tests, confounding/regression, cohorts, seasonality/anomalies, or mix-vs-rate. Fix any [AUDIT] or [PRO DATA GUARD] warnings before answering.']
       : []),
     ...(claudeChannel ? ['Messages from TinyPivot Studio arrive as <channel source="tinypivot"> events: do what they ask, then answer with studio_reply.'] : []),
@@ -539,6 +555,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const reprintCards = options.reprintCards ?? process.env.TINYPIVOT_REPRINT_CARDS !== '0'
   const claudeChannel = options.claudeChannel ?? claudeChannelEnabled()
   const warehouses = options.warehouses ?? warehousesFromEnv()
+  const warehouseCaches = new Map(warehouses.map(w => [w.id, createWarehouseSessionCache()]))
 
   const server = new McpServer(
     {
@@ -551,7 +568,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         tools: {},
         ...(claudeChannel ? { experimental: { 'claude/channel': {} } } : {}),
       },
-      instructions: buildInstructions({ reprintCards, claudeChannel, isPro }),
+      instructions: buildInstructions({ reprintCards, claudeChannel, isPro, warehouses }),
     },
   )
 
@@ -1087,16 +1104,47 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
+  function formatCompactTable(columns: string[], rows: Record<string, unknown>[], maxRows = 25): string {
+    if (columns.length === 0)
+      return '_(no columns)_'
+    const shown = rows.slice(0, maxRows)
+    const header = `| ${columns.join(' | ')} |`
+    const sep = `| ${columns.map(() => '---').join(' | ')} |`
+    const body = shown.map(r => `| ${columns.map(c => String(r[c] ?? '')).join(' | ')} |`)
+    const more = rows.length > maxRows ? `\n_(+${rows.length - maxRows} more rows)_` : ''
+    return `${header}\n${sep}\n${body.join('\n')}${more}`
+  }
+
+  function makeTempDataset(id: string, name: string, source: string, rows: Record<string, unknown>[]): StoredDataset {
+    const cols = rows.length > 0 ? Object.keys(rows[0]) : []
+    return {
+      id,
+      name,
+      source,
+      ingestionMode: 'direct',
+      rawBytes: 0,
+      estimatedDatasetTokens: 0,
+      rows,
+      columns: cols.map(c => ({ name: c, type: 'string' as const, sampleValues: [], distinctCount: 0 })),
+      sourceTotalRows: rows.length,
+      truncatedForFreeTier: false,
+      viewMode: 'grid',
+      loadedAt: new Date().toISOString(),
+    }
+  }
+
   // 6. Optional read-only database and warehouse tools: the SQL runs where the data lives.
   for (const warehouse of warehouses) {
+    const cache = warehouseCaches.get(warehouse.id)!
     studio.registerRerun(warehouse.toolName, async sql => (await warehouse.query(sql)).rows)
     server.registerTool(
       warehouse.toolName,
       {
         title: `Query ${warehouse.label} Directly (Read-Only, Pro)`,
-        description: `Run a read-only SELECT in ${warehouse.label} and chart or pivot the result. ${warehouse.sqlHint}`,
+        description: `Run a read-only SELECT in ${warehouse.label} (or queries[] up to 6) and chart or pivot the result. ${warehouse.sqlHint}`,
         inputSchema: {
-          sql: z.string(),
+          sql: z.string().optional(),
+          queries: z.array(z.string()).optional(),
           why: whyParam,
           ask: askParam,
           name: z.string().optional(),
@@ -1108,7 +1156,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         annotations: READ_ONLY_REMOTE_ANNOTATIONS,
         _meta: INLINE_UI_META,
       },
-      async ({ sql, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
+      async ({ sql, queries, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
         if (!isPro) {
           return {
             isError: true,
@@ -1118,47 +1166,65 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             }],
           }
         }
+        const activeStatements = queries?.length
+          ? queries.map(q => q.trim()).filter(Boolean).slice(0, 6)
+          : (sql?.trim() ? [sql.trim()] : [])
+        if (activeStatements.length === 0)
+          return { isError: true, content: [{ type: 'text' as const, text: 'SQL query is empty.' }] }
+        const primarySql = activeStatements[activeStatements.length - 1]
         try {
           const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
-          const res = await warehouse.query(sql)
+          const results = await mapWarehouseWork(activeStatements, warehouse.concurrent, stmt => warehouse.query(stmt))
+          const primaryRes = results[results.length - 1]
           const ds = store.register({
             name: name ?? `${warehouse.label} Query`,
             source: warehouse.label,
             ingestionMode: 'direct',
-            rows: res.rows,
+            rows: primaryRes.rows,
             viewMode: initialViewMode(viewMode, Boolean(pivotConfig), Boolean(chartConfig)),
             pivotConfig: pivotConfig ? normalizePivot(pivotConfig) : undefined,
             chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
             sessionKey,
             keepExisting: shouldKeep,
           })
-          studio.remember(ds, { kind: warehouse.id, source: sql })
-          studio.recordDatasetStep(ds, { actor: 'agent', tool: warehouse.toolName, why, ask, sql })
-          const warnings = hasFeature(isPro, 'audit_basic')
-            ? await auditWarehouseQuery({ sql, dataset: ds, warehouse, deep: hasFeature(isPro, 'audit_deep') })
-            : []
-          const note = `${res.note ? `\n_${res.note}_` : ''}${res.truncated ? truncationNote(warehouse) : ''}${formatAuditWarnings(warnings)}`
-          return replyWithDataset(ds, sessionKey, warehouse.toolName, note)
+          studio.remember(ds, { kind: warehouse.id, source: primarySql })
+          studio.recordDatasetStep(ds, { actor: 'agent', tool: warehouse.toolName, why, ask, sql: primarySql })
+
+          const runBasicAudit = hasFeature(isPro, 'audit_basic')
+          const runDeepAudit = hasFeature(isPro, 'audit_deep')
+          const priorBlocks: string[] = []
+          const allWarnings: Awaited<ReturnType<typeof auditWarehouseQuery>> = []
+          for (let idx = 0; idx < results.length - 1; idx++) {
+            const stmt = activeStatements[idx]
+            const r = results[idx]
+            const cols = r.rows.length > 0 ? Object.keys(r.rows[0]) : []
+            const trunc = r.truncated ? truncationNote(warehouse) : ''
+            priorBlocks.push(`\n### Batch Query ${idx + 1}/${results.length} (${r.rows.length} row${r.rows.length === 1 ? '' : 's'})\n${formatCompactTable(cols, r.rows)}${trunc}`)
+            if (runBasicAudit) {
+              const tempDs = makeTempDataset(`batch_${idx + 1}`, `Batch ${idx + 1}`, stmt, r.rows)
+              allWarnings.push(...await auditWarehouseQuery({ sql: stmt, dataset: tempDs, warehouse, deep: runDeepAudit, cache }))
+            }
+          }
+          if (runBasicAudit)
+            allWarnings.push(...await auditWarehouseQuery({ sql: primarySql, dataset: ds, warehouse, deep: runDeepAudit, cache }))
+          const dedupedWarnings = [...new Map(allWarnings.map(w => [`${w.kind}:${w.title}`, w])).values()]
+          const batchNote = priorBlocks.length > 0 ? `\n${priorBlocks.join('\n')}` : ''
+          const note = `${batchNote}${primaryRes.note ? `\n_${primaryRes.note}_` : ''}${primaryRes.truncated ? truncationNote(warehouse) : ''}${formatAuditWarnings(dedupedWarnings)}`
+          const preferSmallTable = !viewMode && !chartConfig && !pivotConfig
+          return replyWithDataset(ds, sessionKey, warehouse.toolName, note, { preferSmallTable })
         }
         catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          if (!cache.schemasLoaded && warehouse.describeTables)
+            await withinBudget(loadWarehouseSchemas(warehouse, cache), 2_500).catch(() => {})
+          const repairHint = formatWarehouseSqlRepairHint(warehouse.id, msg, primarySql, listCachedSchemas(cache))
           return {
             isError: true,
-            content: [{ type: 'text', text: `${warehouse.label} query failed: ${err instanceof Error ? err.message : String(err)} Call list_datasets to see the ${warehouse.label} tables, and send one read-only SELECT.` }],
+            content: [{ type: 'text', text: `${warehouse.label} query failed: ${msg} Call \`profile(warehouse="${warehouse.id}")\` for exact schemas or \`list_datasets\` to see the ${warehouse.label} tables, and send read-only SELECT(s).${repairHint}` }],
           }
         }
       },
     )
-  }
-
-  function formatCompactTable(columns: string[], rows: Record<string, unknown>[], maxRows = 25): string {
-    if (columns.length === 0)
-      return '_(no columns)_'
-    const shown = rows.slice(0, maxRows)
-    const header = `| ${columns.join(' | ')} |`
-    const sep = `| ${columns.map(() => '---').join(' | ')} |`
-    const body = shown.map(r => `| ${columns.map(c => String(r[c] ?? '')).join(' | ')} |`)
-    const more = rows.length > maxRows ? `\n_(+${rows.length - maxRows} more rows)_` : ''
-    return `${header}\n${sep}\n${body.join('\n')}${more}`
   }
 
   // 7. List loaded datasets (and Postgres tables if configured)
@@ -1287,21 +1353,53 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
-  // Column-level statistics (plus Pro relational grain, join-key fan-out & partial-period summary), or 1-call folder schema scan.
+  // Column-level statistics (plus Pro relational grain, join-key fan-out & partial-period summary), folder scan, or 1-call warehouse brief.
   server.registerTool(
     'profile',
     {
-      title: 'Profile Dataset or Folder',
-      description: 'Profile a dataset (nulls, ranges, top values) or scan a folder (dirPath) of file schemas.',
+      title: 'Profile Dataset, Folder, or Warehouse',
+      description: warehouses.length > 0
+        ? `Profile a dataset, folder (dirPath), or connected warehouse (warehouse="${warehouses[0].id}" + optional tables/dataset prefix for 1-call schemas, values, date ranges & traps).`
+        : 'Profile a dataset (nulls, ranges, top values) or scan a folder (dirPath) of file schemas.',
       inputSchema: {
         datasetId: z.string().optional(),
         dirPath: z.string().optional(),
+        ...(warehouses.length > 0
+          ? {
+              warehouse: z.string().optional(),
+              tables: z.array(z.string()).optional(),
+            }
+          : {}),
         why: whyParam,
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
-    async ({ datasetId, dirPath, why }, extra) => {
+    async ({ datasetId, dirPath, warehouse: warehouseArg, tables, why }, extra) => {
       const useRelational = hasFeature(isPro, 'profile_relational')
+      if (warehouseArg || (tables?.length && warehouses.length === 1)) {
+        const target = warehouseArg
+          ? warehouses.find(w => w.id === warehouseArg.toLowerCase() || w.toolName === warehouseArg.toLowerCase() || w.label.toLowerCase() === warehouseArg.toLowerCase())
+          : warehouses[0]
+        if (!target) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `Warehouse "${warehouseArg}" is not configured. Configured warehouses: ${warehouses.map(w => w.id).join(', ') || 'none'}.` }],
+          }
+        }
+        if (!isPro) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `Profiling ${target.label} directly requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). On Free, ${target.freeAlternative}. Upgrade at https://tiny-pivot.com/pricing` }],
+          }
+        }
+        try {
+          const text = await profileWarehouse(target, { tables, isPro: useRelational, cache: warehouseCaches.get(target.id)! })
+          return { content: [{ type: 'text' as const, text }] }
+        }
+        catch (err) {
+          return { isError: true, content: [{ type: 'text' as const, text: `${target.label} profile failed: ${err instanceof Error ? err.message : String(err)}` }] }
+        }
+      }
       if (dirPath) {
         try {
           await withinBudget(studio.duck.prepare(), DUCKDB_WAIT_MS)
@@ -1456,7 +1554,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       )
       for (const { warehouse, tables } of warehouseTables) {
         if (tables.length > 0)
-          lines.push('', `${warehouse.label} tables available via \`${warehouse.toolName}\`: ${tables.map(t => `\`${t}\``).join(', ')}`)
+          lines.push('', `${warehouse.label} tables available via \`${warehouse.toolName}\`: ${tables.map(t => `\`${t}\``).join(', ')} (call \`profile(warehouse="${warehouse.id}")\` for schemas, distinct values, date ranges & data traps)`)
       }
 
       return {

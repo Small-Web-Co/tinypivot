@@ -1,5 +1,5 @@
 import type { RuntimePackage } from './runtime-package.js'
-import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
+import type { WarehouseConnector, WarehouseQueryResult, WarehouseTableSchema } from './warehouse.js'
 import crypto from 'node:crypto'
 import os from 'node:os'
 import { formatBytes } from './bigquery.js'
@@ -412,6 +412,31 @@ async function listTables(session: ClickHouseSession, config: ClickHouseConfig):
   return rows.map(row => String(row.name))
 }
 
+async function describeClickHouseTables(session: ClickHouseSession, config: ClickHouseConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
+  const where = config.database
+    ? `database = ${sqlString(config.database)}`
+    : `database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')`
+  const { rows } = await fetchRows(
+    session.client,
+    `SELECT concat(database, '.', table) AS tbl, name AS col, type AS dtype FROM system.columns WHERE ${where} ORDER BY tbl, position LIMIT 1000`,
+    querySettings(config, session.profile.readonly),
+    1000,
+  )
+  const filters = requested?.map(t => t.replace(/`/g, '').toLowerCase())
+  const byTable = new Map<string, WarehouseTableSchema>()
+  for (const row of rows) {
+    const tbl = String(row.tbl ?? '')
+    if (!tbl)
+      continue
+    if (filters?.length && !filters.some(f => tbl.toLowerCase() === f || tbl.toLowerCase().endsWith(`.${f}`) || tbl.toLowerCase().startsWith(`${f}.`)))
+      continue
+    const entry = byTable.get(tbl) ?? { name: tbl, columns: [] }
+    entry.columns.push({ name: String(row.col ?? ''), type: String(row.dtype ?? '') })
+    byTable.set(tbl, entry)
+  }
+  return [...byTable.values()].slice(0, 20)
+}
+
 export function clickHouseConnector(config: ClickHouseConfig, createClient: ClickHouseClientFactory = officialClient): WarehouseConnector {
   let session: Promise<ClickHouseSession> | undefined
   const getSession = () => {
@@ -445,11 +470,18 @@ export function clickHouseConnector(config: ClickHouseConfig, createClient: Clic
     id: 'clickhouse',
     label: 'ClickHouse',
     toolName: 'query_clickhouse',
-    sqlHint: `ClickHouse SQL, one read-only SELECT without SETTINGS or FORMAT${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}. Names are case-sensitive.`,
+    sqlHint: `ClickHouse SQL (SELECT/WITH, sql or queries[]) without SETTINGS or FORMAT${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}. Names are case-sensitive.`,
     freeAlternative: 'export with `clickhouse client --query "SELECT …" --format CSVWithNames > result.csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
-    dialect: { quoteName: backtickName, median: expr => `median(${expr})` },
+    concurrent: true,
+    dialect: {
+      quoteName: backtickName,
+      median: expr => `median(${expr})`,
+      approxCountDistinct: expr => `uniq(${expr})`,
+      sampleDistinct: (expr, limit) => `arrayStringConcat(groupUniqArray(${limit})(toString(${expr})), ', ')`,
+    },
     listTables: () => withSession(s => listTables(s, config)),
+    describeTables: tables => withSession(s => describeClickHouseTables(s, config, tables)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }
 }

@@ -445,12 +445,13 @@ const html = `<!doctype html>
   </p>
 
   <div class="page-break"></div>
-  <h2>4. Track C — Direct Warehouse Connections (${wp.WAREHOUSE_STUDY.totalRuns} Runs)</h2>
+  <h2>4. Track C — Direct Warehouse Connections (${wp.WAREHOUSE_STUDY.totalRuns + wp.WAREHOUSE_LOCAL_STUDY.totalRuns} Runs Across 4 Models)</h2>
   <p>
-    ${wp.WAREHOUSE_STUDY.questions} questions over fake Acme tables in BigQuery (2.7 million orders), each hiding a trap, asked of
-    ${esc(wp.warehouseResults.map(r => r.model).join(' and '))} in three setups, ${wp.WAREHOUSE_STUDY.reps} runs each
-    (${wp.WAREHOUSE_STUDY.date}, $${wp.WAREHOUSE_STUDY.totalCost.toFixed(2)} of API spend in all).
+    ${wp.WAREHOUSE_STUDY.questions} questions over fake Acme tables in BigQuery (2.7 million orders), each hiding a trap, run ${wp.WAREHOUSE_STUDY.reps} times per setup on
+    ${esc(wp.warehouseResults.map(r => r.model).join(' and '))} (${wp.WAREHOUSE_STUDY.totalRuns} Claude Code runs, $${wp.WAREHOUSE_STUDY.totalCost.toFixed(2)} cold-cache API spend)
+    and on small local models ${esc(wp.warehouseLocalResults.map(r => r.model.split(' (')[0]).join(' and '))} (${wp.WAREHOUSE_LOCAL_STUDY.totalRuns} local runs, 8-turn cap), on ${wp.WAREHOUSE_STUDY.date}.
   </p>
+  <h3>Cloud Models (Claude Code)</h3>
   <table>
     <thead><tr><th>Model</th>${wp.warehouseArms.map(a => `<th>${esc(a.name)}</th>`).join('')}</tr></thead>
     <tbody>
@@ -460,7 +461,17 @@ const html = `<!doctype html>
       }).join('')}</tr>`).join('')}
     </tbody>
   </table>
-  <p class="footnote">Time is the average per question; cost is the API price of all ${wp.WAREHOUSE_STUDY.runsPerArm} runs in a cell.
+  <h3>Small Local Models (8-Turn Cap)</h3>
+  <table>
+    <thead><tr><th>Model</th>${wp.warehouseLocalArms.map(a => `<th>${esc(a.name)}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${wp.warehouseLocalResults.map(r => `<tr><td>${esc(r.model)}</td>${wp.warehouseLocalArms.map((a) => {
+        const cell = r.arms[a.id]
+        return `<td class="mono">${cell.correct}/${wp.WAREHOUSE_LOCAL_STUDY.runsPerArm} correct · ${cell.avgSec.toFixed(1)}s · ${cell.avgTurns.toFixed(1)}t · est. $${cell.estCost.toFixed(4)}</td>`
+      }).join('')}</tr>`).join('')}
+    </tbody>
+  </table>
+  <p class="footnote">Time is the average per question; Claude cost is cold-cache API spend for all ${wp.WAREHOUSE_STUDY.runsPerArm} runs in a cell; local models run at $0 with API-equivalent token estimates shown.
     ${wp.warehouseArms.map(a => `<strong>${esc(a.name)}:</strong> ${esc(a.body)}`).join(' ')}</p>
   <ul>
     ${wp.warehouseFindings.map(f => `<li>${esc(f)}</li>`).join('')}

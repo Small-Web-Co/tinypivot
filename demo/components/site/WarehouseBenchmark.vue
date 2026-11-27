@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { formatCost } from '../../site/modelChart'
-import { WAREHOUSE_STUDY, warehouseArms, warehouseResults, warehouseTasks } from '../../site/whitepaper'
+import {
+  WAREHOUSE_LOCAL_STUDY,
+  WAREHOUSE_STUDY,
+  warehouseArms,
+  warehouseLocalArms,
+  warehouseLocalResults,
+  warehouseResults,
+  warehouseTasks,
+} from '../../site/whitepaper'
 
 /** White paper: the direct-warehouse benchmark's results by model and setup, and the questions behind them. */
 </script>
@@ -8,7 +16,7 @@ import { WAREHOUSE_STUDY, warehouseArms, warehouseResults, warehouseTasks } from
 <template>
   <figure class="whb">
     <p class="label whb-cap">
-      BigQuery · {{ WAREHOUSE_STUDY.questions }} questions × {{ WAREHOUSE_STUDY.reps }} runs per model and setup · {{ WAREHOUSE_STUDY.date }}
+      Cloud models (Claude Code) · BigQuery · {{ WAREHOUSE_STUDY.questions }} questions × {{ WAREHOUSE_STUDY.reps }} runs per model and setup · {{ WAREHOUSE_STUDY.date }}
     </p>
     <div class="whb-scroll">
       <table>
@@ -36,8 +44,40 @@ import { WAREHOUSE_STUDY, warehouseArms, warehouseResults, warehouseTasks } from
       </table>
     </div>
     <figcaption class="whb-note">
-      Time is the agent’s own wall-clock time per question, averaged over every run; cost is the API price of all
-      {{ WAREHOUSE_STUDY.runsPerArm }} runs in that cell. Whole study: {{ WAREHOUSE_STUDY.totalRuns }} runs, {{ formatCost(WAREHOUSE_STUDY.totalCost) }}.
+      Time is the agent’s own wall-clock time per question, averaged over every run; cost is the cold-cache API price of all
+      {{ WAREHOUSE_STUDY.runsPerArm }} runs in that cell. Cloud study: {{ WAREHOUSE_STUDY.totalRuns }} runs, {{ formatCost(WAREHOUSE_STUDY.totalCost) }}.
+    </figcaption>
+
+    <p class="label whb-cap">
+      Small local models (8-turn cap) · Same {{ WAREHOUSE_LOCAL_STUDY.questions }} BigQuery questions × {{ WAREHOUSE_LOCAL_STUDY.reps }} runs · {{ WAREHOUSE_LOCAL_STUDY.date }}
+    </p>
+    <div class="whb-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">
+              Model
+            </th>
+            <th v-for="arm in warehouseLocalArms" :key="arm.id" scope="col" :class="{ 'col-direct': arm.id === 'direct' }">
+              {{ arm.name }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in warehouseLocalResults" :key="row.model">
+            <th scope="row">
+              <strong>{{ row.model }}</strong>
+            </th>
+            <td v-for="arm in warehouseLocalArms" :key="arm.id" :class="{ 'col-direct': arm.id === 'direct' }">
+              <span class="score">{{ row.arms[arm.id].correct }} / {{ WAREHOUSE_LOCAL_STUDY.runsPerArm }} correct</span>
+              <span class="sub">{{ row.arms[arm.id].avgSec.toFixed(1) }}s · {{ row.arms[arm.id].avgTurns.toFixed(1) }} turns · est. {{ formatCost(row.arms[arm.id].estCost) }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption class="whb-note">
+      Local hardware runs at $0; estimated cost prices tokens at API-equivalent rates (GPT-4o-mini for Inkling 2 Mini; DeepSeek-Flash peak for DeepSeek V4.1 Flash) across all {{ WAREHOUSE_LOCAL_STUDY.runsPerArm }} runs per cell ({{ WAREHOUSE_LOCAL_STUDY.totalRuns }} local runs).
     </figcaption>
 
     <details class="whb-tasks">

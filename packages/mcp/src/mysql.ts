@@ -1,6 +1,6 @@
 import type { IniFile } from './config-files.js'
 import type { RuntimePackage } from './runtime-package.js'
-import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
+import type { WarehouseConnector, WarehouseQueryResult, WarehouseTableSchema } from './warehouse.js'
 import fs from 'node:fs'
 import os from 'node:os'
 import { expandHome, mysqlOptionFile, readIniFile } from './config-files.js'
@@ -718,6 +718,31 @@ async function runQuery(prepared: PreparedSession, config: MysqlConfig, sql: str
   }
 }
 
+async function describeMysqlTables(session: MysqlSessionLike, config: MysqlConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
+  const schemas = config.database ? [config.database] : undefined
+  const where = schemas ? 'table_schema IN (?)' : 'table_schema NOT IN (?)'
+  const rows = await session.query(
+    `SELECT CONCAT(table_schema, '.', table_name) AS tbl, table_schema AS db, table_name AS name, column_name AS col, data_type AS dtype
+     FROM information_schema.columns WHERE ${where} ORDER BY tbl, ordinal_position LIMIT 1000`,
+    [schemas ?? SYSTEM_SCHEMAS],
+  )
+  const filters = requested?.map(t => t.replace(/`/g, '').toLowerCase())
+  const byTable = new Map<string, WarehouseTableSchema>()
+  for (const row of rows) {
+    const db = String(row.db ?? '')
+    const name = String(row.name ?? '')
+    const tbl = String(row.tbl ?? '')
+    if (!tbl || !isAllowedMysqlObject([db, name], config.allowed))
+      continue
+    if (filters?.length && !filters.some(f => tbl.toLowerCase() === f || tbl.toLowerCase().endsWith(`.${f}`) || tbl.toLowerCase().startsWith(`${f}.`)))
+      continue
+    const entry = byTable.get(tbl) ?? { name: tbl, columns: [] }
+    entry.columns.push({ name: String(row.col ?? ''), type: String(row.dtype ?? '') })
+    byTable.set(tbl, entry)
+  }
+  return [...byTable.values()].slice(0, 20)
+}
+
 export function mysqlConnector(config: MysqlConfig, createSession: MysqlSessionFactory = officialSession): WarehouseConnector {
   let current: Promise<PreparedSession> | undefined
   const open = async () => {
@@ -758,12 +783,16 @@ export function mysqlConnector(config: MysqlConfig, createSession: MysqlSessionF
     id: 'mysql',
     label: 'MySQL',
     toolName: 'query_mysql',
-    sqlHint: `MySQL or MariaDB SQL, one read-only SELECT${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}; quote names with backticks.`,
+    sqlHint: `MySQL or MariaDB SQL (SELECT/WITH, sql or queries[])${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}; quote names with backticks.`,
     freeAlternative: 'export with `mysql --batch -e "SELECT …" > result.tsv` and pass the file to `load_file`',
     maxRows: config.maxRows,
     // MySQL has no median aggregate, so the outlier audit is skipped here.
-    dialect: { quoteName: backtickName },
+    dialect: {
+      quoteName: backtickName,
+      sampleDistinct: (expr, limit) => `SUBSTRING_INDEX(GROUP_CONCAT(DISTINCT CAST(${expr} AS CHAR) ORDER BY 1 SEPARATOR ', '), ', ', ${limit})`,
+    },
     listTables: () => withSession(prepared => listTables(prepared.session, config)),
+    describeTables: tables => withSession(prepared => describeMysqlTables(prepared.session, config, tables)),
     query: sql => withSession(async (prepared) => {
       const result = await runQuery(prepared, config, sql)
       if (result.truncated)

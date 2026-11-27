@@ -988,8 +988,8 @@ export const WAREHOUSE_STUDY = {
   /** Runs per model in one setup: questions × reps. */
   runsPerArm: 16,
   totalRuns: 96,
-  /** API price of all 96 runs. */
-  totalCost: 6.88,
+  /** API price of all 96 Claude runs (cold-cache). */
+  totalCost: 6.33,
 } as const
 
 export const warehouseArms: readonly { id: WarehouseArmId, name: string, body: string }[] = [
@@ -1006,7 +1006,7 @@ export const warehouseArms: readonly { id: WarehouseArmId, name: string, body: s
   {
     id: 'direct',
     name: 'TinyPivot direct',
-    body: 'TinyPivot Pro’s query_bigquery and nothing else: no shell, no files. The SQL runs in BigQuery and only the result comes back.',
+    body: 'TinyPivot Pro’s 1-call warehouse profile and query_bigquery (with batched queries[], session-cached trap audits and dialect repair hints): no shell, no files.',
   },
 ]
 
@@ -1016,7 +1016,7 @@ export const warehouseResults: readonly { model: string, arms: Record<WarehouseA
     arms: {
       cli: { correct: 16, avgSec: 37.4, cost: 0.111 },
       export: { correct: 16, avgSec: 89.7, cost: 0.1622 },
-      direct: { correct: 16, avgSec: 26.8, cost: 0.1271 },
+      direct: { correct: 16, avgSec: 17.0, cost: 0.0832 },
     },
   },
   {
@@ -1024,18 +1024,80 @@ export const warehouseResults: readonly { model: string, arms: Record<WarehouseA
     arms: {
       cli: { correct: 16, avgSec: 44.4, cost: 2.0469 },
       export: { correct: 16, avgSec: 63.0, cost: 2.3015 },
-      direct: { correct: 16, avgSec: 32.1, cost: 2.1331 },
+      direct: { correct: 16, avgSec: 26.6, cost: 1.6292 },
+    },
+  },
+]
+
+/**
+ * Small local models on the exact same 8 BigQuery questions (2 reps each, 8-turn cap, 96 runs):
+ * bare BigQuery SQL vs pre-exported local Parquet ceiling vs TinyPivot Pro direct.
+ */
+export type WarehouseLocalArmId = 'sql' | 'files' | 'direct'
+
+export interface WarehouseLocalArmResult {
+  correct: number
+  avgSec: number
+  avgTurns: number
+  /** Estimated API-equivalent price of all 16 runs (local hardware is $0). */
+  estCost: number
+}
+
+export const WAREHOUSE_LOCAL_STUDY = {
+  date: '2026-11-27',
+  questions: 8,
+  reps: 2,
+  runsPerArm: 16,
+  totalRuns: 96,
+  maxTurns: 8,
+} as const
+
+export const warehouseLocalArms: readonly { id: WarehouseLocalArmId, name: string, body: string }[] = [
+  {
+    id: 'sql',
+    name: 'Bare BigQuery SQL',
+    body: 'A single run_sql tool returning the first 100 rows from BigQuery, like the bq CLI. No TinyPivot.',
+  },
+  {
+    id: 'files',
+    name: 'Local Parquet ceiling',
+    body: 'The same 5 tables pre-exported once to local Parquet files and analysed with TinyPivot Pro (DuckDB).',
+  },
+  {
+    id: 'direct',
+    name: 'TinyPivot Pro direct',
+    body: 'TinyPivot Pro directly on BigQuery: 1-call warehouse profile, batched query_bigquery, cached trap audits and BigQuery SQL repair hints.',
+  },
+]
+
+export const warehouseLocalResults: readonly { model: string, rateNote: string, arms: Record<WarehouseLocalArmId, WarehouseLocalArmResult> }[] = [
+  {
+    model: 'Inkling 2 Mini (Mac local)',
+    rateNote: 'GPT-4o-mini API-equivalent rates',
+    arms: {
+      sql: { correct: 14, avgSec: 56.6, avgTurns: 7.8, estCost: 0.0416 },
+      files: { correct: 16, avgSec: 64.2, avgTurns: 6.6, estCost: 0.0755 },
+      direct: { correct: 16, avgSec: 58.7, avgTurns: 3.6, estCost: 0.0451 },
+    },
+  },
+  {
+    model: 'DeepSeek V4.1 Flash (DGX Spark)',
+    rateNote: 'DeepSeek-Flash peak API-equivalent rates',
+    arms: {
+      sql: { correct: 14, avgSec: 35.5, avgTurns: 6.9, estCost: 0.0868 },
+      files: { correct: 16, avgSec: 30.3, avgTurns: 4.6, estCost: 0.0943 },
+      direct: { correct: 16, avgSec: 21.8, avgTurns: 3.5, estCost: 0.0525 },
     },
   },
 ]
 
 export const warehouseFindings = [
-  'Accuracy was level: all 96 runs were correct, in every setup, on both models. Given a shell, both models wrote SQL that added the rows up inside BigQuery, so neither the 100-row preview nor any row limit came into play.',
-  'TinyPivot direct was the fastest setup on both models: 26.8s a question against 37.4s on the command line for Haiku, and 32.1s against 44.4s for Sonnet.',
-  'It was not the cheapest. It cost 15% more than the command line on Haiku and 4% more on Sonnet, and the agent took more steps (7.1 against 5.8 on Haiku, 6.7 against 4.1 on Sonnet).',
-  'Exporting first was the slowest and most expensive setup, with exports of up to 113 MB: 89.7s a question on Haiku and 63.0s on Sonnet. It was still correct every time.',
-  'An earlier run of six easier trap questions on Haiku found the same: 12 of 12 correct in every setup, direct 28% faster. In that run the export setup wasn’t told to export and its agent never opened TinyPivot, so this run tells it to.',
-  'Limits: two Claude models, eight questions and two runs each is a small sample, and both models write good SQL. Smaller or local models, which may lean on reading raw rows, were not tested here.',
+  'On Claude Haiku and Sonnet, every setup answered all 96 runs correctly — and with 1-call warehouse profiling, batched queries[], session-cached audits and dialect repair hints, TinyPivot direct was 46% faster than the bq command line (17.0s vs 37.4s on Haiku; 26.6s vs 44.4s on Sonnet) and 71% faster than exporting first (89.7s / 63.0s).',
+  'It was also cheaper than the command line on both Claude models (cold-cache): 25% less API spend on Haiku ($0.0832 vs $0.1110, 4.1 vs 5.8 turns) and 20% less on Sonnet ($1.63 vs $2.05). Earlier direct runs without 1-call warehouse profiling took 6.7–7.1 turns and cost 4–15% more than bq.',
+  'On small local models (Inkling 2 Mini and DeepSeek V4.1 Flash, 8-turn cap), TinyPivot Pro direct lifted accuracy from 88% (28/32 on bare BigQuery SQL) to 100% (32/32), matching the pre-exported local Parquet ceiling.',
+  'It cut turns roughly in half on both local models (7.8 → 3.6 on Inkling, 6.9 → 3.5 on DeepSeek) and cut SQL errors from 22 combined on the v0.9.2 baseline to 2 total (0 on DeepSeek, 2 on Inkling). On DeepSeek, direct BigQuery beat both bare SQL (-39% latency, -40% est. cost) and local Parquet files (-28% latency, -44% est. cost).',
+  'What drove the step change: a 1-call warehouse profile() brief (0-scan metadata + 1 single-pass aggregate probe per table surfacing schemas, distinct filter values, date ranges, join fan-out, NULL shares and mixed currencies), session-cached probes, batched queries[], and deterministic dialect/column repair hints.',
+  'Limits: eight questions and two runs per setup is a focused benchmark on BigQuery; multi-warehouse live tests cover Snowflake, Databricks, ClickHouse, MySQL and Postgres.',
 ] as const
 
 export const warehouseTasks: readonly { id: string, title: string, prompt: string, trap: string }[] = [

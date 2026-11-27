@@ -1,6 +1,6 @@
 import type { IniFile } from './config-files.js'
 import type { RuntimePackage } from './runtime-package.js'
-import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
+import type { WarehouseConnector, WarehouseQueryResult, WarehouseTableSchema } from './warehouse.js'
 import { Buffer } from 'node:buffer'
 import os from 'node:os'
 import { databricksConfigFile, readIniFile } from './config-files.js'
@@ -434,6 +434,30 @@ async function runQuery(session: DatabricksSessionLike, config: DatabricksConfig
   return { rows, truncated, note: `Databricks planned it as a read and ran it on SQL warehouse ${warehouseId} (${config.timeoutS}s timeout).` }
 }
 
+async function describeDatabricksTables(session: DatabricksSessionLike, config: DatabricksConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
+  const source = config.catalog ? `${quoteName(config.catalog)}.information_schema.columns` : 'information_schema.columns'
+  const schemaFilter = config.schema ? ` AND table_schema = ${quoteString(config.schema.toLowerCase())}` : ''
+  const rows = await session.run(
+    `SELECT concat_ws('.', table_catalog, table_schema, table_name) AS tbl, column_name AS col, data_type AS dtype
+     FROM ${source} WHERE table_schema <> 'information_schema'${schemaFilter}
+     ORDER BY 1, ordinal_position LIMIT 1000`,
+    1000,
+  )
+  const filters = requested?.map(t => t.replace(/`/g, '').toLowerCase())
+  const byTable = new Map<string, WarehouseTableSchema>()
+  for (const row of rows) {
+    const tbl = String(row.tbl ?? '')
+    if (!tbl)
+      continue
+    if (filters?.length && !filters.some(f => tbl.toLowerCase() === f || tbl.toLowerCase().endsWith(`.${f}`) || tbl.toLowerCase().startsWith(`${f}.`)))
+      continue
+    const entry = byTable.get(tbl) ?? { name: tbl, columns: [] }
+    entry.columns.push({ name: String(row.col ?? ''), type: String(row.dtype ?? '') })
+    byTable.set(tbl, entry)
+  }
+  return [...byTable.values()].slice(0, 20)
+}
+
 export function databricksConnector(config: DatabricksConfig, createSession: DatabricksSessionFactory = officialSession): WarehouseConnector {
   let session: Promise<DatabricksSessionLike> | undefined
   const getSession = () => {
@@ -463,11 +487,17 @@ export function databricksConnector(config: DatabricksConfig, createSession: Dat
     id: 'databricks',
     label: 'Databricks',
     toolName: 'query_databricks',
-    sqlHint: `Databricks SQL, one read-only SELECT${where ? `; unqualified tables resolve in ${where}` : '; name tables catalog.schema.table'}.`,
+    sqlHint: `Databricks SQL (SELECT/WITH, sql or queries[])${where ? `; unqualified tables resolve in ${where}` : '; name tables catalog.schema.table'}.`,
     freeAlternative: 'download the result as CSV from the Databricks SQL editor and pass the file to `load_file`',
     maxRows: config.maxRows,
-    dialect: { quoteName: backtickName, median: expr => `percentile_approx(${expr}, 0.5)` },
+    dialect: {
+      quoteName: backtickName,
+      median: expr => `percentile_approx(${expr}, 0.5)`,
+      approxCountDistinct: expr => `APPROX_COUNT_DISTINCT(${expr})`,
+      sampleDistinct: (expr, limit) => `CONCAT_WS(', ', SLICE(COLLECT_SET(CAST(${expr} AS STRING)), 1, ${limit}))`,
+    },
     listTables: () => withSession(s => listTables(s, config)),
+    describeTables: tables => withSession(s => describeDatabricksTables(s, config, tables)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }
 }

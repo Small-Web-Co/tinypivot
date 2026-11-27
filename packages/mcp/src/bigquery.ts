@@ -1,5 +1,5 @@
 import type { RuntimePackage } from './runtime-package.js'
-import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
+import type { WarehouseConnector, WarehouseQueryResult, WarehouseTableSchema } from './warehouse.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
 import { backtickName, listFromEnv, QueryRefused, readOnlyStatementError } from './warehouse.js'
@@ -71,10 +71,20 @@ export interface BigQueryJobLike {
   getQueryResults: (options: { maxResults: number, autoPaginate: false, timeoutMs: number }) => Promise<[Record<string, unknown>[], ...unknown[]]>
 }
 
+export interface BigQueryTableMetadataLike {
+  numRows?: string | number
+  schema?: { fields?: Array<{ name?: string, type?: string }> }
+}
+
+export interface BigQueryDatasetLike {
+  getTables: () => Promise<[Array<{ id?: string }>, ...unknown[]]>
+  table?: (id: string) => { getMetadata: () => Promise<[BigQueryTableMetadataLike, ...unknown[]]> }
+}
+
 export interface BigQueryClientLike {
   createQueryJob: (options: Record<string, unknown>) => Promise<[BigQueryJobLike, ...unknown[]]>
   getDatasets: () => Promise<[Array<{ id?: string }>, ...unknown[]]>
-  dataset: (id: string) => { getTables: () => Promise<[Array<{ id?: string }>, ...unknown[]]> }
+  dataset: (id: string) => BigQueryDatasetLike
 }
 
 export type BigQueryClientFactory = (config: BigQueryConfig) => Promise<BigQueryClientLike>
@@ -182,6 +192,61 @@ async function runQuery(client: BigQueryClientLike, config: BigQueryConfig, sql:
   return { rows, truncated, note: `BigQuery scanned ${formatBytes(bytes)} (limit ${formatBytes(config.maxBytes)}).` }
 }
 
+/** Maximum tables described in one metadata sweep, keeping context and API calls bounded. */
+const MAX_DESCRIBED_TABLES = 20
+
+function matchesTableFilter(tableName: string, filters: string[] | undefined): boolean {
+  if (!filters || filters.length === 0)
+    return true
+  const lower = tableName.toLowerCase()
+  const parts = lower.split('.')
+  const shortTable = parts[parts.length - 1]
+  const datasetAndTable = parts.slice(-2).join('.')
+  return filters.some((f) => {
+    const clean = f.replace(/`/g, '').trim().toLowerCase()
+    if (!clean)
+      return false
+    return lower === clean
+      || datasetAndTable === clean
+      || shortTable === clean
+      || lower.startsWith(`${clean}.`)
+      || datasetAndTable.startsWith(`${clean}.`)
+  })
+}
+
+async function describeBigQueryTable(client: BigQueryClientLike, fullName: string): Promise<WarehouseTableSchema | undefined> {
+  const parts = fullName.replace(/`/g, '').split('.')
+  const tableId = parts.pop()
+  const datasetId = parts.pop()
+  if (!datasetId || !tableId)
+    return undefined
+  const ds = client.dataset(datasetId)
+  if (!ds.table)
+    return undefined
+  try {
+    const [meta] = await ds.table(tableId).getMetadata()
+    const fields = meta?.schema?.fields ?? []
+    const rowCount = meta?.numRows !== undefined ? Number(meta.numRows) : undefined
+    return {
+      name: fullName,
+      rowCount: Number.isFinite(rowCount) ? rowCount : undefined,
+      columns: fields.flatMap(f => (f.name ? [{ name: f.name, type: String(f.type ?? 'STRING') }] : [])),
+    }
+  }
+  catch {
+    return undefined
+  }
+}
+
+async function describeTables(client: BigQueryClientLike, config: BigQueryConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
+  const listed = await listTables(client, config)
+  const matched = listed.filter(t => matchesTableFilter(t, requested))
+  const explicit = (requested ?? []).filter(r => r.includes('.') && !matched.some(m => m.toLowerCase().endsWith(r.replace(/`/g, '').toLowerCase())))
+  const targets = [...matched, ...explicit].slice(0, MAX_DESCRIBED_TABLES)
+  const described = await Promise.all(targets.map(name => describeBigQueryTable(client, name)))
+  return described.filter((s): s is WarehouseTableSchema => s !== undefined && s.columns.length > 0)
+}
+
 export function bigQueryConnector(config: BigQueryConfig, createClient: BigQueryClientFactory = officialClient): WarehouseConnector {
   let client: Promise<BigQueryClientLike> | undefined
   const getClient = () => {
@@ -195,11 +260,18 @@ export function bigQueryConnector(config: BigQueryConfig, createClient: BigQuery
     id: 'bigquery',
     label: 'BigQuery',
     toolName: 'query_bigquery',
-    sqlHint: `GoogleSQL, one read-only SELECT; name tables \`dataset.table\` (project ${config.projectId}) or \`project.dataset.table\`.`,
+    sqlHint: `GoogleSQL (SELECT/WITH, sql or queries[]). Quote tables \`dataset.table\` (project ${config.projectId}) or \`project.dataset.table\`; use DATE_TRUNC(date, MONTH), SAFE_DIVIDE(a, b), COUNTIF(cond), APPROX_QUANTILES(x, 100)[OFFSET(50)] for median (no MEDIAN() aggregate).`,
     freeAlternative: 'export with `bq query --format=csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
-    dialect: { quoteName: backtickName, median: expr => `APPROX_QUANTILES(${expr}, 2)[OFFSET(1)]` },
+    concurrent: true,
+    dialect: {
+      quoteName: backtickName,
+      median: expr => `APPROX_QUANTILES(${expr}, 2)[OFFSET(1)]`,
+      approxCountDistinct: expr => `APPROX_COUNT_DISTINCT(${expr})`,
+      sampleDistinct: (expr, limit) => `STRING_AGG(DISTINCT CAST(${expr} AS STRING), ', ' LIMIT ${limit})`,
+    },
     listTables: async () => listTables(await getClient(), config),
+    describeTables: async tables => describeTables(await getClient(), config, tables),
     query: async sql => runQuery(await getClient(), config, sql),
   }
 }

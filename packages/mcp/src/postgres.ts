@@ -1,5 +1,5 @@
 import type { RuntimePackage } from './runtime-package.js'
-import type { WarehouseConnector } from './warehouse.js'
+import type { WarehouseConnector, WarehouseTableSchema } from './warehouse.js'
 import { validateSQL } from '@smallwebco/tinypivot-server'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
@@ -132,16 +132,47 @@ export function postgresConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Pos
   return { connectionString: env.DATABASE_URL, allowedTables: listFromEnv(env.TINYPIVOT_ALLOWED_TABLES) }
 }
 
+async function describePostgresTables(config: PostgresConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
+  const pool = await createPool(config.connectionString)
+  try {
+    const res = await pool.query<{ table_name: string, column_name: string, data_type: string }>(
+      `SELECT table_name, column_name, data_type FROM information_schema.columns
+       WHERE table_schema = 'public' ORDER BY table_name, ordinal_position`,
+    )
+    const allow = config.allowedTables?.length ? new Set(config.allowedTables.map(t => t.toLowerCase())) : undefined
+    const filter = requested?.length ? new Set(requested.map(t => t.replace(/["`]/g, '').toLowerCase())) : undefined
+    const byTable = new Map<string, WarehouseTableSchema>()
+    for (const row of res.rows) {
+      const lower = row.table_name.toLowerCase()
+      if ((allow && !allow.has(lower)) || (filter && !filter.has(lower)))
+        continue
+      const entry = byTable.get(row.table_name) ?? { name: row.table_name, columns: [] }
+      entry.columns.push({ name: row.column_name, type: row.data_type })
+      byTable.set(row.table_name, entry)
+    }
+    return [...byTable.values()].slice(0, 20)
+  }
+  finally {
+    await pool.end()
+  }
+}
+
 export function postgresConnector(config: PostgresConfig): WarehouseConnector {
   return {
     id: 'postgres',
     label: 'PostgreSQL',
     toolName: 'query_postgres',
-    sqlHint: 'Postgres SQL, one read-only SELECT.',
+    sqlHint: 'Postgres SQL (SELECT/WITH, sql or queries[]).',
     freeAlternative: 'export with `psql --csv` and pass the file to `load_file`',
     maxRows: config.maxRows ?? DEFAULT_MAX_ROWS,
-    dialect: { quoteName: plainName, median: expr => `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${expr})` },
+    concurrent: true,
+    dialect: {
+      quoteName: plainName,
+      median: expr => `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${expr})`,
+      sampleDistinct: (expr, limit) => `ARRAY_TO_STRING((ARRAY_AGG(DISTINCT CAST(${expr} AS TEXT)))[1:${limit}], ', ')`,
+    },
     listTables: () => listPostgresTables(config),
+    describeTables: tables => describePostgresTables(config, tables),
     query: async (sql) => {
       const res = await executeReadOnlyPostgresQuery(config, sql)
       return { rows: res.rows, truncated: res.truncated }
