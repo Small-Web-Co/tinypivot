@@ -1,4 +1,6 @@
+import type { WarehouseArmId, WarehouseArmResult } from './whitepaper'
 import { percentChange } from './modelChart'
+import { WAREHOUSE_STUDY, warehouseResults } from './whitepaper'
 
 /** Direct warehouse connections (Pro): what they are for, and the measured gain behind the claim. */
 
@@ -26,26 +28,30 @@ export const WAREHOUSE_BENEFITS = [
   },
 ] as const
 
-/**
- * Claude Haiku on 6 trap questions over BigQuery, 2 runs each (analysis/warehouse-benchmark).
- * Totals for all 12 runs.
- */
-export const WAREHOUSE_BENCH = {
-  model: 'Claude Haiku',
-  questions: 6,
-  runs: 12,
-  arms: {
-    cli: { label: 'Agent drives the bq command line', correct: 12, avgSec: 26.3, cost: 0.088 },
-    export: { label: 'Export to a file, then TinyPivot', correct: 12, avgSec: 26.3, cost: 0.069 },
-    direct: { label: 'TinyPivot queries BigQuery directly', correct: 12, avgSec: 18.8, cost: 0.0702 },
-  },
-} as const
+/** The models in the white paper's BigQuery study, e.g. "Claude Haiku and Claude Sonnet". */
+export const warehouseModels = warehouseResults.map(row => row.model).join(' and ')
+
+/** Every model's runs added up for one setup; time is the average per question over all of them. */
+export function warehouseTotal(arm: WarehouseArmId): WarehouseArmResult {
+  const sum = (key: keyof WarehouseArmResult) => warehouseResults.reduce((total, row) => total + row.arms[arm][key], 0)
+  return { correct: sum('correct'), avgSec: sum('avgSec') / warehouseResults.length, cost: sum('cost') }
+}
+
+/** How much more direct queries cost than the agent driving the bq command line, per model, in whole percent. */
+export function directExtraCostPct(): number[] {
+  return warehouseResults.map(({ arms }) => Math.round(((arms.direct.cost - arms.cli.cost) / arms.cli.cost) * 100))
+}
 
 export function warehouseHighlights() {
-  const { cli, direct } = WAREHOUSE_BENCH.arms
+  const [cli, exported, direct] = (['cli', 'export', 'direct'] as const).map(warehouseTotal)
+  const extraCost = directExtraCostPct()
+  const runs = WAREHOUSE_STUDY.runsPerArm * warehouseResults.length
   return [
-    { value: `${-percentChange(cli.avgSec, direct.avgSec)}% faster`, label: 'per question than exporting first or letting the agent drive the bq command line' },
-    { value: `${-percentChange(cli.cost, direct.cost)}% cheaper`, label: 'than the agent driving the bq command line, and the same as exporting first' },
-    { value: `${direct.correct} / ${WAREHOUSE_BENCH.runs} correct`, label: 'in every setup: on these questions the gain is time and spend, not accuracy' },
+    { value: `${-percentChange(cli.avgSec, direct.avgSec)}% faster`, label: 'per question than the agent driving the bq command line itself' },
+    { value: `${-percentChange(exported.avgSec, direct.avgSec)}% faster`, label: 'than exporting to a file first and analysing that, the route TinyPivot Free has' },
+    {
+      value: `${direct.correct} / ${runs} correct`,
+      label: `as in every other setup: the gain is time, not accuracy, at ${Math.min(...extraCost)}–${Math.max(...extraCost)}% more API spend than the command line`,
+    },
   ]
 }
