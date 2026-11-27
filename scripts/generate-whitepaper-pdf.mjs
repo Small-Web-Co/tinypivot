@@ -445,7 +445,29 @@ const html = `<!doctype html>
   </p>
 
   <div class="page-break"></div>
-  <h2>4. Lightweight Neuro-Symbolic Architecture (&lt; 2,500 Free Schema Tokens)</h2>
+  <h2>4. Track C — Direct Warehouse Connections (${wp.WAREHOUSE_STUDY.totalRuns} Runs)</h2>
+  <p>
+    ${wp.WAREHOUSE_STUDY.questions} questions over fake Acme tables in BigQuery (2.7 million orders), each hiding a trap, asked of
+    ${esc(wp.warehouseResults.map(r => r.model).join(' and '))} in three setups, ${wp.WAREHOUSE_STUDY.reps} runs each
+    (${wp.WAREHOUSE_STUDY.date}, $${wp.WAREHOUSE_STUDY.totalCost.toFixed(2)} of API spend in all).
+  </p>
+  <table>
+    <thead><tr><th>Model</th>${wp.warehouseArms.map(a => `<th>${esc(a.name)}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${wp.warehouseResults.map(r => `<tr><td>${esc(r.model)}</td>${wp.warehouseArms.map((a) => {
+        const cell = r.arms[a.id]
+        return `<td class="mono">${cell.correct}/${wp.WAREHOUSE_STUDY.runsPerArm} correct · ${cell.avgSec.toFixed(1)}s · $${cell.cost.toFixed(2)}</td>`
+      }).join('')}</tr>`).join('')}
+    </tbody>
+  </table>
+  <p class="footnote">Time is the average per question; cost is the API price of all ${wp.WAREHOUSE_STUDY.runsPerArm} runs in a cell.
+    ${wp.warehouseArms.map(a => `<strong>${esc(a.name)}:</strong> ${esc(a.body)}`).join(' ')}</p>
+  <ul>
+    ${wp.warehouseFindings.map(f => `<li>${esc(f)}</li>`).join('')}
+  </ul>
+
+  <div class="page-break"></div>
+  <h2>5. Lightweight Neuro-Symbolic Architecture (&lt; 2,500 Free Schema Tokens)</h2>
   <p>
     TinyPivot stays fast, local, and dependency-light by pairing LLM reasoning with deterministic DuckDB &amp; TypeScript
     verification — zero Jupyter servers, zero VLM judges, and raw rows never leave your machine.
@@ -459,7 +481,7 @@ const html = `<!doctype html>
       </div>`).join('')}
   </div>
 
-  <h2>5. Unlimited Local Rows on Free &amp; 10-Second Setup</h2>
+  <h2>6. Unlimited Local Rows on Free &amp; 10-Second Setup</h2>
   <div class="track-grid">
     <div class="track-card">
       <div class="badge mono">TINYPIVOT MCP FREE · $0 (NO SIGNUP)</div>
@@ -508,6 +530,16 @@ const html = `<!doctype html>
         <div class="task-title mono">${esc(t.id)} · ${esc(t.tag)}</div>
         <div class="task-q">“${esc(t.prompt)}”</div>
         <div class="mono" style="color:#145a39;">Expected: ${esc(t.expected)}</div>
+      </div>`).join('')}
+  </div>
+
+  <h2>Appendix C — Direct Warehouse Questions and Their Traps</h2>
+  <div class="appendix-grid">
+    ${wp.warehouseTasks.map(t => `
+      <div class="task-card">
+        <div class="task-title mono">${esc(t.id)} · ${esc(t.title)}</div>
+        <div class="task-q">“${esc(t.prompt)}”</div>
+        <div class="mono" style="color:#145a39;">Trap: ${esc(t.trap)}</div>
       </div>`).join('')}
   </div>
 </body>
