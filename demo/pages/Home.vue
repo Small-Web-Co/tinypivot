@@ -1,16 +1,26 @@
 <script setup lang="ts">
 import HarnessReel from '../components/HarnessReel.vue'
+import CopyCommand from '../components/site/CopyCommand.vue'
 import HeroCharts from '../components/site/HeroCharts.vue'
 import InstallBox from '../components/site/InstallBox.vue'
+import ModelComparisonChart from '../components/site/ModelComparisonChart.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
+import RotatingWord from '../components/site/RotatingWord.vue'
 import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
 import { benchmarkHeadline } from '../site/benchmark'
+import { modelChartHighlights } from '../site/modelChart'
 import { NPM_DOWNLOADS } from '../site/ui'
-import { homeGainCards, smallModelCards } from '../site/whitepaper'
+import { homeGainCards, TRUST_BENCH_TOTALS, trustBenchRows } from '../site/whitepaper'
 
 const facts = ['Free · unlimited rows', 'runs on your machine', 'no signup', 'no API key']
 
-const agents = ['Claude Code', 'Cursor', 'Codex', 'Antigravity', 'pi'] as const
+const heroWords = ['check.', 'trust.', 'visualize.', 'reproduce.'] as const
+
+const modelHighlights = modelChartHighlights()
+const opusCostCut = (() => {
+  const opus = trustBenchRows.find(r => r.id === 'opus')!
+  return Math.floor((1 - opus.proCost / opus.baselineCost) * 100)
+})()
 
 // The cost proof card quotes the measured benchmark from the docs calculator.
 const headline = benchmarkHeadline()
@@ -30,8 +40,14 @@ const heroProof = [
     link: 'See the timings',
   },
   {
-    claim: 'Stays on your computer.',
-    detail: 'Files are queried locally. The AI sees results, not your raw data.',
+    claim: 'Costs less to run.',
+    detail: `${opusCostCut}% off Claude Opus's bill on the same tasks, and up to half the output tokens on smaller models.`,
+    to: '/whitepaper#internal',
+    link: 'See the costs',
+  },
+  {
+    claim: 'Your raw data stays put.',
+    detail: 'Queries run on your machine or in your database. The AI sees results, not raw rows.',
     to: '/privacy',
     link: 'What stays local',
   },
@@ -61,28 +77,25 @@ const capabilities = [
     <section class="hero desk">
       <div class="wrap">
         <RetroWindow title="README — tinypivot">
+          <template #corner>
+            <p class="hero-npm mono">
+              <span class="hero-npm-num">{{ NPM_DOWNLOADS }}</span>
+              <span class="hero-npm-lbl">npm downloads</span>
+            </p>
+          </template>
           <div class="hero-grid">
             <div class="hero-copy">
               <p class="label">
                 TinyPivot · the data-analysis sidecar for AI agents
               </p>
               <h1 class="display hero-title">
-                Ask your AI about your data. <em>Get answers you can check.</em>
+                Ask your AI about your data. <em>Get answers you can <RotatingWord :words="heroWords" /></em>
               </h1>
               <p class="lede">
-                TinyPivot runs alongside Claude, Cursor, Codex and other AI agents as a sidecar for data work. It queries your
-                spreadsheets and data files on your machine, catches the math mistakes AI quietly makes, and shows the SQL behind every number.
+                TinyPivot runs alongside Claude, Cursor, Codex and other AI agents as a sidecar for data work. It works with
+                spreadsheets, data files and warehouses like Snowflake, BigQuery and Postgres, catches the math mistakes AI quietly
+                makes, and shows the SQL behind every number.
               </p>
-              <div class="hero-trust">
-                <p class="hero-trust-stat">
-                  <span class="hero-trust-num mono">{{ NPM_DOWNLOADS }}</span>
-                  <span class="hero-trust-lbl">npm downloads</span>
-                </p>
-                <p class="hero-trust-agents mono">
-                  <span class="hero-trust-k">Works with</span>
-                  <span v-for="agent in agents" :key="agent" class="hero-trust-agent">{{ agent }}</span>
-                </p>
-              </div>
               <ul class="hero-proof">
                 <li v-for="point in heroProof" :key="point.claim">
                   <strong>{{ point.claim }}</strong>
@@ -93,12 +106,14 @@ const capabilities = [
                 </li>
               </ul>
               <div id="install" class="hero-install">
-                <InstallBox
-                  source="hero"
-                  prominent
-                  action-label="Get started · run once"
-                  action-meta="10s setup"
-                />
+                <p class="hero-install-k mono">
+                  Get started · paste in your terminal
+                </p>
+                <CopyCommand source="hero" />
+                <p class="hero-install-note mono">
+                  Sets up Claude Code, Claude Desktop, Cursor, Codex, OpenCode, Antigravity and pi.
+                  <a href="#install-options" class="hero-proof-link">Other ways to install ↓</a>
+                </p>
                 <ul class="facts" aria-label="At a glance">
                   <li v-for="fact in facts" :key="fact">
                     {{ fact }}
@@ -237,39 +252,32 @@ const capabilities = [
 
     <section id="small-models" class="block small-models" aria-labelledby="small-title">
       <div class="wrap">
-        <header class="section-head">
+        <header class="section-head small-head">
           <p class="label">
-            Also good to know · smaller models
+            Head to head · {{ TRUST_BENCH_TOTALS.models }} models × {{ TRUST_BENCH_TOTALS.tasksPerModel }} data tasks
           </p>
           <h2 id="small-title" class="heading">
-            Frontier-level answers <em>from cheaper models.</em>
+            Same models, same tasks. <em>With and without TinyPivot.</em>
           </h2>
           <p class="lede">
-            TinyPivot does the exact maths and the checking, so the model only has to reason. Small, local and open-weight models gain
-            the most, which makes them practical for data work you’d rather not pay frontier prices for, including as a subagent.
+            Each model got the same {{ TRUST_BENCH_TOTALS.tasksPerModel }} data-analysis tasks, every one hiding a common trap: a join
+            that double-counts, a month that is only half over, an uneven A/B split. It ran them once on its own and once with
+            TinyPivot Pro. We measured how many answers were right, how long each task took, and what it cost.
           </p>
         </header>
-        <div class="small-grid">
-          <article v-for="card in smallModelCards" :key="card.model" class="small-card">
-            <p class="small-where mono">
-              {{ card.where }}
-            </p>
-            <h3 class="small-model">
-              {{ card.model }}
-            </h3>
-            <p class="small-val mono">
-              {{ card.headline }}
-            </p>
-            <p class="small-detail">
-              {{ card.detail }}
-            </p>
-          </article>
-        </div>
+        <ul class="small-highlights">
+          <li v-for="item in modelHighlights" :key="item.value">
+            <span class="small-hl-val mono">{{ item.value }}</span>
+            <span class="small-hl-lbl">{{ item.label }}</span>
+          </li>
+        </ul>
+        <ModelComparisonChart />
         <p class="small-foot">
-          Frontier models were already at 100%; TinyPivot kept them there, answered hard statistics questions about 20% faster, and cut
-          their cost by 17–39%. Accuracy is on our 18-task suite with TinyPivot Pro. *API-equivalent cost.
+          Small and open-weight models gain the most: TinyPivot does the exact maths and the checking, so the model only has to
+          reason. Opus and Sonnet were already at 100% and stayed there. Cost is the API price; models on your own hardware cost
+          nothing to run, and their API-equivalent prices are in the white paper.
           <router-link to="/whitepaper#internal" class="text-link">
-            See every model’s results →
+            Every run, task and prompt →
           </router-link>
         </p>
       </div>
@@ -295,7 +303,7 @@ const capabilities = [
             </h3>
             <p class="product-body">
               Install once and Claude Code, Cursor, Codex, Antigravity or pi can query your CSV, Excel, Parquet and JSON
-              files locally, with built-in checks, one-step statistics, and a Studio window that shows every chart and the SQL behind it.
+              files, plus data pulled from Postgres, Snowflake or BigQuery, with built-in checks, one-step statistics, and a Studio window that shows every chart and the SQL behind it.
             </p>
             <p class="product-price mono">
               Free to start · Pro from $149/yr
@@ -334,7 +342,7 @@ const capabilities = [
       </div>
     </section>
 
-    <section class="block closing desk" aria-labelledby="closing-title">
+    <section id="install-options" class="block closing desk" aria-labelledby="closing-title">
       <div class="wrap closing-grid">
         <RetroWindow title="install.sh">
           <div class="closing-stack">
@@ -371,18 +379,18 @@ const capabilities = [
   align-content: start;
 }
 
-.hero-install {
-  margin-top: 4px;
-}
-
 .hero-side {
   display: grid;
   align-content: start;
 }
 
 .hero-title {
-  font-size: clamp(2.15rem, 6.2vw, 3.25rem);
+  font-size: clamp(2.15rem, 6.2vw, 2.7rem);
   line-height: 1.04;
+}
+
+.hero-title em {
+  display: block;
 }
 
 .hero .lede {
@@ -686,60 +694,6 @@ a.gain-card:hover {
   font-size: 0.74rem;
 }
 
-.hero-trust {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 22px;
-  padding: 12px 16px;
-  border: var(--line);
-  background: var(--paper);
-  box-shadow: var(--shadow-sm);
-}
-
-.hero-trust-stat {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.hero-trust-num {
-  font-size: 1.7rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--ink);
-}
-
-.hero-trust-lbl {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-muted);
-}
-
-.hero-trust-agents {
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  font-size: 0.72rem;
-}
-
-.hero-trust-k {
-  margin-right: 2px;
-  color: var(--ink-muted);
-}
-
-.hero-trust-agent {
-  padding: 1px 6px;
-  border: 1px solid var(--rule);
-  background: var(--ledger);
-  color: var(--ink);
-}
-
 .product-side {
   background: transparent;
   box-shadow: none;
@@ -763,45 +717,75 @@ a.gain-card:hover {
   border-top: 0;
 }
 
-.small-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-}
-
-.small-card {
-  display: grid;
-  gap: 4px;
-  align-content: start;
-  padding: 16px 18px;
-  border: 1px solid var(--ink);
-  background: var(--paper);
-}
-
-.small-where {
+.hero-npm {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   margin: 0;
-  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.hero-npm-num {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.hero-npm-lbl {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.hero-install {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.hero-install-k {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hero-install-note {
+  font-size: 0.72rem;
+  line-height: 1.5;
   color: var(--ink-muted);
 }
 
-.small-model {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 400;
+.small-head {
+  max-width: 50rem;
 }
 
-.small-val {
-  margin: 4px 0 2px;
-  font-size: 1.25rem;
+.small-highlights {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+  list-style: none;
+}
+
+.small-highlights li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-left: 4px solid #1d7a4f;
+  background: var(--paper-raised);
+}
+
+.small-hl-val {
+  font-size: 1.2rem;
   font-weight: 700;
   color: #145a39;
 }
 
-.small-detail {
-  font-size: 0.88rem;
-  line-height: 1.45;
+.small-hl-lbl {
+  font-size: 0.86rem;
+  line-height: 1.4;
   color: var(--ink-muted);
 }
 
@@ -844,12 +828,12 @@ a.gain-card:hover {
 }
 
 @media (min-width: 680px) {
-  .gain-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .small-highlights {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .small-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .gain-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .product-grid {
@@ -860,7 +844,7 @@ a.gain-card:hover {
 
 @media (min-width: 1024px) {
   .hero-grid {
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     align-items: start;
     gap: 44px;
   }

@@ -8,11 +8,12 @@ defineProps<{
 
 <template>
   <div class="window">
-    <div class="window-bar" aria-hidden="true">
-      <span class="window-box" />
-      <span class="window-stripes" />
-      <span class="window-title">{{ title }}</span>
-      <span class="window-stripes" />
+    <div class="window-bar">
+      <span class="window-box" aria-hidden="true" />
+      <span class="window-stripes" aria-hidden="true" />
+      <span class="window-title" aria-hidden="true">{{ title }}</span>
+      <span class="window-stripes" aria-hidden="true" />
+      <span v-if="$slots.corner" class="window-corner"><slot name="corner" /></span>
     </div>
     <div class="window-body" :class="{ flush }">
       <slot />
@@ -61,6 +62,18 @@ defineProps<{
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.window-corner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  margin-right: -8px;
+  padding: 0 10px;
+  border-left: var(--line);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .window-body {

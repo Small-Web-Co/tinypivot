@@ -37,6 +37,13 @@ export interface TrustBenchModelRow {
   proShort: string
   proHighlight: string
   impact: TrustBenchImpact
+  /** Runs on the tester's own hardware, so it costs nothing to run (API prices are imputed). */
+  local: boolean
+  /** Average seconds per task and API cost in USD for all 18 tasks, alone and with TinyPivot Pro. */
+  baselineSec: number
+  proSec: number
+  baselineCost: number
+  proCost: number
 }
 
 export const TRUST_BENCH_DATE = '2026-11-26'
@@ -67,6 +74,11 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
       tokens: '−50% out · −17% turns',
       cost: '$0 local · $0.046 API†',
     },
+    local: true,
+    baselineSec: 46.1,
+    proSec: 26.0,
+    baselineCost: 0.027,
+    proCost: 0.046,
   },
   {
     id: 'deepseek',
@@ -93,6 +105,11 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
       tokens: '−48% out · −30% turns',
       cost: '−7% API† ($0.055) · $0 local',
     },
+    local: true,
+    baselineSec: 25.7,
+    proSec: 15.6,
+    baselineCost: 0.059,
+    proCost: 0.055,
   },
   {
     id: 'haiku',
@@ -119,6 +136,11 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
       tokens: '−12% out on Hard DS',
       cost: '+0.05¢/task vs Python*',
     },
+    local: false,
+    baselineSec: 13.1,
+    proSec: 12.5,
+    baselineCost: 0.074,
+    proCost: 0.083,
   },
   {
     id: 'sonnet',
@@ -145,6 +167,11 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
       tokens: '6/6 Hard DS in 25.9s',
       cost: '−17% Pro · −28% Free API*',
     },
+    local: false,
+    baselineSec: 20.0,
+    proSec: 18.8,
+    baselineCost: 1.22,
+    proCost: 1.01,
   },
   {
     id: 'opus',
@@ -171,6 +198,11 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
       tokens: '−17% out on Hard DS',
       cost: '−39% warm API* ($1.41)',
     },
+    local: false,
+    baselineSec: 21.5,
+    proSec: 22.0,
+    baselineCost: 2.32,
+    proCost: 1.41,
   },
 ]
 
@@ -259,28 +291,6 @@ export const homeGainCards: readonly HomeGainCard[] = [
     to: '/whitepaper#kramabench',
   },
 ]
-
-/** Home page: the measured case for running data work on smaller, local or cheaper models. */
-export const smallModelCards = [
-  {
-    model: 'Inkling 2 Mini',
-    where: 'Small model on a Mac',
-    headline: '78% → 100%',
-    detail: '44% faster, 17% fewer turns, half the output tokens. $0 cloud spend.',
-  },
-  {
-    model: 'DeepSeek V4.1',
-    where: 'Open weights on a DGX Spark',
-    headline: '94% → 100%',
-    detail: '39% faster, 30% fewer turns, 48% fewer output tokens. $0 cloud spend.',
-  },
-  {
-    model: 'Claude Haiku 5.5',
-    where: 'Fast, low-cost cloud model',
-    headline: '83% → 100%',
-    detail: 'Matched Opus on all 18 tasks for about 8¢ in total, under 4% of what Opus cost on its own.*',
-  },
-] as const
 
 export interface CategoryBenchRow {
   id: string
