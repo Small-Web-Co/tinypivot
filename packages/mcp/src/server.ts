@@ -20,7 +20,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS, CHART_TYPES, resolveChartType } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
 import { runAnalysis } from './analyze.js'
-import { auditQueryResult, formatAuditWarnings, formatSqlRepairHint } from './audit.js'
+import { auditQueryResult, formatAuditWarnings, formatProGuardTeaser, formatSqlRepairHint, peekDeepAuditCount } from './audit.js'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList, formatSessionList } from './history.js'
@@ -538,7 +538,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.8.5',
+      version: '0.8.6',
     },
     {
       capabilities: {
@@ -1242,6 +1242,16 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           allWarnings.push(...warnings)
           const dedupedWarnings = [...new Map(allWarnings.map(w => [`${w.kind}:${w.title}`, w])).values()]
           auditBlock = formatAuditWarnings(dedupedWarnings)
+          if (!runDeepAudit) {
+            const proFlagCount = await peekDeepAuditCount({
+              sql: primarySql,
+              dataset,
+              duck: studio.duck,
+              views: studio.queryViews(sessionKey),
+            })
+            if (proFlagCount > 0)
+              auditBlock += formatProGuardTeaser(proFlagCount)
+          }
           if (hasFeature(isPro, 'recursive_memory') && dedupedWarnings.length > 0 && sqlSources.length > 0) {
             const targetSource = sqlSources[0]
             for (const w of dedupedWarnings) {

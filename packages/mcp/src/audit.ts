@@ -658,6 +658,38 @@ export async function auditQueryResult(options: {
   return [...staticWarnings, ...joinWarnings, ...periodWarnings, ...filterWarnings, ...outlierWarnings, ...dupCurrWarnings]
 }
 
+/** Checks whether any Pro deep audit guard triggers on a Free-tier query without exposing Pro diagnostics. Returns 0 when clean. */
+export async function peekDeepAuditCount(options: {
+  sql: string
+  dataset: StoredDataset
+  duck: DuckDbRunner
+  views: QueryView[]
+}): Promise<number> {
+  const { sql, dataset, duck, views } = options
+  const [joinWarnings, periodWarnings, filterWarnings, outlierWarnings, dupCurrWarnings] = await Promise.all([
+    auditJoinFanout(sql, duck, views),
+    auditPartialTrailingPeriod(sql, dataset, duck, views),
+    auditFiltersAndNulls(sql, dataset, duck, views),
+    auditExtremeOutliers(sql, duck, views),
+    auditDuplicateAndCurrency(sql, duck, views),
+  ])
+  const deepOnly = [
+    ...joinWarnings,
+    ...periodWarnings,
+    ...filterWarnings.filter(w => w.kind !== 'empty_filter'),
+    ...outlierWarnings,
+    ...dupCurrWarnings,
+  ]
+  return new Map(deepOnly.map(w => [`${w.kind}:${w.title}`, w])).size
+}
+
+/** Formats a non-spoiler 1-line Pro Guard preview when Free tier hits a genuine deep analytical trap. */
+export function formatProGuardTeaser(count: number): string {
+  if (count <= 0)
+    return ''
+  return `\n> **[TinyPivot Pro Guard]** ${count} deep data-integrity check${count === 1 ? '' : 's'} flagged on this query (join fan-out, partial period, NULL drop, outlier, duplicate ID, or mixed-currency audit). Unlock full diagnostics, auto-fix hints & Recursive Data Memory with TinyPivot Pro: https://tiny-pivot.com/pricing`
+}
+
 /** Formats non-empty audit warnings into a concise, high-signal block for the LLM. */
 export function formatAuditWarnings(warnings: AuditWarning[]): string {
   if (warnings.length === 0)

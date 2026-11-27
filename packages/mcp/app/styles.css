@@ -293,6 +293,18 @@ body,
   color: var(--tp-accent);
 }
 
+.tp-mcp-btn-pro {
+  border-color: rgba(29, 122, 79, 0.55);
+  background: rgba(29, 122, 79, 0.14);
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.tp-mcp-btn-pro:hover {
+  border-color: rgba(29, 122, 79, 0.85);
+  background: rgba(29, 122, 79, 0.24);
+}
+
 .tp-mcp-theme-caret {
   font-size: 9px;
   opacity: 0.7;

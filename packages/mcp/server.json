@@ -3,7 +3,7 @@
   "name": "io.github.Small-Web-Co/tinypivot",
   "title": "TinyPivot — Data Analysis Studio for AI Agents",
   "description": "Interactive charts, pivot tables, terminal cards, live TUI, and Excel export inside AI agents.",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "websiteUrl": "https://tiny-pivot.com",
   "repository": {
     "url": "https://github.com/Small-Web-Co/tinypivot",
@@ -14,7 +14,7 @@
     {
       "registryType": "npm",
       "identifier": "@smallwebco/tinypivot-mcp",
-      "version": "0.8.5",
+      "version": "0.8.6",
       "transport": {
         "type": "stdio"
       },

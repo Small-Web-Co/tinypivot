@@ -158,12 +158,12 @@ describe('query, profile and history tools', () => {
     signer = undefined
   })
 
-  async function connect() {
+  async function connect({ pro = true }: { pro?: boolean } = {}) {
     signer ??= installTestLicenseKeypair()
     const history = new HistoryStore({ dir: path.join(dir, 'history') })
     const store = new DatasetStore()
     const studio = new Studio(store, { history, duck: new DuckDbRunner() })
-    const { server } = createTinyPivotMcpServer({ licenseKey: signer.signLicense('MCPP'), store, studio })
+    const { server } = createTinyPivotMcpServer({ licenseKey: pro ? signer.signLicense('MCPP') : undefined, store, studio })
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
     const client = new Client({ name: 'test-host', version: '1.0.0' }, { capabilities: {} })
     await server.connect(serverTransport)
@@ -433,5 +433,45 @@ describe('query, profile and history tools', () => {
     const step2 = await call('query', { sql: 'SELECT region, stretched FROM stretched_targets' })
     expect(step2.isError).toBe(false)
     expect(step2.text).toContain('| EMEA | 2,000 |')
+  }, 30_000)
+
+  it('stays silent on clean Free queries and emits a non-spoiler Pro Guard teaser on real deep traps', async () => {
+    const ordersPath = path.join(dir, 'fan_orders.csv')
+    const repsPath = path.join(dir, 'fan_reps.csv')
+    fs.writeFileSync(ordersPath, [
+      'order_id,account_id,revenue',
+      '1,A1,1000',
+      '2,A1,2000',
+      '3,A2,1500',
+      '4,A2,500',
+    ].join('\n'))
+    fs.writeFileSync(repsPath, [
+      'account_id,rep_name',
+      'A1,Alice',
+      'A1,Bob',
+      'A2,Carol',
+      'A2,Dave',
+    ].join('\n'))
+
+    const { call } = await connect({ pro: false })
+    const clean = await call('query', { sql: `SELECT account_id, SUM(revenue) AS rev FROM ${quoteLiteral(ordersPath)} GROUP BY 1` })
+    expect(clean.isError).toBe(false)
+    expect(clean.text).not.toContain('TinyPivot Pro Guard')
+
+    const fanout = await call('query', {
+      sql: `SELECT o.account_id, SUM(o.revenue) AS rev FROM ${quoteLiteral(ordersPath)} o JOIN ${quoteLiteral(repsPath)} r ON o.account_id = r.account_id GROUP BY 1`,
+    })
+    expect(fanout.isError).toBe(false)
+    expect(fanout.text).toContain('[TinyPivot Pro Guard]')
+    expect(fanout.text).toContain('https://tiny-pivot.com/pricing')
+    expect(fanout.text).not.toContain('VERIFY BEFORE ANSWERING')
+
+    const proClient = await connect({ pro: true })
+    const proFanout = await proClient.call('query', {
+      sql: `SELECT o.account_id, SUM(o.revenue) AS rev FROM ${quoteLiteral(ordersPath)} o JOIN ${quoteLiteral(repsPath)} r ON o.account_id = r.account_id GROUP BY 1`,
+    })
+    expect(proFanout.isError).toBe(false)
+    expect(proFanout.text).toContain('VERIFY BEFORE ANSWERING')
+    expect(proFanout.text).toContain('2.00× average fan-out')
   }, 30_000)
 })

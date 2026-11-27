@@ -1155,10 +1155,22 @@ export function McpApp() {
             <button
               type="button"
               className="tp-mcp-btn"
-              title="Export this isolated session as a standalone offline HTML notebook"
+              title={tier === 'free'
+                ? 'Export this isolated session as a standalone offline HTML notebook (Pro removes footer & unlocks styled .xlsx)'
+                : 'Export this isolated session as a standalone white-label offline HTML notebook'}
               onClick={() => handleExportHtml(studio.sessionId)}
             >
               Export .html
+            </button>
+          )}
+          {tier === 'free' && (
+            <button
+              type="button"
+              className="tp-mcp-btn tp-mcp-btn-pro"
+              title="Unlock deep SQL trap guards (join fan-out, partial periods, NULL drops, outliers), full Data Science shelf, Recursive Data Memory, 10 themes, white-label HTML/.xlsx & PostgreSQL"
+              onClick={handleOpenUpgrade}
+            >
+              ✦ Upgrade to Pro
             </button>
           )}
           {studio && layoutCustomized && (
