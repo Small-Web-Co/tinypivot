@@ -12,7 +12,7 @@
 
 TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinypivot-mcp`) plus a batteries-included analytics DataGrid for Vue 3 and React. The MCP server streams CSV, TSV, JSON, Parquet, inline MCP tool outputs, and read-only PostgreSQL results straight into local DuckDB + an interactive Chart, Pivot Table, and Data Grid without stuffing raw rows into LLM context. Every SQL query, chart, and pivot is automatically audited for silent analytical traps (join fan-out, non-additive rates, partial trailing periods, Simpson's Paradox, SRM, confounding, and outliers) and logged with Proof-of-Work Lineage in TinyPivot Studio on localhost. Free includes **unlimited local rows**, core charts, basic pivot, Studio IDE + lineage, offline HTML export, basic SQL guardrails, and `analyze(explain_change, ab_test)` with no signup; MCP Pro ($149/yr or $399 local v1.x lifetime) and MCP Team ($699/yr for 5 seats) unlock deep relational & statistical guardrails, the full Data Science shelf (`analyze` with SRM + Holm-Bonferroni, controlled regression, right-censored cohorts, seasonal anomalies), Recursive Data Memory, 10 themes, drill-through, white-label HTML & Excel export, and read-only Postgres via dedicated offline-verified `TP-MCP*` keys. UI Library perpetual licenses ($49–$399, `TP-PRO*` keys) remain separate for React & Vue web apps.
 
-## Verified 5-Model Benchmarks + Official Adyen DABstep (2026-11-26)
+## Verified Benchmarks — 5-Model BI/DS + MIT KramaBench (ICLR 2026) + Official 450-Task Adyen DABstep (2026-11-26)
 
 1) **18-Task Unhinted Executive Benchmark** (6 Routine BI, 6 Relational Analytics, 6 Hard Data Science; 5 models × 3 arms = 270 runs; zero hints in prompts):
 - **Combined (90 model-tasks/arm):** Baseline **91.1% (82/90, 25.3s/task)** → TinyPivot Free **93.3% (84/90, 24.6s — zero regressions)** → TinyPivot Pro **100.0% (90/90, 19.0s — 25% faster)**; Routine BI **100% (30/30)**; Relational **100% (30/30)** on Free & Pro; Hard Data Science **80% → 87% Free → 100% Pro (+20 pts), 2.1× faster (39.7s → 19.3s), −20% turns, −32% output tokens**.
@@ -23,12 +23,20 @@ TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinyp
 - **Claude Opus 5.5:** 18/18 (100%) → Free **18/18 (100%)** → Pro **18/18 (100%, no Bash needed)**, **−19% faster Hard DS** (2.8× faster OLS), **$1.41 vs $2.32** warm-cache API-equiv (−39%).
 - **Recursive Data Memory:** Cuts repeat schema inquiry tokens by **−47%** (32.5k → 17.1k tokens, 6 → 3 turns on Inkling).
 
-2) **Official Adyen / Hugging Face `adyen/DABstep` Dev** (10 labeled tasks over 22 MB `payments.csv` + `fees.json`, verbatim `question_scorer`, 3 Claude 5.5 models = 60 runs):
-- **Combined (30 runs/arm):** Vanilla **23/30 (76.7%)** → TinyPivot Pro **24/30 (80.0%)**; Hard tasks **16/21 (76.2%) → 17/21 (81.0%)**; **Claude Haiku 5.5**: **6/10 (60%) → 7/10 (70%, +10 pts)**.
+2) **Controlled Same-Model A/B — MIT KramaBench (ICLR 2026)** (https://kramabench.org/ · https://github.com/mitdbg/Kramabench · 4 public multi-file data lakes: Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 2 models × 2 arms = 248 runs, verbatim MIT deterministic metrics):
+- **Combined (124 paired tasks):** Vanilla **77.3%** → TinyPivot Pro **80.9% (+3.6 pts, 10–6 H2H)**.
+- **Claude Haiku 5.5:** **71.9% → 78.0% (+6.1 pts, 10% faster, 8–5 H2H)** — Biomedical (7 `.xlsx` + 1 CSV): **66.7% → 88.9% (+22.2 pts) & 2.14× faster (67.7s → 31.6s)**; Archaeology: **41.7% → 50.0% (+8.3 pts)**; Environment: **78.0% → 83.3% (+5.3 pts)**. Closes 57% of the gap to Vanilla Sonnet 5.5 at half the API cost.
+- **Claude Sonnet 5.5:** **82.6% → 83.8% (+1.1 pts, 2–1 H2H)** — Environment: **90.0% → 95.0% (+5.0 pts)**; Biomedical (`.xlsx`): **100.0% & 16% faster (31.3s → 26.4s)**.
+
+3) **Official Adyen / Hugging Face `adyen/DABstep` 450-Task Blind Leaderboard + Dev A/B** (https://huggingface.co/spaces/adyen/DABstep):
+- **Claude Sonnet 5.5 + TinyPivot Pro:** **97.22% Easy (70/72) / 68.78% Hard (260/378) / 73.33% Total (330/450)** (#1 Easy & #3-equiv Hard vs Validated Leaderboard).
+- **Claude Haiku 5.5 + TinyPivot Pro:** **88.89% Easy (64/72) / 38.62% Hard (146/378) / 46.67% Total (210/450)** (~2× Claude 4 ReACT; Dev A/B +10 pts 60% → 70%).
+- **DeepSeek V4.1 (DGX Spark local) + TinyPivot Pro:** **90.28% Easy (65/72) / 24.34% Hard (92/378) / 34.89% Total (157/450)** (100% local open-weights at $0 cloud spend; beats Claude 4 ReACT Hard).
+- **Headless / CI mode:** pass `--no-studio` (or `TINYPIVOT_NO_STUDIO=1`) to disable the localhost Studio server completely, or `--no-open` (`TINYPIVOT_OPEN_STUDIO=0`) to suppress browser auto-open.
 
 ## Docs
 
-- [Technical White Paper & 5-Model + DABstep Benchmarks](https://tiny-pivot.com/whitepaper): Empirical evaluation across Inkling 2 Mini, DeepSeek V4.1 Flash, Claude Haiku 5.5, Sonnet 5.5, and Opus 5.5 (91% → 100% unhinted accuracy on Pro, 2.1× faster Hard Data Science, plus official Adyen DABstep Dev)
+- [Technical White Paper & 5-Model + KramaBench + DABstep Benchmarks](https://tiny-pivot.com/whitepaper): Full tables across Bench v2 (91% → 100%), MIT KramaBench (ICLR 2026) same-model A/B (77.3% → 80.9%), and official 450-task Adyen DABstep submissions
 
 - [In-Agent Analytics (TinyPivot MCP Docs)](https://tiny-pivot.com/docs): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference
 - [Full AI-friendly developer reference](https://tiny-pivot.com/llms-full.txt): Complete install, quick-start code, all props, free vs Pro feature matrix, pricing, aggregations, theming, and AI Data Analyst setup for both Vue and React

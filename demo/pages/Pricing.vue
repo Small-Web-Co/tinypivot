@@ -37,7 +37,7 @@ const { pendingPlan, error, startCheckout } = useCheckout()
         <p v-if="product === 'mcp'" class="lede">
           Unlimited local rows in TinyPivot Free with no signup or trial clock. TinyPivot Pro adds deep SQL &amp; statistical guardrails, the full Data Science shelf, Recursive Data Memory, white-label exports, and PostgreSQL.
           <router-link to="/whitepaper" class="wp-inline-link">
-            Read the 5-model + DABstep benchmarks →
+            Read the 5-model + KramaBench + DABstep benchmarks →
           </router-link>
         </p>
         <p v-else class="lede">

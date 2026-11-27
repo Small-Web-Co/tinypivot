@@ -223,12 +223,14 @@ export function formatSelectionForClipboard<T extends Record<string, unknown>>(
   return lines.join('\n')
 }
 
-// XLSX export (re-exported from xlsx.ts)
+// XLSX export & read helpers (re-exported from xlsx.ts)
 export {
   buildGridWorkbook,
   buildPivotWorkbook,
   exportPivotToXLSX,
   exportToXLSX,
+  inspectXlsxBuffer,
+  readXlsxBuffer,
   resolveExcelJS,
 } from './xlsx'
-export type { SourceData } from './xlsx'
+export type { SourceData, XlsxInspectResult, XlsxReadResult } from './xlsx'

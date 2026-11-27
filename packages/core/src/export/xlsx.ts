@@ -471,6 +471,125 @@ export async function exportPivotToXLSX(
 }
 
 // ============================================================================
+// XLSX Read / Inspect helpers (shared by MCP & browser importers)
+// ============================================================================
+
+export interface XlsxReadResult {
+  rows: Record<string, unknown>[]
+  sheetName: string
+  sheetNames: string[]
+}
+
+export interface XlsxInspectResult {
+  sheetNames: string[]
+  firstSheetName: string
+  rowCount: number
+  columns: string[]
+}
+
+function toArrayBuffer(input: ArrayBuffer | Uint8Array): ArrayBuffer {
+  if (input instanceof ArrayBuffer)
+    return input
+  return input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer
+}
+
+function coerceReadCell(value: unknown): unknown {
+  if (value === null || value === undefined)
+    return null
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    return value
+  if (value instanceof Date)
+    return value.toISOString().slice(0, 10)
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    if ('result' in obj && obj.result !== undefined)
+      return coerceReadCell(obj.result)
+    if (Array.isArray(obj.richText))
+      return obj.richText.map(part => String((part as { text?: unknown }).text ?? '')).join('')
+    if (typeof obj.text === 'string')
+      return obj.text
+    if (typeof obj.formula === 'string')
+      return null
+  }
+  return String(value)
+}
+
+/**
+ * Inspect an XLSX buffer's sheet names, first non-empty sheet row count, and header columns
+ * without materializing every row.
+ */
+export async function inspectXlsxBuffer(input: ArrayBuffer | Uint8Array): Promise<XlsxInspectResult> {
+  const ExcelJS = await loadExcelJS()
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(toArrayBuffer(input))
+  const sheetNames = workbook.worksheets.map(ws => ws.name)
+  const first = workbook.worksheets.find(ws => ws.rowCount > 0) ?? workbook.worksheets[0]
+  const columns: string[] = []
+  if (first) {
+    const headerRow = first.getRow(1)
+    const vals = Array.isArray(headerRow.values) ? headerRow.values.slice(1) : []
+    for (const v of vals) {
+      const coerced = coerceReadCell(v)
+      const s = coerced === null || coerced === undefined ? '' : String(coerced).trim()
+      if (s)
+        columns.push(s)
+    }
+  }
+  return {
+    sheetNames,
+    firstSheetName: first?.name ?? '',
+    rowCount: first?.rowCount ?? 0,
+    columns,
+  }
+}
+
+/**
+ * Read a worksheet from an XLSX buffer into plain row objects.
+ * Defaults to the first non-empty worksheet when `requestedSheet` is omitted.
+ */
+export async function readXlsxBuffer(
+  input: ArrayBuffer | Uint8Array,
+  requestedSheet?: string,
+): Promise<XlsxReadResult> {
+  const ExcelJS = await loadExcelJS()
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(toArrayBuffer(input))
+  const sheets = workbook.worksheets
+  const sheetNames = sheets.map(ws => ws.name)
+  if (sheets.length === 0)
+    return { rows: [], sheetName: '', sheetNames: [] }
+
+  const target = requestedSheet
+    ? sheets.find(ws => ws.name.toLowerCase() === requestedSheet.trim().toLowerCase())
+    : sheets.find(ws => ws.rowCount > 0) ?? sheets[0]
+  if (!target)
+    throw new Error(`Sheet "${requestedSheet}" not found. Available sheets: ${sheetNames.join(', ')}`)
+
+  let headers: string[] = []
+  const rows: Record<string, unknown>[] = []
+  target.eachRow({ includeEmpty: false }, (row) => {
+    const rawVals = Array.isArray(row.values) ? row.values.slice(1) : []
+    const coerced = rawVals.map(coerceReadCell)
+    if (headers.length === 0) {
+      headers = sanitizeColumns(coerced.map(cell => (cell === null || cell === undefined ? '' : String(cell))))
+      return
+    }
+    const record: Record<string, unknown> = {}
+    let hasValue = false
+    for (let i = 0; i < headers.length; i++) {
+      const val = i < coerced.length ? coerced[i] : null
+      if (val !== null && val !== '')
+        hasValue = true
+      record[headers[i]] = val
+    }
+    if (hasValue)
+      rows.push(record)
+  })
+
+  return { rows, sheetName: target.name, sheetNames }
+}
+
+// ============================================================================
 // Download helper
 // ============================================================================
 

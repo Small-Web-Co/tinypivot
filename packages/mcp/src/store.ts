@@ -4,7 +4,7 @@ import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { CHART_THEME_IDS } from '@smallwebco/tinypivot-core'
+import { CHART_THEME_IDS, readXlsxBuffer } from '@smallwebco/tinypivot-core'
 import { DEFAULT_MODEL_PRICING, resolveModelPricing, tokensToUsd } from './pricing.js'
 
 const VALID_VISUAL_THEMES = new Set<ChartThemePreset>(CHART_THEME_IDS)
@@ -477,6 +477,19 @@ export function generateSampleSalesData(count = 400): Record<string, unknown>[] 
   return rows
 }
 
+export async function readXlsxFile(
+  filePath: string,
+  requestedSheet?: string,
+): Promise<{ rows: Record<string, unknown>[], sheetName: string, sheetNames: string[] }> {
+  const buf = await fs.readFile(filePath)
+  const parsed = await readXlsxBuffer(buf, requestedSheet)
+  return {
+    rows: parsed.rows.map(flattenRow),
+    sheetName: parsed.sheetName,
+    sheetNames: parsed.sheetNames,
+  }
+}
+
 export class DatasetStore {
   private datasets = new Map<string, StoredDataset>()
   private sessionDatasetIds = new Map<string, string[]>()
@@ -647,56 +660,67 @@ export class DatasetStore {
     return dataset
   }
 
-  /** Reads a data file from disk. With `where`, only the matching rows become the dataset. */
+  /** Reads a data file from disk (CSV, TSV, JSON, JSONL, XLSX). With `where`, only matching rows become the dataset. */
   async loadFromFile(
     filePath: string,
     name?: string,
-    options?: { sessionKey?: string, keepExisting?: boolean, where?: RowFilter[] },
-  ): Promise<StoredDataset> {
+    options?: { sessionKey?: string, keepExisting?: boolean, where?: RowFilter[], sheet?: string },
+  ): Promise<StoredDataset & { sheetNames?: string[], loadedSheet?: string }> {
     const where = options?.where ?? []
     const resolved = path.resolve(filePath)
     const ext = path.extname(resolved).toLowerCase()
-    const raw = await fs.readFile(resolved, 'utf8')
     const baseName = name || path.basename(resolved)
     const displayName = where.length > 0 && !name ? `${baseName} (${describeFilters(where)})` : baseName
 
     let rows: Record<string, unknown>[]
-    if (ext === '.json') {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) {
-        rows = parsed.map(flattenRow)
-      }
-      else if (parsed && typeof parsed === 'object') {
-        // Support wrapped payloads like { data: [...] } or { rows: [...] }
-        const firstArray = Object.values(parsed).find(v => Array.isArray(v)) as unknown[] | undefined
-        rows = firstArray ? firstArray.map(flattenRow) : [flattenRow(parsed)]
-      }
-      else {
-        rows = []
-      }
-    }
-    else if (ext === '.jsonl' || ext === '.ndjson') {
-      rows = raw
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .filter(Boolean)
-        .map(line => flattenRow(JSON.parse(line)))
-    }
-    else if (ext === '.tsv') {
-      rows = parseDelimitedText(raw, '\t')
+    let sheetNames: string[] | undefined
+    let loadedSheet: string | undefined
+    if (ext === '.xlsx') {
+      const xlsx = await readXlsxFile(resolved, options?.sheet)
+      rows = xlsx.rows
+      sheetNames = xlsx.sheetNames
+      loadedSheet = xlsx.sheetName
     }
     else {
-      // Default CSV
-      rows = parseDelimitedText(raw, ',')
+      const raw = await fs.readFile(resolved, 'utf8')
+      if (ext === '.json') {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          rows = parsed.map(flattenRow)
+        }
+        else if (parsed && typeof parsed === 'object') {
+          // Support wrapped payloads like { data: [...] } or { rows: [...] }
+          const firstArray = Object.values(parsed).find(v => Array.isArray(v)) as unknown[] | undefined
+          rows = firstArray ? firstArray.map(flattenRow) : [flattenRow(parsed)]
+        }
+        else {
+          rows = []
+        }
+      }
+      else if (ext === '.jsonl' || ext === '.ndjson') {
+        rows = raw
+          .split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(Boolean)
+          .map(line => flattenRow(JSON.parse(line)))
+      }
+      else if (ext === '.tsv') {
+        rows = parseDelimitedText(raw, '\t')
+      }
+      else {
+        // Default CSV
+        rows = parseDelimitedText(raw, ',')
+      }
     }
 
-    return this.register({
-      name: displayName,
+    const ds = this.register({
+      name: loadedSheet && !name && sheetNames && sheetNames.length > 1 ? `${displayName} [${loadedSheet}]` : displayName,
       source: resolved,
       rows: filterRows(rows, where),
       sessionKey: options?.sessionKey,
       keepExisting: options?.keepExisting,
     })
+    return sheetNames ? Object.assign(ds, { sheetNames, loadedSheet }) : ds
   }
 
   get(id?: string, sessionKey?: string): StoredDataset | undefined {

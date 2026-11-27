@@ -71,12 +71,13 @@ export const harnesses: HarnessSetup[] = [
 
 export const tools = [
   { name: 'open_tinypivot', role: 'Open the Studio', desc: 'Opens the Chart / Pivot / Data view. With no arguments it loads sample data.' },
-  { name: 'load_file', role: 'Local files', desc: 'Loads a CSV, TSV or JSON file, including exports from BigQuery, Snowflake, MySQL, DuckDB or Databricks. Rows stay out of context.' },
+  { name: 'load_file', role: 'Local files & Excel', desc: 'Loads a CSV, TSV, JSON, JSONL or Excel (.xlsx, optional sheet) file, including exports from BigQuery, Snowflake, MySQL, DuckDB or Databricks. Rows stay out of context and loaded .xlsx sheets can be queried immediately with DuckDB SQL.' },
   { name: 'load_data', role: 'Rows from other tools', desc: 'Takes JSON rows from Stripe, GitHub, an API or another SQL MCP server and renders a chart and pivot.' },
   { name: 'configure_pivot', role: 'Exact pivots', desc: 'Sums, averages, medians and totals computed by TinyPivot, not by the model.' },
   { name: 'configure_chart', role: 'Chart types', desc: 'Bar, stacked bar, line, area, pie, donut, scatter, bubble, heatmap and radar, plus maps of countries, US states or sales regions, bullet (actual against target), slope, treemap, sunburst and radial charts. Ask for a dashboard and it adds filter controls above every view.' },
-  { name: 'query', role: 'SQL over files', desc: 'Read-only DuckDB SQL over CSV, Parquet and JSON files and earlier pulls. Joins and filters run locally; only the chart comes back.' },
-  { name: 'profile', role: 'Know the columns', desc: 'Empty share, ranges and commonest values per column, so the agent can plan without reading rows.' },
+  { name: 'query', role: 'SQL over files', desc: 'Read-only DuckDB SQL (single sql or queries[] batching up to 6 SELECTs) over CSV, Parquet and JSON files and loaded datasets. Named queries persist as DuckDB views across turns while keeping raw rows out of context.' },
+  { name: 'profile', role: 'Dataset or folder scan', desc: 'Profiles a loaded dataset (null share, ranges, top values, Pro relational grain), or pass dirPath to scan a local folder of CSV/JSON/Parquet/XLSX schemas, docs, and Pro cross-file join keys in 1 call.' },
+  { name: 'analyze', role: '1-call Data Science', desc: 'Deterministic statistical shelf on datasetId or filePath: explain_change and ab_test on Free; SRM + Holm-Bonferroni, controlled regression, right-censored cohorts, and seasonal anomalies on Pro.' },
   { name: 'history', role: 'Every pull, kept', desc: 'Lists earlier pulls and reopens any of them without re-querying. Saved locally for 30 days.' },
   { name: 'query_postgres', role: 'Pro · Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
 ] as const

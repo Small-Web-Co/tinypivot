@@ -23,8 +23,10 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
               whale outliers invert a regional ranking, or a broken 52.5/47.5 A/B test gets shipped as a win.
               We built a local, deterministic DuckDB + statistical verification layer inside TinyPivot MCP and
               tested it across five models (from a Mac-local model and DGX Spark to Claude Haiku 5.5, Sonnet 5.5,
-              and Opus 5.5) on 18 unhinted BI &amp; Data Science tasks plus the official Adyen/Hugging Face
-              <code>adyen/DABstep</code> benchmark.
+              and Opus 5.5) on 18 unhinted BI &amp; Data Science tasks, a controlled same-model A/B on
+              <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a>,
+              and three live 450-task blind submissions on the official Adyen/Hugging Face
+              <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener"><code>adyen/DABstep</code></a> leaderboard.
             </p>
             <div class="wp-stats">
               <div v-for="stat in whitepaperHeroStats" :key="stat.label" class="wp-stat">
@@ -64,7 +66,7 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            02 · Empirical Proof (5 Models × 18 Unhinted Tasks + Official DABstep)
+            02 · Empirical Proof (5 Models × 18 Tasks + MIT KramaBench + Official 450-Task DABstep)
           </p>
           <h2 class="heading">
             Higher accuracy, <em>fewer turns</em> &amp; 2.1× faster Data Science.
@@ -73,8 +75,8 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
             Every prompt is written the way a real stakeholder asks — <strong>zero hints</strong> about traps,
             outliers, or statistical checks. We evaluated 18 realistic tasks spanning <strong>Routine BI</strong> (6),
             <strong>Relational Analytics</strong> (6), and <strong>Hard Data Science</strong> (6) across 5 models
-            (270 runs), plus the external <strong>Adyen / Hugging Face <code>adyen/DABstep</code> Dev</strong>
-            benchmark (10 official tasks over a 22 MB payments ledger, 60 runs scored with Adyen’s verbatim scorer).
+            (270 runs), a 4-domain controlled A/B on <strong>MIT KramaBench (ICLR 2026)</strong> (62 multi-file tasks × 2 models = 248 runs),
+            and three full 450-task blind submissions on <strong>Adyen / Hugging Face <code>adyen/DABstep</code></strong>.
           </p>
         </header>
 
@@ -116,14 +118,12 @@ import { architecturePillars, hardTrapCases, TRUST_BENCH_DATE, whitepaperHeroSta
           </article>
           <article class="wp-finding">
             <h3 class="mono">
-              4. Verified on external Adyen/Hugging Face DABstep + Recursive Memory
+              4. External proof: MIT KramaBench (ICLR 2026) A/B &amp; Official 450-Task DABstep
             </h3>
             <p>
-              On the public <code>adyen/DABstep</code> Dev benchmark (22 MB <code>payments.csv</code> + 1,000 nested JSON fee rules),
-              <strong>TinyPivot Pro</strong> lifted 3-model accuracy from <strong>76.7% → 80.0%</strong> (Hard tasks
-              <strong>76.2% → 81.0%</strong>, Haiku <strong>60% → 70%</strong>) using Adyen’s verbatim scorer. And on repeat
-              inquiries against the same schema, local <strong>Recursive Data Memory</strong> cuts Inkling tokens a further
-              <strong>−47%</strong> (6 → 3 turns).
+              On <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a> across 4 multi-file data lakes (62 tasks × 2 models = 248 runs),
+              <strong>TinyPivot Pro</strong> lifted same-model accuracy <strong>77.3% → 80.9% (+3.6 pts)</strong> — with <code>Haiku 5.5</code> jumping <strong>+6.1 pts (71.9% → 78.0%)</strong> and running <strong>10% faster</strong> (Biomedical <code>.xlsx</code> workbooks: <strong>66.7% → 88.9%, +22.2 pts, 2.14× faster</strong>), closing 57% of the gap to Vanilla <code>Sonnet 5.5</code> at half the cost.
+              On <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener"><code>adyen/DABstep</code></a> (450 blind tasks), all three live submissions beat Claude 4 ReACT (<code>19.8%</code> Hard): <code>Sonnet 5.5</code> hit <strong>97.2% Easy / 68.8% Hard</strong> (#1 Easy / #3-equiv Hard), <code>Haiku 5.5</code> hit <strong>88.9% / 38.6%</strong>, and local DGX Spark <code>DeepSeek V4.1</code> hit <strong>90.3% / 24.3%</strong> at $0 cloud spend.
             </p>
           </article>
         </div>

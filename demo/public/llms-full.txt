@@ -1,6 +1,6 @@
 # TinyPivot — Developer & In-Agent Analytics Reference
 
-> Updated for TinyPivot MCP v0.8.3 & TinyPivot React/Vue v1.4.9.
+> Updated for TinyPivot MCP v0.8.4 & TinyPivot React/Vue v1.4.9.
 
 TinyPivot is **one deterministic analytics engine** shipped in two complementary forms:
 1. **TinyPivot MCP (`@smallwebco/tinypivot-mcp`)** — Data analysis studio for AI agents: TinyPivot Studio on localhost, an MCP App, a native Claude plugin, framed terminal cards and a live Ghostty TUI.
@@ -14,7 +14,7 @@ Give any AI coding or chat agent a data analysis studio, with zero raw-row dumpi
 
 ### TinyPivot Studio
 
-In terminal agents the first TinyPivot step opens TinyPivot Studio at `http://127.0.0.1:47317` (`TINYPIVOT_OPEN_STUDIO=0` turns that off). It shows:
+In terminal agents the first TinyPivot step opens TinyPivot Studio at `http://127.0.0.1:47317`. Pass `--no-studio` (or `TINYPIVOT_NO_STUDIO=1`) to disable the Studio server completely for CI/headless/benchmarks, or `--no-open` (`TINYPIVOT_OPEN_STUDIO=0` / `TINYPIVOT_NO_OPEN=1`) to keep Studio available without auto-opening a browser tab. It shows:
 
 - **Trace:** every step by the agent or the user, with the agent's reason (the optional `why` argument on every data tool), what it shows, and the SQL or file filter behind it. Opening a step shows the data as it was right after that step.
 - **SQL editor:** edit a step's SQL or write new read-only DuckDB SQL over local files and loaded tables; the result joins the trace as the user's step.
@@ -70,8 +70,16 @@ Full white paper and methodology: `https://tiny-pivot.com/whitepaper`
 | **Claude Opus 5.5** | 18/18 (100%) · 21.5s · $2.32* | 18/18 (100%) · 21.9s · $2.65* | **18/18 (100%)** · 22.0s · $1.41* | **100% Free & Pro · −19% faster Hard DS · −39% warm API*** |
 | **Combined (90 tasks/arm)** | **82/90 (91%) · 25.3s** | **84/90 (93%) · 24.6s** | **90/90 (100%) · 19.0s** | **+9 pts overall (Free +2) · −25% faster · 2.1× Hard DS** |
 
-**2) Official External Benchmark — Adyen / Hugging Face `adyen/DABstep` Dev** (10 official labeled tasks over 22 MB `payments.csv` + `fees.json`, scored with Adyen's verbatim `question_scorer`):
-- **Combined (3 Claude 5.5 models, 30 runs/arm):** Vanilla **23/30 (76.7%)** → TinyPivot Pro **24/30 (80.0%)**; Hard tasks **16/21 (76.2%) → 17/21 (81.0%)** (`Haiku 5.5`: 6/10 → **7/10**, `Sonnet 5.5`: 9/10 → **9/10**, `Opus 5.5`: 8/10 → **8/10**, faster overall).
+**2) Controlled Same-Model A/B — MIT KramaBench (ICLR 2026)** (`https://kramabench.org/` · `https://github.com/mitdbg/Kramabench` · 4 public multi-file data lakes: Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 2 models × 2 arms = 248 runs, verbatim MIT deterministic metrics):
+- **Claude Haiku 5.5:** **71.9% → 78.0% (+6.1 pts, 10% faster, 8–5 H2H)** — Biomedical (7 `.xlsx` workbooks + 1 CSV): **66.7% → 88.9% (+22.2 pts) & 2.14× faster (67.7s → 31.6s)**; Archaeology: **41.7% → 50.0% (+8.3 pts)**; Environment: **78.0% → 83.3% (+5.3 pts)**; Wildfire: 85.7% → 84.4%. Closes 57% of the gap to Vanilla Sonnet 5.5 (82.6%) at half the API cost ($5.28 vs $10.63*).
+- **Claude Sonnet 5.5:** **82.6% → 83.8% (+1.1 pts, 2–1 H2H)** — Environment: **90.0% → 95.0% (+5.0 pts)**; Biomedical (`.xlsx`): **100.0% & 16% faster (31.3s → 26.4s)**; Archaeology: 41.7% (5% faster); Wildfire: 91.6% → 90.2%.
+- **Combined (124 paired tasks):** Vanilla **77.3%** → TinyPivot Pro **80.9% (+3.6 pts, 10–6 H2H)**.
+
+**3) Official Adyen / Hugging Face `adyen/DABstep` 450-Task Blind Leaderboard + Dev A/B** (`https://huggingface.co/spaces/adyen/DABstep`):
+- **Claude Sonnet 5.5 + TinyPivot Pro:** **97.22% Easy (70/72) / 68.78% Hard (260/378) / 73.33% Total (330/450)** (#1 Easy & #3-equiv Hard vs Validated Leaderboard).
+- **Claude Haiku 5.5 + TinyPivot Pro:** **88.89% Easy (64/72) / 38.62% Hard (146/378) / 46.67% Total (210/450)** (~2× Claude 4 ReACT; Dev A/B +10 pts 60% → 70%).
+- **DeepSeek V4.1 (DGX Spark local) + TinyPivot Pro:** **90.28% Easy (65/72) / 24.34% Hard (92/378) / 34.89% Total (157/450)** (100% local open-weights at $0 cloud spend; beats Claude 4 ReACT Hard).
+- **10-Task Dev A/B (3 Claude 5.5 models, 30 runs/arm):** Vanilla **23/30 (76.7%)** → TinyPivot Pro **24/30 (80.0%)**; Hard tasks **16/21 (76.2%) → 17/21 (81.0%)**.
 
 - **Recursive Data Memory:** Local learning from caught SQL traps and Studio edits cut repeat `join_fanout` inquiry cost on Inkling 2 Mini from `6 turns / 32.5k tok` (TinyPivot Free) → `4 turns / 22.7k` (Pro cold) → **`3 turns / 17.1k tok` (−47%)** warm.
 - **Everyday BI Cost (44,714 rows in Claude Code):** TinyPivot ran **15% cheaper than Python** (`5.6¢` vs `6.6¢` per question) and avoided **92.9%** of context tokens vs pasting rows.
@@ -85,12 +93,12 @@ Full white paper and methodology: `https://tiny-pivot.com/whitepaper`
 ### MCP Tools
 
 - `open_tinypivot` — Opens TinyPivot (works with `{}` using the built-in sample dataset).
-- `load_file` — Loads local `.csv`, `.tsv`, `.json`, or `.jsonl` files (or SQL CLI exports) with 0 raw rows in context; accepts `chartConfig` and `pivotConfig` in 1 call.
+- `load_file` — Loads local `.csv`, `.tsv`, `.json`, `.jsonl`, or `.xlsx` workbooks (`sheet` optional) with 0 raw rows in context; accepts `chartConfig` and `pivotConfig` in 1 call. Loaded `.xlsx` sheets are immediately queryable in DuckDB SQL.
 - `load_data` — Loads flat JSON rows already in memory (up to `~50` rows) directly without temp CSVs; accepts `chartConfig` and `pivotConfig` in 1 call.
 - `configure_pivot` — Deterministic pivot calculation via `@smallwebco/tinypivot-core` (zero LLM arithmetic errors).
 - `configure_chart` — Interactive charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, `scatter`, `bubble`, `heatmap`, `radar`, `choropleth` maps of countries / US states / sales regions, `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`) + Unicode terminal cards.
-- `query` — Runs local DuckDB SQL across loaded tables with deterministic trap auditing (silent when clean; flags join fan-out, non-additive rates, partial trailing periods, NULL drops, and extreme outliers).
-- `profile` — Inspects column schemas, distributions, and (on Pro) relational grain & cross-table join fan-out maps.
+- `query` — Runs local DuckDB SQL (`sql` or `queries[]` up to 6 SELECTs) across files and loaded tables with deterministic trap auditing; named queries persist as DuckDB views across turns.
+- `profile` — Inspects column schemas, distributions, and (on Pro) relational grain & join fan-out maps, OR pass `dirPath` to scan a local folder of CSV/JSON/Parquet/XLSX schemas + docs (+ Pro cross-file join keys) in 1 call.
 - `analyze` — Deterministic 1-call Data Science shelf: `explain_change` (Kitagawa mix-vs-rate + Simpson's Paradox) and `ab_test` on Free; full SRM χ² + Holm-Bonferroni, controlled multivariate `regression`, right-censored `cohort_retention`, and seasonal `anomalies` + change-points on Pro.
 - `query_postgres` — *(Optional Pro)* AST-validated read-only `SELECT` against `DATABASE_URL`.
 - `list_datasets` — Lists loaded datasets, row counts, and inferred schemas.

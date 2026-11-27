@@ -123,7 +123,8 @@ const { copiedKey, copy } = useCopy()
           </h2>
           <p class="docs-text">
             In a terminal agent, the first TinyPivot step opens the Studio at <code>http://127.0.0.1:47317</code>.
-            A Studio tab left open from an earlier session reconnects instead. Set <code>TINYPIVOT_OPEN_STUDIO=0</code> to open it yourself.
+            A Studio tab left open from an earlier session reconnects instead.
+            Need headless mode for CI, SSH, or benchmarks? Pass <code>--no-studio</code> (or set <code>TINYPIVOT_NO_STUDIO=1</code>) to disable the Studio server completely (zero ports bound, zero browser popups), or pass <code>--no-open</code> (<code>TINYPIVOT_OPEN_STUDIO=0</code> / <code>TINYPIVOT_NO_OPEN=1</code>) to keep the Studio URL available without auto-opening a tab.
           </p>
           <ul class="docs-text studio-list">
             <li><strong>Questions.</strong> Each question you ask, with every step that answered it: the source, the SQL, the rows, the chart and the agent's answer. Each step carries the agent's reason (the <code>why</code> it passes on every data tool); <em>Rows</em> and <em>Chart</em> show the data as it was right after that step.</li>
@@ -153,7 +154,7 @@ const { copiedKey, copy } = useCopy()
           <p class="docs-text">
             TinyPivot also runs deterministic SQL &amp; statistical guardrails on every query (join fan-out, chasm traps, non-additive rate averages, partial trailing periods, silent NULL drops, extreme outliers) and tracks clickable Proof-of-Work Lineage back to underlying source rows.
             <router-link to="/whitepaper">
-              Read the Trust Layer White Paper &amp; 5-model + DABstep benchmarks →
+              Read the Trust Layer White Paper &amp; 5-model + KramaBench + DABstep benchmarks →
             </router-link>
           </p>
         </section>

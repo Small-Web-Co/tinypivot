@@ -22,9 +22,9 @@ const facts = ['TinyPivot Free · unlimited rows', 'runs locally', 'no signup', 
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  '91% → 100% accuracy across all 5 models × 18 unhinted BI/DS tasks (90/90 on Pro)',
-  '2.1× faster Hard Data Science (−30% turns, −48% to −50% local output tokens)',
-  'Verified on official Adyen DABstep (77% → 80%) · < 2,500 Free schema tokens',
+  '91% → 100% accuracy across 5 models × 18 unhinted BI/DS tasks (2.1× faster Hard DS)',
+  'MIT KramaBench (ICLR 2026) same-model A/B: 77.3% → 80.9% (Haiku +6.1 pts · .xlsx Bio +22.2 pts, 2.14× faster)',
+  'Official 450-task Adyen DABstep: Sonnet 97.2% Easy / 68.8% Hard · < 2,500 Free schema tokens',
 ] as const
 
 const capabilities = [
@@ -85,7 +85,7 @@ const capabilities = [
               </div>
               <div class="hero-meta-links">
                 <a href="#savings" class="hero-fine">
-                  5-model unhinted benchmark + official Adyen DABstep: 91% → 100% accuracy (90/90 Pro), 2.1× faster Hard DS, Inkling 78% → 100%.
+                  5-model unhinted benchmark + MIT KramaBench (ICLR 2026) + 450-task Adyen DABstep: 91% → 100% BI/DS, Haiku +6.1 pts on KramaBench.
                   Benchmarks ↓
                 </a>
                 <router-link to="/whitepaper" class="hero-why-link">
@@ -176,11 +176,12 @@ const capabilities = [
               Proof 01 · Technical White Paper
             </p>
             <h3 class="proof-title">
-              5-Model Unhinted Benchmark (270 Runs) + Official DABstep
+              5-Model Bench (270 Runs) + MIT KramaBench + 450-Task DABstep
             </h3>
             <p class="proof-body">
-              Head-to-head across Inkling 2 Mini (<strong>78% → 83% Free → 100% Pro, −44% faster</strong>), DeepSeek V4.1 (<strong>100%, −39% faster, −30% turns</strong>),
-              Claude Haiku 5.5 (<strong>83% → 89% → 100%</strong>), Sonnet 5.5 (<strong>100%, −17% warm API*</strong>), Opus 5.5 (<strong>100%</strong>), and Adyen’s public <code>DABstep</code> Dev.
+              <strong>91% → 100%</strong> across Inkling 2 Mini, DeepSeek V4.1, and Claude 5.5 (2.1× faster Hard DS);
+              <strong>77.3% → 80.9%</strong> on controlled MIT KramaBench (Haiku <strong>+6.1 pts</strong>, <code>.xlsx</code> Biomedical <strong>+22.2 pts &amp; 2.14× faster</strong>);
+              and 3 live 450-task <code>adyen/DABstep</code> submissions (Sonnet <strong>97.2% Easy / 68.8% Hard</strong>).
             </p>
             <span class="text-link">Read the White Paper &amp; full benchmark tables →</span>
           </router-link>

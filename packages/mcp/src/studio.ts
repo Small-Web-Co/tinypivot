@@ -120,13 +120,15 @@ function viewFields(dataset: StoredDataset): string[] {
   ].filter((field): field is string => Boolean(field))
 }
 
-/** How SQL reads an earlier pull back: the source file, or the rows saved in history. */
+/** How SQL reads an earlier pull back: saved JSONL rows when materialized (e.g. queries, inline data, XLSX sheets), else the source file. */
 function historyTableExpression(entry: HistoryEntry, rowsPath: string | undefined): string | undefined {
+  if (rowsPath)
+    return `read_json_auto(${quoteLiteral(rowsPath)})`
   if (entry.kind === 'file') {
     const file = quoteLiteral(entry.source)
     return entry.where?.length ? `(SELECT * FROM ${file} WHERE ${whereSql(entry.where)})` : file
   }
-  return rowsPath ? `read_json_auto(${quoteLiteral(rowsPath)})` : undefined
+  return undefined
 }
 
 /** A sentence about the tool rather than the data: it names TinyPivot or the Studio, or links to it. */
@@ -712,7 +714,7 @@ export class Studio {
     if (!entry)
       throw new Error(`No saved pull "${id}".`)
     const sessionKey = options.sessionKey ?? DEFAULT_SESSION_KEY
-    const dataset = entry.kind === 'file'
+    const dataset = entry.kind === 'file' && !entry.rowsFile
       ? await this.store.loadFromFile(entry.source, entry.name, { sessionKey, keepExisting: true, where: entry.where })
       : this.store.register({ name: entry.name, source: entry.source, ingestionMode: 'direct', rows: this.history.readRows(entry), sessionKey, keepExisting: true })
     this.store.updateView(dataset.id, {

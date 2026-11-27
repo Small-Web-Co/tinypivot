@@ -3,9 +3,11 @@
  * All figures come directly from reproducible benchmarks run on 2026-11-26:
  *  1) 18-Task Unhinted Executive Benchmark (Routine BI, Relational Analytics & Hard Data Science)
  *     across 5 models × 3 arms (270 runs total).
- *  2) Official Adyen / Hugging Face `adyen/DABstep` Dev Benchmark (10 official labeled tasks
- *     over 22 MB `payments.csv` + `fees.json`) across 3 Claude 5.5 models (60 runs total),
- *     scored with Adyen's verbatim `question_scorer`.
+ *  2) MIT KramaBench (ICLR 2026) Controlled Same-Model A/B across 4 multi-file data lakes
+ *     (Environment, Wildfire, Archaeology, Biomedical — 62 tasks × 2 models × 2 arms = 248 runs),
+ *     scored verbatim with MIT's deterministic metrics (`Success`, `RAEScore`, `F1`).
+ *  3) Official Adyen / Hugging Face `adyen/DABstep` 450-task blind leaderboard submissions
+ *     (Sonnet 5.5, Haiku 5.5, local DGX Spark DeepSeek V4.1) + 10-task Dev A/B (60 runs).
  */
 
 export interface TrustBenchImpact {
@@ -242,6 +244,17 @@ export const categoryBenchRows: readonly CategoryBenchRow[] = [
     delta: '+20 pts · 2.1× faster',
   },
   {
+    id: 'kramabench',
+    label: 'MIT KramaBench',
+    sub: '124 paired runs/arm',
+    baselinePct: 77,
+    freePct: 0,
+    proPct: 81,
+    baselineMeta: '77.3% (Haiku 71.9%)',
+    proMeta: '80.9% (Haiku 78.0%)',
+    delta: '+3.6 pts (Bio +22)',
+  },
+  {
     id: 'dabstep',
     label: 'adyen/DABstep Dev',
     sub: '30 official runs/arm',
@@ -251,6 +264,70 @@ export const categoryBenchRows: readonly CategoryBenchRow[] = [
     baselineMeta: '23/30 (Hard 76%)',
     proMeta: '24/30 (Hard 81%)',
     delta: '+3 pts (Haiku +10)',
+  },
+]
+
+export interface KramaBenchRow {
+  model: string
+  overall: string
+  speed: string
+  domains: string
+  note: string
+}
+
+export const kramaBenchRows: readonly KramaBenchRow[] = [
+  {
+    model: 'Claude Haiku 5.5',
+    overall: '71.9% → 78.0% (+6.1 pts)',
+    speed: '24.2s → 21.9s (10% faster · 8–5 H2H)',
+    domains: 'Bio (.xlsx) 66.7% → 88.9% (2.14× faster) · Arch 41.7% → 50.0% · Env 78.0% → 83.3% · Wild 85.7% → 84.4%',
+    note: 'Closes 57% of the gap to Vanilla Sonnet 5.5 (82.6%) at half the API cost ($5.28 vs $10.63*)',
+  },
+  {
+    model: 'Claude Sonnet 5.5',
+    overall: '82.6% → 83.8% (+1.1 pts)',
+    speed: '17.5s → 19.2s (2–1 H2H · Bio 16% faster)',
+    domains: 'Env 90.0% → 95.0% (+5 pts) · Bio (.xlsx) 100.0% (26.4s vs 31.3s) · Arch 41.7% · Wild 91.6% → 90.2%',
+    note: '1-call profile(dirPath) + direct .xlsx flipped Environment +5 pts and sped up Biomedical by 16%',
+  },
+  {
+    model: 'Combined (n = 124 paired)',
+    overall: '77.3% → 80.9% (+3.6 pts)',
+    speed: '20.9s → 20.6s · 10–6 head-to-head',
+    domains: '4 public multi-file data lakes (Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 2 models)',
+    note: 'Zero Jupyter, zero VLM, zero multi-agent bloat — lightweight DuckDB + .xlsx + folder schema scan',
+  },
+]
+
+export interface DabstepOfficialRow {
+  model: string
+  easy: string
+  hard: string
+  total: string
+  note: string
+}
+
+export const dabstepOfficialRows: readonly DabstepOfficialRow[] = [
+  {
+    model: 'Claude Sonnet 5.5 + TP Pro',
+    easy: '97.22% (70/72)',
+    hard: '68.78% (260/378)',
+    total: '73.33% (330/450)',
+    note: '#1 Easy · #3-equiv Hard vs Validated Leaderboard (ahead of GPT-5 57.7% & Google DS-STAR 45.2%)',
+  },
+  {
+    model: 'Claude Haiku 5.5 + TP Pro',
+    easy: '88.89% (64/72)',
+    hard: '38.62% (146/378)',
+    total: '46.67% (210/450)',
+    note: '#8-equiv Hard (~2× Claude 4 Sonnet ReACT 19.8%); Dev A/B showed +10 pts same-model lift (60% → 70%)',
+  },
+  {
+    model: 'DeepSeek V4.1 (DGX Spark) + TP Pro',
+    easy: '90.28% (65/72)',
+    hard: '24.34% (92/378)',
+    total: '34.89% (157/450)',
+    note: '100% local open-weights ($0 cloud spend) — beats Claude 4 ReACT Hard & exceeds KGMON/DataPilot Easy %',
   },
 ]
 
@@ -293,19 +370,19 @@ export const dabstepBenchRows: readonly DabstepBenchRow[] = [
 export const whitepaperHeroStats = [
   {
     value: '91% → 100%',
-    label: 'Overall accuracy across all 5 models × 18 unhinted tasks (90/90 on TinyPivot Pro)',
+    label: '5 models × 18 unhinted BI/DS tasks (90/90 on TinyPivot Pro · 2.1× faster Hard DS)',
   },
   {
-    value: '2.1× faster',
-    label: 'Hard Data Science: 80% → 100% accuracy, 39.7s → 19.3s (−51%), −32% output tokens',
+    value: '77.3% → 80.9%',
+    label: 'MIT KramaBench (ICLR 2026) same-model A/B (Haiku +6.1 pts; .xlsx Bio +22.2 pts & 2.14× faster)',
   },
   {
-    value: '78% → 100%',
-    label: 'Mac-local Inkling 2 Mini lifted +22 pts (83% Free → 100% Pro), −44% faster, −50% output',
+    value: '97.2% / 68.8%',
+    label: 'Official 450-task blind Adyen DABstep (Sonnet 5.5 + Pro #1 Easy / #3-equiv Hard; local DeepSeek 90.3% Easy)',
   },
   {
-    value: '77% → 80%',
-    label: 'Official Adyen DABstep Dev external benchmark (Haiku 60% → 70%, Hard 76% → 81%)',
+    value: '< 2,500 tokens',
+    label: 'Free schema footprint · zero Jupyter/VLM bloat · headless --no-studio mode for CI & benchmarks',
   },
 ] as const
 

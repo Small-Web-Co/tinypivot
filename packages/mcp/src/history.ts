@@ -98,7 +98,8 @@ export class HistoryStore {
     try {
       fs.mkdirSync(this.dir, { recursive: true })
       const id = `${timestampId(now)}-${slug(dataset.name)}`
-      const saveRows = input.kind !== 'file' && dataset.rows.length <= HISTORY_MAX_SAVED_ROWS
+      const needsMaterializedRows = input.kind !== 'file' || input.source.toLowerCase().endsWith('.xlsx')
+      const saveRows = needsMaterializedRows && dataset.rows.length <= HISTORY_MAX_SAVED_ROWS
       const entry: HistoryEntry = {
         id,
         name: dataset.name,

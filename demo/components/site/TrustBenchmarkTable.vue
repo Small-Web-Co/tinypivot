@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { dabstepBenchRows, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
+import { dabstepOfficialRows, kramaBenchRows, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
 </script>
 
 <template>
@@ -154,18 +154,39 @@ import { dabstepBenchRows, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows 
 
     <div class="dabstep-strip">
       <p class="label dabstep-cap">
-        External Public Benchmark · Official Adyen / Hugging Face <code>adyen/DABstep</code> Dev (10 Tasks · 22 MB <code>payments.csv</code> + <code>fees.json</code> · Verbatim Scorer)
+        External Benchmark 1 · <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a> Controlled Same-Model A/B · 4 Multi-File Data Lakes (62 Tasks × 2 Models = 248 Runs · <a href="https://github.com/mitdbg/Kramabench" target="_blank" rel="noopener">mitdbg/Kramabench</a>)
       </p>
       <div class="dabstep-grid mono">
-        <div v-for="row in dabstepBenchRows" :key="row.model" class="dabstep-card">
+        <div v-for="row in kramaBenchRows" :key="row.model" class="dabstep-card">
           <strong>{{ row.model }}</strong>
           <div class="dabstep-scores">
-            <span>Vanilla: {{ row.baselineScore }} ({{ row.baselineHard }} hard)</span>
-            <span class="dabstep-pro">TP Pro: {{ row.proScore }} ({{ row.proHard }} hard)</span>
+            <span class="dabstep-pro">{{ row.overall }}</span>
+            <span>{{ row.speed }}</span>
+          </div>
+          <span class="dabstep-note">{{ row.domains }}</span>
+          <span class="dabstep-note">{{ row.note }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dabstep-strip">
+      <p class="label dabstep-cap">
+        External Benchmark 2 · Official 450-Task Blind <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener">Adyen / Hugging Face <code>adyen/DABstep</code></a> Leaderboard (3 Live Submissions Scored by Adyen + Dev A/B 77% → 80%)
+      </p>
+      <div class="dabstep-grid mono">
+        <div v-for="row in dabstepOfficialRows" :key="row.model" class="dabstep-card">
+          <strong>{{ row.model }}</strong>
+          <div class="dabstep-scores">
+            <span>Easy: {{ row.easy }}</span>
+            <span class="dabstep-pro">Hard: {{ row.hard }}</span>
+            <span>Total: {{ row.total }}</span>
           </div>
           <span class="dabstep-note">{{ row.note }}</span>
         </div>
       </div>
+      <p class="dabstep-disclosure mono">
+        Honest attribution: on <code>adyen/DABstep</code>, Sonnet 5.5’s absolute 97.2% Easy / 68.8% Hard score reflects strong base-model reasoning alongside TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and +10 pts on Haiku 60% → 70%). Our controlled same-model Bench v2 (91% → 100%) and MIT KramaBench A/B (77.3% → 80.9%, Haiku +6.1 pts) isolate TinyPivot’s direct lift.
+      </p>
     </div>
 
     <figcaption class="tbench-note">
@@ -403,6 +424,19 @@ tfoot .totals td {
 .dabstep-cap code {
   font-family: var(--font-mono);
   text-transform: none;
+}
+
+.dabstep-cap a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dabstep-disclosure {
+  margin: 0;
+  font-size: 0.65rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
 }
 
 .dabstep-grid {

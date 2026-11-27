@@ -455,6 +455,8 @@ Options:
   --theme=<id>                       Visual theme (${CHART_THEME_IDS.join(', ')})
   --pivot                            Also print a framed sparkline pivot table on stdin pipe
   --open                             Open TinyPivot Studio in your browser now
+  --no-open                          Keep Studio server available without auto-opening a browser tab (env: TINYPIVOT_OPEN_STUDIO=0)
+  --no-studio                        Disable the localhost Studio server completely — zero ports, zero popups (env: TINYPIVOT_NO_STUDIO=1)
   --port=<n>                         Serve the Studio on this localhost port (default 47317)
   --name=<title>                     Dataset title for piped stdin / loaded files
 `.trim())
@@ -508,7 +510,8 @@ async function main() {
   let appHtmlPath: string | undefined
   let explicitPort = false
   let port = process.env.TINYPIVOT_PORT ? Number(process.env.TINYPIVOT_PORT) : STUDIO_PORT
-  let disableCompanion = process.env.TINYPIVOT_NO_COMPANION === '1'
+  let disableCompanion = process.env.TINYPIVOT_NO_COMPANION === '1' || process.env.TINYPIVOT_NO_STUDIO === '1'
+  let suppressBrowserOpen = process.env.TINYPIVOT_OPEN_STUDIO === '0' || process.env.TINYPIVOT_NO_OPEN === '1'
   let autoOpen = false
   let forceStdinPipe = false
   let showPivotOutput = false
@@ -538,8 +541,11 @@ async function main() {
     else if (arg.startsWith('--name=')) {
       datasetName = arg.slice('--name='.length).trim() || undefined
     }
-    else if (arg === '--no-companion') {
+    else if (arg === '--no-companion' || arg === '--no-studio') {
       disableCompanion = true
+    }
+    else if (arg === '--no-open') {
+      suppressBrowserOpen = true
     }
     else if (arg === '--open') {
       autoOpen = true
@@ -784,9 +790,8 @@ async function main() {
     companionUrl: companion?.link,
     ensureCompanion: disableCompanion
       ? undefined
-      // A terminal agent's first data step opens the Studio, unless TINYPIVOT_OPEN_STUDIO=0. Where
-      // the host draws TinyPivot's view, the view asks the host to open it instead.
-      : async ({ open = true } = {}) => (await ensureCompanionStarted(open && process.env.TINYPIVOT_OPEN_STUDIO !== '0'))?.link,
+      // A terminal agent's first data step opens the Studio, unless TINYPIVOT_OPEN_STUDIO=0 / TINYPIVOT_NO_OPEN=1 / TINYPIVOT_NO_STUDIO=1.
+      : async ({ open = true } = {}) => (await ensureCompanionStarted(open && !suppressBrowserOpen))?.link,
     onStateChanged: () => companion?.broadcastUpdate(),
   })
 

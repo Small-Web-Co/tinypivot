@@ -137,8 +137,11 @@ export {
   exportToCSV,
   exportToXLSX,
   formatSelectionForClipboard,
+  inspectXlsxBuffer,
+  readXlsxBuffer,
+  resolveExcelJS,
 } from './export'
-export type { PivotExportData, SourceData } from './export'
+export type { PivotExportData, SourceData, XlsxInspectResult, XlsxReadResult } from './export'
 
 // Layout
 export { FILL_SNAP_PX, heightToFill, measureFill, snapToFill } from './layout'

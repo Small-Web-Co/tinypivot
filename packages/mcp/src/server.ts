@@ -30,7 +30,7 @@ import { ROW_PAGE_SIZE } from './limits.js'
 import { extractSqlLineage } from './lineage.js'
 import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
-import { formatProfile, formatProLoadTraps } from './profile.js'
+import { formatProfile, formatProLoadTraps, profileDirectory } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, datasetView, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { agentLabel, Studio } from './studio.js'
 import { describeChartForText, formatDatasetSummary, formatPivotSummary } from './summary.js'
@@ -54,7 +54,7 @@ export function buildInstructions({ reprintCards = true, claudeChannel = false, 
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
-    `For files use load_file to chart directly, or query (sql or queries[] batching up to 6 SELECTs over file paths directly) to filter, join or aggregate without loading rows into context. Use load_data only for <=${LOAD_DATA_ROW_GUIDE} inline rows. history lists and reopens pulls.`,
+    `Use load_file to chart files, or query (sql or queries[] up to 6 SELECTs over files) to filter/join/aggregate without loading rows into context. load_data is only for <=${LOAD_DATA_ROW_GUIDE} inline rows; history lists/reopens pulls.`,
     `Chart types: ${CHART_TYPES.map(t => t.type).join(', ')}; names like map also work. slope: xAxisField the items, seriesField the two periods; treemap: seriesField the parent; bullet: targetField the target.`,
     'Totals are exact. Compute ratios, shares and rates as numerator / denominator, one row per chart point, before loading; never add up percentage columns, and do not use percentOfTotal for a share within a period.',
     'Use keepExisting: true only to compare datasets in one conversation; clear_datasets resets.',
@@ -538,7 +538,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.8.3',
+      version: '0.8.4',
     },
     {
       capabilities: {
@@ -821,14 +821,15 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
-  // 2. Load local CSV / TSV / JSON / JSONL file
+  // 2. Load local CSV / TSV / JSON / JSONL / XLSX file
   server.registerTool(
     'load_file',
     {
       title: 'Load Data File into TinyPivot',
-      description: 'Chart or pivot a local CSV/TSV/JSON/JSONL file without reading rows into context.',
+      description: 'Chart or pivot a local CSV/TSV/JSON/JSONL/XLSX file without reading rows into context.',
       inputSchema: {
         filePath: z.string(),
+        sheet: z.string().optional(),
         name: z.string().optional(),
         why: whyParam,
         ask: askParam,
@@ -841,10 +842,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
       _meta: INLINE_UI_META,
     },
-    async ({ filePath, name, why, ask, where, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
+    async ({ filePath, sheet, name, why, ask, where, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
       try {
         const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
-        const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep, where })
+        const ds = await store.loadFromFile(filePath, name, { sessionKey, keepExisting: shouldKeep, where, sheet })
         studio.remember(ds, { kind: 'file', source: ds.source, where })
         const explicitChart = chartConfig ? toCoreChartConfig(chartConfig, ds.name) : undefined
         if (pivotConfig) {
@@ -863,7 +864,9 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         }
 
         studio.recordDatasetStep(ds, { actor: 'agent', tool: 'load_file', why, ask, file: ds.source, where })
-        let proLoadNote = ''
+        let proLoadNote = ds.sheetNames && ds.sheetNames.length > 1
+          ? `\nWorkbook sheets: ${ds.sheetNames.map(s => `\`${s}\``).join(', ')} (loaded \`${ds.loadedSheet}\`; pass \`sheet\` to load another).`
+          : ''
         if (hasFeature(isPro, 'profile_relational')) {
           const peerDatasets = store.listMetadata(sessionKey).flatMap((m) => {
             if (m.id === ds.id)
@@ -1165,7 +1168,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       _meta: INLINE_UI_META,
     },
     async ({ sql, queries, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
-      const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
+      const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting ?? (name ? true : undefined))
       const activeStatements = queries?.length
         ? queries.map(q => q.trim()).filter(Boolean).slice(0, 6)
         : (sql?.trim() ? [sql.trim()] : [])
@@ -1259,24 +1262,35 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
-  // Column-level statistics (plus Pro relational grain, join-key fan-out & partial-period summary), so the model can plan without reading rows.
+  // Column-level statistics (plus Pro relational grain, join-key fan-out & partial-period summary), or 1-call folder schema scan.
   server.registerTool(
     'profile',
     {
-      title: 'Profile Dataset',
-      description: 'Describe each column of a loaded dataset: empty share, number and date ranges, commonest values.',
+      title: 'Profile Dataset or Folder',
+      description: 'Profile a dataset (nulls, ranges, top values) or scan a folder (dirPath) of file schemas.',
       inputSchema: {
         datasetId: z.string().optional(),
+        dirPath: z.string().optional(),
         why: whyParam,
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
-    async ({ datasetId, why }, extra) => {
+    async ({ datasetId, dirPath, why }, extra) => {
+      const useRelational = hasFeature(isPro, 'profile_relational')
+      if (dirPath) {
+        try {
+          await withinBudget(studio.duck.prepare(), DUCKDB_WAIT_MS)
+          const text = await profileDirectory(dirPath, { duck: studio.duck, isPro: useRelational })
+          return { content: [{ type: 'text' as const, text }] }
+        }
+        catch (err) {
+          return { isError: true, content: [{ type: 'text' as const, text: err instanceof Error ? err.message : String(err) }] }
+        }
+      }
       const { sessionKey } = resolveSessionContext(extra)
       const ds = store.get(datasetId, sessionKey)
       if (!ds)
         return datasetNotFoundError(datasetId, store, sessionKey)
-      const useRelational = hasFeature(isPro, 'profile_relational')
       const peerDatasets = useRelational
         ? store.listMetadata(sessionKey).flatMap((m) => {
             if (m.id === ds.id)
@@ -1297,8 +1311,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     {
       title: 'Statistical Analysis',
       description: hasFeature(isPro, 'analyze_pro')
-        ? 'Exact 1-call stats on datasetId or filePath (auto-detects columns; params optional): explain_change, ab_test (+SRM/Holm), regression, cohort_retention, anomalies.'
-        : 'Exact 1-call stats on datasetId or filePath (auto-detects columns; params optional): explain_change, ab_test (Pro: regression, cohort_retention, anomalies).',
+        ? '1-call stats on datasetId/filePath (auto-detects cols): explain_change, ab_test (+SRM/Holm), regression, cohort_retention, anomalies.'
+        : '1-call stats on datasetId/filePath: explain_change, ab_test (Pro: regression, cohort_retention, anomalies).',
       inputSchema: {
         method: z.enum(['explain_change', 'ab_test', 'regression', 'cohort_retention', 'anomalies']),
         datasetId: z.string().optional(),

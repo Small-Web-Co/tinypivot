@@ -374,4 +374,38 @@ describe('query, profile and history tools', () => {
 
     expect((await call('history', { open: 'nope' })).isError).toBe(true)
   }, 30_000)
+
+  it('profiles a local folder of CSV/XLSX/doc files in 1 call, loads .xlsx sheets, and persists named query views', async () => {
+    const { buildGridWorkbook } = await import('@smallwebco/tinypivot-core')
+    const wb = await buildGridWorkbook(
+      [{ region: 'EMEA', amount: 1200 }, { region: 'APAC', amount: 900 }],
+      ['region', 'amount'],
+      { sheetName: 'Sales' },
+    )
+    const s2 = wb.addWorksheet('Targets')
+    s2.addRow(['region', 'target'])
+    s2.addRow(['EMEA', 1000])
+    const xlsxPath = path.join(dir, 'quarterly.xlsx')
+    await wb.xlsx.writeFile(xlsxPath)
+    fs.writeFileSync(path.join(dir, 'notes.md'), '# Notes\n')
+
+    const { call } = await connect()
+    const folder = await call('profile', { dirPath: dir })
+    expect(folder.isError).toBe(false)
+    expect(folder.text).toContain('orders.csv')
+    expect(folder.text).toContain('quarterly.xlsx')
+    expect(folder.text).toContain('sheets [Sales, Targets]')
+    expect(folder.text).toContain('notes.md')
+
+    const loaded = await call('load_file', { filePath: xlsxPath, sheet: 'Targets', name: 'targets_tbl' })
+    expect(loaded.isError).toBe(false)
+    expect(loaded.text).toContain('Workbook sheets: `Sales`, `Targets`')
+
+    // Named intermediate query persists as a DuckDB view for subsequent queries
+    const step1 = await call('query', { sql: 'SELECT region, target * 2 AS stretched FROM targets_tbl', name: 'stretched_targets' })
+    expect(step1.isError).toBe(false)
+    const step2 = await call('query', { sql: 'SELECT region, stretched FROM stretched_targets' })
+    expect(step2.isError).toBe(false)
+    expect(step2.text).toContain('| EMEA | 2,000 |')
+  }, 30_000)
 })

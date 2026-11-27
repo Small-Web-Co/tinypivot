@@ -1,4 +1,9 @@
+import type { DuckDbRunner } from './duckdb.js'
 import type { ColumnSummary, StoredDataset } from './store.js'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { inspectXlsxBuffer } from '@smallwebco/tinypivot-core'
+import { quoteLiteral } from './duckdb.js'
 import { isNonAdditiveMeasure } from './terminal-chart.js'
 
 /**
@@ -464,4 +469,145 @@ export function formatProLoadTraps(dataset: StoredDataset, peerDatasets: StoredD
   if (traps.length === 0)
     return ''
   return `\n> **[PRO DATA GUARD — TURN-1 BRIEF]**\n${traps.slice(0, 5).map(t => `> - ${t}`).join('\n')}`
+}
+
+const TABULAR_EXTS = new Set(['.csv', '.tsv', '.json', '.jsonl', '.ndjson', '.parquet', '.xlsx'])
+const DOC_EXTS = new Set(['.md', '.txt', '.html', '.htm', '.pdf', '.xml'])
+const IGNORED_DIRS = new Set(['.git', 'node_modules', '__pycache__', '.venv', 'venv', 'dist'])
+const MAX_DIR_DEPTH = 3
+const MAX_SCANNED_FILES = 60
+const MAX_SCHEMA_PROBES = 25
+
+interface DiscoveredFile {
+  absPath: string
+  relPath: string
+  ext: string
+  sizeBytes: number
+}
+
+function formatByteSize(bytes: number): string {
+  if (bytes >= 1_048_576)
+    return `${(bytes / 1_048_576).toFixed(1)} MB`
+  if (bytes >= 1024)
+    return `${Math.round(bytes / 1024)} KB`
+  return `${bytes} B`
+}
+
+async function walkDataDir(rootDir: string, currentDir: string, depth: number, out: DiscoveredFile[]): Promise<void> {
+  if (depth > MAX_DIR_DEPTH || out.length >= MAX_SCANNED_FILES)
+    return
+  const entries = await fs.readdir(currentDir, { withFileTypes: true })
+  entries.sort((a, b) => a.name.localeCompare(b.name))
+  for (const entry of entries) {
+    if (out.length >= MAX_SCANNED_FILES)
+      break
+    if (entry.name.startsWith('.') || IGNORED_DIRS.has(entry.name))
+      continue
+    const full = path.join(currentDir, entry.name)
+    if (entry.isDirectory()) {
+      await walkDataDir(rootDir, full, depth + 1, out)
+      continue
+    }
+    if (!entry.isFile())
+      continue
+    const ext = path.extname(entry.name).toLowerCase()
+    if (!TABULAR_EXTS.has(ext) && !DOC_EXTS.has(ext))
+      continue
+    const stat = await fs.stat(full)
+    out.push({ absPath: full, relPath: path.relative(rootDir, full), ext, sizeBytes: stat.size })
+  }
+}
+
+async function probeTabularSchema(
+  file: DiscoveredFile,
+  duck?: DuckDbRunner,
+): Promise<{ detail: string, colNames: string[] }> {
+  if (file.ext === '.xlsx') {
+    const buf = await fs.readFile(file.absPath)
+    const info = await inspectXlsxBuffer(buf)
+    const colNames = info.columns.slice(0, 12)
+    const colsNote = colNames.length ? ` · cols: ${colNames.join(', ')}` : ''
+    return {
+      detail: `sheets [${info.sheetNames.slice(0, 5).join(', ')}${info.sheetNames.length > 5 ? ', …' : ''}] (${info.rowCount} rows)${colsNote}`,
+      colNames,
+    }
+  }
+  if (!duck)
+    return { detail: file.ext.slice(1), colNames: [] }
+  const expr = file.ext === '.json' || file.ext === '.jsonl' || file.ext === '.ndjson'
+    ? `read_json_auto(${quoteLiteral(file.absPath)})`
+    : file.ext === '.parquet'
+      ? `read_parquet(${quoteLiteral(file.absPath)})`
+      : `read_csv_auto(${quoteLiteral(file.absPath)}, sample_size=2048)`
+  const res = await duck.run(`DESCRIBE SELECT * FROM ${expr}`, [], 30)
+  const colNames = res.rows.map(r => String(r.column_name ?? '')).filter(Boolean)
+  const shown = res.rows.slice(0, 10).map(r => `\`${r.column_name}\` ${String(r.column_type ?? '').toLowerCase()}`)
+  const more = res.rows.length > 10 ? ` (+${res.rows.length - 10} cols)` : ''
+  return { detail: `${res.rows.length} cols: ${shown.join(', ')}${more}`, colNames }
+}
+
+/**
+ * 1-call local data-lake profiler: scans a directory for tabular & doc files, inspects schemas
+ * via DuckDB metadata (`DESCRIBE`) / ExcelJS without pasting raw rows into context, and (in Pro)
+ * surfaces cross-file shared join keys.
+ */
+export async function profileDirectory(
+  dirPath: string,
+  options: { duck?: DuckDbRunner, isPro?: boolean } = {},
+): Promise<string> {
+  const resolved = path.resolve(dirPath)
+  const stat = await fs.stat(resolved)
+  if (!stat.isDirectory())
+    throw new Error(`Not a directory: ${dirPath}`)
+
+  const discovered: DiscoveredFile[] = []
+  await walkDataDir(resolved, resolved, 0, discovered)
+  if (discovered.length === 0)
+    return `Folder **${resolved}**: no supported data or doc files found.`
+
+  const tabular = discovered.filter(f => TABULAR_EXTS.has(f.ext))
+  const docs = discovered.filter(f => DOC_EXTS.has(f.ext))
+  const lines = [
+    `Folder **${resolved}**: ${tabular.length} data file${tabular.length === 1 ? '' : 's'}, ${docs.length} doc file${docs.length === 1 ? '' : 's'}${discovered.length >= MAX_SCANNED_FILES ? ` (first ${MAX_SCANNED_FILES} shown)` : ''}.`,
+  ]
+
+  const colToFiles = new Map<string, string[]>()
+  for (let i = 0; i < tabular.length; i++) {
+    const f = tabular[i]
+    if (i < MAX_SCHEMA_PROBES) {
+      try {
+        const { detail, colNames } = await probeTabularSchema(f, options.duck)
+        lines.push(`- \`${f.relPath}\` (${formatByteSize(f.sizeBytes)}) · ${detail}`)
+        for (const col of colNames) {
+          const key = col.toLowerCase()
+          const list = colToFiles.get(key) ?? []
+          if (!list.includes(f.relPath))
+            list.push(f.relPath)
+          colToFiles.set(key, list)
+        }
+      }
+      catch {
+        lines.push(`- \`${f.relPath}\` (${formatByteSize(f.sizeBytes)})`)
+      }
+    }
+    else {
+      lines.push(`- \`${f.relPath}\` (${formatByteSize(f.sizeBytes)})`)
+    }
+  }
+
+  if (docs.length > 0) {
+    const docList = docs.slice(0, 15).map(d => `\`${d.relPath}\` (${formatByteSize(d.sizeBytes)})`).join(', ')
+    lines.push('', `Docs: ${docList}${docs.length > 15 ? ` (+${docs.length - 15} more)` : ''}`)
+  }
+
+  if (options.isPro) {
+    const shared = [...colToFiles.entries()]
+      .filter(([, files]) => files.length >= 2)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 6)
+    if (shared.length > 0) {
+      lines.push('', `Shared columns across files: ${shared.map(([c, fsList]) => `\`${c}\` (${fsList.length} files)`).join(' · ')}`)
+    }
+  }
+  return lines.join('\n')
 }

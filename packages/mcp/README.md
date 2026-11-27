@@ -2,11 +2,16 @@
 
 **TinyPivot Studio: a data analysis workspace your AI agent works in, and you can check.** Your agent loads files, runs SQL and builds charts and pivot tables through TinyPivot. Each step shows up live in the Studio, a local page in your browser, with the reason the agent gave and the exact SQL behind it. Edit that SQL and rerun it, reopen any earlier result, and send the agent notes it picks up on its next step. In the chat, TinyPivot keeps to a compact chart or table card so you can follow progress.
 
-Works with Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, pi and any MCP Apps host. Reads CSV, TSV, JSON, JSONL and Parquet files, rows from other MCP tools, and SQL results from any database.
+Works with Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, pi and any MCP Apps host. Reads CSV, TSV, JSON, JSONL, Parquet and Excel (`.xlsx`) files, rows from other MCP tools, and SQL results from any database.
 
-## TinyPivot Studio
+## TinyPivot Studio (or Headless `--no-studio`)
 
-In a terminal agent, the first TinyPivot step opens the Studio at `http://127.0.0.1:47317` (set `TINYPIVOT_OPEN_STUDIO=0` to open it yourself; a Studio tab left open from an earlier session reconnects instead of opening a new one). It has three parts:
+In a terminal agent, the first TinyPivot step opens the Studio at `http://127.0.0.1:47317` (a Studio tab left open from an earlier session reconnects instead of opening a new one). For headless servers, CI, or automated benchmarks:
+
+- **Keep Studio off completely (zero ports, zero browser popups):** pass `--no-studio` (or set `TINYPIVOT_NO_STUDIO=1` / `TINYPIVOT_NO_COMPANION=1`).
+- **Keep Studio running without auto-opening a browser tab:** pass `--no-open` (or set `TINYPIVOT_OPEN_STUDIO=0` / `TINYPIVOT_NO_OPEN=1`).
+
+When enabled, TinyPivot Studio has three parts:
 
 - **Trace:** every step, newest last, marked as the agent's or yours, with its reason (the `why` the agent passes), what it shows (for example `line chart: sum(mrr) by month`), the row count, and the SQL or file filter behind it. File loads are shown as the SQL that reproduces them.
 - **SQL editor:** edit a step's SQL, or write new SQL over local files and loaded tables, and run it with DuckDB, read-only. The result replaces the view, keeps the step's chart when its fields still exist, and joins the trace as your step.
@@ -147,7 +152,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Optional direct `query_postgres` (`DATABASE_URL`) | — | Included |
 | Watermark-free UI, HTML & terminal cards | — | Included |
 
-> **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the 4-model benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper).
+> **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the 5-model + MIT KramaBench (ICLR 2026) + Adyen DABstep benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper).
 
 Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 
@@ -156,28 +161,29 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | Tool | Purpose |
 |---|---|
 | `open_tinypivot` | Opens TinyPivot (side pane, sidebar, or inline). Works with `{}` using the built-in sample dataset. |
-| `load_file` | Loads a local `.csv`, `.tsv`, `.json`, or `.jsonl` file (including SQL CLI exports from any database) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call. Pass `where` (for example `[{"field":"year","equals":[2026]}]`) to load only the rows a question is about; filtering runs on disk. |
-| `query` | Runs one read-only DuckDB `SELECT` over local CSV, Parquet or JSON files and over loaded datasets (tables named by dataset id), then charts or pivots the result. Rows never enter the model's context. DuckDB (about 20 MB) downloads once, on first use, into `~/.cache/tinypivot`. |
+| `load_file` | Loads a local `.csv`, `.tsv`, `.json`, `.jsonl`, or `.xlsx` workbook (pass `sheet` to pick a worksheet) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call, or `where` to filter on disk. Loaded `.xlsx` sheets are immediately queryable in DuckDB SQL by table name. |
+| `query` | Runs read-only DuckDB `SELECT` (single `sql` or `queries[]` batching up to 6 queries) over local CSV, Parquet, JSON files and loaded datasets, then charts or pivots the result. Named queries (`name`) persist as DuckDB views across turns. DuckDB (~20 MB) downloads once into `~/.cache/tinypivot`. |
 | `load_data` | Loads flat JSON rows already in memory (up to `~50` rows) from any other MCP tool, API, or small SQL query without writing a temp CSV; renders chart + pivot in 1 call. |
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
 | `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, maps (`choropleth`), `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`, etc.; loose names like `map` work too). |
+| `analyze` | Deterministic 1-call Data Science shelf on `datasetId` or `filePath`: `explain_change` and `ab_test` on Free; full Pro SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, and seasonal `anomalies`. |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
-| `profile` | Describes each column of a loaded dataset: empty share, number and date ranges, commonest values. |
+| `profile` | Describes each column of a loaded dataset (null share, ranges, top values, Pro relational grain), or pass `dirPath` to scan an entire local folder of CSV/JSON/Parquet/XLSX schemas + nearby docs (and Pro cross-file shared join keys) in 1 call. |
 | `history` | Lists every earlier pull, or reopens one by id without re-querying. Pulls are saved locally under `~/.local/share/tinypivot/history` for 30 days. |
 
 Data tools take an optional `why`: one sentence the agent writes about each step, shown in the Studio trace.
 
-## Environment Variables (Optional)
+## CLI Flags & Environment Variables (Optional)
 
+- `--no-studio` / `TINYPIVOT_NO_STUDIO=1` (alias: `--no-companion` / `TINYPIVOT_NO_COMPANION=1`) — Disable the localhost Studio HTTP server completely (zero ports bound, zero browser windows — ideal for CI, SSH, and automated benchmarks)
+- `--no-open` / `TINYPIVOT_OPEN_STUDIO=0` (alias: `TINYPIVOT_NO_OPEN=1`) — Keep the localhost Studio server running so you can open its URL manually, without auto-popping a browser tab on the first tool call
 - `TINYPIVOT_LICENSE_KEY` — TinyPivot MCP Pro/Team license key (`TP-MCPP-...` or `TP-MCPT-...`; note that UI Library `TP-PRO*` keys apply to `@smallwebco/tinypivot-react`/`-vue` only)
 - `DATABASE_URL` — Optional PostgreSQL connection string for direct read-only `query_postgres` (Pro). The tool is only offered to the model when this is set. Works with **any** database (BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, Postgres) today via CLI/file handoff (`load_file`), stdin pipe, or MCP piping (`load_data`)
 - `TINYPIVOT_ALLOWED_TABLES` — Comma-separated table allowlist for `query_postgres`
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
-- `TINYPIVOT_NO_COMPANION=1` — Disable the localhost Studio server
 - `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; when it is taken, the Studio uses a free port and the tool replies link to it)
 - `TINYPIVOT_CLAUDE_CHANNEL` — `1` or `0` overrides whether TinyPivot offers Claude Code a channel. By default it does when Claude Code was started with this server in `--channels` or `--dangerously-load-development-channels`.
-- `TINYPIVOT_OPEN_STUDIO` — Set to `0` so the first TinyPivot step in a terminal agent does not open the Studio in your browser
 - `TINYPIVOT_REPRINT_CARDS` — Set to `0` so the model does not reprint each chart card in a terminal. Saves about 400 output tokens per question; the card stays visible in the Studio, the `tui` pane and pi.
 - `TINYPIVOT_HISTORY` — Set to `0` to stop saving pulls to history. `TINYPIVOT_HISTORY_DAYS` sets how long they are kept (default 30).
 
