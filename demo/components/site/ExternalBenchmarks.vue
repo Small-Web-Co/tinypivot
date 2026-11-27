@@ -60,7 +60,7 @@ const dabColumns = computed(() => {
             <div class="ref-line" style="bottom: 71.2%">
               <span class="ref-axis mono">71.2%</span>
             </div>
-            <div class="col-bars-row col-grid-7">
+            <div class="col-bars-row col-grid-9">
               <div
                 v-for="item in kramaLeaderboardBars"
                 :key="item.id"
@@ -84,7 +84,7 @@ const dabColumns = computed(() => {
               </div>
             </div>
           </div>
-          <div class="col-labels-row col-grid-7">
+          <div class="col-labels-row col-grid-9">
             <div
               v-for="item in kramaLeaderboardBars"
               :key="`${item.id}-lbl`"
@@ -237,7 +237,7 @@ const dabColumns = computed(() => {
       </div>
 
       <p class="ext-disclosure mono">
-        <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy (#1) / 68.8% Hard (#3-equiv, ahead of GPT-5 57.7% &amp; Google DS-STAR 45.2%) reflects strong base-model reasoning paired with TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and <strong>+10 pts on Haiku 5.5</strong>, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and MIT KramaBench A/B (77.3% → 80.9%, Haiku +6.1 pts) isolate TinyPivot’s direct lift.
+        <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy (#1) / 68.8% Hard (#3-equiv, ahead of GPT-5 57.7% &amp; Google DS-STAR 45.2%) reflects strong base-model reasoning paired with TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and <strong>+10 pts on Haiku 5.5</strong>, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and 3-model MIT KramaBench A/B (72.5% → 75.2%, Haiku +6.1 pts, local DeepSeek +1.1 pts &amp; +10.7 pts above #2 TalkTask) isolate TinyPivot’s direct lift.
       </p>
 
       <details class="sample-drawer">
@@ -692,7 +692,7 @@ const dabColumns = computed(() => {
 
 @media (min-width: 780px) {
   .ext-cards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sample-list {

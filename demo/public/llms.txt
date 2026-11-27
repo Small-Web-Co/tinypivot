@@ -23,10 +23,11 @@ TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinyp
 - **Claude Opus 5.5:** 18/18 (100%) → Free **18/18 (100%)** → Pro **18/18 (100%, no Bash needed)**, **−19% faster Hard DS** (2.8× faster OLS), **$1.41 vs $2.32** warm-cache API-equiv (−39%).
 - **Recursive Data Memory:** Cuts repeat schema inquiry tokens by **−47%** (32.5k → 17.1k tokens, 6 → 3 turns on Inkling).
 
-2) **Controlled Same-Model A/B — MIT KramaBench (ICLR 2026)** (https://kramabench.org/ · https://github.com/mitdbg/Kramabench · 4 public multi-file data lakes: Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 2 models × 2 arms = 248 runs, verbatim MIT deterministic metrics):
-- **Combined (124 paired tasks):** Vanilla **77.3%** → TinyPivot Pro **80.9% (+3.6 pts, 10–6 H2H)**.
+2) **Controlled Same-Model A/B — MIT KramaBench (ICLR 2026)** (https://kramabench.org/ · https://github.com/mitdbg/Kramabench · 4 public multi-file data lakes: Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 3 models × 2 arms = 372 runs, verbatim MIT deterministic metrics):
+- **Combined 3-Model (186 paired tasks):** Vanilla **72.5%** → TinyPivot Pro **75.2% (+2.8 pts, 20–15 H2H)** — every model improved.
 - **Claude Haiku 5.5:** **71.9% → 78.0% (+6.1 pts, 10% faster, 8–5 H2H)** — Biomedical (7 `.xlsx` + 1 CSV): **66.7% → 88.9% (+22.2 pts) & 2.14× faster (67.7s → 31.6s)**; Archaeology: **41.7% → 50.0% (+8.3 pts)**; Environment: **78.0% → 83.3% (+5.3 pts)**. Closes 57% of the gap to Vanilla Sonnet 5.5 at half the API cost.
 - **Claude Sonnet 5.5:** **82.6% → 83.8% (+1.1 pts, 2–1 H2H)** — Environment: **90.0% → 95.0% (+5.0 pts)**; Biomedical (`.xlsx`): **100.0% & 16% faster (31.3s → 26.4s)**.
+- **DeepSeek V4.1 Flash 1017 (DGX Spark local · $0 cloud):** **62.8% → 63.9% (+1.1 pts, 10–9 H2H)** — Environment: **68.3% → 75.0% (+6.7 pts)**; Wildfire: **72.7% → 74.4% (+1.7 pts, beats #1 RADAR 73.7%)**. Beats Published **#2 TalkTask (53.2%) by +10.7 pts** on the exact same DeepSeek-V4.1-Flash model family.
 
 3) **Official Adyen / Hugging Face `adyen/DABstep` 450-Task Blind Leaderboard + Dev A/B** (https://huggingface.co/spaces/adyen/DABstep):
 - **Claude Sonnet 5.5 + TinyPivot Pro:** **97.22% Easy (70/72) / 68.78% Hard (260/378) / 73.33% Total (330/450)** (#1 Easy & #3-equiv Hard vs Validated Leaderboard).
@@ -36,7 +37,7 @@ TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinyp
 
 ## Docs
 
-- [Technical White Paper & Internal + External Benchmarks](https://tiny-pivot.com/whitepaper): Full tables, horizontal external leaderboard charts, and collapsible test catalogs across Track A (Internal 5-Model Suite: 91% → 100%) and Track B (External MIT KramaBench 77.3% → 80.9% + official 450-task Adyen DABstep)
+- [Technical White Paper & Internal + External Benchmarks](https://tiny-pivot.com/whitepaper): Full tables, side-by-side column leaderboard charts, and collapsible test catalogs across Track A (Internal 5-Model Suite: 91% → 100%) and Track B (External 3-Model MIT KramaBench 72.5% → 75.2% + official 450-task Adyen DABstep)
 - [Official Downloadable PDF White Paper](https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf): Publication-grade PDF with executive abstract, internal/external leaderboards, architecture, and full task appendix
 
 - [In-Agent Analytics (TinyPivot MCP Docs)](https://tiny-pivot.com/docs): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference

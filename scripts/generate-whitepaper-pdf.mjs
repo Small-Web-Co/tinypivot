@@ -302,7 +302,7 @@ const html = `<!doctype html>
       comprising a controlled same-model A/B on <strong>MIT KramaBench (ICLR 2026)</strong> and three live 450-task blind leaderboard submissions
       on <strong>Adyen / Hugging Face <code>adyen/DABstep</code></strong>. TinyPivot lifts internal accuracy monotonically from
       <strong>91% → 93% Free → 100% Pro</strong> (2.1× faster Hard Data Science; Thinking Machines <code>Inkling 2 Mini</code> +22 pts &amp; −50% output tokens)
-      and delivers real same-model lifts on MIT KramaBench (<strong>77.3% → 80.9%</strong>; Haiku +6.1 pts, Biomedical <code>.xlsx</code> +22.2 pts &amp; 2.14× faster).
+      and delivers consistent same-model lifts across all 3 models on MIT KramaBench (<strong>72.5% → 75.2%</strong> across 372 runs; Haiku +6.1 pts, Biomedical <code>.xlsx</code> +22.2 pts &amp; 2.14× faster; local DeepSeek V4.1 +1.1 pts &amp; +10.7 pts above #2 TalkTask on the same model family).
     </p>
     <div class="kpi-grid">
       ${wp.whitepaperHeroStats.map(s => `<div class="kpi"><span class="kpi-val mono">${esc(s.value)}</span><span class="kpi-lbl">${esc(s.label)}</span></div>`).join('')}
@@ -324,7 +324,7 @@ const html = `<!doctype html>
     <div class="track-card">
       <div class="badge mono">TRACK B · EXTERNAL PUBLIC BENCHMARKS</div>
       <h3>MIT KramaBench (ICLR 2026) &amp; Adyen DABstep</h3>
-      <p>Independent third-party datasets we did not author: controlled same-model A/B on 62 multi-file KramaBench tasks (248+ runs) plus 3 live 450-task blind Adyen DABstep leaderboard submissions.</p>
+      <p>Independent third-party datasets we did not author: controlled 3-model same-model A/B on 62 multi-file KramaBench tasks (372 runs across Sonnet 5.5, Haiku 5.5 &amp; local DeepSeek V4.1) plus 3 live 450-task blind Adyen DABstep leaderboard submissions.</p>
     </div>
   </div>
 
@@ -389,7 +389,7 @@ const html = `<!doctype html>
     ${renderColumnChart(wp.dabstepLeaderboardBars, { pct: 19.8, label: 'Adyen ReACT Baseline · 19.8%' })}
   </div>
   <p class="footnote">
-    <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy / 68.8% Hard score is strongly driven by base-model reasoning paired with TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and +10 pts on Haiku, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and MIT KramaBench A/B (77.3% → 80.9%, Haiku +6.1 pts) isolate TinyPivot’s direct lift.
+    <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy / 68.8% Hard score is strongly driven by base-model reasoning paired with TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and +10 pts on Haiku, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and 3-model MIT KramaBench A/B (72.5% → 75.2%, Haiku +6.1 pts, local DeepSeek +1.1 pts &amp; +10.7 pts above #2 TalkTask) isolate TinyPivot’s direct lift.
   </p>
 
   <div class="page-break"></div>

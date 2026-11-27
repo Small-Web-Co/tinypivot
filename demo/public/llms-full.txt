@@ -70,10 +70,11 @@ Full white paper and methodology: `https://tiny-pivot.com/whitepaper` · Officia
 | **Claude Opus 5.5** | 18/18 (100%) · 21.5s · $2.32* | 18/18 (100%) · 21.9s · $2.65* | **18/18 (100%)** · 22.0s · $1.41* | **100% Free & Pro · −19% faster Hard DS · −39% warm API*** |
 | **Combined (90 tasks/arm)** | **82/90 (91%) · 25.3s** | **84/90 (93%) · 24.6s** | **90/90 (100%) · 19.0s** | **+9 pts overall (Free +2) · −25% faster · 2.1× Hard DS** |
 
-**2) Controlled Same-Model A/B — MIT KramaBench (ICLR 2026)** (`https://kramabench.org/` · `https://github.com/mitdbg/Kramabench` · 4 public multi-file data lakes: Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 2 models × 2 arms = 248 runs, verbatim MIT deterministic metrics):
+**2) Controlled Same-Model A/B — MIT KramaBench (ICLR 2026)** (`https://kramabench.org/` · `https://github.com/mitdbg/Kramabench` · 4 public multi-file data lakes: Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 3 models × 2 arms = 372 runs, verbatim MIT deterministic metrics):
 - **Claude Haiku 5.5:** **71.9% → 78.0% (+6.1 pts, 10% faster, 8–5 H2H)** — Biomedical (7 `.xlsx` workbooks + 1 CSV): **66.7% → 88.9% (+22.2 pts) & 2.14× faster (67.7s → 31.6s)**; Archaeology: **41.7% → 50.0% (+8.3 pts)**; Environment: **78.0% → 83.3% (+5.3 pts)**; Wildfire: 85.7% → 84.4%. Closes 57% of the gap to Vanilla Sonnet 5.5 (82.6%) at half the API cost ($5.28 vs $10.63*).
 - **Claude Sonnet 5.5:** **82.6% → 83.8% (+1.1 pts, 2–1 H2H)** — Environment: **90.0% → 95.0% (+5.0 pts)**; Biomedical (`.xlsx`): **100.0% & 16% faster (31.3s → 26.4s)**; Archaeology: 41.7% (5% faster); Wildfire: 91.6% → 90.2%.
-- **Combined (124 paired tasks):** Vanilla **77.3%** → TinyPivot Pro **80.9% (+3.6 pts, 10–6 H2H)**.
+- **DeepSeek V4.1 Flash 1017 (DGX Spark local · $0 cloud):** **62.8% → 63.9% (+1.1 pts, 10–9 H2H)** — Environment: **68.3% → 75.0% (+6.7 pts)**; Wildfire: **72.7% → 74.4% (+1.7 pts, beats #1 RADAR 73.7%)**; Archaeology: 41.7%; Biomedical: 55.6% → 44.4%. Beats Published **#2 TalkTask (53.2%) by +10.7 pts** on the exact same DeepSeek-V4.1-Flash model family.
+- **Combined 3-Model (186 paired tasks):** Vanilla **72.5%** → TinyPivot Pro **75.2% (+2.8 pts, 20–15 H2H)**.
 
 **3) Official Adyen / Hugging Face `adyen/DABstep` 450-Task Blind Leaderboard + Dev A/B** (`https://huggingface.co/spaces/adyen/DABstep`):
 - **Claude Sonnet 5.5 + TinyPivot Pro:** **97.22% Easy (70/72) / 68.78% Hard (260/378) / 73.33% Total (330/450)** (#1 Easy & #3-equiv Hard vs Validated Leaderboard).

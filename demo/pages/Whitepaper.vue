@@ -85,7 +85,7 @@ import { architecturePillars, TRUST_BENCH_DATE, whitepaperHeroStats } from '../s
             <h3>MIT KramaBench (ICLR 2026) &amp; Adyen DABstep</h3>
             <p>
               <strong>Purpose:</strong> Verify zero-bloat generality on independent third-party datasets we did not write —
-              combining a <strong>same-model controlled A/B</strong> on MIT’s multi-file data lakes (248+ runs) with
+              combining a <strong>3-model same-model controlled A/B</strong> on MIT’s multi-file data lakes (372 runs across Sonnet 5.5, Haiku 5.5 &amp; local DeepSeek V4.1) with
               <strong>three live 450-task blind leaderboard submissions</strong> scored directly by Adyen.
             </p>
           </article>

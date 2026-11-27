@@ -384,6 +384,30 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
     note: 'Published public #1 on kramabench.org (4-domain weighted mean shown for apples-to-apples)',
   },
   {
+    id: 'kb-deepseek-tp',
+    label: 'TinyPivot Pro (v0.8.5 · Local)',
+    shortLabel: 'TinyPivot Pro',
+    model: 'DeepSeek V4.1 (DGX Spark)',
+    shortModel: 'DeepSeek Local',
+    badge: '+1.1 · $0 Local',
+    score: 63.9,
+    secondary: 'Env 75.0% (+6.7) · Wild 74.4% (> RADAR 73.7%)',
+    kind: 'tinypivot',
+    note: '+1.1 pts over Vanilla DeepSeek · +10.7 pts above #2 TalkTask on same DeepSeek-V4.1-Flash model family ($0 cloud)',
+  },
+  {
+    id: 'kb-deepseek-van',
+    label: 'Vanilla Local (Same Model)',
+    shortLabel: 'Vanilla Base',
+    model: 'DeepSeek V4.1 (DGX Spark)',
+    shortModel: 'DeepSeek Local',
+    badge: 'Same Model',
+    score: 62.8,
+    secondary: 'Env 68.3% · Wild 72.7% · Arch 41.7%',
+    kind: 'baseline',
+    note: 'Same-model local Python baseline on DGX Spark ($0 cloud)',
+  },
+  {
     id: 'kb-smolagents',
     label: 'Published #3 Public / #1 Obscured · smolagents DR',
     shortLabel: 'smolagents DR',
@@ -405,7 +429,7 @@ export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
     score: 53.2,
     secondary: '6-domain overall: 56.7% (45.0% obscured)',
     kind: 'leader',
-    note: 'Published #2 on kramabench.org',
+    note: 'Published #2 on kramabench.org (same DeepSeek-V4.1-Flash family)',
   },
 ]
 
@@ -433,11 +457,18 @@ export const kramaBenchRows: readonly KramaBenchRow[] = [
     note: '1-call profile(dirPath) + direct .xlsx flipped Environment +5 pts and sped up Biomedical by 16%',
   },
   {
-    model: 'Combined (n = 124 paired)',
-    overall: '77.3% → 80.9% (+3.6 pts)',
-    speed: '20.9s → 20.6s · 10–6 head-to-head',
-    domains: '4 public multi-file data lakes (Environment, Wildfire, Archaeology, Biomedical; 62 tasks × 2 models)',
-    note: 'Zero Jupyter, zero VLM, zero multi-agent bloat — lightweight DuckDB + .xlsx + folder schema scan',
+    model: 'DeepSeek V4.1 (DGX Spark Local)',
+    overall: '62.8% → 63.9% (+1.1 pts)',
+    speed: '$0 cloud spend · 10–9 H2H',
+    domains: 'Env 68.3% → 75.0% (+6.7 pts) · Wild 72.7% → 74.4% (+1.7, beats RADAR 73.7%) · Arch 41.7% · Bio 55.6% → 44.4%',
+    note: 'Beats Published #2 TalkTask (53.2%) by +10.7 pts on the exact same DeepSeek-V4.1-Flash model family',
+  },
+  {
+    model: 'Combined 3-Model (n = 186 paired)',
+    overall: '72.5% → 75.2% (+2.8 pts)',
+    speed: '372 controlled runs · 20–15 H2H',
+    domains: 'All 3 models (Sonnet 5.5, Haiku 5.5, local DeepSeek V4.1) improved across 4 multi-file data lakes',
+    note: 'Zero Jupyter, zero VLM, zero multi-agent bloat — lightweight DuckDB + smart .xlsx + folder profiling',
   },
 ]
 
@@ -607,8 +638,8 @@ export const whitepaperHeroStats = [
     label: 'Thinking Machines Inkling 2 Mini local boost (78% → 100% · −44% faster · −50% output tokens)',
   },
   {
-    value: '77.3% → 80.9%',
-    label: 'External MIT KramaBench (ICLR 2026) same-model A/B (Haiku +6.1 pts; .xlsx Bio +22.2 pts & 2.14× faster)',
+    value: '72.5% → 75.2%',
+    label: 'External MIT KramaBench 3-model A/B (372 runs: Haiku +6.1, Sonnet +1.1, local DeepSeek +1.1 & +10.7 vs #2 TalkTask)',
   },
   {
     value: '97.2% / 68.8%',
