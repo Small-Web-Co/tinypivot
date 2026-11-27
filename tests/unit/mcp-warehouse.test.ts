@@ -182,7 +182,8 @@ describe('query_bigquery tool', () => {
 
   it('is listed only when a BigQuery project is configured', async () => {
     const { client } = await connect(undefined)
-    expect((await client.listTools()).tools.map(tool => tool.name)).toContain('query_bigquery')
+    const tool = (await client.listTools()).tools.find(t => t.name === 'query_bigquery')
+    expect(tool?.description).toMatch(/^Preview\. /)
     expect(warehousesFromEnv({})).toEqual([])
   })
 

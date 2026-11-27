@@ -1082,8 +1082,8 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     server.registerTool(
       warehouse.toolName,
       {
-        title: `Query ${warehouse.label} Directly (Read-Only, Pro)`,
-        description: `Run a read-only SELECT in ${warehouse.label} and chart or pivot the result. ${warehouse.sqlHint}`,
+        title: `Query ${warehouse.label} Directly (Read-Only, Pro${warehouse.preview ? ', Preview' : ''})`,
+        description: `${warehouse.preview ? 'Preview. ' : ''}Run a read-only SELECT in ${warehouse.label} and chart or pivot the result. ${warehouse.sqlHint}`,
         inputSchema: {
           sql: z.string(),
           why: whyParam,

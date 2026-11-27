@@ -24,6 +24,8 @@ export interface WarehouseConnector {
   freeAlternative: string
   /** The most rows one query returns. */
   maxRows: number
+  /** Not yet tested against a live account: the tool says so, so people know to report problems. */
+  preview?: boolean
   /** Tables the model may query, as it should name them in SQL. */
   listTables: () => Promise<string[]>
   /** Checks the SQL is a single read-only SELECT within limits, then runs it. Throws with a reason if not. */

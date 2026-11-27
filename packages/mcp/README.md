@@ -135,7 +135,7 @@ TinyPivot works with any data your agent can reach. Use whichever workflow match
 
 Each tool appears only when its settings are present.
 
-**BigQuery** (`query_bigquery`): set `TINYPIVOT_BIGQUERY_PROJECT`. Credentials come from Google's usual sources: `gcloud auth application-default login`, or `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account key. Google's client library downloads once into `~/.cache/tinypivot` on the first query.
+**BigQuery** (`query_bigquery`, preview: please report problems on GitHub): set `TINYPIVOT_BIGQUERY_PROJECT`. Credentials come from Google's usual sources: `gcloud auth application-default login`, or `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account key. Google's client library downloads once into `~/.cache/tinypivot` on the first query.
 
 - Every query is dry-run first. BigQuery itself reports what the SQL does, so anything other than one `SELECT` is refused before it runs, whatever the syntax.
 - `TINYPIVOT_BIGQUERY_MAX_GB` caps how much one query may scan (default 50 GB). The cap is checked on the dry run and also set as `maximumBytesBilled` on the job, so BigQuery will not bill past it.
