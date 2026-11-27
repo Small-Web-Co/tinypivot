@@ -3,7 +3,7 @@
   "mcpName": "io.github.Small-Web-Co/tinypivot",
   "type": "module",
   "version": "0.8.6",
-  "description": "TinyPivot MCP Server, Interactive MCP App & Claude Plugin — turn CSV, JSON, API/MCP outputs, and queries from any database into interactive charts, pivot tables, terminal cards, live TUI, drill-through, and Excel exports inside AI agents.",
+  "description": "TinyPivot MCP Server, Interactive MCP App & Claude Plugin \u2014 turn CSV, JSON, API/MCP outputs, and queries from any database into interactive charts, pivot tables, terminal cards, live TUI, drill-through, and Excel exports inside AI agents.",
   "author": "Small Web, LLC",
   "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://tiny-pivot.com",
@@ -71,14 +71,6 @@
     "build:server": "tsup",
     "dev:app": "vite --config vite.app.config.ts",
     "type-check": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "pg": "^8.0.0"
-  },
-  "peerDependenciesMeta": {
-    "pg": {
-      "optional": true
-    }
   },
   "dependencies": {
     "@codemirror/lang-sql": "^6.10.0",

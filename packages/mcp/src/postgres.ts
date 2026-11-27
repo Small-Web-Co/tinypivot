@@ -1,5 +1,8 @@
+import type { RuntimePackage } from './runtime-package.js'
 import type { WarehouseConnector } from './warehouse.js'
 import { validateSQL } from '@smallwebco/tinypivot-server'
+import { toPlainValue } from './duckdb.js'
+import { loadRuntimePackage } from './runtime-package.js'
 import { listFromEnv } from './warehouse.js'
 
 export interface PostgresConfig {
@@ -16,16 +19,42 @@ export interface PostgresQueryResult {
   truncated: boolean
 }
 
+/** The pg driver installs once, on the first Postgres query, like TinyPivot's other database drivers. */
+export const PG_RUNTIME: RuntimePackage = {
+  name: 'pg',
+  version: '8.23.1',
+  cacheName: 'pg-8.23.1',
+  purpose: 'PostgreSQL queries',
+}
+
+/** Postgres type ids whose text TinyPivot reads itself, instead of pg's default parsing. */
+const PG_TYPES = { int8: 20, numeric: 1700, date: 1082, timestamp: 1114 } as const
+
+/** A number when the text is one JavaScript holds exactly enough to chart; else the text unchanged. */
+export function pgNumber(text: string): number | string {
+  const n = Number(text)
+  return Number.isFinite(n) && (Number.isSafeInteger(n) || !/^-?\d+$/.test(text)) ? n : text
+}
+
+/**
+ * pg returns bigint (COUNT, SUM of integers) and numeric (SUM, AVG) as strings, and dates as local-time
+ * Date objects. TinyPivot needs numbers to total and chart, and the calendar date as written.
+ */
+export function pgTypeParser(defaultParser: (oid: number, format?: string) => (text: string) => unknown) {
+  return (oid: number, format?: string) => {
+    if (oid === PG_TYPES.int8 || oid === PG_TYPES.numeric)
+      return pgNumber
+    if (oid === PG_TYPES.date || oid === PG_TYPES.timestamp)
+      return (text: string) => text
+    return defaultParser(oid, format)
+  }
+}
+
 async function createPool(connectionString: string) {
-  let pgModule: typeof import('pg')
-  try {
-    pgModule = await import('pg')
-  }
-  catch {
-    throw new Error('PostgreSQL queries require the optional "pg" package (`pnpm add pg`).')
-  }
-  const Pool = pgModule.Pool ?? (pgModule as unknown as { default: typeof import('pg') }).default.Pool
-  return new Pool({ connectionString, max: 3, idleTimeoutMillis: 15_000 })
+  const pgModule = await loadRuntimePackage<typeof import('pg')>(PG_RUNTIME)
+  const pg = pgModule.Pool ? pgModule : (pgModule as unknown as { default: typeof import('pg') }).default
+  const getTypeParser = pgTypeParser(pg.types.getTypeParser as (oid: number, format?: string) => (text: string) => unknown)
+  return new pg.Pool({ connectionString, max: 3, idleTimeoutMillis: 15_000, types: { getTypeParser } as never })
 }
 
 export async function listPostgresTables(config: PostgresConfig): Promise<string[]> {
@@ -77,7 +106,9 @@ export async function executeReadOnlyPostgresQuery(
 
     const rawRows = (result.rows ?? []) as Record<string, unknown>[]
     const truncated = rawRows.length > maxRows
-    const rows = truncated ? rawRows.slice(0, maxRows) : rawRows
+    const rows = (truncated ? rawRows.slice(0, maxRows) : rawRows).map(row =>
+      Object.fromEntries(Object.entries(row).map(([key, value]) => [key, toPlainValue(value)])),
+    )
     return {
       rows,
       rowCount: rows.length,

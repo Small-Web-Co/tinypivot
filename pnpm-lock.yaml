@@ -274,9 +274,6 @@ importers:
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2
-      pg:
-        specifier: ^8.0.0
-        version: 8.16.3
       smol-toml:
         specifier: '>=1.9.0'
         version: 1.9.1
