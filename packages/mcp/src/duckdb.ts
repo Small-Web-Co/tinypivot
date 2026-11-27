@@ -1,9 +1,6 @@
 import type { DuckDBConnection } from '@duckdb/node-api'
-import { spawn } from 'node:child_process'
-import fs from 'node:fs'
-import { createRequire } from 'node:module'
-import os from 'node:os'
-import path from 'node:path'
+import type { RuntimePackage } from './runtime-package.js'
+import { loadRuntimePackage, runtimePackageDir } from './runtime-package.js'
 
 /**
  * Read-only SQL over local files and earlier pulls, through an embedded DuckDB.
@@ -17,76 +14,23 @@ export const DUCKDB_PACKAGE = '@duckdb/node-api'
 export const DUCKDB_VERSION = '2.0.1-r.1'
 /** Most rows a query result may bring into TinyPivot. */
 export const QUERY_ROW_LIMIT = 500_000
-const INSTALL_TIMEOUT_MS = 5 * 60 * 1000
 
 type DuckDbModule = typeof import('@duckdb/node-api')
 
+const DUCKDB_RUNTIME: RuntimePackage = {
+  name: DUCKDB_PACKAGE,
+  version: DUCKDB_VERSION,
+  cacheName: `duckdb-${DUCKDB_VERSION}`,
+  purpose: 'SQL queries',
+}
+
 export function duckdbCacheDir(): string {
-  const base = process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache')
-  return path.join(base, 'tinypivot', `duckdb-${DUCKDB_VERSION}`)
+  return runtimePackageDir(DUCKDB_RUNTIME)
 }
-
-function requireFrom(dir: string): DuckDbModule | undefined {
-  try {
-    return createRequire(path.join(dir, 'package.json'))(DUCKDB_PACKAGE) as DuckDbModule
-  }
-  catch {
-    return undefined
-  }
-}
-
-function installInto(dir: string): Promise<void> {
-  fs.mkdirSync(dir, { recursive: true })
-  // A package.json here stops npm from walking up and installing into a parent project.
-  fs.writeFileSync(path.join(dir, 'package.json'), '{ "private": true }\n')
-  const isWindows = process.platform === 'win32'
-  return new Promise((resolve, reject) => {
-    const child = spawn(isWindows ? 'npm.cmd' : 'npm', [
-      'install',
-      '--prefix',
-      dir,
-      '--no-save',
-      '--no-audit',
-      '--no-fund',
-      '--loglevel=error',
-      `${DUCKDB_PACKAGE}@${DUCKDB_VERSION}`,
-    ], { stdio: ['ignore', 'ignore', 'pipe'], shell: isWindows, timeout: INSTALL_TIMEOUT_MS })
-    let stderr = ''
-    child.stderr?.on('data', (chunk) => {
-      stderr += String(chunk)
-    })
-    child.on('error', reject)
-    child.on('exit', code => (code === 0 ? resolve() : reject(new Error(`npm install failed (${code}): ${stderr.trim().slice(0, 300)}`))))
-  })
-}
-
-let loading: Promise<DuckDbModule> | undefined
 
 /** DuckDB's module: from TinyPivot's own install if present, else from the cache, installing it once. */
 export function loadDuckDb(): Promise<DuckDbModule> {
-  loading ??= (async () => {
-    try {
-      // A variable specifier keeps the bundler from trying to bundle the native package.
-      const specifier = DUCKDB_PACKAGE
-      return await import(specifier) as DuckDbModule
-    }
-    catch {}
-    const dir = duckdbCacheDir()
-    const cached = requireFrom(dir)
-    if (cached)
-      return cached
-    console.error(`[tinypivot-mcp] Downloading DuckDB ${DUCKDB_VERSION} once into ${dir} for SQL queries...`)
-    await installInto(dir)
-    const installed = requireFrom(dir)
-    if (!installed)
-      throw new Error(`DuckDB installed into ${dir} but could not be loaded.`)
-    return installed
-  })()
-  // A failed download can be retried on the next query.
-  loading.catch(() => {
-    loading = undefined
-  })
-  return loading
+  return loadRuntimePackage<DuckDbModule>(DUCKDB_RUNTIME)
 }
 
 /** Resolves to the value, or to 'pending' if it takes longer than `ms`. The work keeps going. */

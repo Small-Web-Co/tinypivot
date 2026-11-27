@@ -11,7 +11,7 @@ export type StudioRun = Run<StudioStep>
 
 export type Stage = 'source' | 'transform' | 'view' | 'answer' | 'message'
 
-const SOURCE_TOOLS = new Set(['load_file', 'load_data', 'query_postgres', 'history', 'profile'])
+const SOURCE_TOOLS = new Set(['load_file', 'load_data', 'query_postgres', 'query_bigquery', 'history', 'profile'])
 const VIEW_TOOLS = new Set(['configure_chart', 'configure_pivot'])
 
 /** Where a step sits in the path from question to answer. */

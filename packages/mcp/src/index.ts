@@ -17,6 +17,13 @@ export {
   formatAuditWarnings,
   formatSqlRepairHint,
 } from './audit.js'
+export {
+  type BigQueryClientFactory,
+  type BigQueryClientLike,
+  type BigQueryConfig,
+  bigQueryConfigFromEnv,
+  bigQueryConnector,
+} from './bigquery.js'
 export { type TerminalFormatOptions } from './card.js'
 export {
   type CompanionServerHandle,
@@ -53,6 +60,8 @@ export {
   executeReadOnlyPostgresQuery,
   listPostgresTables,
   type PostgresConfig,
+  postgresConfigFromEnv,
+  postgresConnector,
   type PostgresQueryResult,
 } from './postgres.js'
 export {
@@ -105,3 +114,4 @@ export {
   resolveCompanionUrl,
   runTuiCommand,
 } from './tui.js'
+export { type WarehouseConnector, type WarehouseQueryResult } from './warehouse.js'

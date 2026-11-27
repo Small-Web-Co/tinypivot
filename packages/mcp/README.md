@@ -122,13 +122,29 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 
    `--open` shows the rows in TinyPivot Studio (`http://127.0.0.1:47317`) for filtering, drill-through and exports.
 
-## Works With Any Database (Not Postgres-Only)
+## Works With Any Data Source
 
-TinyPivot is **database-agnostic**. Use whichever data workflow matches your stack:
+TinyPivot works with any data your agent can reach. Use whichever workflow matches your stack:
+
+- **Direct BigQuery and PostgreSQL (Pro):** TinyPivot runs read-only SQL in the warehouse itself, so totals are computed where the data lives and only the result comes back. Every step's SQL shows in the Studio and can be re-checked there. See [Direct connections](#direct-connections-pro) below.
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, or Postgres (CLI / file handoff — 0 raw rows in LLM context):** Export query output to `.csv`, `.tsv`, `.json`, or `.jsonl` via `bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, or `psql` and pass the path to `load_file` (or pipe stdout straight into `npx @smallwebco/tinypivot-mcp@latest --open`).
 - **Any MCP Server or API (Stripe, GitHub, BigQuery MCP, Snowflake MCP, REST APIs):** Pipe structured JSON rows (up to `~50` rows already in memory) directly into `load_data` with `chartConfig` / `pivotConfig` in a single call — no temp CSV required (for larger sets, write a file and use `load_file`).
-- **Optional Direct PostgreSQL Connector (Pro):** If you use PostgreSQL and want zero-temp-file SQL execution inside the MCP server itself, set `DATABASE_URL` (and optionally `TINYPIVOT_ALLOWED_TABLES`) to enable the AST-validated, read-only `query_postgres` tool.
+
+### Direct connections (Pro)
+
+Each tool appears only when its settings are present.
+
+**BigQuery** (`query_bigquery`): set `TINYPIVOT_BIGQUERY_PROJECT`. Credentials come from Google's usual sources: `gcloud auth application-default login`, or `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account key. Google's client library downloads once into `~/.cache/tinypivot` on the first query.
+
+- Every query is dry-run first. BigQuery itself reports what the SQL does, so anything other than one `SELECT` is refused before it runs, whatever the syntax.
+- `TINYPIVOT_BIGQUERY_MAX_GB` caps how much one query may scan (default 50 GB). The cap is checked on the dry run and also set as `maximumBytesBilled` on the job, so BigQuery will not bill past it.
+- `TINYPIVOT_BIGQUERY_ALLOWED` limits queries to listed `dataset`, `dataset.table` or `project.dataset.table` entries (comma-separated). Without it, the credentials' own BigQuery permissions are the limit.
+- `TINYPIVOT_BIGQUERY_LOCATION` sets the dataset location (e.g. `EU`) when BigQuery cannot infer it.
+- Results return up to 5,000 rows. When a result is cut, TinyPivot tells the agent to aggregate in BigQuery instead, so totals cover the whole table.
+- Jobs are labelled `client: tinypivot`, so they are easy to find in BigQuery's job history and billing.
+
+**PostgreSQL** (`query_postgres`): set `DATABASE_URL`, and optionally `TINYPIVOT_ALLOWED_TABLES`. Queries are parsed and validated as a single read-only `SELECT`, then run in a read-only transaction with a 15-second timeout.
 
 ## Free vs. Pro
 
@@ -149,7 +165,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Visual themes | `Code` theme (Dark & Light) | All 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`) |
 | Drill-Through modals | — | Included |
 | Formatted `.xlsx` Excel export | — | Included |
-| Optional direct `query_postgres` (`DATABASE_URL`) | — | Included |
+| Direct BigQuery & PostgreSQL (`query_bigquery`, `query_postgres`) | — | Included |
 | Watermark-free UI, HTML & terminal cards | — | Included |
 
 > **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the full Internal + External (MIT KramaBench & Adyen DABstep) benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper) or download the [Official PDF White Paper](https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf).
@@ -167,6 +183,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
 | `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, maps (`choropleth`), `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`, etc.; loose names like `map` work too). |
 | `analyze` | Deterministic 1-call Data Science shelf on `datasetId` or `filePath`: `explain_change` and `ab_test` on Free; full Pro SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, and seasonal `anomalies`. |
+| `query_bigquery` | *(Optional Pro)* Runs one read-only GoogleSQL `SELECT` in BigQuery (dry-run checked, scan-capped) and opens the result in TinyPivot. Listed when `TINYPIVOT_BIGQUERY_PROJECT` is set. |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
 | `profile` | Describes each column of a loaded dataset (null share, ranges, top values, Pro relational grain), or pass `dirPath` to scan an entire local folder of CSV/JSON/Parquet/XLSX schemas (collapsing partitioned file series like `data-2021..2024.csv` with a DuckDB glob hint and surfacing multi-sheet `.xlsx` headers & preamble notes) + nearby docs (and Pro cross-file shared join keys) in 1 call. |
@@ -179,8 +196,9 @@ Data tools take an optional `why`: one sentence the agent writes about each step
 - `--no-studio` / `TINYPIVOT_NO_STUDIO=1` (alias: `--no-companion` / `TINYPIVOT_NO_COMPANION=1`) — Disable the localhost Studio HTTP server completely (zero ports bound, zero browser windows — ideal for CI, SSH, and automated benchmarks)
 - `--no-open` / `TINYPIVOT_OPEN_STUDIO=0` (alias: `TINYPIVOT_NO_OPEN=1`) — Keep the localhost Studio server running so you can open its URL manually, without auto-popping a browser tab on the first tool call
 - `TINYPIVOT_LICENSE_KEY` — TinyPivot MCP Pro/Team license key (`TP-MCPP-...` or `TP-MCPT-...`; note that UI Library `TP-PRO*` keys apply to `@smallwebco/tinypivot-react`/`-vue` only)
-- `DATABASE_URL` — Optional PostgreSQL connection string for direct read-only `query_postgres` (Pro). The tool is only offered to the model when this is set. Works with **any** database (BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, Postgres) today via CLI/file handoff (`load_file`), stdin pipe, or MCP piping (`load_data`)
+- `DATABASE_URL` — Optional PostgreSQL connection string for direct read-only `query_postgres` (Pro). The tool is only offered to the model when this is set
 - `TINYPIVOT_ALLOWED_TABLES` — Comma-separated table allowlist for `query_postgres`
+- `TINYPIVOT_BIGQUERY_PROJECT` — Optional Google Cloud project for direct read-only `query_bigquery` (Pro); `TINYPIVOT_BIGQUERY_MAX_GB`, `TINYPIVOT_BIGQUERY_ALLOWED` and `TINYPIVOT_BIGQUERY_LOCATION` tune it (see [Direct connections](#direct-connections-pro))
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
 - `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; when it is taken, the Studio uses a free port and the tool replies link to it)
 - `TINYPIVOT_CLAUDE_CHANNEL` — `1` or `0` overrides whether TinyPivot offers Claude Code a channel. By default it does when Claude Code was started with this server in `--channels` or `--dangerously-load-development-channels`.

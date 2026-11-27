@@ -8,9 +8,9 @@ import type {
 import type { AnalyzeMethod } from './analyze.js'
 import type { TerminalFormatOptions } from './card.js'
 import type { AgentExtension } from './init.js'
-import type { PostgresConfig } from './postgres.js'
 import type { StoredDataset } from './store.js'
 import type { AgentHint } from './studio-protocol.js'
+import type { WarehouseConnector } from './warehouse.js'
 import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -20,7 +20,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { CHART_THEME_IDS, CHART_TYPES, resolveChartType } from '@smallwebco/tinypivot-core'
 import { z } from 'zod'
 import { runAnalysis } from './analyze.js'
-import { auditQueryResult, formatAuditWarnings, formatProGuardTeaser, formatSqlRepairHint, peekDeepAuditCount } from './audit.js'
+import { auditChartReaggregation, auditNonAdditiveSql, auditQueryResult, formatAuditWarnings, formatProGuardTeaser, formatSqlRepairHint, peekDeepAuditCount } from './audit.js'
+import { bigQueryConfigFromEnv, bigQueryConnector } from './bigquery.js'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList, formatSessionList } from './history.js'
@@ -28,7 +29,7 @@ import { refreshAgentExtension } from './init.js'
 import { classifyMcpLicenseKey, isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { extractSqlLineage } from './lineage.js'
-import { executeReadOnlyPostgresQuery, listPostgresTables } from './postgres.js'
+import { postgresConfigFromEnv, postgresConnector } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile, formatProLoadTraps, profileDirectory } from './profile.js'
 import { chartConfigFromPivot, DatasetStore, datasetView, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
@@ -37,6 +38,7 @@ import { describeChartForText, formatDatasetSummary, formatPivotSummary } from '
 import { bucketRowCount, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
 import { hasFeature } from './tiers.js'
+import { truncationNote } from './warehouse.js'
 
 export const APP_RESOURCE_URI = 'ui://tinypivot/app.html'
 export const APP_MIME_TYPE = 'text/html;profile=mcp-app'
@@ -165,7 +167,8 @@ type ChartInput = z.infer<typeof loadChartSchema> & {
 export interface CreateTinyPivotMcpServerOptions {
   store?: DatasetStore
   appHtmlPath?: string
-  postgres?: PostgresConfig
+  /** Databases and warehouses to query directly. Defaults to those configured in the environment. */
+  warehouses?: WarehouseConnector[]
   licenseKey?: string
   demoToken?: string
   companionUrl?: string
@@ -524,16 +527,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   }
   const reprintCards = options.reprintCards ?? process.env.TINYPIVOT_REPRINT_CARDS !== '0'
   const claudeChannel = options.claudeChannel ?? claudeChannelEnabled()
-  const postgresConfig: PostgresConfig | undefined = options.postgres ?? (
-    process.env.DATABASE_URL
-      ? {
-          connectionString: process.env.DATABASE_URL,
-          allowedTables: process.env.TINYPIVOT_ALLOWED_TABLES
-            ? process.env.TINYPIVOT_ALLOWED_TABLES.split(',').map(s => s.trim()).filter(Boolean)
-            : undefined,
-        }
-      : undefined
-  )
+  const warehouses = options.warehouses ?? warehousesFromEnv()
 
   const server = new McpServer(
     {
@@ -1082,13 +1076,14 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     },
   )
 
-  // 6. Optional read-only PostgreSQL query tool (validated by @smallwebco/tinypivot-server)
-  if (postgresConfig) {
+  // 6. Optional read-only database and warehouse tools: the SQL runs where the data lives.
+  for (const warehouse of warehouses) {
+    studio.registerRerun(warehouse.toolName, async sql => (await warehouse.query(sql)).rows)
     server.registerTool(
-      'query_postgres',
+      warehouse.toolName,
       {
-        title: 'Query PostgreSQL Directly (Read-Only, Pro)',
-        description: 'Run a read-only SELECT on the configured Postgres database and chart the result.',
+        title: `Query ${warehouse.label} Directly (Read-Only, Pro)`,
+        description: `Run a read-only SELECT in ${warehouse.label} and chart or pivot the result. ${warehouse.sqlHint}`,
         inputSchema: {
           sql: z.string(),
           why: whyParam,
@@ -1096,42 +1091,46 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           name: z.string().optional(),
           viewMode: z.enum(VIEW_MODE_VALUES).optional(),
           pivotConfig: pivotConfigSchema.optional(),
+          chartConfig: loadChartSchema.optional(),
           keepExisting: z.boolean().optional(),
         },
         annotations: READ_ONLY_REMOTE_ANNOTATIONS,
         _meta: INLINE_UI_META,
       },
-      async ({ sql, why, ask, name, viewMode, pivotConfig, keepExisting }, extra) => {
+      async ({ sql, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
         if (!isPro) {
           return {
             isError: true,
             content: [{
               type: 'text',
-              text: 'Read-only PostgreSQL querying (`query_postgres`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). Free tier includes unlimited local CSV/TSV/JSON/Parquet analysis — or export via `psql --csv` and pass the file to `load_file`. Upgrade at https://tiny-pivot.com/pricing',
+              text: `Querying ${warehouse.label} directly (\`${warehouse.toolName}\`) requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). On Free, ${warehouse.freeAlternative}. Upgrade at https://tiny-pivot.com/pricing`,
             }],
           }
         }
         try {
           const { sessionKey, keepExisting: shouldKeep } = resolveSessionContext(extra, keepExisting)
-          const res = await executeReadOnlyPostgresQuery(postgresConfig, sql)
+          const res = await warehouse.query(sql)
           const ds = store.register({
-            name: name ?? 'PostgreSQL Query',
-            source: 'postgresql',
+            name: name ?? `${warehouse.label} Query`,
+            source: warehouse.label,
             ingestionMode: 'direct',
             rows: res.rows,
-            viewMode: initialViewMode(viewMode, Boolean(pivotConfig), false),
+            viewMode: initialViewMode(viewMode, Boolean(pivotConfig), Boolean(chartConfig)),
             pivotConfig: pivotConfig ? normalizePivot(pivotConfig) : undefined,
+            chartConfig: chartConfig ? toCoreChartConfig(chartConfig) : undefined,
             sessionKey,
             keepExisting: shouldKeep,
           })
-          studio.remember(ds, { kind: 'postgres', source: sql })
-          studio.recordDatasetStep(ds, { actor: 'agent', tool: 'query_postgres', why, ask, sql })
-          return replyWithDataset(ds, sessionKey, 'query_postgres', res.truncated ? ' (capped at max rows)' : '')
+          studio.remember(ds, { kind: warehouse.id, source: sql })
+          studio.recordDatasetStep(ds, { actor: 'agent', tool: warehouse.toolName, why, ask, sql })
+          const warnings = hasFeature(isPro, 'audit_basic') ? [...auditNonAdditiveSql(sql), ...auditChartReaggregation(ds)] : []
+          const note = `${res.note ? `\n_${res.note}_` : ''}${res.truncated ? truncationNote(warehouse) : ''}${formatAuditWarnings(warnings)}`
+          return replyWithDataset(ds, sessionKey, warehouse.toolName, note)
         }
         catch (err) {
           return {
             isError: true,
-            content: [{ type: 'text', text: `PostgreSQL query failed: ${err instanceof Error ? err.message : String(err)}. Call list_datasets to check available PostgreSQL tables and ensure the query is a single read-only SELECT.` }],
+            content: [{ type: 'text', text: `${warehouse.label} query failed: ${err instanceof Error ? err.message : String(err)} Call list_datasets to see the ${warehouse.label} tables, and send one read-only SELECT.` }],
           }
         }
       },
@@ -1434,21 +1433,17 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     async (_args, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const datasets = store.listMetadata(sessionKey)
-      let pgTables: string[] = []
-      if (postgresConfig) {
-        try {
-          pgTables = await listPostgresTables(postgresConfig)
-        }
-        catch {
-          pgTables = []
-        }
-      }
+      const warehouseTables = await Promise.all(warehouses.map(async w => ({
+        warehouse: w,
+        tables: await w.listTables().catch(() => [] as string[]),
+      })))
 
       const lines = datasets.map(d =>
         `- **${d.name}** (\`${d.id}\`): ${d.rowCount.toLocaleString()} rows · columns: ${d.columns.map(c => `${c.name}:${c.type}`).join(', ')}`,
       )
-      if (pgTables.length > 0) {
-        lines.push('', `PostgreSQL tables available via \`query_postgres\`: ${pgTables.map(t => `\`${t}\``).join(', ')}`)
+      for (const { warehouse, tables } of warehouseTables) {
+        if (tables.length > 0)
+          lines.push('', `${warehouse.label} tables available via \`${warehouse.toolName}\`: ${tables.map(t => `\`${t}\``).join(', ')}`)
       }
 
       return {
@@ -1456,7 +1451,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         structuredContent: {
           activeDatasetId: store.getActiveId(sessionKey),
           datasets,
-          postgresTables: pgTables,
+          warehouseTables: Object.fromEntries(warehouseTables.map(({ warehouse, tables }) => [warehouse.id, tables])),
         },
       }
     },
@@ -1672,4 +1667,14 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   ))
 
   return { server, store }
+}
+
+/** The databases and warehouses configured through environment variables. */
+export function warehousesFromEnv(env: NodeJS.ProcessEnv = process.env): WarehouseConnector[] {
+  const postgres = postgresConfigFromEnv(env)
+  const bigquery = bigQueryConfigFromEnv(env)
+  return [
+    ...(postgres ? [postgresConnector(postgres)] : []),
+    ...(bigquery ? [bigQueryConnector(bigquery)] : []),
+  ]
 }

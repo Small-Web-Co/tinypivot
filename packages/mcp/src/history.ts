@@ -12,10 +12,10 @@ import { groupRuns } from './runs.js'
  * re-sending anything to the model. Local only, under the user's data folder.
  *
  * Files are remembered by path and filter, since the file is still there to re-read. Ephemeral
- * pulls (rows passed in, query results, Postgres results) are saved with their rows.
+ * pulls (rows passed in, query results, database and warehouse results) are saved with their rows.
  */
 
-export type HistoryKind = 'file' | 'data' | 'query' | 'postgres'
+export type HistoryKind = 'file' | 'data' | 'query' | 'postgres' | 'bigquery'
 
 export interface HistoryEntry {
   id: string
@@ -24,7 +24,7 @@ export interface HistoryEntry {
   createdAt: string
   rows: number
   columns: string[]
-  /** File path for `file`, a source label for `data`, the SQL text for `query` and `postgres`. */
+  /** File path for `file`, a source label for `data`, the SQL text for `query` and the database kinds. */
   source: string
   where?: RowFilter[]
   /** Saved rows, gzipped JSON lines, for pulls that cannot be re-read from a file. */

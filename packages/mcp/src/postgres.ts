@@ -1,10 +1,14 @@
+import type { WarehouseConnector } from './warehouse.js'
 import { validateSQL } from '@smallwebco/tinypivot-server'
+import { listFromEnv } from './warehouse.js'
 
 export interface PostgresConfig {
   connectionString: string
   allowedTables?: string[]
   maxRows?: number
 }
+
+const DEFAULT_MAX_ROWS = 5000
 
 export interface PostgresQueryResult {
   rows: Record<string, unknown>[]
@@ -57,7 +61,7 @@ export async function executeReadOnlyPostgresQuery(
     throw new Error(`SQL rejected by TinyPivot read-only validator: ${check.error}`)
   }
 
-  const maxRows = config.maxRows ?? 5000
+  const maxRows = config.maxRows ?? DEFAULT_MAX_ROWS
   const cleaned = sql.trim().replace(/;+\s*$/, '')
   const limitedSql = /\bLIMIT\s+\d+/i.test(cleaned)
     ? cleaned
@@ -87,5 +91,28 @@ export async function executeReadOnlyPostgresQuery(
   finally {
     client.release()
     await pool.end()
+  }
+}
+
+/** Postgres settings from DATABASE_URL and TINYPIVOT_ALLOWED_TABLES, or undefined when no database is set. */
+export function postgresConfigFromEnv(env: NodeJS.ProcessEnv = process.env): PostgresConfig | undefined {
+  if (!env.DATABASE_URL)
+    return undefined
+  return { connectionString: env.DATABASE_URL, allowedTables: listFromEnv(env.TINYPIVOT_ALLOWED_TABLES) }
+}
+
+export function postgresConnector(config: PostgresConfig): WarehouseConnector {
+  return {
+    id: 'postgres',
+    label: 'PostgreSQL',
+    toolName: 'query_postgres',
+    sqlHint: 'Postgres SQL, one read-only SELECT.',
+    freeAlternative: 'export with `psql --csv` and pass the file to `load_file`',
+    maxRows: config.maxRows ?? DEFAULT_MAX_ROWS,
+    listTables: () => listPostgresTables(config),
+    query: async (sql) => {
+      const res = await executeReadOnlyPostgresQuery(config, sql)
+      return { rows: res.rows, truncated: res.truncated }
+    },
   }
 }

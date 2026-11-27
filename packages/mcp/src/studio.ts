@@ -237,6 +237,8 @@ export class Studio {
   readonly formatSql: SqlFormatter
   /** Each step's SQL as SQLFluff lays it out, once formatted (null: SQLFluff is not available). */
   private readonly formattedSql = new Map<string, string | null>()
+  /** Tools whose SQL runs in a database or warehouse, with how to run it there again. */
+  private readonly remoteRuns = new Map<string, (sql: string) => Promise<Record<string, unknown>[]>>()
 
   /**
    * Which conversation this Studio belongs to. Each server process is one conversation, so its
@@ -251,6 +253,19 @@ export class Studio {
     this.duck = options.duck ?? new DuckDbRunner()
     this.sessionId = options.sessionId ?? newSessionId()
     this.steps = this.readTraceFile()
+  }
+
+  /** Lets steps from a direct database tool run their SQL there again, instead of in the local DuckDB. */
+  registerRerun(tool: string, run: (sql: string) => Promise<Record<string, unknown>[]>): void {
+    this.remoteRuns.set(tool, run)
+  }
+
+  /** Runs a step's SQL where that step's data lives: its database for direct tools, else DuckDB. */
+  private async runStepSql(tool: string | undefined, sql: string, sessionKey: string): Promise<{ rows: Record<string, unknown>[], truncated: boolean }> {
+    const remote = tool ? this.remoteRuns.get(tool) : undefined
+    if (remote)
+      return { rows: await remote(sql), truncated: false }
+    return this.duck.run(sql, this.queryViews(sessionKey))
   }
 
   /** Calls `listener` (once per tick at most) whenever the trace or the notes change. */
@@ -574,7 +589,7 @@ export class Studio {
       throw new Error('That step is no longer in the trace.')
     const sessionKey = options.sessionKey ?? DEFAULT_SESSION_KEY
     const prevSql = step.sql ?? (step.file ? fileStepSql(step.file, step.where) : undefined)
-    const result = await this.duck.run(sql, this.queryViews(sessionKey))
+    const result = await this.runStepSql(step.tool, sql, sessionKey)
     const dataset = this.store.register({
       name: options.name ?? step.datasetName ?? 'Edited query',
       source: sql,
@@ -664,7 +679,7 @@ export class Studio {
       step.view = describeView(dataset!)
     }
     else if (target.sql) {
-      const result = await this.duck.run(target.sql, this.queryViews(sessionKey))
+      const result = await this.runStepSql(step.tool, target.sql, sessionKey)
       dataset = this.store.register({
         name: step.datasetName ?? 'Restored query',
         source: target.sql,
@@ -832,9 +847,9 @@ export class Studio {
   private async checkRerun(sql: string, step: TraceStep, sessionKey: string): Promise<StepCheck> {
     const expected = step.fingerprint!
     try {
-      const result = await this.duck.run(sql, this.queryViews(sessionKey))
+      const result = await this.runStepSql(step.tool, sql, sessionKey)
       const again = fingerprintRows(result.rows)
-      if (step.tool !== 'query' && step.tool !== 'query_postgres')
+      if (step.tool !== 'query' && !this.remoteRuns.has(step.tool))
         return { kind: 'rerun', ok: again.rows === expected.rows, detail: `The SQL gives ${again.rows.toLocaleString('en-US')} rows again; the load had ${expected.rows.toLocaleString('en-US')}.` }
       const ok = again.rows === expected.rows && again.hash === expected.hash
       return { kind: 'rerun', ok, detail: ok ? `Same ${again.rows.toLocaleString('en-US')} rows, same values.` : `Different result: ${again.rows.toLocaleString('en-US')} rows now, ${expected.rows.toLocaleString('en-US')} then${again.rows === expected.rows ? ', with changed values' : ''}.` }

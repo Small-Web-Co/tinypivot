@@ -57,9 +57,21 @@ export const harnesses: HarnessSetup[] = [
     code: `${INIT_COMMAND} --targets=antigravity-cli\n\n# Or add it by hand:\nagy mcp add tinypivot -- npx -y ${MCP_SPEC}`,
   },
   {
+    id: 'bigquery',
+    label: 'Direct BigQuery (Pro)',
+    summary: 'Read-only SQL that runs in BigQuery. Each query is dry-run first and capped by how much it may scan. Sign in with gcloud auth application-default login, or point GOOGLE_APPLICATION_CREDENTIALS at a service-account key.',
+    filename: 'mcp config',
+    code: npxServer({
+      TINYPIVOT_BIGQUERY_PROJECT: 'my-gcp-project',
+      TINYPIVOT_BIGQUERY_MAX_GB: '50',
+      TINYPIVOT_BIGQUERY_ALLOWED: 'sales,marketing.campaigns',
+      TINYPIVOT_LICENSE_KEY: 'TP-MCP…',
+    }),
+  },
+  {
     id: 'postgres',
     label: 'Direct Postgres (Pro)',
-    summary: 'Read-only connector with SQL validation and a table allowlist. Every other database works by piping CSV or JSON.',
+    summary: 'Read-only connector with SQL validation and a table allowlist. Any other database works by handing TinyPivot an export or rows from its own MCP server.',
     filename: 'mcp config',
     code: npxServer({
       DATABASE_URL: 'postgresql://readonly:pass@localhost:5432/analytics',
@@ -79,6 +91,7 @@ export const tools = [
   { name: 'profile', role: 'Dataset or folder scan', desc: 'Profiles a loaded dataset (null share, ranges, top values, Pro relational grain), or pass dirPath to scan a local folder of CSV/JSON/Parquet/XLSX schemas, docs, and Pro cross-file join keys in 1 call.' },
   { name: 'analyze', role: '1-call Data Science', desc: 'Deterministic statistical shelf on datasetId or filePath: explain_change and ab_test on Free; SRM + Holm-Bonferroni, controlled regression, right-censored cohorts, and seasonal anomalies on Pro.' },
   { name: 'history', role: 'Every pull, kept', desc: 'Lists earlier pulls and reopens any of them without re-querying. Saved locally for 30 days.' },
+  { name: 'query_bigquery', role: 'Pro · BigQuery', desc: 'Read-only GoogleSQL run in BigQuery: dry-run checked, capped by bytes scanned, optionally limited to listed datasets.' },
   { name: 'query_postgres', role: 'Pro · Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
 ] as const
 
