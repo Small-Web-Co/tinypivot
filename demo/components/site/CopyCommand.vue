@@ -4,23 +4,26 @@ import { INIT_COMMAND } from '../../site/install'
 import { useCopy } from '../../site/useCopy'
 
 /** One copy-paste terminal line: the shortest path to installing. */
-const props = defineProps<{ source: string }>()
+const props = withDefaults(defineProps<{ source: string, command?: string, option?: string }>(), {
+  command: INIT_COMMAND,
+  option: 'init',
+})
 
 const { copiedKey, copy } = useCopy()
 
 async function copyCommand() {
-  await copy('init', INIT_COMMAND)
-  track('install_copied', { option: 'init', source: props.source })
+  await copy(props.option, props.command)
+  track('install_copied', { option: props.option, source: props.source })
 }
 </script>
 
 <template>
   <div class="cmd">
     <code class="cmd-line" tabindex="0" title="Click to copy" @click="copyCommand" @keydown.enter="copyCommand">
-      <span class="cmd-prompt" aria-hidden="true">$</span>{{ INIT_COMMAND }}
+      <span class="cmd-prompt" aria-hidden="true">$</span>{{ command }}
     </code>
     <button type="button" class="cmd-copy" @click="copyCommand">
-      {{ copiedKey === 'init' ? '✓ Copied' : 'Copy' }}
+      {{ copiedKey === option ? '✓ Copied' : 'Copy' }}
     </button>
   </div>
 </template>

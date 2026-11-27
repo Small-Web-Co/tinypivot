@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import HarnessReel from '../components/HarnessReel.vue'
 import CopyCommand from '../components/site/CopyCommand.vue'
+import DirectConnections from '../components/site/DirectConnections.vue'
 import HeroCharts from '../components/site/HeroCharts.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import ModelComparisonChart from '../components/site/ModelComparisonChart.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import RotatingWord from '../components/site/RotatingWord.vue'
+import StatHighlights from '../components/site/StatHighlights.vue'
 import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
 import { benchmarkHeadline } from '../site/benchmark'
 import { modelChartHighlights } from '../site/modelChart'
@@ -265,12 +267,7 @@ const capabilities = [
             TinyPivot Pro. We measured how many answers were right, how long each task took, and what it cost.
           </p>
         </header>
-        <ul class="small-highlights">
-          <li v-for="item in modelHighlights" :key="item.value">
-            <span class="small-hl-val mono">{{ item.value }}</span>
-            <span class="small-hl-lbl">{{ item.label }}</span>
-          </li>
-        </ul>
+        <StatHighlights class="small-highlights" :items="modelHighlights" />
         <ModelComparisonChart />
         <p class="small-foot">
           Small and open-weight models gain the most: TinyPivot does the exact maths and the checking, so the model only has to
@@ -281,6 +278,24 @@ const capabilities = [
             Every run, task and prompt →
           </router-link>
         </p>
+      </div>
+    </section>
+
+    <section id="warehouses" class="block warehouses" aria-labelledby="warehouses-title">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            Direct connections · Pro
+          </p>
+          <h2 id="warehouses-title" class="heading">
+            Ask the warehouse. <em>Skip the export.</em>
+          </h2>
+          <p class="lede">
+            TinyPivot Pro queries your warehouse where the data lives. The warehouse adds up every row, the agent sees only
+            the answer, and every step in the Studio reruns against the same tables.
+          </p>
+        </header>
+        <DirectConnections />
       </div>
     </section>
 
@@ -633,6 +648,7 @@ const capabilities = [
 }
 
 .products,
+.warehouses,
 .caps-section {
   border-top: var(--line);
 }
@@ -763,31 +779,7 @@ a.gain-card:hover {
 }
 
 .small-highlights {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
   margin-bottom: 20px;
-  list-style: none;
-}
-
-.small-highlights li {
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border-left: 4px solid #1d7a4f;
-  background: var(--paper-raised);
-}
-
-.small-hl-val {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #145a39;
-}
-
-.small-hl-lbl {
-  font-size: 0.86rem;
-  line-height: 1.4;
-  color: var(--ink-muted);
 }
 
 .small-foot {
@@ -829,10 +821,6 @@ a.gain-card:hover {
 }
 
 @media (min-width: 680px) {
-  .small-highlights {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .gain-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

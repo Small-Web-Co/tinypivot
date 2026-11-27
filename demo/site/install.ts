@@ -4,6 +4,8 @@ export const MCP_PACKAGE = '@smallwebco/tinypivot-mcp'
 /** npx re-resolves a tagged spec on every run; a bare name would reuse its cached copy. */
 export const MCP_SPEC = `${MCP_PACKAGE}@latest`
 export const INIT_COMMAND = `npx ${MCP_SPEC} init`
+/** Install, and switch on the warehouse sign-ins `init` finds on this machine. */
+export const CONNECT_COMMAND = `${INIT_COMMAND} --connect`
 
 export interface InstallOption {
   id: string
