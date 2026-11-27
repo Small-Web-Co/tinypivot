@@ -25,6 +25,7 @@ export {
   bigQueryConnector,
 } from './bigquery.js'
 export { type TerminalFormatOptions } from './card.js'
+export { clickHouseConfigFromEnv, clickHouseConnector } from './clickhouse.js'
 export {
   type CompanionServerHandle,
   type StartCompanionOptions,

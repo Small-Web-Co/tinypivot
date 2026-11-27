@@ -127,7 +127,7 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 
 TinyPivot works with any data your agent can reach. Use whichever workflow matches your stack:
 
-- **Direct Snowflake, BigQuery, Databricks and PostgreSQL (Pro):** TinyPivot runs read-only SQL in the warehouse itself, so totals are computed where the data lives and only the result comes back. Every step's SQL shows in the Studio and can be re-checked there. See [Direct connections](#direct-connections-pro) below.
+- **Direct Snowflake, BigQuery, Databricks, ClickHouse and PostgreSQL (Pro):** TinyPivot runs read-only SQL in the warehouse itself, so totals are computed where the data lives and only the result comes back. Every step's SQL shows in the Studio and can be re-checked there. See [Direct connections](#direct-connections-pro) below.
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, or Postgres (CLI / file handoff — 0 raw rows in LLM context):** Export query output to `.csv`, `.tsv`, `.json`, or `.jsonl` via `bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, or `psql` and pass the path to `load_file` (or pipe stdout straight into `npx @smallwebco/tinypivot-mcp@latest --open`).
 - **Any MCP Server or API (Stripe, GitHub, BigQuery MCP, Snowflake MCP, REST APIs):** Pipe structured JSON rows (up to `~50` rows already in memory) directly into `load_data` with `chartConfig` / `pivotConfig` in a single call — no temp CSV required (for larger sets, write a file and use `load_file`).
@@ -180,6 +180,15 @@ Each tool appears only when its settings are present.
 - Queries carry the user agent `TinyPivot` and the query tag `client:tinypivot`, so they are easy to find in query history.
 - Results return up to 5,000 rows. When a result is cut, TinyPivot tells the agent to aggregate in Databricks instead, so totals cover the whole table.
 
+**ClickHouse** (`query_clickhouse`, preview: please report problems on GitHub): set `TINYPIVOT_CLICKHOUSE_URL` to the HTTP(S) endpoint (e.g. `https://abc.eu-west-1.aws.clickhouse.cloud:8443`), plus `TINYPIVOT_CLICKHOUSE_USER`, `_PASSWORD` and `_DATABASE` (or put them in the URL as `https://user:pass@host:8443/database`). If you already use `clickhouse client`, `TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG=1` reuses the host, user, password, database and `secure` flag from `~/.clickhouse-client/config.xml` (over HTTPS on 8443 when secure, else HTTP on 8123; set the URL for other ports). ClickHouse's official Node client downloads once into `~/.cache/tinypivot` on the first query and never logs to the console.
+
+- **Use a read-only user** (a settings profile with `readonly = 1` and only `SELECT` grants). That is the strongest guard. TinyPivot adds:
+  1. A text check that allows one `SELECT` and refuses write words, `SETTINGS`, `FORMAT` and `INTO OUTFILE`.
+  2. ClickHouse's own enforcement on every query: `readonly = 1` (no writes, no setting changes, no `url()`/`s3()`/`remote()` table functions), `max_bytes_to_read`, and `max_execution_time = 60`, with both limits set to fail rather than return partial results. For a user whose profile is already `readonly = 1`, ClickHouse refuses per-query settings, so that profile's own limits apply.
+- `TINYPIVOT_CLICKHOUSE_MAX_GB` caps the uncompressed bytes one query may read (default 50 GB). ClickHouse stops the query once it reads past it.
+- Queries carry `log_comment = 'tinypivot'`, a `tinypivot-…` query id and the application name `TinyPivot`, so they are easy to find in `system.query_log`.
+- Results return up to 5,000 rows. The result is streamed and reading stops after that, so a large result is never downloaded whole.
+
 **PostgreSQL** (`query_postgres`): set `DATABASE_URL`, and optionally `TINYPIVOT_ALLOWED_TABLES`. Queries are parsed and validated as a single read-only `SELECT`, then run in a read-only transaction with a 15-second timeout.
 
 ## Free vs. Pro
@@ -201,7 +210,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Visual themes | `Code` theme (Dark & Light) | All 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`) |
 | Drill-Through modals | — | Included |
 | Formatted `.xlsx` Excel export | — | Included |
-| Direct Snowflake, BigQuery, Databricks & PostgreSQL (`query_snowflake`, `query_bigquery`, `query_databricks`, `query_postgres`) | — | Included |
+| Direct Snowflake, BigQuery, Databricks, ClickHouse & PostgreSQL (`query_snowflake`, `query_bigquery`, `query_databricks`, `query_clickhouse`, `query_postgres`) | — | Included |
 | Watermark-free UI, HTML & terminal cards | — | Included |
 
 > **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the full Internal + External (MIT KramaBench & Adyen DABstep) benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper) or download the [Official PDF White Paper](https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf).
@@ -221,6 +230,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `analyze` | Deterministic 1-call Data Science shelf on `datasetId` or `filePath`: `explain_change` and `ab_test` on Free; full Pro SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, and seasonal `anomalies`. |
 | `query_snowflake` | *(Optional Pro)* Runs one read-only Snowflake `SELECT` after a text check and an `EXPLAIN` plan check (read steps only, scan-capped) and opens the result in TinyPivot. Listed when `TINYPIVOT_SNOWFLAKE_ACCOUNT` and `TINYPIVOT_SNOWFLAKE_USER` are set. |
 | `query_databricks` | *(Optional Pro)* Runs one read-only Databricks SQL `SELECT` after a text check and an `EXPLAIN` plan check (no write or DDL steps) and opens the result in TinyPivot. Listed when `TINYPIVOT_DATABRICKS_PROFILE` or `TINYPIVOT_DATABRICKS_HOST` is set. |
+| `query_clickhouse` | *(Optional Pro)* Runs one read-only ClickHouse `SELECT` with server-enforced `readonly`, scan and time limits, and opens the result in TinyPivot. Listed when `TINYPIVOT_CLICKHOUSE_URL` is set (or `TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG=1`). |
 | `query_bigquery` | *(Optional Pro)* Runs one read-only GoogleSQL `SELECT` in BigQuery (dry-run checked, scan-capped) and opens the result in TinyPivot. Listed when `TINYPIVOT_BIGQUERY_PROJECT` is set. |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
@@ -238,6 +248,7 @@ Data tools take an optional `why`: one sentence the agent writes about each step
 - `TINYPIVOT_ALLOWED_TABLES` — Comma-separated table allowlist for `query_postgres`
 - `TINYPIVOT_SNOWFLAKE_ACCOUNT`, `TINYPIVOT_SNOWFLAKE_USER` — Optional Snowflake account for direct read-only `query_snowflake` (Pro); sign-in, session and limit settings are under [Direct connections](#direct-connections-pro)
 - `TINYPIVOT_DATABRICKS_PROFILE` or `TINYPIVOT_DATABRICKS_HOST` — Optional Databricks workspace for direct read-only `query_databricks` (Pro); see [Direct connections](#direct-connections-pro)
+- `TINYPIVOT_CLICKHOUSE_URL` — Optional ClickHouse endpoint for direct read-only `query_clickhouse` (Pro); see [Direct connections](#direct-connections-pro)
 - `TINYPIVOT_BIGQUERY_PROJECT` — Optional Google Cloud project for direct read-only `query_bigquery` (Pro); `TINYPIVOT_BIGQUERY_MAX_GB`, `TINYPIVOT_BIGQUERY_ALLOWED` and `TINYPIVOT_BIGQUERY_LOCATION` tune it (see [Direct connections](#direct-connections-pro))
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
 - `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; when it is taken, the Studio uses a free port and the tool replies link to it)

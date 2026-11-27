@@ -797,7 +797,7 @@ export async function runInitCommand(args: string[]): Promise<InitSummary | null
     console.log('  1. Restart your AI client(s) so the tinypivot MCP server loads.')
     console.log('  2. Try asking: "Open TinyPivot" or "Chart revenue by region from sales.csv".')
     console.log('  3. Free tier includes unlimited local rows, charts, SQL, smart .xlsx, Studio + lineage, and basic stats.')
-    console.log('     Upgrade to Pro for deep SQL trap guards (join fan-out, partial periods, NULL drops, outliers), full Data Science shelf, Recursive Data Memory, white-label HTML/.xlsx, direct Snowflake, BigQuery, Databricks & Postgres, 10 themes: https://tiny-pivot.com/pricing')
+    console.log('     Upgrade to Pro for deep SQL trap guards (join fan-out, partial periods, NULL drops, outliers), full Data Science shelf, Recursive Data Memory, white-label HTML/.xlsx, direct Snowflake, BigQuery, Databricks, ClickHouse & Postgres, 10 themes: https://tiny-pivot.com/pricing')
   }
   console.log('')
   return summary

@@ -23,6 +23,7 @@ import { runAnalysis } from './analyze.js'
 import { auditChartReaggregation, auditNonAdditiveSql, auditQueryResult, formatAuditWarnings, formatProGuardTeaser, formatSqlRepairHint, peekDeepAuditCount } from './audit.js'
 import { bigQueryConfigFromEnv, bigQueryConnector } from './bigquery.js'
 import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
+import { clickHouseConfigFromEnv, clickHouseConnector } from './clickhouse.js'
 import { databricksConfigFromEnv, databricksConnector } from './databricks.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList, formatSessionList } from './history.js'
@@ -1677,10 +1678,12 @@ export function warehousesFromEnv(env: NodeJS.ProcessEnv = process.env): Warehou
   const bigquery = bigQueryConfigFromEnv(env)
   const snowflake = snowflakeConfigFromEnv(env)
   const databricks = databricksConfigFromEnv(env)
+  const clickhouse = clickHouseConfigFromEnv(env)
   return [
     ...(postgres ? [postgresConnector(postgres)] : []),
     ...(bigquery ? [bigQueryConnector(bigquery)] : []),
     ...(snowflake ? [snowflakeConnector(snowflake)] : []),
     ...(databricks ? [databricksConnector(databricks)] : []),
+    ...(clickhouse ? [clickHouseConnector(clickhouse)] : []),
   ]
 }
