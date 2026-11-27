@@ -478,6 +478,16 @@ export interface XlsxReadResult {
   rows: Record<string, unknown>[]
   sheetName: string
   sheetNames: string[]
+  headerRow?: number
+  notes?: string[]
+}
+
+export interface XlsxSheetSummary {
+  name: string
+  rowCount: number
+  headerRow: number
+  columns: string[]
+  notes: string[]
 }
 
 export interface XlsxInspectResult {
@@ -485,6 +495,88 @@ export interface XlsxInspectResult {
   firstSheetName: string
   rowCount: number
   columns: string[]
+  headerRow?: number
+  notes?: string[]
+  sheets?: XlsxSheetSummary[]
+}
+
+const UNIT_ONLY_RE = /^(?:\([^)]{1,24}\)|\[[^\]]{1,24}\])$/
+const PURE_NUM_RE = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i
+
+function extractRowValues(row: ExcelRow): unknown[] {
+  const rawVals = Array.isArray(row.values) ? row.values.slice(1) : []
+  return rawVals.map(coerceReadCell)
+}
+
+function scoreHeaderCandidate(cells: unknown[]): number {
+  const nonEmpty = cells
+    .map(c => (c === null || c === undefined ? '' : String(c).trim()))
+    .filter(Boolean)
+  if (nonEmpty.length === 0)
+    return -1
+  if (nonEmpty.length === 1)
+    return 0.5
+  let stringCount = 0
+  let numericCount = 0
+  let unitOnlyCount = 0
+  const distinct = new Set<string>()
+  for (const s of nonEmpty) {
+    if (UNIT_ONLY_RE.test(s)) {
+      unitOnlyCount++
+    }
+    else if (PURE_NUM_RE.test(s.replace(/,/g, ''))) {
+      numericCount++
+    }
+    else {
+      stringCount++
+      distinct.add(s.toLowerCase())
+    }
+  }
+  if (stringCount === 0 && unitOnlyCount > 0)
+    return 1
+  if (stringCount === 0)
+    return 0.2
+  return distinct.size * 3 + stringCount - numericCount * 1.5 - unitOnlyCount * 0.5
+}
+
+function detectWorksheetHeader(ws: ExcelWorksheet): { headerRow: number, rawHeaders: string[], notes: string[] } {
+  const scanLimit = Math.min(ws.rowCount, 20)
+  const candidates: Array<{ rowNum: number, cells: unknown[], score: number }> = []
+  for (let r = 1; r <= scanLimit; r++) {
+    const cells = extractRowValues(ws.getRow(r))
+    const score = scoreHeaderCandidate(cells)
+    if (score >= 0)
+      candidates.push({ rowNum: r, cells, score })
+  }
+  if (candidates.length === 0)
+    return { headerRow: 1, rawHeaders: [], notes: [] }
+
+  let best = candidates[0]
+  for (const cand of candidates) {
+    if (cand.score > best.score + 0.5)
+      best = cand
+  }
+
+  const notes: string[] = []
+  for (const cand of candidates) {
+    if (cand.rowNum >= best.rowNum)
+      break
+    const parts = cand.cells
+      .map(c => (c === null || c === undefined ? '' : String(c).trim()))
+      .filter(Boolean)
+    if (parts.length > 0 && parts.some(p => !UNIT_ONLY_RE.test(p))) {
+      const joined = parts.slice(0, 6).join(' · ')
+      notes.push(joined.length > 220 ? `${joined.slice(0, 217)}...` : joined)
+    }
+  }
+
+  // Trim trailing null cells so header length matches actual header columns
+  let lastIdx = best.cells.length - 1
+  while (lastIdx >= 0 && (best.cells[lastIdx] === null || best.cells[lastIdx] === ''))
+    lastIdx--
+  const trimmed = best.cells.slice(0, lastIdx + 1)
+  const rawHeaders = sanitizeColumns(trimmed.map(cell => (cell === null || cell === undefined ? '' : String(cell))))
+  return { headerRow: best.rowNum, rawHeaders, notes: notes.slice(0, 4) }
 }
 
 function toArrayBuffer(input: ArrayBuffer | Uint8Array): ArrayBuffer {
@@ -515,7 +607,7 @@ function coerceReadCell(value: unknown): unknown {
 }
 
 /**
- * Inspect an XLSX buffer's sheet names, first non-empty sheet row count, and header columns
+ * Inspect an XLSX buffer's sheets, auto-detected header rows, preamble notes, and column names
  * without materializing every row.
  */
 export async function inspectXlsxBuffer(input: ArrayBuffer | Uint8Array): Promise<XlsxInspectResult> {
@@ -523,29 +615,31 @@ export async function inspectXlsxBuffer(input: ArrayBuffer | Uint8Array): Promis
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(toArrayBuffer(input))
   const sheetNames = workbook.worksheets.map(ws => ws.name)
-  const first = workbook.worksheets.find(ws => ws.rowCount > 0) ?? workbook.worksheets[0]
-  const columns: string[] = []
-  if (first) {
-    const headerRow = first.getRow(1)
-    const vals = Array.isArray(headerRow.values) ? headerRow.values.slice(1) : []
-    for (const v of vals) {
-      const coerced = coerceReadCell(v)
-      const s = coerced === null || coerced === undefined ? '' : String(coerced).trim()
-      if (s)
-        columns.push(s)
+  const sheets: XlsxSheetSummary[] = workbook.worksheets.slice(0, 6).map((ws) => {
+    const detected = detectWorksheetHeader(ws)
+    return {
+      name: ws.name,
+      rowCount: Math.max(0, ws.rowCount - detected.headerRow),
+      headerRow: detected.headerRow,
+      columns: detected.rawHeaders,
+      notes: detected.notes,
     }
-  }
+  })
+  const first = sheets.find(s => s.rowCount > 0 || s.columns.length > 0) ?? sheets[0]
   return {
     sheetNames,
     firstSheetName: first?.name ?? '',
     rowCount: first?.rowCount ?? 0,
-    columns,
+    columns: first?.columns ?? [],
+    headerRow: first?.headerRow ?? 1,
+    notes: first?.notes ?? [],
+    sheets,
   }
 }
 
 /**
- * Read a worksheet from an XLSX buffer into plain row objects.
- * Defaults to the first non-empty worksheet when `requestedSheet` is omitted.
+ * Read a worksheet from an XLSX buffer into plain row objects, auto-detecting preamble title/note
+ * rows above the real header row. Defaults to the first non-empty worksheet when `requestedSheet` is omitted.
  */
 export async function readXlsxBuffer(
   input: ArrayBuffer | Uint8Array,
@@ -565,15 +659,12 @@ export async function readXlsxBuffer(
   if (!target)
     throw new Error(`Sheet "${requestedSheet}" not found. Available sheets: ${sheetNames.join(', ')}`)
 
-  let headers: string[] = []
+  const { headerRow, rawHeaders: headers, notes } = detectWorksheetHeader(target)
   const rows: Record<string, unknown>[] = []
-  target.eachRow({ includeEmpty: false }, (row) => {
-    const rawVals = Array.isArray(row.values) ? row.values.slice(1) : []
-    const coerced = rawVals.map(coerceReadCell)
-    if (headers.length === 0) {
-      headers = sanitizeColumns(coerced.map(cell => (cell === null || cell === undefined ? '' : String(cell))))
+  target.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber <= headerRow || headers.length === 0)
       return
-    }
+    const coerced = extractRowValues(row)
     const record: Record<string, unknown> = {}
     let hasValue = false
     for (let i = 0; i < headers.length; i++) {
@@ -586,7 +677,7 @@ export async function readXlsxBuffer(
       rows.push(record)
   })
 
-  return { rows, sheetName: target.name, sheetNames }
+  return { rows, sheetName: target.name, sheetNames, headerRow, notes }
 }
 
 // ============================================================================

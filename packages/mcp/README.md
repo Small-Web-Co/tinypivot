@@ -152,7 +152,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Optional direct `query_postgres` (`DATABASE_URL`) | — | Included |
 | Watermark-free UI, HTML & terminal cards | — | Included |
 
-> **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the 5-model + MIT KramaBench (ICLR 2026) + Adyen DABstep benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper).
+> **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the full Internal + External (MIT KramaBench & Adyen DABstep) benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper) or download the [Official PDF White Paper](https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf).
 
 Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 
@@ -161,7 +161,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | Tool | Purpose |
 |---|---|
 | `open_tinypivot` | Opens TinyPivot (side pane, sidebar, or inline). Works with `{}` using the built-in sample dataset. |
-| `load_file` | Loads a local `.csv`, `.tsv`, `.json`, `.jsonl`, or `.xlsx` workbook (pass `sheet` to pick a worksheet) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call, or `where` to filter on disk. Loaded `.xlsx` sheets are immediately queryable in DuckDB SQL by table name. |
+| `load_file` | Loads a local `.csv`, `.tsv`, `.json`, `.jsonl`, or `.xlsx` workbook (auto-detects real header rows below title/notes preambles, surfaces workbook notes, and accepts `sheet` to pick a worksheet) with 0 raw rows entering LLM context; pass `chartConfig` / `pivotConfig` to render in 1 call, or `where` to filter on disk. Loaded `.xlsx` sheets are immediately queryable in DuckDB SQL by table name. |
 | `query` | Runs read-only DuckDB `SELECT` (single `sql` or `queries[]` batching up to 6 queries) over local CSV, Parquet, JSON files and loaded datasets, then charts or pivots the result. Named queries (`name`) persist as DuckDB views across turns. DuckDB (~20 MB) downloads once into `~/.cache/tinypivot`. |
 | `load_data` | Loads flat JSON rows already in memory (up to `~50` rows) from any other MCP tool, API, or small SQL query without writing a temp CSV; renders chart + pivot in 1 call. |
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
@@ -169,7 +169,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `analyze` | Deterministic 1-call Data Science shelf on `datasetId` or `filePath`: `explain_change` and `ab_test` on Free; full Pro SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, and seasonal `anomalies`. |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
-| `profile` | Describes each column of a loaded dataset (null share, ranges, top values, Pro relational grain), or pass `dirPath` to scan an entire local folder of CSV/JSON/Parquet/XLSX schemas + nearby docs (and Pro cross-file shared join keys) in 1 call. |
+| `profile` | Describes each column of a loaded dataset (null share, ranges, top values, Pro relational grain), or pass `dirPath` to scan an entire local folder of CSV/JSON/Parquet/XLSX schemas (collapsing partitioned file series like `data-2021..2024.csv` with a DuckDB glob hint and surfacing multi-sheet `.xlsx` headers & preamble notes) + nearby docs (and Pro cross-file shared join keys) in 1 call. |
 | `history` | Lists every earlier pull, or reopens one by id without re-querying. Pulls are saved locally under `~/.local/share/tinypivot/history` for 30 days. |
 
 Data tools take an optional `why`: one sentence the agent writes about each step, shown in the Studio trace.

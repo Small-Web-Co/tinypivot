@@ -538,7 +538,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.8.4',
+      version: '0.8.5',
     },
     {
       capabilities: {
@@ -867,6 +867,9 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         let proLoadNote = ds.sheetNames && ds.sheetNames.length > 1
           ? `\nWorkbook sheets: ${ds.sheetNames.map(s => `\`${s}\``).join(', ')} (loaded \`${ds.loadedSheet}\`; pass \`sheet\` to load another).`
           : ''
+        if (ds.workbookNotes && ds.workbookNotes.length > 0) {
+          proLoadNote += `\nWorkbook notes (above header row ${ds.headerRow ?? 1}): ${ds.workbookNotes.join(' | ')}`
+        }
         if (hasFeature(isPro, 'profile_relational')) {
           const peerDatasets = store.listMetadata(sessionKey).flatMap((m) => {
             if (m.id === ds.id)

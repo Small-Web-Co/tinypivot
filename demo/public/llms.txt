@@ -16,7 +16,7 @@ TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinyp
 
 1) **18-Task Unhinted Executive Benchmark** (6 Routine BI, 6 Relational Analytics, 6 Hard Data Science; 5 models × 3 arms = 270 runs; zero hints in prompts):
 - **Combined (90 model-tasks/arm):** Baseline **91.1% (82/90, 25.3s/task)** → TinyPivot Free **93.3% (84/90, 24.6s — zero regressions)** → TinyPivot Pro **100.0% (90/90, 19.0s — 25% faster)**; Routine BI **100% (30/30)**; Relational **100% (30/30)** on Free & Pro; Hard Data Science **80% → 87% Free → 100% Pro (+20 pts), 2.1× faster (39.7s → 19.3s), −20% turns, −32% output tokens**.
-- **Inkling 2 Mini (Mac local, fast):** 14/18 (78%, $0.027 API†) → Free **15/18 (83%, −19% faster, −29% out, $0.059†)** → Pro **18/18 (100%, +22 pts, $0.046†)**, **−44% faster** (46.1s → 26.0s; 3.8× faster Hard DS), **−17% turns**, **−50% output tokens**.
+- **Thinking Machines Inkling 2 Mini (Mac local, fast):** 14/18 (78%, $0.027 API†) → Free **15/18 (83%, −19% faster, −29% out, $0.059†)** → Pro **18/18 (100%, +22 pts, $0.046†)**, **−44% faster** (46.1s → 26.0s; 3.8× faster Hard DS), **−17% turns**, **−50% output tokens**.
 - **DeepSeek V4.1 Flash 1017 (DGX Spark):** 17/18 (94%, $0.059 API†) → Free **17/18 (94%, $0.090†)** → Pro **18/18 (100%, +6 pts, $0.055† — −7% imputed API cost)**, **−39% faster** (25.7s → 15.6s; 3.4× faster Hard DS), **−30% turns** (4.94 → 3.44), **−48% output tokens**.
 - **Claude Haiku 5.5:** 15/18 (83%) → Free **16/18 (89%)** → Pro **18/18 (100%, +17 pts)**, **−5% faster** (13.1s → 12.5s; −23% Hard DS), $0.083 API-equiv across 18 tasks.
 - **Claude Sonnet 5.5:** 18/18 (100%, $1.22*) → Free **18/18 (100%, $0.88* — −28% warm API)** → Pro **18/18 (100%, no Bash needed)**, **−6% faster** (20.0s → 18.8s; −21% Hard DS), **$1.01 vs $1.22** warm-cache API-equiv (−17%) + live Studio charts & lineage.
@@ -36,7 +36,8 @@ TinyPivot is the **Trust Layer & In-Agent Analytics Studio** (`@smallwebco/tinyp
 
 ## Docs
 
-- [Technical White Paper & 5-Model + KramaBench + DABstep Benchmarks](https://tiny-pivot.com/whitepaper): Full tables across Bench v2 (91% → 100%), MIT KramaBench (ICLR 2026) same-model A/B (77.3% → 80.9%), and official 450-task Adyen DABstep submissions
+- [Technical White Paper & Internal + External Benchmarks](https://tiny-pivot.com/whitepaper): Full tables, horizontal external leaderboard charts, and collapsible test catalogs across Track A (Internal 5-Model Suite: 91% → 100%) and Track B (External MIT KramaBench 77.3% → 80.9% + official 450-task Adyen DABstep)
+- [Official Downloadable PDF White Paper](https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf): Publication-grade PDF with executive abstract, internal/external leaderboards, architecture, and full task appendix
 
 - [In-Agent Analytics (TinyPivot MCP Docs)](https://tiny-pivot.com/docs): Setup instructions for Antigravity, Claude Desktop, Cursor, and CLI/PostgreSQL, plus MCP tool reference
 - [Full AI-friendly developer reference](https://tiny-pivot.com/llms-full.txt): Complete install, quick-start code, all props, free vs Pro feature matrix, pricing, aggregations, theming, and AI Data Analyst setup for both Vue and React

@@ -389,13 +389,39 @@ describe('query, profile and history tools', () => {
     await wb.xlsx.writeFile(xlsxPath)
     fs.writeFileSync(path.join(dir, 'notes.md'), '# Notes\n')
 
+    // Also verify preamble-row Excel workbooks (title/notes/units above real header row) + partitioned CSV series
+    const messyWb = await buildGridWorkbook([], [], { sheetName: 'Climate' })
+    const messySheet = messyWb.getWorksheet('Climate')!
+    messySheet.spliceRows(1, 1)
+    messySheet.addRow(['Data Supplement: North African Climate Study'])
+    messySheet.addRow(['Note: dust proxy is hematite IRM measurement'])
+    messySheet.addRow(['', '(ppm)', '(ppm)'])
+    messySheet.addRow(['Site', 'Al', 'Ca'])
+    messySheet.addRow(['ODP658', 4200, 12500])
+    const messyPath = path.join(dir, 'climate.xlsx')
+    await messyWb.xlsx.writeFile(messyPath)
+    for (const yr of [2021, 2022, 2023]) {
+      fs.writeFileSync(path.join(dir, `water-${yr}.csv`), `year,ph\n${yr},7.1\n`)
+    }
+
     const { call } = await connect()
     const folder = await call('profile', { dirPath: dir })
     expect(folder.isError).toBe(false)
     expect(folder.text).toContain('orders.csv')
     expect(folder.text).toContain('quarterly.xlsx')
-    expect(folder.text).toContain('sheets [Sales, Targets]')
+    expect(folder.text).toContain('2 sheets [Sales, Targets]')
+    expect(folder.text).toContain('climate.xlsx')
+    expect(folder.text).toContain('hdr row 4')
+    expect(folder.text).toContain('water-*.csv (3 partitioned files')
+    expect(folder.text).toContain('union_by_name=true')
     expect(folder.text).toContain('notes.md')
+
+    const messyLoaded = await call('load_file', { filePath: messyPath, name: 'climate_tbl' })
+    expect(messyLoaded.isError).toBe(false)
+    expect(messyLoaded.text).toContain('Workbook notes (above header row 4)')
+    const messyQ = await call('query', { sql: 'SELECT Site, Ca FROM climate_tbl' })
+    expect(messyQ.isError).toBe(false)
+    expect(messyQ.text).toContain('| ODP658 | 12,500 |')
 
     const loaded = await call('load_file', { filePath: xlsxPath, sheet: 'Targets', name: 'targets_tbl' })
     expect(loaded.isError).toBe(false)

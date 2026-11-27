@@ -45,7 +45,7 @@ const categoryGroups = computed<BarGroup[]>(() =>
     label: c.label,
     sub: c.sub,
     baseline: c.baselinePct,
-    free: c.id === 'dabstep' || c.id === 'kramabench' ? null : c.freePct,
+    free: c.freePct,
     pro: c.proPct,
     delta: c.delta,
   })),
@@ -160,7 +160,7 @@ const efficiencyItems: readonly EfficiencyItem[] = [
           :aria-selected="activeTab === 'categories'"
           @click="activeTab = 'categories'"
         >
-          Categories &amp; External
+          By Category (Internal)
         </button>
       </div>
     </div>
@@ -251,12 +251,12 @@ const efficiencyItems: readonly EfficiencyItem[] = [
         <span><i class="swatch swatch-pro" /> TinyPivot Pro</span>
       </div>
 
-      <div class="col-chart col-chart-5">
+      <div class="col-chart col-chart-3">
         <div
           v-for="g in categoryGroups"
           :key="g.id"
           class="col-group"
-          :class="{ 'col-group-total': g.id === 'dabstep' || g.id === 'kramabench' }"
+          :class="{ 'col-group-total': g.id === 'hard_ds' }"
         >
           <span class="col-delta mono">{{ g.delta }}</span>
           <div class="col-bars" :class="{ 'col-bars-2': g.free === null }">
@@ -537,7 +537,7 @@ const efficiencyItems: readonly EfficiencyItem[] = [
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .col-chart-5 {
+  .col-chart-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -547,11 +547,6 @@ const efficiencyItems: readonly EfficiencyItem[] = [
 }
 
 @media (min-width: 980px) {
-  .col-chart-5 {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 10px;
-  }
-
   .col-chart-6 {
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 10px;

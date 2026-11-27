@@ -1,13 +1,13 @@
 /**
- * Empirical data and editorial copy for the TinyPivot Trust Layer White Paper (/whitepaper).
- * All figures come directly from reproducible benchmarks run on 2026-11-26:
- *  1) 18-Task Unhinted Executive Benchmark (Routine BI, Relational Analytics & Hard Data Science)
- *     across 5 models × 3 arms (270 runs total).
- *  2) MIT KramaBench (ICLR 2026) Controlled Same-Model A/B across 4 multi-file data lakes
- *     (Environment, Wildfire, Archaeology, Biomedical — 62 tasks × 2 models × 2 arms = 248 runs),
- *     scored verbatim with MIT's deterministic metrics (`Success`, `RAEScore`, `F1`).
- *  3) Official Adyen / Hugging Face `adyen/DABstep` 450-task blind leaderboard submissions
- *     (Sonnet 5.5, Haiku 5.5, local DGX Spark DeepSeek V4.1) + 10-task Dev A/B (60 runs).
+ * Empirical data and editorial copy for TinyPivot's Homepage visual gains, Technical White Paper (/whitepaper),
+ * and Official PDF White Paper (/TinyPivot-Trust-Layer-Whitepaper.pdf).
+ *
+ * Strictly separated into:
+ *  A) INTERNAL CONTROLLED SUITE — 18 Unhinted BI, Relational & Hard Data Science tasks across
+ *     5 models × 3 arms (270 runs), including Thinking Machines Inkling 2 Mini & DGX Spark DeepSeek V4.1.
+ *  B) EXTERNAL PUBLIC BENCHMARKS —
+ *     1) MIT KramaBench (ICLR 2026) controlled same-model A/B across 4 multi-file data lakes (62 tasks).
+ *     2) Official 450-task blind Adyen / Hugging Face `adyen/DABstep` leaderboard + 10-task Dev A/B.
  */
 
 export interface TrustBenchImpact {
@@ -45,7 +45,7 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
   {
     id: 'inkling',
     shortLabel: 'Inkling 2 Mini',
-    model: 'Inkling 2 Mini (fast)',
+    model: 'Thinking Machines Inkling 2 Mini',
     hardware: 'Small local (Mac)',
     baselineLabel: 'Bare DuckDB SQL',
     baselineScore: '14/18',
@@ -60,12 +60,12 @@ export const trustBenchRows: readonly TrustBenchModelRow[] = [
     proPct: 100,
     proMeta: '26.0s/task · 4.22 turns · $0.046 API†',
     proShort: '26.0s · $0.046†',
-    proHighlight: '+22.2 pts accuracy (78% → 83% Free → 100% Pro) · 44% faster (3.8× Hard DS) · −50% output · $0.046 API† ($0 local)',
+    proHighlight: '+22.2 pts accuracy (78% → 83% Free → 100% Pro) · 44% faster (3.8× Hard DS) · −50% output · $0 local',
     impact: {
       accuracy: '+22.2 pts (78% → 100%)',
       speed: '44% faster (3.8× Hard DS)',
       tokens: '−50% out · −17% turns',
-      cost: '$0 local · $0.046 API† (+0.1¢/t)',
+      cost: '$0 local · $0.046 API†',
     },
   },
   {
@@ -197,6 +197,64 @@ export const TRUST_BENCH_TOTALS = {
   hardDsSpeedupPct: 51,
 } as const
 
+/** Visual before -> after performance gain cards for the Homepage (clean benefits, no benchmark jargon). */
+export interface HomeGainCard {
+  id: string
+  kicker: string
+  headline: string
+  beforeLabel: string
+  afterLabel: string
+  beforePct: number
+  afterPct: number
+  detail: string
+  lowerIsBetter?: boolean
+}
+
+export const homeGainCards: readonly HomeGainCard[] = [
+  {
+    id: 'accuracy',
+    kicker: 'Accuracy · Zero Silent Traps',
+    headline: '91% → 100%',
+    beforeLabel: 'Baseline agents (91%)',
+    afterLabel: 'TinyPivot Pro (100% · 90/90)',
+    beforePct: 91,
+    afterPct: 100,
+    detail: 'Catches join fan-out, whale outliers, partial months, NULL drops, and broken A/B splits before the model answers.',
+  },
+  {
+    id: 'speed',
+    kicker: 'Speed · Hard Data Science',
+    headline: '2.1× faster',
+    beforeLabel: '39.7s/task baseline',
+    afterLabel: '19.3s/task with TinyPivot (−51%)',
+    beforePct: 100,
+    afterPct: 49,
+    lowerIsBetter: true,
+    detail: 'Deterministic 1-call stats & local DuckDB SQL replace slow multi-turn Python debugging loops.',
+  },
+  {
+    id: 'local-boost',
+    kicker: 'Local Model Boost · Inkling 2 Mini',
+    headline: '+22 pts · −50% tokens',
+    beforeLabel: 'Thinking Machines Inkling (78% · 46.1s)',
+    afterLabel: 'With TinyPivot Pro (100% · 26.0s)',
+    beforePct: 78,
+    afterPct: 100,
+    detail: 'Turns a Mac-local model into a 100%-accurate analyst — 44% faster overall (3.8× on Hard DS) with half the output tokens.',
+  },
+  {
+    id: 'cost-tokens',
+    kicker: 'Cost & Context Spend',
+    headline: '−17% to −39% API*',
+    beforeLabel: 'Raw rows / Python baseline',
+    afterLabel: 'Local DuckDB + Recursive Memory',
+    beforePct: 100,
+    afterPct: 61,
+    lowerIsBetter: true,
+    detail: '92.9% fewer context tokens vs. pasting rows, −47% repeat schema tokens via local memory, and < 2,500 Free schema tokens.',
+  },
+]
+
 export interface CategoryBenchRow {
   id: string
   label: string
@@ -243,27 +301,86 @@ export const categoryBenchRows: readonly CategoryBenchRow[] = [
     proMeta: '30/30 · 19.3s',
     delta: '+20 pts · 2.1× faster',
   },
+]
+
+export interface LeaderboardBarItem {
+  id: string
+  label: string
+  model: string
+  score: number
+  secondary?: string
+  kind: 'tinypivot' | 'baseline' | 'leader'
+  note: string
+}
+
+/**
+ * External Benchmark 1: MIT KramaBench (ICLR 2026) — 4 multi-file data lakes (Environment, Wildfire,
+ * Archaeology, Biomedical — 62 tasks) comparing TinyPivot Pro vs Same-Model Vanilla Baselines vs
+ * published public leaders on kramabench.org (4-domain weighted scores for exact apples-to-apples comparison).
+ */
+export const kramaLeaderboardBars: readonly LeaderboardBarItem[] = [
   {
-    id: 'kramabench',
-    label: 'MIT KramaBench',
-    sub: '124 paired runs/arm',
-    baselinePct: 77,
-    freePct: 0,
-    proPct: 81,
-    baselineMeta: '77.3% (Haiku 71.9%)',
-    proMeta: '80.9% (Haiku 78.0%)',
-    delta: '+3.6 pts (Bio +22)',
+    id: 'kb-sonnet-tp',
+    label: 'TinyPivot Pro (v0.8.5)',
+    model: 'Claude Sonnet 5.5',
+    score: 83.8,
+    secondary: 'Env 95.0% · Bio 100% (16% faster)',
+    kind: 'tinypivot',
+    note: '+1.1 pts over Vanilla Sonnet · +12.6 pts above published #1 RADAR on same 4 domains',
   },
   {
-    id: 'dabstep',
-    label: 'adyen/DABstep Dev',
-    sub: '30 official runs/arm',
-    baselinePct: 77,
-    freePct: 0,
-    proPct: 80,
-    baselineMeta: '23/30 (Hard 76%)',
-    proMeta: '24/30 (Hard 81%)',
-    delta: '+3 pts (Haiku +10)',
+    id: 'kb-sonnet-van',
+    label: 'Vanilla Claude Code (Same Model)',
+    model: 'Claude Sonnet 5.5',
+    score: 82.6,
+    secondary: 'Env 90.0% · Bio 100% (31.3s)',
+    kind: 'baseline',
+    note: 'Same-model baseline without TinyPivot MCP',
+  },
+  {
+    id: 'kb-haiku-tp',
+    label: 'TinyPivot Pro (v0.8.5)',
+    model: 'Claude Haiku 5.5',
+    score: 78.0,
+    secondary: 'Bio 88.9% (+22.2 · 2.14× faster) · 10% faster overall',
+    kind: 'tinypivot',
+    note: '+6.1 pts over Vanilla Haiku · closes 57% of gap to Vanilla Sonnet at half the API cost',
+  },
+  {
+    id: 'kb-haiku-van',
+    label: 'Vanilla Claude Code (Same Model)',
+    model: 'Claude Haiku 5.5',
+    score: 71.9,
+    secondary: 'Bio 66.7% (67.7s) · Env 78.0%',
+    kind: 'baseline',
+    note: 'Same-model baseline — tied with #1 RADAR before TinyPivot lifted it +6.1 pts',
+  },
+  {
+    id: 'kb-radar',
+    label: 'Published #1 · RADAR (arXiv:2609.32528)',
+    model: 'DeepSeek-V4-Flash',
+    score: 71.2,
+    secondary: '6-domain overall: 73.7% · Env 83.3% · Bio 66.7%',
+    kind: 'leader',
+    note: 'Published public #1 on kramabench.org (4-domain weighted mean shown for apples-to-apples)',
+  },
+  {
+    id: 'kb-smolagents',
+    label: 'Published #3 Public / #1 Obscured · smolagents DR',
+    model: 'Claude-3-7',
+    score: 54.2,
+    secondary: '6-domain overall: 55.8% · Env 60.6% · Bio 38.9%',
+    kind: 'leader',
+    note: 'Published #1 on MIT obscured leaderboard (kramabench.org)',
+  },
+  {
+    id: 'kb-talktask',
+    label: 'Published #2 · TalkTask',
+    model: 'DeepSeek-V4.1-Flash',
+    score: 53.2,
+    secondary: '6-domain overall: 56.7% (45.0% obscured)',
+    kind: 'leader',
+    note: 'Published #2 on kramabench.org',
   },
 ]
 
@@ -299,6 +416,94 @@ export const kramaBenchRows: readonly KramaBenchRow[] = [
   },
 ]
 
+/**
+ * External Benchmark 2: Official 450-task blind Adyen / Hugging Face `adyen/DABstep` Leaderboard.
+ * Bars show Hard-Level Accuracy (%) — the leaderboard's primary ranking metric — with Easy % beside it.
+ */
+export const dabstepLeaderboardBars: readonly LeaderboardBarItem[] = [
+  {
+    id: 'dab-kgmon',
+    label: 'Validated #1 · NVIDIA KGMON Data Explorer',
+    model: 'Claude Haiku 4.5 (multi-agent)',
+    score: 90.0,
+    secondary: 'Easy: 87.5% · Hard: 90.0%',
+    kind: 'leader',
+    note: 'Specialized multi-agent + domain workflow',
+  },
+  {
+    id: 'dab-datapilot',
+    label: 'Validated #2 · DataPilot (OceanBase)',
+    model: 'Qwen3',
+    score: 87.6,
+    secondary: 'Easy: 86.1% · Hard: 87.6%',
+    kind: 'leader',
+    note: 'Validated #2 on adyen/DABstep',
+  },
+  {
+    id: 'dab-sonnet-tp',
+    label: 'TinyPivot Pro (Live Adyen Score)',
+    model: 'Claude Sonnet 5.5',
+    score: 68.8,
+    secondary: 'Easy: 97.2% (#1!) · Hard: 68.8% (#3-equiv) · Total: 73.3%',
+    kind: 'tinypivot',
+    note: 'General-purpose MCP, zero domain hacks — ahead of GPT-5 (57.7%) & Google DS-STAR (45.2%)',
+  },
+  {
+    id: 'dab-gg',
+    label: 'Validated #3 · gg-agent-gpt5-1104-1',
+    model: 'Doubao',
+    score: 63.0,
+    secondary: 'Easy: 88.9% · Hard: 63.0%',
+    kind: 'leader',
+    note: 'Validated #3 on adyen/DABstep',
+  },
+  {
+    id: 'dab-cambio',
+    label: 'Validated #4 · CambioML energent.ai DS Agent',
+    model: 'GPT-5',
+    score: 57.7,
+    secondary: 'Easy: 94.4% · Hard: 57.7%',
+    kind: 'leader',
+    note: 'Validated #4 on adyen/DABstep',
+  },
+  {
+    id: 'dab-dsstar',
+    label: 'Validated #5 · Google Cloud DS-STAR',
+    model: 'Gemini-2.5-Pro',
+    score: 45.2,
+    secondary: 'Easy: 87.5% · Hard: 45.2%',
+    kind: 'leader',
+    note: 'Google Research data-science agent',
+  },
+  {
+    id: 'dab-haiku-tp',
+    label: 'TinyPivot Pro (Live Adyen Score)',
+    model: 'Claude Haiku 5.5',
+    score: 38.6,
+    secondary: 'Easy: 88.9% · Hard: 38.6% · Total: 46.7%',
+    kind: 'tinypivot',
+    note: '~2× Claude 4 Sonnet ReACT; Dev A/B showed +10 pts same-model lift (60% → 70%)',
+  },
+  {
+    id: 'dab-deepseek-tp',
+    label: 'TinyPivot Pro (Live Adyen Score · Local)',
+    model: 'DeepSeek V4.1 (DGX Spark)',
+    score: 24.3,
+    secondary: 'Easy: 90.3% · Hard: 24.3% · Total: 34.9% ($0 cloud)',
+    kind: 'tinypivot',
+    note: '100% local open-weights — beats Claude 4 ReACT Hard & exceeds KGMON/DataPilot Easy %',
+  },
+  {
+    id: 'dab-react',
+    label: 'Official Baseline · Claude 4 Sonnet ReACT',
+    model: 'Claude 4 Sonnet',
+    score: 19.8,
+    secondary: 'Easy: 81.9% · Hard: 19.8%',
+    kind: 'baseline',
+    note: 'Adyen reference ReACT baseline',
+  },
+]
+
 export interface DabstepOfficialRow {
   model: string
   easy: string
@@ -331,118 +536,300 @@ export const dabstepOfficialRows: readonly DabstepOfficialRow[] = [
   },
 ]
 
-export interface DabstepBenchRow {
-  model: string
-  baselineScore: string
-  baselineHard: string
-  proScore: string
-  proHard: string
-  note: string
-}
-
-export const dabstepBenchRows: readonly DabstepBenchRow[] = [
-  {
-    model: 'Claude Haiku 5.5',
-    baselineScore: '6/10 (60%)',
-    baselineHard: '4/7',
-    proScore: '7/10 (70%)',
-    proHard: '5/7',
-    note: '+10 pts · solved hard fee-rule tasks #1464 & #1753 that vanilla Haiku missed',
-  },
-  {
-    model: 'Claude Sonnet 5.5',
-    baselineScore: '9/10 (90%)',
-    baselineHard: '6/7',
-    proScore: '9/10 (90%)',
-    proHard: '6/7',
-    note: '90% parity · faster & cheaper on hard task #1464 (11.0s vs 11.6s)',
-  },
-  {
-    model: 'Claude Opus 5.5',
-    baselineScore: '8/10 (80%)',
-    baselineHard: '6/7',
-    proScore: '8/10 (80%)',
-    proHard: '6/7',
-    note: '80% parity · faster overall (16.6s vs 16.7s); −37% faster on hard task #2697',
-  },
-]
-
 export const whitepaperHeroStats = [
   {
     value: '91% → 100%',
-    label: '5 models × 18 unhinted BI/DS tasks (90/90 on TinyPivot Pro · 2.1× faster Hard DS)',
+    label: 'Internal 5-model unhinted BI/DS suite (90/90 on Pro · 2.1× faster Hard DS)',
+  },
+  {
+    value: '+22 pts · −50%',
+    label: 'Thinking Machines Inkling 2 Mini local boost (78% → 100% · −44% faster · −50% output tokens)',
   },
   {
     value: '77.3% → 80.9%',
-    label: 'MIT KramaBench (ICLR 2026) same-model A/B (Haiku +6.1 pts; .xlsx Bio +22.2 pts & 2.14× faster)',
+    label: 'External MIT KramaBench (ICLR 2026) same-model A/B (Haiku +6.1 pts; .xlsx Bio +22.2 pts & 2.14× faster)',
   },
   {
     value: '97.2% / 68.8%',
-    label: 'Official 450-task blind Adyen DABstep (Sonnet 5.5 + Pro #1 Easy / #3-equiv Hard; local DeepSeek 90.3% Easy)',
-  },
-  {
-    value: '< 2,500 tokens',
-    label: 'Free schema footprint · zero Jupyter/VLM bloat · headless --no-studio mode for CI & benchmarks',
+    label: 'External 450-task blind Adyen DABstep (Sonnet 5.5 + Pro #1 Easy / #3-equiv Hard; local DeepSeek 90.3% Easy)',
   },
 ] as const
 
-export interface TrapCase {
+/** Full 18-task Internal Controlled Suite catalog (shown in collapsible details). */
+export interface InternalTaskItem {
   id: string
-  category: 'Routine BI' | 'Relational' | 'Hard Data Science'
-  name: string
+  category: 'Routine BI' | 'Relational Analytics' | 'Hard Data Science'
+  title: string
+  prompt: string
   trap: string
-  failureMode: string
-  tinypivotGuard: string
+  guardrail: string
 }
 
-export const hardTrapCases: readonly TrapCase[] = [
+export const internalTestCatalog: readonly InternalTaskItem[] = [
   {
-    id: 'routine_bi_suite',
+    id: 'routine_exec_summary',
     category: 'Routine BI',
-    name: '01 · Everyday BI & Data Quality (6 Unhinted Tasks)',
-    trap: 'Executive KPI summaries, 6-day partial April month, 40% NULL discount_code anti-joins, 2 whale orders ($500k) inverting East vs. West, 1.35× duplicate event IDs, and mixed USD/EUR/GBP/JPY currencies.',
-    failureMode: 'Without hints, fast and local models miss whale-skewed groups, drop NULL rows on !=, or report partial months as revenue crashes.',
-    tinypivotGuard: 'TinyPivot Pro hit 30/30 (100%) across all 5 models via silent-when-clean DuckDB audit probes for partial periods, NULL exclusions, duplicate IDs, mixed currencies, and extreme outliers.',
+    title: '01 · Executive YoY Revenue Summary',
+    prompt: 'Using orders_saas.csv in this folder, summarize 2025 vs 2026 total revenue, YoY growth %, and the leading region in 2026.',
+    trap: 'Clean baseline executive KPI check — ensures guardrails stay 100% silent with zero false positives.',
+    guardrail: 'Silent-when-clean DuckDB SQL execution + exact-table return.',
   },
   {
-    id: 'relational_suite',
-    category: 'Relational',
-    name: '02 · Multi-Table Relational Analytics (6 Unhinted Tasks)',
-    trap: '2.25× dimension fan-out, 3-table multi-fact chasm traps, unweighted conversion-rate averages, Kitagawa mix-vs-rate Simpson’s paradox, Search Console impression-weighted CTR/position, and survivorship-biased LTV.',
-    failureMode: 'Standard SQL executes cleanly while multiplying totals 2×–8× or computing unweighted AVG(position) / AVG(ctr).',
-    tinypivotGuard: 'Both TinyPivot Free and Pro hit 30/30 (100%) via unweighted AVG(rate/position) guards, Pro join-key uniqueness probes, and 1-call analyze(explain_change).',
+    id: 'routine_partial_month',
+    category: 'Routine BI',
+    title: '02 · 6-Day Partial Trailing Month',
+    prompt: 'Using monthly_sales.csv in this folder, summarize our monthly revenue trend from Jan to Apr 2026 and tell me how April is performing vs March.',
+    trap: 'April only covers Apr 1–6 (6 days), making raw monthly revenue look like a −79% crash when daily run-rate actually grew.',
+    guardrail: 'Pro partial-period audit detects incomplete trailing month and computes exact daily run-rate.',
   },
   {
-    id: 'ab_srm_20seg',
+    id: 'routine_null_antijoin',
+    category: 'Routine BI',
+    title: '03 · 40% NULL Anti-Join Exclusion',
+    prompt: 'Using promo_orders.csv in this folder, what is our total revenue for orders without the \'PROMO20\' discount code?',
+    trap: 'SQL WHERE discount_code != \'PROMO20\' silently drops all 40% NULL discount_code rows.',
+    guardrail: 'Pro NULL-exclusion audit counts dropped NULL rows and flags IS DISTINCT FROM / IS NULL.',
+  },
+  {
+    id: 'routine_whale_outlier',
+    category: 'Routine BI',
+    title: '04 · Whale Orders Inverting Regional Leader',
+    prompt: 'Using regional_orders.csv in this folder, which region led revenue — East or West — and by how much?',
+    trap: 'Two $250k anomalous whale orders in East invert the underlying East vs. West regional ranking.',
+    guardrail: 'Pro extreme-outlier audit surfaces the 2 whale order IDs alongside clean vs. raw totals.',
+  },
+  {
+    id: 'routine_duplicate_events',
+    category: 'Routine BI',
+    title: '05 · 1.35× Duplicate Event Ingestion',
+    prompt: 'Using checkout_events.csv in this folder, what was our total checkout revenue and total order count?',
+    trap: '35% of event_id rows were double-ingested, inflating naive SUM(amount) and COUNT(*).',
+    guardrail: 'Pro duplicate-ID audit detects non-unique primary event keys and prompts deduplication.',
+  },
+  {
+    id: 'routine_mixed_currency',
+    category: 'Routine BI',
+    title: '06 · Mixed USD/EUR/GBP/JPY Currencies',
+    prompt: 'Using global_tx.csv (and fx_rates.csv if needed) in this folder, what is our total revenue across all regions?',
+    trap: 'Naive SUM(amount) adds USD, EUR, GBP, and JPY face values together without FX conversion.',
+    guardrail: 'Pro mixed-currency audit detects multi-currency amounts and flags FX normalization.',
+  },
+  {
+    id: 'rel_fanout_dim',
+    category: 'Relational Analytics',
+    title: '07 · 2.25× Dimension Join Fan-Out',
+    prompt: 'Using orders.csv and account_reps.csv in this folder, report total revenue by region and overall total.',
+    trap: 'Joining orders to multi-row account_reps silently multiplies total revenue by 2.25×.',
+    guardrail: 'Pro join-fanout audit probes key uniqueness on both sides and alerts on row-multiplication.',
+  },
+  {
+    id: 'rel_chasm_trap',
+    category: 'Relational Analytics',
+    title: '08 · 3-Table Multi-Fact Chasm Trap',
+    prompt: 'Using accounts.csv, orders.csv, and support_tickets.csv in this folder, report total revenue and total support tickets by tier plus grand totals.',
+    trap: 'Joining two fact tables (orders + support_tickets) via accounts creates a Cartesian explosion (6×–8× totals).',
+    guardrail: 'Pro join-fanout audit catches multi-fact row explosion and suggests pre-aggregating each fact in CTEs.',
+  },
+  {
+    id: 'rel_nonadditive_rate',
+    category: 'Relational Analytics',
+    title: '09 · Unweighted Conversion-Rate Average',
+    prompt: 'Using channel_daily.csv in this folder, what is our overall conversion rate (%) and which channel converts best?',
+    trap: 'AVG(conversion_rate) weights tiny-traffic days equally with high-volume days and flips the top channel.',
+    guardrail: 'Built-in non-additive rate guard flags AVG(rate) and requires SUM(conversions) / SUM(sessions).',
+  },
+  {
+    id: 'rel_kitagawa_mix',
+    category: 'Relational Analytics',
+    title: '10 · Kitagawa Mix-vs-Rate Simpson’s Paradox',
+    prompt: 'Using q4_funnel_events.csv in this folder, why did our blended conversion rate drop from 2026-Q3 to 2026-Q4? Quantify the drivers in percentage points.',
+    trap: 'Every individual channel improved conversion rate, yet blended conversion dropped due to traffic mix shift.',
+    guardrail: '1-call analyze(explain_change) computes exact Kitagawa rate vs. mix percentage-point decomposition.',
+  },
+  {
+    id: 'rel_gsc_weighted_ctr',
+    category: 'Relational Analytics',
+    title: '11 · Search Console Impression-Weighted CTR & Position',
+    prompt: 'Using gsc_queries.csv in this folder, what is our overall CTR (%) and average search position, and what is our biggest page-2 (position 10-20) opportunity query?',
+    trap: 'Unweighted AVG(ctr) and AVG(position) distort SEO performance vs. impression-weighted averages.',
+    guardrail: 'Non-additive rate/position guard flags unweighted AVG(ctr) / AVG(position).',
+  },
+  {
+    id: 'rel_survivorship_ltv',
+    category: 'Relational Analytics',
+    title: '12 · Survivorship-Biased Customer LTV',
+    prompt: 'Using the customer files in this folder (all_customers.csv, active_customers.csv), what is our average customer lifetime spend?',
+    trap: 'Querying only active_customers.csv excludes churned cohorts and severely overstates true LTV.',
+    guardrail: 'Multi-file profile(dirPath) + peer dataset inspection surfaces both tables and survivorship gap.',
+  },
+  {
+    id: 'ds_ab_srm_phacking',
     category: 'Hard Data Science',
-    name: '03 · Subtle 52.5/47.5 SRM & 20-Segment P-Hacking',
-    trap: 'Two A/B suites (obvious 54/46 + subtle 52.5/47.5 SRM across 20 segments) where raw p = 0.01–0.02 segments collapse under Holm-Bonferroni correction.',
-    failureMode: 'Baseline Inkling, DeepSeek, and Haiku all failed the subtle 20-segment SRM check and risked shipping broken experiments.',
-    tinypivotGuard: 'analyze(ab_test) runs automatic χ² SRM + Holm-Bonferroni correction on Turn 1 — lifting all 5 models to 10/10 (100%) in 2–4 turns (4.6× faster on DeepSeek).',
+    title: '13 · 12-Segment 54/46 SRM + P-Hacking',
+    prompt: 'Using experiment_results.csv in this folder, did any segment win our A/B test and should we ship?',
+    trap: 'Broken 54/46 traffic split (SRM) plus 12 segments where raw p < 0.05 winners disappear under Holm-Bonferroni.',
+    guardrail: '1-call analyze(ab_test) runs automatic χ² SRM + Holm-Bonferroni correction on Turn 1.',
   },
   {
-    id: 'confounded_discount',
+    id: 'ds_ab_subtle_20seg',
     category: 'Hard Data Science',
-    name: '04 · Confounded Discount Causal Reversal',
-    trap: '2,000 accounts where discounts target at-risk customers: naive SQL shows −19.1 pp renewal drop while true controlled OLS lift is +8.0 pp.',
-    failureMode: 'Naive aggregations invert the causal sign, or agents spend 6–9 turns (61s on Opus, 113s on Inkling) hand-rolling OLS in Python/SQL.',
-    tinypivotGuard: 'analyze(regression) fits controlled OLS in 1 call, flagging CONFOUNDING / SIGN REVERSAL — 2.8× faster on Opus, 3.5× faster on DeepSeek, 5.8× faster on Inkling.',
+    title: '14 · Subtle 52.5/47.5 SRM Across 20 Geos',
+    prompt: 'Using ab_20seg.csv in this folder, did any geo win our A/B test and should we ship?',
+    trap: 'Subtle 52.5/47.5 imbalance escapes eyeballing while 1 of 20 geos shows raw p = 0.015 noise.',
+    guardrail: '1-call analyze(ab_test) catches subtle χ² SRM (p < 1e-4) and rejects false-positive geo under Holm.',
   },
   {
-    id: 'right_censored_cohorts',
+    id: 'ds_confounded_ols',
     category: 'Hard Data Science',
-    name: '05 · Right-Censored Cohort Retention',
-    trap: '6 monthly cohorts where the 3 newest cohorts have not existed 3 months yet; true matured M3 retention is flat at ~40%, not collapsing.',
-    failureMode: 'Haiku baseline and unguided SQL average immature trailing cohorts as 0% and alarm leadership on a fake retention cliff.',
-    tinypivotGuard: 'Pro SQL audit routes cohort tables directly to analyze(cohort_retention), masking immature cells as null — 4.3× faster on DeepSeek, 7.0× faster on Inkling.',
+    title: '15 · Confounded Discount Causal Reversal',
+    prompt: 'Using account_renewals.csv in this folder, our VP says giving discounts hurts renewals. What do the numbers show? Quantify the effect.',
+    trap: 'Discounts target at-risk accounts: naive group comparison shows −19.1 pp drop while controlled OLS lift is +8.0 pp.',
+    guardrail: '1-call analyze(regression) fits controlled multivariate OLS and flags CONFOUNDING / SIGN REVERSAL.',
   },
   {
-    id: 'seasonal_whale_ds',
+    id: 'ds_right_censored_cohorts',
     category: 'Hard Data Science',
-    name: '06 · Seasonal Structural Breaks & Whale Revenue A/B',
-    trap: '90-day daily series with a 62% weekend drop hiding a −16.5% shift on 2026-02-18, plus a revenue A/B test where 3 whale orders create a fake +$12k lift.',
-    failureMode: 'Weekend variance hides exact break dates; standard t-tests on raw revenue get fooled by top-0.1% whale orders.',
-    tinypivotGuard: 'analyze(anomalies) removes day-of-week seasonality to pinpoint 2026-02-18, and analyze(ab_test) adds automatic top-1% trimmed Welch whale checks.',
+    title: '16 · Right-Censored Cohort Retention',
+    prompt: 'Using user_activity.csv in this folder, what is our M3 cohort retention rate and how is it trending across recent cohorts?',
+    trap: 'The 3 newest monthly cohorts are not yet 3 months old — averaging them as 0% fabricates a retention cliff.',
+    guardrail: 'Pro SQL audit routes to analyze(cohort_retention) which masks immature cells as null (~40% flat).',
+  },
+  {
+    id: 'ds_seasonal_changepoint',
+    category: 'Hard Data Science',
+    title: '17 · Seasonal Structural Break (Weekend Masking)',
+    prompt: 'Using daily_orders.csv in this folder, how are daily orders trending — did anything shift, and if so when and by how much?',
+    trap: '62% weekend order drops hide an exact −16.5% structural break starting 2026-02-18.',
+    guardrail: '1-call analyze(anomalies) removes day-of-week seasonality and pinpoints 2026-02-18 (−16.5%).',
+  },
+  {
+    id: 'ds_whale_ab_revenue',
+    category: 'Hard Data Science',
+    title: '18 · Whale-Skewed Revenue A/B Test',
+    prompt: 'Using ab_revenue.csv in this folder, did the treatment lift revenue per user enough to ship?',
+    trap: '3 extreme whale orders ($12,500+) create a fake +$12k revenue lift that vanishes when top 1% is trimmed.',
+    guardrail: '1-call analyze(ab_test) runs automatic top-1% trimmed Welch t-test and warns not to ship.',
+  },
+]
+
+export interface ExternalSampleTask {
+  id: string
+  tag: string
+  prompt: string
+  expected: string
+}
+
+export const kramaSampleTasks: readonly ExternalSampleTask[] = [
+  {
+    id: 'environment-easy-1',
+    tag: 'Environment · 36 CSVs',
+    prompt: 'What percentage (to 3 decimal places) of water samples collected from Massachusetts beaches during the 2013 bathing season exceeded bacterial standards?',
+    expected: '4.796',
+  },
+  {
+    id: 'environment-hard-20',
+    tag: 'Environment · Multi-file join',
+    prompt: 'In 2015, what are the three most polluted beaches of the city that had the least rainfall in the summer (June, July, August)?',
+    expected: '["Bucks Creek", "Pleasant Street", "Forest Beach"]',
+  },
+  {
+    id: 'biomedical-hard-1',
+    tag: 'Biomedical · 7 .xlsx workbooks',
+    prompt: 'What is the Spearman correlation between the abundance of the protein PLK1 and the abundance of CHEK2-S163 in tumor samples? Exclude samples not in the study and with missing values.',
+    expected: '0.4765',
+  },
+  {
+    id: 'biomedical-easy-9',
+    tag: 'Biomedical · Multi-sheet .xlsx',
+    prompt: 'What is the difference between the average false discovery rate (FDR) in CBX3 genes and the average FDR for the rest of the genes?',
+    expected: '-0.008003975',
+  },
+  {
+    id: 'archeology-hard-1',
+    tag: 'Archaeology · Preamble-row .xlsx',
+    prompt: 'What is the average Potassium in ppm from the first and last time the study recorded people in the Maltese area? Assume Potassium is linearly interpolated between samples.',
+    expected: '8577.5298',
+  },
+  {
+    id: 'archeology-hard-7',
+    tag: 'Archaeology · CSV + .xlsx',
+    prompt: 'How many radiocarbon samples belong to the Neolithic period in the regional radiocarbon database?',
+    expected: '274',
+  },
+  {
+    id: 'wildfire-easy-1',
+    tag: 'Wildfire · 17 CSVs + JSON',
+    prompt: 'Find the 3-month period with the highest total acres burned since Jan 2000, according to NOAA. What was the total acres burned in that period?',
+    expected: '7805421',
+  },
+  {
+    id: 'wildfire-hard-21',
+    tag: 'Wildfire · Multi-table ranking',
+    prompt: 'Based on NOAA data, what are the top 3 states that lost the most residential property in value between 2005 and 2010 (inclusive)?',
+    expected: '["California", "Washington", "Idaho"]',
+  },
+]
+
+export const dabstepSampleTasks: readonly ExternalSampleTask[] = [
+  {
+    id: 'task-5',
+    tag: 'Easy · Ledger aggregation',
+    prompt: 'Which issuing country has the highest number of transactions?',
+    expected: 'NL',
+  },
+  {
+    id: 'task-49',
+    tag: 'Easy · Fraud rate',
+    prompt: 'What is the top country (ip_country) for fraud? A. NL, B. BE, C. ES, D. FR',
+    expected: 'B. BE',
+  },
+  {
+    id: 'task-70',
+    tag: 'Easy · Manual rule check',
+    prompt: 'Is Martinis_Fine_Steakhouse in danger of getting a high-fraud rate fine?',
+    expected: 'Not Applicable',
+  },
+  {
+    id: 'task-1273',
+    tag: 'Hard · Nested JSON fee rules',
+    prompt: 'For credit transactions, what would be the average fee that the card scheme GlobalCard would charge for a transaction value of 10 EUR?',
+    expected: '0.120132',
+  },
+  {
+    id: 'task-1305',
+    tag: 'Hard · MCC + Fee rule join',
+    prompt: 'For account type H and the MCC description: Eating Places and Restaurants, what would be the average fee that GlobalCard would charge for a 10 EUR transaction?',
+    expected: '0.123217',
+  },
+  {
+    id: 'task-1464',
+    tag: 'Hard · Wildcard rule matching',
+    prompt: 'What is the fee ID or IDs that apply to account_type = R and aci = B?',
+    expected: '391 matching fee IDs (comma-separated)',
+  },
+  {
+    id: 'task-1681',
+    tag: 'Hard · Merchant monthly volume + fraud',
+    prompt: 'For the 10th day of the year 2023, what are the Fee IDs applicable to Belles_cookbook_store?',
+    expected: '741, 709, 454, 813, 381, 536, 473, 572, 477, 286',
+  },
+  {
+    id: 'task-1753',
+    tag: 'Hard · Monthly rule set (34 IDs)',
+    prompt: 'What are the applicable fee IDs for Belles_cookbook_store in March 2023?',
+    expected: '34 matching fee IDs',
+  },
+  {
+    id: 'task-1871',
+    tag: 'Hard · 14-decimal fee counterfactual',
+    prompt: 'In January 2023 what delta would Belles_cookbook_store pay if the relative fee of the fee with ID=384 changed to 1?',
+    expected: '-0.94810300000017',
+  },
+  {
+    id: 'task-2697',
+    tag: 'Hard · Fraud ACI fee optimization',
+    prompt: 'For Belles_cookbook_store in January, if we moved fraudulent transactions to a different ACI, which ACI minimizes total fees and what is the cost?',
+    expected: 'E:13.57',
   },
 ]
 
@@ -450,21 +837,21 @@ export const architecturePillars = [
   {
     n: '01',
     title: 'Silent-When-Clean SQL Audit Oracle',
-    body: 'Runs lightweight DuckDB probes (~5–15 ms) after each query. Completely silent when SQL is clean; emits actionable [AUDIT] blocks (unweighted AVG of rates/positions, fan-out multipliers, partial-period daily run-rates, excluded NULL totals, duplicate event IDs, mixed currencies, extreme outliers, and 1-call analyze routing hints) only when a real trap triggers.',
+    body: 'Runs lightweight DuckDB probes (~5–15 ms) after each query. Completely silent when SQL is clean; emits actionable [AUDIT] blocks (unweighted AVG of rates/positions, fan-out multipliers, partial-period daily run-rates, excluded NULL totals, zero-row filter suggestions, duplicate event IDs, mixed currencies, extreme outliers, and 1-call analyze routing hints) only when a real trap triggers.',
   },
   {
     n: '02',
-    title: 'Exact-Table Batch SQL + 1-Call Data Science Shelf',
-    body: 'Analytical SQL queries return exact, high-precision row-aligned tables automatically (with query.queries[] batching up to 6 SELECTs per call on both Free & Pro), while five deterministic statistical engines live behind one compact analyze tool — keeping TinyPivot Free strictly under 2,500 schema tokens.',
+    title: '1-Call Data-Lake Profiling + Direct .xlsx into DuckDB',
+    body: 'profile({ dirPath }) collapses partitioned file series (e.g. 22 yearly CSVs) into DuckDB glob hints and inspects multi-sheet .xlsx workbooks (auto-detecting headers below preamble title/note rows!) without pasting raw rows into context. Named queries persist as DuckDB views across turns, while TinyPivot Free stays strictly under 2,500 schema tokens.',
   },
   {
     n: '03',
-    title: 'Recursive Data Memory (100% Local)',
-    body: 'Every [AUDIT] catch and every human SQL edit in TinyPivot Studio is saved locally by schema fingerprint (~/.local/share/tinypivot/memory.json). On repeat inquiries, TinyPivot recalls a ~40-token brief on Turn 1 — cutting Inkling 2 Mini join-trap tokens by 47% (6 → 3 turns).',
+    title: '1-Call Data Science Shelf & Recursive Memory',
+    body: 'Five deterministic statistical engines (explain_change, ab_test with χ² SRM + Holm-Bonferroni + whale trim, controlled OLS regression, right-censored cohorts, seasonal anomalies) run in 10–40 ms. Local Recursive Data Memory (~/.local/share/tinypivot/memory.json) learns traps and Studio edits to cut repeat schema tokens by 47%.',
   },
   {
     n: '04',
-    title: 'Proof-of-Work Studio & Lineage',
-    body: 'Every chart and pivot links back to editable SQL (with lossless revision history), clickable Underlying Source Rows, order-independent SHA-256 Data Hashes, claim-checked prose, and zero-CDN Offline HTML Notebooks.',
+    title: 'Proof-of-Work Studio & Headless CI Mode',
+    body: 'Every chart and pivot links back to editable SQL (with lossless revision history), clickable Underlying Source Rows, order-independent SHA-256 Data Hashes, claim-checked prose, and zero-CDN Offline HTML Notebooks — or pass --no-studio (TINYPIVOT_NO_STUDIO=1) for zero-popup headless CI and benchmarks.',
   },
 ] as const

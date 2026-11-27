@@ -480,13 +480,15 @@ export function generateSampleSalesData(count = 400): Record<string, unknown>[] 
 export async function readXlsxFile(
   filePath: string,
   requestedSheet?: string,
-): Promise<{ rows: Record<string, unknown>[], sheetName: string, sheetNames: string[] }> {
+): Promise<{ rows: Record<string, unknown>[], sheetName: string, sheetNames: string[], headerRow?: number, notes?: string[] }> {
   const buf = await fs.readFile(filePath)
   const parsed = await readXlsxBuffer(buf, requestedSheet)
   return {
     rows: parsed.rows.map(flattenRow),
     sheetName: parsed.sheetName,
     sheetNames: parsed.sheetNames,
+    headerRow: parsed.headerRow,
+    notes: parsed.notes,
   }
 }
 
@@ -665,7 +667,7 @@ export class DatasetStore {
     filePath: string,
     name?: string,
     options?: { sessionKey?: string, keepExisting?: boolean, where?: RowFilter[], sheet?: string },
-  ): Promise<StoredDataset & { sheetNames?: string[], loadedSheet?: string }> {
+  ): Promise<StoredDataset & { sheetNames?: string[], loadedSheet?: string, workbookNotes?: string[], headerRow?: number }> {
     const where = options?.where ?? []
     const resolved = path.resolve(filePath)
     const ext = path.extname(resolved).toLowerCase()
@@ -675,11 +677,15 @@ export class DatasetStore {
     let rows: Record<string, unknown>[]
     let sheetNames: string[] | undefined
     let loadedSheet: string | undefined
+    let workbookNotes: string[] | undefined
+    let headerRow: number | undefined
     if (ext === '.xlsx') {
       const xlsx = await readXlsxFile(resolved, options?.sheet)
       rows = xlsx.rows
       sheetNames = xlsx.sheetNames
       loadedSheet = xlsx.sheetName
+      workbookNotes = xlsx.notes
+      headerRow = xlsx.headerRow
     }
     else {
       const raw = await fs.readFile(resolved, 'utf8')
@@ -720,7 +726,7 @@ export class DatasetStore {
       sessionKey: options?.sessionKey,
       keepExisting: options?.keepExisting,
     })
-    return sheetNames ? Object.assign(ds, { sheetNames, loadedSheet }) : ds
+    return sheetNames ? Object.assign(ds, { sheetNames, loadedSheet, workbookNotes, headerRow }) : ds
   }
 
   get(id?: string, sessionKey?: string): StoredDataset | undefined {

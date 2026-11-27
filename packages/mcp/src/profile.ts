@@ -525,10 +525,27 @@ async function probeTabularSchema(
   if (file.ext === '.xlsx') {
     const buf = await fs.readFile(file.absPath)
     const info = await inspectXlsxBuffer(buf)
-    const colNames = info.columns.slice(0, 12)
-    const colsNote = colNames.length ? ` · cols: ${colNames.join(', ')}` : ''
+    const sheetSummaries = info.sheets && info.sheets.length > 0 ? info.sheets : []
+    const colNames = [...new Set(sheetSummaries.flatMap(s => s.columns.slice(0, 12)))]
+    if (sheetSummaries.length <= 1) {
+      const first = sheetSummaries[0]
+      const hdrNote = first && first.headerRow > 1 ? `, hdr row ${first.headerRow}` : ''
+      const colsNote = first?.columns.length ? ` · cols: ${first.columns.slice(0, 12).join(', ')}${first.columns.length > 12 ? ` (+${first.columns.length - 12})` : ''}` : ''
+      const notePreview = first?.notes.length ? ` · note: "${first.notes[0].slice(0, 120)}"` : ''
+      return {
+        detail: `sheet [${info.sheetNames[0] ?? 'Sheet1'}] (${info.rowCount} rows${hdrNote})${colsNote}${notePreview}`,
+        colNames,
+      }
+    }
+    const perSheet = sheetSummaries.slice(0, 4).map((s) => {
+      const cols = s.columns.slice(0, 6).join(', ')
+      const more = s.columns.length > 6 ? ` (+${s.columns.length - 6})` : ''
+      return `\`${s.name}\` (${s.rowCount}r: ${cols}${more})`
+    }).join('; ')
+    const extraSheets = info.sheetNames.length > 4 ? `; +${info.sheetNames.length - 4} more sheets` : ''
+    const notePreview = info.notes?.length ? ` · note: "${info.notes[0].slice(0, 120)}"` : ''
     return {
-      detail: `sheets [${info.sheetNames.slice(0, 5).join(', ')}${info.sheetNames.length > 5 ? ', …' : ''}] (${info.rowCount} rows)${colsNote}`,
+      detail: `${info.sheetNames.length} sheets [${info.sheetNames.slice(0, 6).join(', ')}${info.sheetNames.length > 6 ? ', …' : ''}] · ${perSheet}${extraSheets}${notePreview}`,
       colNames,
     }
   }
@@ -546,10 +563,59 @@ async function probeTabularSchema(
   return { detail: `${res.rows.length} cols: ${shown.join(', ')}${more}`, colNames }
 }
 
+interface TabularUnit {
+  label: string
+  rep: DiscoveredFile
+  count: number
+  totalBytes: number
+  globHint?: string
+}
+
+function collapsePartitionedFiles(files: DiscoveredFile[]): TabularUnit[] {
+  const buckets = new Map<string, DiscoveredFile[]>()
+  for (const f of files) {
+    const dir = path.dirname(f.relPath)
+    const stem = path.basename(f.relPath, f.ext)
+    const pattern = /\d+/.test(stem) ? `${dir}::${stem.replace(/\d+/g, '*')}::${f.ext}` : `single::${f.relPath}`
+    const list = buckets.get(pattern) ?? []
+    list.push(f)
+    buckets.set(pattern, list)
+  }
+  const units: TabularUnit[] = []
+  for (const [, group] of buckets) {
+    if (group.length >= 3 && group[0].ext !== '.xlsx') {
+      const first = group[0]
+      const dir = path.dirname(first.relPath)
+      const stemPattern = path.basename(first.relPath, first.ext).replace(/\d+/g, '*')
+      const globRel = dir === '.' ? `${stemPattern}${first.ext}` : `${dir}/${stemPattern}${first.ext}`
+      const globAbs = path.join(path.dirname(first.absPath), `${stemPattern}${first.ext}`)
+      const reader = first.ext === '.parquet'
+        ? `read_parquet(${quoteLiteral(globAbs)}, union_by_name=true)`
+        : first.ext === '.json' || first.ext === '.jsonl' || first.ext === '.ndjson'
+          ? `read_json_auto(${quoteLiteral(globAbs)}, union_by_name=true)`
+          : `read_csv_auto(${quoteLiteral(globAbs)}, union_by_name=true)`
+      units.push({
+        label: `${globRel} (${group.length} partitioned files: \`${path.basename(first.relPath)}\` … \`${path.basename(group[group.length - 1].relPath)}\`)`,
+        rep: group[group.length - 1],
+        count: group.length,
+        totalBytes: group.reduce((sum, x) => sum + x.sizeBytes, 0),
+        globHint: reader,
+      })
+    }
+    else {
+      for (const f of group) {
+        units.push({ label: f.relPath, rep: f, count: 1, totalBytes: f.sizeBytes })
+      }
+    }
+  }
+  return units
+}
+
 /**
- * 1-call local data-lake profiler: scans a directory for tabular & doc files, inspects schemas
- * via DuckDB metadata (`DESCRIBE`) / ExcelJS without pasting raw rows into context, and (in Pro)
- * surfaces cross-file shared join keys.
+ * 1-call local data-lake profiler: scans a directory for tabular & doc files, collapses partitioned
+ * file series into DuckDB glob hints, inspects schemas via DuckDB metadata (`DESCRIBE`) / ExcelJS
+ * (with smart header-row & preamble-note detection) without pasting raw rows into context, and
+ * (in Pro) surfaces cross-file shared join keys.
  */
 export async function profileDirectory(
   dirPath: string,
@@ -567,31 +633,33 @@ export async function profileDirectory(
 
   const tabular = discovered.filter(f => TABULAR_EXTS.has(f.ext))
   const docs = discovered.filter(f => DOC_EXTS.has(f.ext))
+  const units = collapsePartitionedFiles(tabular)
   const lines = [
-    `Folder **${resolved}**: ${tabular.length} data file${tabular.length === 1 ? '' : 's'}, ${docs.length} doc file${docs.length === 1 ? '' : 's'}${discovered.length >= MAX_SCANNED_FILES ? ` (first ${MAX_SCANNED_FILES} shown)` : ''}.`,
+    `Folder **${resolved}**: ${tabular.length} data file${tabular.length === 1 ? '' : 's'}${units.length < tabular.length ? ` (${units.length} table groups)` : ''}, ${docs.length} doc file${docs.length === 1 ? '' : 's'}${discovered.length >= MAX_SCANNED_FILES ? ` (first ${MAX_SCANNED_FILES} shown)` : ''}.`,
   ]
 
   const colToFiles = new Map<string, string[]>()
-  for (let i = 0; i < tabular.length; i++) {
-    const f = tabular[i]
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i]
+    const globSuffix = u.globHint ? ` · SQL glob: \`${u.globHint}\`` : ''
     if (i < MAX_SCHEMA_PROBES) {
       try {
-        const { detail, colNames } = await probeTabularSchema(f, options.duck)
-        lines.push(`- \`${f.relPath}\` (${formatByteSize(f.sizeBytes)}) · ${detail}`)
+        const { detail, colNames } = await probeTabularSchema(u.rep, options.duck)
+        lines.push(`- \`${u.label}\` (${formatByteSize(u.totalBytes)}) · ${detail}${globSuffix}`)
         for (const col of colNames) {
           const key = col.toLowerCase()
           const list = colToFiles.get(key) ?? []
-          if (!list.includes(f.relPath))
-            list.push(f.relPath)
+          if (!list.includes(u.label))
+            list.push(u.label)
           colToFiles.set(key, list)
         }
       }
       catch {
-        lines.push(`- \`${f.relPath}\` (${formatByteSize(f.sizeBytes)})`)
+        lines.push(`- \`${u.label}\` (${formatByteSize(u.totalBytes)})${globSuffix}`)
       }
     }
     else {
-      lines.push(`- \`${f.relPath}\` (${formatByteSize(f.sizeBytes)})`)
+      lines.push(`- \`${u.label}\` (${formatByteSize(u.totalBytes)})${globSuffix}`)
     }
   }
 

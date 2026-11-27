@@ -1,6 +1,6 @@
 # TinyPivot — Developer & In-Agent Analytics Reference
 
-> Updated for TinyPivot MCP v0.8.4 & TinyPivot React/Vue v1.4.9.
+> Updated for TinyPivot MCP v0.8.5 & TinyPivot React/Vue v1.4.9.
 
 TinyPivot is **one deterministic analytics engine** shipped in two complementary forms:
 1. **TinyPivot MCP (`@smallwebco/tinypivot-mcp`)** — Data analysis studio for AI agents: TinyPivot Studio on localhost, an MCP App, a native Claude plugin, framed terminal cards and a live Ghostty TUI.
@@ -57,13 +57,13 @@ duckdb -csv -c "SELECT region, month, SUM(revenue) AS revenue FROM 'sales.parque
 
 ### Empirical 5-Model Trust & Data Science Benchmarks + Official DABstep (2026-11-26)
 
-Full white paper and methodology: `https://tiny-pivot.com/whitepaper`
+Full white paper and methodology: `https://tiny-pivot.com/whitepaper` · Official PDF: `https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf`
 
 **1) 18-Task Unhinted Executive Benchmark** (6 Routine BI, 6 Relational Analytics, 6 Hard Data Science; 270 total runs):
 
 | Model | Baseline (Bare SQL or Python) | TinyPivot Free | TinyPivot Pro | Measured Pro Impact |
 |---|---|---|---|---|
-| **Inkling 2 Mini (Mac local)** | 14/18 (78%) · 46.1s · $0.027† | 15/18 (83%) · 37.3s · $0.059† | **18/18 (100%)** · 26.0s · $0.046† | **+22 pts (Free +6) · −44% faster (3.8× Hard DS) · −50% out** |
+| **Thinking Machines Inkling 2 Mini (Mac local)** | 14/18 (78%) · 46.1s · $0.027† | 15/18 (83%) · 37.3s · $0.059† | **18/18 (100%)** · 26.0s · $0.046† | **+22 pts (Free +6) · −44% faster (3.8× Hard DS) · −50% out** |
 | **DeepSeek V4.1 Flash 1017 (DGX Spark)** | 17/18 (94%) · 25.7s · $0.059† | 17/18 (94%) · 27.7s · $0.090† | **18/18 (100%)** · 15.6s · $0.055† | **+6 pts · −39% faster · −30% turns · −48% out · −7% API†** |
 | **Claude Haiku 5.5** | 15/18 (83%) · 13.1s · $0.074* | 16/18 (89%) · 13.9s · $0.083* | **18/18 (100%)** · 12.5s · $0.083* | **+17 pts (Free +6) · −5% faster (−23% Hard DS)** |
 | **Claude Sonnet 5.5** | 18/18 (100%) · 20.0s · $1.22* | 18/18 (100%) · 22.1s · $0.88* | **18/18 (100%)** · 18.8s · $1.01* | **100% Free (−28%*) & Pro (no Bash) · −6% faster · −17% warm*** |
@@ -93,12 +93,12 @@ Full white paper and methodology: `https://tiny-pivot.com/whitepaper`
 ### MCP Tools
 
 - `open_tinypivot` — Opens TinyPivot (works with `{}` using the built-in sample dataset).
-- `load_file` — Loads local `.csv`, `.tsv`, `.json`, `.jsonl`, or `.xlsx` workbooks (`sheet` optional) with 0 raw rows in context; accepts `chartConfig` and `pivotConfig` in 1 call. Loaded `.xlsx` sheets are immediately queryable in DuckDB SQL.
+- `load_file` — Loads local `.csv`, `.tsv`, `.json`, `.jsonl`, or `.xlsx` workbooks (auto-detects real header rows below title/notes preambles, surfaces workbook notes, `sheet` optional) with 0 raw rows in context; accepts `chartConfig` and `pivotConfig` in 1 call. Loaded `.xlsx` sheets are immediately queryable in DuckDB SQL.
 - `load_data` — Loads flat JSON rows already in memory (up to `~50` rows) directly without temp CSVs; accepts `chartConfig` and `pivotConfig` in 1 call.
 - `configure_pivot` — Deterministic pivot calculation via `@smallwebco/tinypivot-core` (zero LLM arithmetic errors).
 - `configure_chart` — Interactive charts (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, `scatter`, `bubble`, `heatmap`, `radar`, `choropleth` maps of countries / US states / sales regions, `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`) + Unicode terminal cards.
 - `query` — Runs local DuckDB SQL (`sql` or `queries[]` up to 6 SELECTs) across files and loaded tables with deterministic trap auditing; named queries persist as DuckDB views across turns.
-- `profile` — Inspects column schemas, distributions, and (on Pro) relational grain & join fan-out maps, OR pass `dirPath` to scan a local folder of CSV/JSON/Parquet/XLSX schemas + docs (+ Pro cross-file join keys) in 1 call.
+- `profile` — Inspects column schemas, distributions, and (on Pro) relational grain & join fan-out maps, OR pass `dirPath` to scan a local folder of CSV/JSON/Parquet/XLSX schemas (collapsing partitioned file series like `data-2021..2024.csv` with a DuckDB glob hint and surfacing multi-sheet `.xlsx` headers & preamble notes) + docs (+ Pro cross-file join keys) in 1 call.
 - `analyze` — Deterministic 1-call Data Science shelf: `explain_change` (Kitagawa mix-vs-rate + Simpson's Paradox) and `ab_test` on Free; full SRM χ² + Holm-Bonferroni, controlled multivariate `regression`, right-censored `cohort_retention`, and seasonal `anomalies` + change-points on Pro.
 - `query_postgres` — *(Optional Pro)* AST-validated read-only `SELECT` against `DATABASE_URL`.
 - `list_datasets` — Lists loaded datasets, row counts, and inferred schemas.

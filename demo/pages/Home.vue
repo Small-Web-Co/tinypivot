@@ -6,7 +6,7 @@ import InstallBox from '../components/site/InstallBox.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
 import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
 import { benchmarkHeadline } from '../site/benchmark'
-import { whitepaperHeroStats } from '../site/whitepaper'
+import { homeGainCards } from '../site/whitepaper'
 
 // The showcase loads the real grid and chart library, so it is fetched in the
 // browser only and kept out of the prerendered HTML and the first bundle.
@@ -22,9 +22,9 @@ const facts = ['TinyPivot Free · unlimited rows', 'runs locally', 'no signup', 
 const headline = benchmarkHeadline()
 
 const heroPoints = [
-  '91% → 100% accuracy across 5 models × 18 unhinted BI/DS tasks (2.1× faster Hard DS)',
-  'MIT KramaBench (ICLR 2026) same-model A/B: 77.3% → 80.9% (Haiku +6.1 pts · .xlsx Bio +22.2 pts, 2.14× faster)',
-  'Official 450-task Adyen DABstep: Sonnet 97.2% Easy / 68.8% Hard · < 2,500 Free schema tokens',
+  '100% verified accuracy on silent SQL, join & statistical traps (91% → 100%)',
+  '2.1× faster data science — lifts local models like Inkling 2 Mini +22 pts with −50% output tokens',
+  'Runs 100% locally on CSV, Parquet, JSON & Excel with < 2,500 Free schema tokens',
 ] as const
 
 const capabilities = [
@@ -85,11 +85,11 @@ const capabilities = [
               </div>
               <div class="hero-meta-links">
                 <a href="#savings" class="hero-fine">
-                  5-model unhinted benchmark + MIT KramaBench (ICLR 2026) + 450-task Adyen DABstep: 91% → 100% BI/DS, Haiku +6.1 pts on KramaBench.
-                  Benchmarks ↓
+                  Measured across local &amp; frontier models: higher accuracy, 2.1× faster Hard DS, up to 50% fewer output tokens.
+                  See the gains ↓
                 </a>
                 <router-link to="/whitepaper" class="hero-why-link">
-                  Read the Trust Layer White Paper →
+                  Read the Technical White Paper →
                 </router-link>
               </div>
             </div>
@@ -159,31 +159,48 @@ const capabilities = [
           </p>
         </header>
 
-        <dl class="savings-kpis">
-          <div v-for="stat in whitepaperHeroStats" :key="stat.label" class="savings-kpi">
-            <dt class="mono savings-kpi-val">
-              {{ stat.value }}
-            </dt>
-            <dd class="savings-kpi-lbl">
-              {{ stat.label }}
-            </dd>
-          </div>
-        </dl>
+        <div class="gain-grid">
+          <article v-for="card in homeGainCards" :key="card.id" class="gain-card">
+            <p class="label gain-kicker">
+              {{ card.kicker }}
+            </p>
+            <p class="mono gain-val">
+              {{ card.headline }}
+            </p>
+            <div class="gain-bars mono">
+              <div class="gain-bar-row">
+                <span class="gain-bar-lbl">{{ card.beforeLabel }}</span>
+                <div class="gain-track">
+                  <div class="gain-fill gain-fill-base" :style="{ width: `${card.beforePct}%` }" />
+                </div>
+              </div>
+              <div class="gain-bar-row">
+                <span class="gain-bar-lbl gain-bar-pro">{{ card.afterLabel }}</span>
+                <div class="gain-track">
+                  <div class="gain-fill gain-fill-pro" :style="{ width: `${card.afterPct}%` }" />
+                </div>
+              </div>
+            </div>
+            <p class="gain-detail">
+              {{ card.detail }}
+            </p>
+          </article>
+        </div>
 
         <div class="proof-cards">
           <router-link to="/whitepaper" class="proof-card">
             <p class="label">
-              Proof 01 · Technical White Paper
+              Proof 01 · Technical White Paper &amp; Official PDF
             </p>
             <h3 class="proof-title">
-              5-Model Bench (270 Runs) + MIT KramaBench + 450-Task DABstep
+              Full Internal &amp; Independent Public Benchmarks
             </h3>
             <p class="proof-body">
-              <strong>91% → 100%</strong> across Inkling 2 Mini, DeepSeek V4.1, and Claude 5.5 (2.1× faster Hard DS);
-              <strong>77.3% → 80.9%</strong> on controlled MIT KramaBench (Haiku <strong>+6.1 pts</strong>, <code>.xlsx</code> Biomedical <strong>+22.2 pts &amp; 2.14× faster</strong>);
-              and 3 live 450-task <code>adyen/DABstep</code> submissions (Sonnet <strong>97.2% Easy / 68.8% Hard</strong>).
+              See exact accuracy, speed, token, and cost lifts across <strong>Thinking Machines Inkling 2 Mini</strong>,
+              <strong>DeepSeek V4.1</strong>, and <strong>Claude 5.5</strong> — plus how TinyPivot ranks against published
+              leaders on independent multi-file data lakes and financial reasoning leaderboards.
             </p>
-            <span class="text-link">Read the White Paper &amp; full benchmark tables →</span>
+            <span class="text-link">Read the White Paper &amp; download PDF →</span>
           </router-link>
 
           <router-link to="/docs#savings" class="proof-card">
@@ -388,29 +405,76 @@ const capabilities = [
   max-width: 50rem;
 }
 
-.savings-kpis {
+.gain-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 14px;
+}
+
+.gain-card {
+  padding: 16px 18px;
+  border: var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.gain-kicker {
   margin: 0;
 }
 
-.savings-kpi {
-  padding: 14px 16px;
-  border: var(--line);
-  background: var(--ledger);
-}
-
-.savings-kpi-val {
-  font-size: 1.2rem;
+.gain-val {
+  margin: 0;
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--ink);
 }
 
-.savings-kpi-lbl {
-  margin: 4px 0 0;
+.gain-bars {
+  display: grid;
+  gap: 7px;
+}
+
+.gain-bar-row {
+  display: grid;
+  gap: 3px;
+}
+
+.gain-bar-lbl {
+  font-size: 0.68rem;
+  color: var(--ink-muted);
+}
+
+.gain-bar-pro {
+  font-weight: 700;
+  color: #145a39;
+}
+
+.gain-track {
+  height: 11px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--rule);
+}
+
+.gain-fill {
+  height: 100%;
+  border-right: 1px solid var(--ink);
+}
+
+.gain-fill-base {
+  background: #b9b3a4;
+}
+
+.gain-fill-pro {
+  background: #1d7a4f;
+}
+
+.gain-detail {
+  margin: 0;
   font-size: 0.84rem;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--ink-muted);
 }
 
@@ -556,8 +620,8 @@ const capabilities = [
   }
 }
 
-@media (min-width: 560px) {
-  .savings-kpis {
+@media (min-width: 680px) {
+  .gain-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -567,10 +631,6 @@ const capabilities = [
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     align-items: start;
     gap: 44px;
-  }
-
-  .savings-kpis {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .proof-cards {

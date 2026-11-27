@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { dabstepOfficialRows, kramaBenchRows, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
+import { internalTestCatalog, TRUST_BENCH_DATE, TRUST_BENCH_TOTALS, trustBenchRows } from '../../site/whitepaper'
 </script>
 
 <template>
   <figure class="tbench">
     <p class="label tbench-cap">
-      18-Task Unhinted Benchmark (Routine BI · Relational · Hard DS) · {{ TRUST_BENCH_DATE }} · 5 Models × 3 Arms ({{ TRUST_BENCH_TOTALS.totalRuns }} Runs)
+      INTERNAL CONTROLLED BENCHMARK · 18 Unhinted Tasks (Routine BI · Relational · Hard DS) · {{ TRUST_BENCH_DATE }} · 5 Models × 3 Arms ({{ TRUST_BENCH_TOTALS.totalRuns }} Runs)
     </p>
 
     <!-- Desktop table -->
@@ -152,42 +152,29 @@ import { dabstepOfficialRows, kramaBenchRows, TRUST_BENCH_DATE, TRUST_BENCH_TOTA
       </div>
     </div>
 
-    <div class="dabstep-strip">
-      <p class="label dabstep-cap">
-        External Benchmark 1 · <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a> Controlled Same-Model A/B · 4 Multi-File Data Lakes (62 Tasks × 2 Models = 248 Runs · <a href="https://github.com/mitdbg/Kramabench" target="_blank" rel="noopener">mitdbg/Kramabench</a>)
-      </p>
-      <div class="dabstep-grid mono">
-        <div v-for="row in kramaBenchRows" :key="row.model" class="dabstep-card">
-          <strong>{{ row.model }}</strong>
-          <div class="dabstep-scores">
-            <span class="dabstep-pro">{{ row.overall }}</span>
-            <span>{{ row.speed }}</span>
+    <details class="catalog-drawer">
+      <summary class="mono">
+        <span>Inspect all 18 exact internal benchmark tasks (6 Routine BI · 6 Relational Analytics · 6 Hard Data Science)</span>
+        <span class="drawer-ico" aria-hidden="true">+</span>
+      </summary>
+      <div class="catalog-list">
+        <article v-for="task in internalTestCatalog" :key="task.id" class="catalog-item">
+          <div class="catalog-top mono">
+            <strong>{{ task.title }}</strong>
+            <span class="catalog-cat">{{ task.category }}</span>
           </div>
-          <span class="dabstep-note">{{ row.domains }}</span>
-          <span class="dabstep-note">{{ row.note }}</span>
-        </div>
+          <p class="catalog-prompt">
+            <q>{{ task.prompt }}</q>
+          </p>
+          <p class="catalog-meta">
+            <strong>Trap:</strong> {{ task.trap }}
+          </p>
+          <p class="catalog-meta catalog-guard">
+            <strong>TinyPivot guard:</strong> {{ task.guardrail }}
+          </p>
+        </article>
       </div>
-    </div>
-
-    <div class="dabstep-strip">
-      <p class="label dabstep-cap">
-        External Benchmark 2 · Official 450-Task Blind <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener">Adyen / Hugging Face <code>adyen/DABstep</code></a> Leaderboard (3 Live Submissions Scored by Adyen + Dev A/B 77% → 80%)
-      </p>
-      <div class="dabstep-grid mono">
-        <div v-for="row in dabstepOfficialRows" :key="row.model" class="dabstep-card">
-          <strong>{{ row.model }}</strong>
-          <div class="dabstep-scores">
-            <span>Easy: {{ row.easy }}</span>
-            <span class="dabstep-pro">Hard: {{ row.hard }}</span>
-            <span>Total: {{ row.total }}</span>
-          </div>
-          <span class="dabstep-note">{{ row.note }}</span>
-        </div>
-      </div>
-      <p class="dabstep-disclosure mono">
-        Honest attribution: on <code>adyen/DABstep</code>, Sonnet 5.5’s absolute 97.2% Easy / 68.8% Hard score reflects strong base-model reasoning alongside TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and +10 pts on Haiku 60% → 70%). Our controlled same-model Bench v2 (91% → 100%) and MIT KramaBench A/B (77.3% → 80.9%, Haiku +6.1 pts) isolate TinyPivot’s direct lift.
-      </p>
-    </div>
+    </details>
 
     <figcaption class="tbench-note">
       <strong>Local overhead &amp; fairness:</strong> DuckDB audits add ~5–15 ms per query (<code>analyze</code> ~10–40 ms) while TinyPivot Free tool schemas stay strictly <strong>&lt; 2,500 tokens</strong>. On Claude Code, <strong>TinyPivot Free</strong> runs additively alongside built-in <code>Bash</code> (matching real installs) and lifts overall accuracy monotonically from <strong>91% → 93% Free → 100% Pro</strong> (zero regressions on any model), while <strong>TinyPivot Pro</strong> ran MCP-only (<code>Bash</code> disabled) and hit <strong>90/90 (100%)</strong> — <strong>25% faster overall</strong> (25.3s → 19.0s/task) and <strong>2.1× faster on Hard Data Science</strong> (39.7s → 19.3s/task) with −32% fewer Hard DS output tokens.
@@ -409,77 +396,98 @@ tfoot .totals td {
   background: var(--ledger);
 }
 
-.dabstep-strip {
-  padding: 14px;
+.catalog-drawer {
   border-top: var(--line);
-  background: var(--paper-raised, var(--paper));
-  display: grid;
-  gap: 10px;
+  background: var(--paper);
 }
 
-.dabstep-cap {
-  margin: 0;
-}
-
-.dabstep-cap code {
-  font-family: var(--font-mono);
-  text-transform: none;
-}
-
-.dabstep-cap a {
+.catalog-drawer summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  cursor: pointer;
+  list-style: none;
 }
 
-.dabstep-disclosure {
-  margin: 0;
-  font-size: 0.65rem;
-  line-height: 1.45;
-  color: var(--ink-muted);
+.catalog-drawer summary::-webkit-details-marker {
+  display: none;
 }
 
-.dabstep-grid {
+.catalog-drawer summary:hover {
+  background: var(--ledger);
+}
+
+.drawer-ico {
+  font-size: 1rem;
+  color: var(--accent, var(--ink));
+  transition: transform 0.2s;
+}
+
+.catalog-drawer[open] .drawer-ico {
+  transform: rotate(45deg);
+}
+
+.catalog-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 10px;
+  padding: 0 14px 16px;
 }
 
-.dabstep-card {
-  padding: 10px;
+.catalog-item {
+  padding: 10px 12px;
   border: 1px solid var(--rule);
   background: var(--ledger);
   display: grid;
-  gap: 4px;
+  gap: 5px;
+}
+
+.catalog-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
   font-size: 0.72rem;
 }
 
-.dabstep-card strong {
+.catalog-top strong {
   color: var(--ink);
-  font-size: 0.78rem;
 }
 
-.dabstep-scores {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  color: var(--ink-muted);
-}
-
-.dabstep-pro {
+.catalog-cat {
+  font-size: 0.64rem;
   font-weight: 700;
-  color: #145a39;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent, var(--ink-muted));
 }
 
-.dabstep-note {
-  font-size: 0.66rem;
+.catalog-prompt {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.catalog-meta {
+  margin: 0;
+  font-size: 0.76rem;
   line-height: 1.4;
   color: var(--ink-muted);
 }
 
+.catalog-guard {
+  color: #145a39;
+}
+
 @media (min-width: 760px) {
-  .dabstep-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .catalog-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tbench-scroll {
