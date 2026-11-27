@@ -31,6 +31,13 @@ export {
   startCompanionServer,
 } from './companion.js'
 export {
+  type DatabricksConfig,
+  databricksConfigFromEnv,
+  databricksConnector,
+  type DatabricksSessionFactory,
+  type DatabricksSessionLike,
+} from './databricks.js'
+export {
   type AdditiveDriver,
   type ExplainChangeInput,
   type ExplainChangeResult,
