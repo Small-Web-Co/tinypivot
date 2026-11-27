@@ -24,6 +24,9 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
       </h3>
       <span v-if="plan.featured" class="plan-flag">Most picked</span>
     </header>
+    <p v-if="plan.tagline" class="plan-tagline">
+      {{ plan.tagline }}
+    </p>
 
     <SegmentedControl
       v-if="plan.options.length > 1"
@@ -48,6 +51,10 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
         {{ feature }}
       </li>
     </ul>
+
+    <router-link v-if="plan.proof" :to="plan.proof.to" class="plan-proof">
+      {{ plan.proof.text }} →
+    </router-link>
 
     <router-link
       v-if="plan.action.kind === 'link'"
@@ -176,5 +183,27 @@ const isPending = computed(() => props.pendingPlan === option.value.id)
 .plan-cta:disabled {
   opacity: 0.6;
   cursor: progress;
+}
+.plan-tagline {
+  margin-top: -6px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.plan-proof {
+  display: block;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  background: var(--ledger);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: #145a39;
+  text-decoration: none;
+}
+
+.plan-proof:hover {
+  text-decoration: underline;
 }
 </style>

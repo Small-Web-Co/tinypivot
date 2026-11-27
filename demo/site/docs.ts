@@ -96,6 +96,9 @@ export const edges = [
 export const prompts = [
   'Open TinyPivot and show me a chart of sample SaaS revenue by quarter and region.',
   'Load ./exports/q3_orders.csv into TinyPivot and chart net revenue by category and channel.',
+  'Scan the files in ./data and tell me what is in each one before you answer anything.',
+  'Did the new checkout flow win? Run an A/B test on ./experiments/checkout.csv.',
+  'Why did revenue drop last month? Use ./exports/orders.csv and explain the change.',
   'Pull our last 100 Stripe charges into TinyPivot so I can pivot revenue by month and country.',
   'Export monthly active accounts by plan from BigQuery and chart it in TinyPivot.',
 ] as const

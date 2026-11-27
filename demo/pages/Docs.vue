@@ -20,6 +20,7 @@ const toc = [
   { id: 'checks', label: 'Checking answers' },
   { id: 'tools', label: 'Tools' },
   { id: 'savings', label: 'Token savings' },
+  { id: 'pro', label: 'Free vs Pro' },
   { id: 'privacy', label: 'Privacy' },
 ] as const
 
@@ -39,13 +40,14 @@ const { copiedKey, copy } = useCopy()
       <div class="docs-body">
         <header class="docs-head">
           <p class="label">
-            Docs · MCP server
+            Docs · the agent sidecar
           </p>
           <h1 class="display">
             Set up TinyPivot <em>in a minute.</em>
           </h1>
           <p class="lede">
-            One command configures every harness on your machine. Ask your agent to chart something and the result opens as an interactive chart and pivot.
+            One command adds TinyPivot to every AI agent on your machine. From then on, ask a data question and your agent answers
+            with checked numbers, a chart, and the SQL behind it. Your files never leave your computer.
           </p>
         </header>
 
@@ -57,7 +59,7 @@ const { copiedKey, copy } = useCopy()
           <ol class="steps">
             <li>Run the command above.</li>
             <li>Restart your harness so it picks up the new MCP server.</li>
-            <li>Ask: <q>Open TinyPivot and show me sample revenue by region.</q></li>
+            <li>Ask: <q>Open TinyPivot and show me sample revenue by region.</q> Then try it on one of your own files.</li>
           </ol>
         </section>
 
@@ -100,10 +102,10 @@ const { copiedKey, copy } = useCopy()
 
         <section id="why" class="docs-section">
           <h2 class="heading">
-            Why TinyPivot, <em>not a chat artifact</em>
+            Why not just <em>paste the data into chat?</em>
           </h2>
           <p class="docs-text">
-            A chat app can draw a chart from a few rows you paste in. TinyPivot is for real files and real questions, in the agent you already use.
+            Pasting works for a few rows. For real files and questions that matter, you want the numbers computed exactly, checked, and kept on your machine.
           </p>
           <dl class="tools ledger">
             <div v-for="edge in edges" :key="edge.title" class="tool">
@@ -152,9 +154,11 @@ const { copiedKey, copy } = useCopy()
             <li><strong>Left alone on purpose.</strong> Years, dates, links, code, and small counts like "4 regions" are not checked. A growth rate the data cannot show directly is marked unchecked rather than wrong.</li>
           </ul>
           <p class="docs-text">
-            TinyPivot also runs deterministic SQL &amp; statistical guardrails on every query (join fan-out, chasm traps, non-additive rate averages, partial trailing periods, silent NULL drops, extreme outliers) and tracks clickable Proof-of-Work Lineage back to underlying source rows.
+            Separately, every query is checked for the quiet mistakes that return a believable but wrong number: joins that double-count,
+            averages of percentages, half-finished periods, rows silently dropped by missing values, and extreme outliers.
+            Free runs the basic checks; Pro adds the deep ones.
             <router-link to="/whitepaper">
-              Read the Trust Layer White Paper &amp; 5-model + KramaBench + DABstep benchmarks →
+              See how much that changes accuracy →
             </router-link>
           </p>
         </section>
@@ -183,9 +187,10 @@ const { copiedKey, copy } = useCopy()
           <p class="docs-text">
             Measured in Claude Code on a {{ headline.largeRows.toLocaleString('en-US') }}-row dataset, TinyPivot cost
             <strong>{{ headline.cheaperThanPythonPct }}% less than writing Python</strong> ({{ headline.cheaperThanPythonSmallPct }}% less on the small file) with every figure verified, while pasting rows cost ~2× more and got {{ headline.pastedCorrect }} of {{ headline.questions }} right.
-            On our 18-task unhinted BI &amp; Data Science benchmark across 5 models (270 runs), TinyPivot Pro lifted overall accuracy from <strong>91% → 100% (90/90)</strong> (Inkling <strong>78% → 83% Free → 100% Pro</strong>; Haiku 5.5 <strong>83% → 89% → 100%</strong>), ran <strong>2.1× faster on Hard Data Science</strong> (39.7s → 19.3s), cut local output tokens by <strong>48%–50%</strong>, and cut repeat schema tokens by <strong>47%</strong> with Recursive Data Memory —
+            Across 5 models and 18 analysis tasks, TinyPivot Pro took accuracy from <strong>91% to 100%</strong>, answered the hardest
+            statistics questions <strong>2.1× faster</strong>, and its memory cut repeat schema tokens by <strong>47%</strong>.
             <router-link to="/whitepaper">
-              see full benchmark tables →
+              See the full results →
             </router-link>
           </p>
           <div class="docs-proof-grid">
@@ -201,6 +206,26 @@ const { copiedKey, copy } = useCopy()
             and ~{{ OUTPUT_TOKENS_PER_REWRITE }} output tokens per rewritten table. With TinyPivot, every question is a tool call whose reply adds
             ~{{ TOOL_REPLY_TOKENS }} tokens (measured on a 2,000-row, 6-column file), and in a terminal the model reprints the card, ~{{ CARD_ECHO_TOKENS }} output tokens per answer.
             If you already aggregate down to a handful of rows in SQL before the model sees them, there is little or nothing to save.
+          </p>
+        </section>
+
+        <section id="pro" class="docs-section">
+          <h2 class="heading">
+            When to <em>upgrade to Pro</em>
+          </h2>
+          <p class="docs-text">
+            Free has no row or time limit, so use it on your real work first. Upgrade when:
+          </p>
+          <ul class="docs-text studio-list">
+            <li><strong>The answer will be acted on.</strong> Pro’s deep checks catch double-counting joins, half-finished periods, dropped missing values and outliers before the agent answers.</li>
+            <li><strong>You need real statistics.</strong> Trustworthy A/B tests, regressions that control for other factors, cohort retention and seasonal anomalies, each in one step.</li>
+            <li><strong>You come back to the same data.</strong> Pro remembers your data between sessions, cutting repeat schema tokens by 47%.</li>
+            <li><strong>You share the results or dig deeper.</strong> Formatted Excel and white-label HTML exports, drill-through to the rows behind any cell, and a read-only Postgres connection.</li>
+          </ul>
+          <p class="docs-text">
+            <router-link to="/pricing" class="btn btn-solid">
+              See Pro pricing · from $149/yr
+            </router-link>
           </p>
         </section>
 

@@ -24,38 +24,44 @@ const dabColumns = computed(() =>
     <!-- Architecture Weight Disclosure: Lightweight MCP vs Heavy Benchmark Harnesses -->
     <div class="weight-banner">
       <div class="weight-col weight-us">
-        <span class="weight-tag mono">TINYPIVOT MCP (v0.8.5) · LIGHTWEIGHT DROP-IN TOOL</span>
+        <span class="weight-tag mono">TINYPIVOT · ONE SMALL ADD-ON</span>
         <p>
-          <strong>Single local MCP server (&lt; 2,500 Free schema tokens):</strong> DuckDB SQL + smart <code>.xlsx</code> + 1-call folder profiling + deterministic audits.
-          <strong>Zero</strong> Jupyter servers, <strong>zero</strong> VLM judges, <strong>zero</strong> multi-agent planner loops, and <strong>zero</strong> benchmark-specific prompts.
+          A single local tool the agent can call: SQL over your files, Excel and folder reading, and automatic checks.
+          No notebook servers, no extra AI judges, no team of agents, and nothing tuned for these benchmarks.
         </p>
       </div>
       <div class="weight-col weight-them">
-        <span class="weight-tag mono">PUBLISHED LEADERBOARD SYSTEMS · HEAVY INSTRUMENTATION</span>
+        <span class="weight-tag mono">PUBLISHED LEADERS · PURPOSE-BUILT RESEARCH SYSTEMS</span>
         <p>
-          <strong>Bespoke research harnesses (RADAR, TalkTask, smolagents DR, NVIDIA KGMON, Google DS-STAR):</strong>
-          multi-agent planner/coder/verifier ensembles, persistent Jupyter sandboxes, VLM visual checks, and iterative search trees engineered specifically to maximize leaderboard score.
+          Systems such as RADAR, TalkTask, smolagents, NVIDIA KGMON and Google DS-STAR use teams of planner, coder and checker agents,
+          notebook sandboxes and repeated search, engineered to score as high as possible on a leaderboard.
         </p>
       </div>
     </div>
 
     <!-- External Benchmark 1: MIT KramaBench (ICLR 2026) -->
-    <figure class="ext-panel" aria-label="External Benchmark 1: MIT KramaBench (ICLR 2026) Like-for-Like Stacked Lift Column Chart">
+    <figure id="kramabench" class="ext-panel" aria-label="External Benchmark 1: MIT KramaBench (ICLR 2026) Like-for-Like Stacked Lift Column Chart">
       <div class="ext-head">
         <div>
-          <span class="ext-badge mono">EXTERNAL PUBLIC BENCHMARK 01 · LIKE-FOR-LIKE CONTROLLED A/B</span>
+          <span class="ext-badge mono">PUBLIC BENCHMARK 01 · SAME MODEL, WITH AND WITHOUT TINYPIVOT</span>
           <h3>
-            <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a> — Direct Lift Inside Each Column vs. Heavy Leaders
+            <a href="https://kramabench.org/" target="_blank" rel="noopener">MIT KramaBench (ICLR 2026)</a> — what TinyPivot adds to each model
           </h3>
           <p class="ext-sub">
-            62 real-world tasks across 4 multi-file data lakes (Environment, Wildfire, Archaeology, Biomedical · <code>.csv</code>, <code>.xlsx</code>, <code>.json</code>, <code>.gpkg</code>),
-            scored verbatim with MIT’s deterministic metrics (<a href="https://github.com/mitdbg/Kramabench" target="_blank" rel="noopener"><code>mitdbg/Kramabench</code></a> ·
-            <a href="https://openreview.net/forum?id=fZfUdeCC5X" target="_blank" rel="noopener">ICLR 2026 Paper</a>).
-            Each TinyPivot column stacks the <strong>same-model Vanilla base (sand)</strong> directly beneath <strong>TinyPivot Pro’s lift (green cap)</strong> alongside like-for-like model families from <code>kramabench.org</code>.
+            62 real-world questions over 4 collections of messy files (environment, wildfire, archaeology and biomedical data in
+            <code>.csv</code>, <code>.xlsx</code>, <code>.json</code> and <code>.gpkg</code>), scored with MIT’s own published checker
+            (<a href="https://github.com/mitdbg/Kramabench" target="_blank" rel="noopener"><code>mitdbg/Kramabench</code></a> ·
+            <a href="https://openreview.net/forum?id=fZfUdeCC5X" target="_blank" rel="noopener">ICLR 2026 paper</a>).
           </p>
         </div>
       </div>
 
+      <p class="ext-howto">
+        <strong>How to read this chart:</strong> columns are grouped by model family, not ranked by score, so each TinyPivot result
+        stands next to published systems built on the same family of model. In each group our columns come first, then the published
+        systems. In a TinyPivot column, the sand part is the model on its own and the green cap is what TinyPivot added.
+        Dark columns are published leaderboard systems, and the dashed line marks the published #1, RADAR, at 71.2%.
+      </p>
       <div class="ext-legend mono">
         <span><i class="sw sw-base" /> Same-Model Vanilla Base</span>
         <span><i class="sw sw-tp" /> TinyPivot Pro Lift (Stacked on Base)</span>
@@ -172,17 +178,16 @@ const dabColumns = computed(() =>
     </figure>
 
     <!-- External Benchmark 2: Adyen / Hugging Face DABstep (450 Blind Tasks) -->
-    <figure class="ext-panel" aria-label="External Benchmark 2: Official 450-Task Adyen DABstep Column Chart">
+    <figure id="dabstep" class="ext-panel" aria-label="External Benchmark 2: Official 450-Task Adyen DABstep Column Chart">
       <div class="ext-head ext-head-split">
         <div>
-          <span class="ext-badge mono">EXTERNAL PUBLIC BENCHMARK 02 · OFFICIAL 450-TASK BLIND LEADERBOARD</span>
+          <span class="ext-badge mono">PUBLIC BENCHMARK 02 · 450 QUESTIONS, SCORED BLIND BY ADYEN</span>
           <h3>
-            <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener">Adyen / Hugging Face <code>adyen/DABstep</code></a> — Lightweight MCP vs. Heavy Agents
+            <a href="https://huggingface.co/spaces/adyen/DABstep" target="_blank" rel="noopener">Adyen / Hugging Face <code>adyen/DABstep</code></a> — our submissions vs. the leaderboard
           </h3>
           <p class="ext-sub">
-            450 blind questions (72 Easy, 378 Hard) over a 22 MB payments ledger (<code>payments.csv</code>, 138k rows) + 1,000 nested JSON fee rules,
-            scored blindly by Adyen and published in <code>adyen/DABstep</code> <code>data/task_scores/</code>.
-            Toggle between <strong>Hard Accuracy</strong> (primary ranking) and <strong>Easy Accuracy</strong> (where TinyPivot Sonnet ranks <strong>#1 at 97.2%</strong>).
+            450 questions (72 Easy, 378 Hard) about a 138,000-row payments file and 1,000 fee rules. Adyen holds the answers and
+            scores every submission; the scores are published in <code>adyen/DABstep</code>. The leaderboard ranks by the Hard tier.
           </p>
         </div>
         <div class="ext-tabs" role="tablist" aria-label="DABstep accuracy split">
@@ -207,6 +212,13 @@ const dabColumns = computed(() =>
         </div>
       </div>
 
+      <p class="ext-howto">
+        <strong>How to read this chart:</strong> the three columns on the left are our submissions, from the strongest model
+        (Claude Sonnet) to the smallest (DeepSeek, running locally at no cloud cost). The four on the right are Adyen’s own reference
+        agent followed by leaderboard systems, in rank order from #5 up to #1. Each system uses a different model, so unlike
+        KramaBench this isn’t a with-and-without comparison: gaps reflect both the model and the tooling. The dashed line is Adyen’s
+        reference agent. Use the toggle to switch between the Hard and Easy tiers.
+      </p>
       <div class="ext-legend mono">
         <span><i class="sw sw-tp" /> TinyPivot Pro (Lightweight MCP)</span>
         <span><i class="sw sw-base" /> Official Adyen ReACT Baseline</span>
@@ -937,5 +949,18 @@ const dabColumns = computed(() =>
   .sample-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.ext-howto {
+  margin: 14px 16px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--ink);
+  background: var(--paper);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.ext-howto strong {
+  color: var(--ink);
 }
 </style>

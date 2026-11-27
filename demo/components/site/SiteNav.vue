@@ -4,10 +4,10 @@ import { useRoute } from 'vue-router'
 import SiteMark from './SiteMark.vue'
 
 const links = [
-  { to: '/whitepaper', label: 'White Paper' },
   { to: '/docs', label: 'Docs' },
-  { to: '/ui', label: 'UI library' },
+  { to: '/whitepaper', label: 'White Paper' },
   { to: '/pricing', label: 'Pricing' },
+  { to: '/ui', label: 'UI library' },
 ] as const
 
 const GITHUB_URL = 'https://github.com/Small-Web-Co/tinypivot'

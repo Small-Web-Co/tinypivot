@@ -4,14 +4,14 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PlanCard from '../components/site/PlanCard.vue'
 import SegmentedControl from '../components/site/SegmentedControl.vue'
-import { licenseNote, plans } from '../site/pricing'
+import { licenseNote, mcpFaq, plans } from '../site/pricing'
 import { useCheckout } from '../site/useCheckout'
 
 const route = useRoute()
 const router = useRouter()
 
 const products = [
-  { value: 'mcp', label: 'MCP server' },
+  { value: 'mcp', label: 'AI agent sidecar' },
   { value: 'ui', label: 'React & Vue library' },
 ] as const
 
@@ -32,16 +32,18 @@ const { pendingPlan, error, startCheckout } = useCheckout()
           Pricing
         </p>
         <h1 class="display">
-          TinyPivot Free to start. <em>Pro</em> when the numbers matter.
+          Free to start. <em>Pro when the numbers have to be right.</em>
         </h1>
         <p v-if="product === 'mcp'" class="lede">
-          Unlimited local rows in TinyPivot Free with no signup or trial clock. TinyPivot Pro adds deep SQL &amp; statistical guardrails, the full Data Science shelf, Recursive Data Memory, white-label exports, and PostgreSQL.
+          Free is the full sidecar on your own files: no row limit, no signup, no trial clock.
+          Pro adds the deep checks and one-step statistics that took every model in our tests to 100% correct.
           <router-link to="/whitepaper" class="wp-inline-link">
-            Read the 5-model + KramaBench + DABstep benchmarks →
+            See the results →
           </router-link>
         </p>
         <p v-else class="lede">
-          TinyPivot Free core grid and pivot table with no signup or trial clock. TinyPivot Pro adds drill-through, all aggregations, 10 themes, and Excel export with a perpetual license.
+          Ship a real data grid and pivot table for free. Pro adds drill-through, every aggregation, the AI analyst and Excel export,
+          with a one-time license and no per-seat fees.
         </p>
         <SegmentedControl v-model="product" :options="products" label="Product" class="product-switch" />
       </header>
@@ -59,6 +61,23 @@ const { pendingPlan, error, startCheckout } = useCheckout()
           @checkout="startCheckout"
         />
       </div>
+
+      <section v-if="product === 'mcp'" class="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title" class="heading">
+          Questions before <em>you buy.</em>
+        </h2>
+        <dl class="faq-list">
+          <div v-for="item in mcpFaq" :key="item.q" class="faq-item">
+            <dt>{{ item.q }}</dt>
+            <dd>
+              {{ item.a }}
+              <router-link v-if="'link' in item" :to="item.link.to" class="faq-link">
+                {{ item.link.label }} →
+              </router-link>
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       <p class="license-note">
         {{ licenseNote }}
@@ -120,6 +139,47 @@ const { pendingPlan, error, startCheckout } = useCheckout()
 @media (min-width: 1024px) {
   .plans-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.faq {
+  margin-top: 56px;
+  padding-top: 32px;
+  border-top: var(--line);
+}
+
+.faq-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 40px;
+  margin: 24px 0 0;
+}
+
+.faq-item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.faq-item dt {
+  font-weight: 600;
+}
+
+.faq-item dd {
+  margin: 6px 0 0;
+  line-height: 1.55;
+  color: var(--ink-muted);
+}
+
+.faq-link {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--accent);
+  white-space: nowrap;
+  text-underline-offset: 3px;
+}
+
+@media (min-width: 768px) {
+  .faq-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

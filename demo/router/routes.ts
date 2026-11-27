@@ -98,8 +98,8 @@ export const routeDefinitions = [
     name: 'home',
     component: () => import('../pages/Home.vue'),
     meta: {
-      title: 'TinyPivot — The Trust Layer & Data IDE for AI Agents',
-      description: 'Deterministic DuckDB SQL & statistical guardrails, 1-call Data Science shelf, Proof-of-Work Lineage, and Recursive Data Memory. 91% → 100% across 5 models, 77.3% → 80.9% on MIT KramaBench (Haiku +6.1 pts), and official 450-task Adyen DABstep.',
+      title: 'TinyPivot — The Data-Analysis Sidecar for AI Agents',
+      description: 'TinyPivot runs alongside Claude, Cursor, Codex and other AI agents as a sidecar for data work: it queries your files locally, catches the math mistakes AI quietly makes, and shows the SQL behind every number. 53,000+ npm downloads.',
     },
   },
   {
@@ -117,7 +117,7 @@ export const routeDefinitions = [
     component: () => import('../pages/Docs.vue'),
     meta: {
       title: 'TinyPivot MCP Docs — Setup, Tools & Token Savings Calculator',
-      description: 'Set up TinyPivot MCP in Claude, Cursor, Antigravity, OpenCode and pi. Tool reference and a prompt-cache-adjusted token savings calculator.',
+      description: 'Add TinyPivot to Claude Code, Cursor, Codex, Antigravity, OpenCode or pi with one command. Setup, prompts to try, tool reference and a token savings calculator.',
     },
   },
   {
@@ -125,8 +125,8 @@ export const routeDefinitions = [
     name: 'whitepaper',
     component: () => import('../pages/Whitepaper.vue'),
     meta: {
-      title: 'The Trust Layer for AI Data Analysis — White Paper & Benchmarks | TinyPivot',
-      description: 'Empirical 5-model unhinted benchmark (91% → 100%, 2.1× faster Hard DS), controlled MIT KramaBench (ICLR 2026) A/B (77.3% → 80.9%, Haiku +6.1 pts, .xlsx Biomedical +22.2 pts), and 3 live 450-task Adyen DABstep submissions.',
+      title: 'Can You Trust an AI Agent With Your Numbers? — White Paper & Benchmarks | TinyPivot',
+      description: 'How much TinyPivot reduces silent AI analysis mistakes: 91% → 100% across 5 models on 18 trap-laden tasks, 72.5% → 75.2% on MIT KramaBench, and blind-scored Adyen DABstep submissions.',
     },
   },
   {
@@ -134,8 +134,8 @@ export const routeDefinitions = [
     name: 'pricing',
     component: () => import('../pages/Pricing.vue'),
     meta: {
-      title: 'TinyPivot Pricing — MCP Server & React/Vue Library',
-      description: 'TinyPivot Free includes unlimited local rows, charts, DuckDB SQL, Studio & lineage. TinyPivot Pro adds deep SQL/statistical guardrails, full Data Science shelf, Recursive Data Memory, Excel export and Postgres from $149/year or $399 lifetime.',
+      title: 'TinyPivot Pricing — AI Agent Sidecar & React/Vue Library',
+      description: 'TinyPivot Free: unlimited rows, charts, pivots and the Studio, with no signup. Pro adds deep checks, one-step statistics, memory, Excel export and Postgres, from $149/year or $399 once. React & Vue library licenses from $49.',
     },
   },
   {

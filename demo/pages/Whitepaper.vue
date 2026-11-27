@@ -5,183 +5,305 @@ import RetroWindow from '../components/site/RetroWindow.vue'
 import TrustBenchmarkChart from '../components/site/TrustBenchmarkChart.vue'
 import TrustBenchmarkTable from '../components/site/TrustBenchmarkTable.vue'
 import { architecturePillars, TRUST_BENCH_DATE, whitepaperHeroStats } from '../site/whitepaper'
+
+// The page reads top to bottom: what is tested → why it matters → how → results → how it works → tiers.
+const contents = [
+  { id: 'products', title: 'What TinyPivot is', why: 'The two products, and which one these tests measure.' },
+  { id: 'problem', title: 'The problem', why: 'What a “silent mistake” is and why it matters.' },
+  { id: 'method', title: 'How we tested', why: 'The two test tracks and the three setups we compare.' },
+  { id: 'internal', title: 'Results on our own tasks', why: 'Full control, so TinyPivot’s effect is isolated.' },
+  { id: 'external', title: 'Results on public benchmarks', why: 'Problems we didn’t write, next to published leaders.' },
+  { id: 'architecture', title: 'How it works', why: 'The four pieces behind the results.' },
+  { id: 'tiers', title: 'Free vs Pro', why: 'What each tier includes, and how to try it.' },
+] as const
+
+const arms = [
+  {
+    name: 'Baseline',
+    body: 'The AI agent on its own. Claude models used their built-in Python and shell tools; the two local models, which don’t have those tools, got plain SQL over the same files.',
+  },
+  {
+    name: 'TinyPivot Free',
+    body: 'The free tier added alongside the agent’s own tools, the way a normal install works.',
+  },
+  {
+    name: 'TinyPivot Pro',
+    body: 'The full checks and statistics. On our own tasks Pro ran on its own, with shell access turned off, so every answer came through TinyPivot.',
+  },
+] as const
+
+const silentMistakes = [
+  'A join that matches each order to several rows and inflates revenue 2.25×.',
+  'A filter that silently drops the 40% of rows with a missing value.',
+  'An average of percentages that ignores how big each group is.',
+  'A month that is six days old, compared against full months.',
+  'An A/B test whose groups were split unevenly, so its result can’t be trusted.',
+] as const
+
+const takeaways = [
+  'Accuracy rose with each step, on every model: 91% on their own, 93% with Free, 100% with Pro. Free never made a model worse.',
+  'The hardest statistics questions changed most: 80% → 100% correct, and 2.1× faster on average.',
+  'Local models gained the most. DeepSeek V4.1 on a DGX Spark also reached 100%, 39% faster.',
+  'Claude Haiku went from 83% to 100%, level with Sonnet and Opus, for under 9¢ across all 18 tasks.',
+  'Sonnet and Opus were already at 100%. TinyPivot kept them there and lowered their cost by 17–39%.',
+] as const
 </script>
 
 <template>
   <main class="wp">
-    <!-- Hero + Abstract: Benefits first, then clear path through process & evidence -->
     <section class="wp-hero desk">
       <div class="wrap">
-        <RetroWindow title="TECHNICAL WHITE PAPER · TINYPIVOT TRUST LAYER">
+        <RetroWindow title="WHITE PAPER · TINYPIVOT">
           <div class="wp-hero-inner">
             <p class="label">
-              Technical White Paper · {{ TRUST_BENCH_DATE }} · Internal &amp; External Benchmarks
+              White paper · updated {{ TRUST_BENCH_DATE }}
             </p>
             <h1 class="display wp-title">
-              The Trust Layer for <em>AI Data Analysis.</em>
+              Can you trust an AI agent <em>with your numbers?</em>
             </h1>
             <p class="lede">
-              <strong>Abstract —</strong> AI agents write fluent SQL and Python, yet silently double revenue on many-to-many joins,
-              ship broken 52.5/47.5 A/B tests, or burn dozens of turns wrestling with multi-sheet Excel files.
-              TinyPivot MCP adds a lightweight, 100% local DuckDB + statistical verification layer (&lt; 2,500 Free schema tokens, zero Jupyter/VLM bloat)
-              that catches silent analytical failures before the model answers — making fast and local models dramatically more accurate, faster, and cheaper.
+              AI agents write SQL and Python fluently, but they still make quiet mistakes: double-counting revenue through a join,
+              comparing a half-finished month with full ones, misreading an A/B test. The query runs, the answer looks right, and it’s wrong.
+              This paper measures how much TinyPivot reduces those mistakes, on our own tests and on two independent public benchmarks.
             </p>
             <div class="wp-hero-actions">
               <a href="/TinyPivot-Trust-Layer-Whitepaper.pdf" target="_blank" rel="noopener" class="btn btn-solid">
-                Download Official PDF ↓
+                Download the PDF ↓
               </a>
               <a href="#internal" class="btn">
-                Internal Bench
-              </a>
-              <a href="#external" class="btn">
-                External Leaderboards
+                Jump to results
               </a>
             </div>
+            <p class="label wp-stats-cap">
+              Key findings · tap one for the detail
+            </p>
             <div class="wp-stats">
-              <div v-for="stat in whitepaperHeroStats" :key="stat.label" class="wp-stat">
+              <a v-for="stat in whitepaperHeroStats" :key="stat.label" :href="stat.to" class="wp-stat">
                 <span class="wp-stat-val mono">{{ stat.value }}</span>
                 <span class="wp-stat-lbl">{{ stat.label }}</span>
-              </div>
+              </a>
             </div>
           </div>
         </RetroWindow>
       </div>
     </section>
 
-    <!-- 01: Executive Benefits & Evaluation Process -->
-    <section class="block">
+    <!-- Contents: explains the order of the page so readers can skip to what they care about -->
+    <nav class="block wp-toc-section" aria-labelledby="toc-title">
       <div class="wrap">
-        <div class="wp-prose">
+        <div class="wp-toc">
+          <div class="wp-toc-intro">
+            <p id="toc-title" class="label">
+              How this paper is organized
+            </p>
+            <p>
+              We start with what’s being tested and why, then how, then the results: our own tasks first, because they isolate
+              TinyPivot’s effect, then independent benchmarks to show it holds up on problems we didn’t design.
+            </p>
+          </div>
+          <ol class="wp-toc-list">
+            <li v-for="(item, i) in contents" :key="item.id">
+              <a :href="`#${item.id}`">
+                <span class="mono wp-toc-n">{{ String(i + 1).padStart(2, '0') }}</span>
+                <span class="wp-toc-title">{{ item.title }}</span>
+                <span class="wp-toc-why">{{ item.why }}</span>
+              </a>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 01: The two products -->
+    <section id="products" class="block wp-section">
+      <div class="wrap">
+        <header class="section-head">
           <p class="label">
-            01 · Why It Matters &amp; How We Evaluated It
+            01 · What TinyPivot is
           </p>
           <h2 class="heading">
-            Catch silent wrong math — <em>and prove it honestly.</em>
+            Two products, <em>one engine.</em>
           </h2>
-          <p>
-            A SQL syntax error is harmless; the model fixes it in two seconds. The real reason data leaders still rebuild AI output
-            in Excel before a board meeting is <strong>silent analytical failure</strong>: queries that execute cleanly in 12 ms while
-            multiplying revenue 2.25× on a fan-out join, dropping 40% of NULL rows on <code>!=</code>, averaging percentages unweighted,
-            or celebrating a p-hacked A/B segment.
-          </p>
-          <p>
-            To measure whether a lightweight local MCP actually solves this — without hiding behind a stronger base model — we keep our
-            evidence strictly separated into two tracks:
-          </p>
-        </div>
-
-        <div class="wp-process-grid">
-          <article class="wp-process-card">
-            <span class="proc-badge mono">TRACK A · INTERNAL CONTROLLED SUITE</span>
-            <h3>18 Unhinted BI, Relational &amp; Hard DS Tasks</h3>
+        </header>
+        <div class="wp-two">
+          <article class="wp-product wp-product-tested">
+            <span class="proc-badge mono">TESTED IN THIS PAPER</span>
+            <h3>TinyPivot MCP + Studio</h3>
             <p>
-              <strong>Purpose:</strong> Isolate TinyPivot’s exact lift on real-world analytical traps across 5 models
-              (Thinking Machines <code>Inkling 2 Mini</code>, DGX Spark <code>DeepSeek V4.1</code>, <code>Claude Haiku 5.5</code>,
-              <code>Sonnet 5.5</code>, and <code>Opus 5.5</code> — 270 controlled runs). Prompts contain <strong>zero hints</strong>.
+              An add-on for AI agents such as Claude Code, Cursor, Codex, Antigravity and pi. It gives the agent fast SQL over
+              your local files, automatic checks, one-step statistics, and a Studio window showing every chart with the SQL behind it.
+              Every result in this paper measures this product.
             </p>
+            <router-link to="/docs" class="text-link">
+              Read the MCP docs →
+            </router-link>
           </article>
-          <article class="wp-process-card">
-            <span class="proc-badge mono">TRACK B · EXTERNAL PUBLIC BENCHMARKS</span>
-            <h3>MIT KramaBench (ICLR 2026) &amp; Adyen DABstep</h3>
+          <article class="wp-product">
+            <span class="proc-badge mono">FOR YOUR APP</span>
+            <h3>TinyPivot UI for React &amp; Vue 3</h3>
             <p>
-              <strong>Purpose:</strong> Verify zero-bloat generality on independent third-party datasets we did not write —
-              combining a <strong>3-model same-model controlled A/B</strong> on MIT’s multi-file data lakes (372 runs across Sonnet 5.5, Haiku 5.5 &amp; local DeepSeek V4.1) with
-              <strong>three live 450-task blind leaderboard submissions</strong> scored directly by Adyen.
+              The same grid, pivot and chart engine as a component you embed in your own product, with an optional AI analyst
+              that uses your API key. It isn’t part of these benchmarks.
             </p>
+            <router-link to="/ui" class="text-link">
+              See TinyPivot UI →
+            </router-link>
           </article>
         </div>
       </div>
     </section>
 
-    <!-- 02: Internal Controlled Benchmark -->
+    <!-- 02: The problem -->
+    <section id="problem" class="block wp-section">
+      <div class="wrap">
+        <div class="wp-prose">
+          <p class="label">
+            02 · The problem
+          </p>
+          <h2 class="heading">
+            The mistakes that matter <em>don’t throw errors.</em>
+          </h2>
+          <p>
+            A syntax error is harmless: the model sees it and fixes it in seconds. The mistakes that matter run cleanly and return a
+            believable number. For example:
+          </p>
+          <ul class="wp-list">
+            <li v-for="m in silentMistakes" :key="m">
+              {{ m }}
+            </li>
+          </ul>
+          <p>
+            These are why teams still rebuild AI output in a spreadsheet before it reaches leadership. TinyPivot’s job is to catch them
+            before the model answers.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03: Method -->
+    <section id="method" class="block wp-section">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            03 · How we tested
+          </p>
+          <h2 class="heading">
+            Two tracks, <em>three setups.</em>
+          </h2>
+          <p class="lede">
+            Our own tasks let us control everything and isolate TinyPivot’s effect. Public benchmarks check that the effect holds up on
+            problems someone else wrote. Prompts never hint at the trap.
+          </p>
+        </header>
+
+        <div class="wp-process-grid">
+          <article class="wp-process-card">
+            <span class="proc-badge mono">TRACK A · OUR OWN TASKS</span>
+            <h3>18 tasks with hidden traps, 5 models</h3>
+            <p>
+              Written like real requests from a manager: 6 routine reports, 6 multi-table questions and 6 hard statistics problems.
+              Run on two local models (Inkling 2 Mini, DeepSeek V4.1) and three Claude models (Haiku, Sonnet, Opus): 270 runs in total.
+            </p>
+            <a href="#internal" class="text-link">See the results →</a>
+          </article>
+          <article class="wp-process-card">
+            <span class="proc-badge mono">TRACK B · PUBLIC BENCHMARKS</span>
+            <h3>MIT KramaBench and Adyen DABstep</h3>
+            <p>
+              Independent datasets and scoring we had no hand in. On KramaBench we ran each model with and without TinyPivot (372 runs).
+              On DABstep, Adyen scored our three submissions blind on its 450-question leaderboard.
+            </p>
+            <a href="#external" class="text-link">See the results →</a>
+          </article>
+        </div>
+
+        <div class="wp-arms">
+          <p class="label">
+            The three setups we compare on each model
+          </p>
+          <dl class="wp-arms-list">
+            <div v-for="arm in arms" :key="arm.name" class="wp-arm">
+              <dt class="mono">
+                {{ arm.name }}
+              </dt>
+              <dd>{{ arm.body }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04: Internal results -->
     <section id="internal" class="block wp-bench-section">
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            02 · Track A — Internal Controlled Benchmark (5 Models × 18 Unhinted Tasks = 270 Runs)
+            04 · Results · our own tasks
           </p>
           <h2 class="heading">
-            Monotonic lift from 91% → 93% Free → <em>100% Pro.</em>
+            Every model reached <em>100% with TinyPivot Pro.</em>
           </h2>
           <p class="lede">
-            Every task is phrased like a real stakeholder ask across <strong>Routine BI (6)</strong>,
-            <strong>Relational Analytics (6)</strong>, and <strong>Hard Data Science (6)</strong>.
-            Expand the collapsible catalog below the table to read all 18 exact prompts.
+            Five models, three setups, 18 tasks each. Overall accuracy went from 91% to 93% with Free and 100% with Pro.
           </p>
         </header>
 
         <div class="wp-spotlight">
           <p class="mono wp-spotlight-tag">
-            STANDOUT RESULT · THINKING MACHINES INKLING 2 MINI (MAC LOCAL · $0 CLOUD SPEND)
+            BIGGEST JUMP · A SMALL MODEL ON A MAC
           </p>
           <p class="wp-spotlight-body">
-            Adding TinyPivot Pro lifted Mac-local <strong>Thinking Machines Inkling 2 Mini</strong> by
-            <strong>+22.2 percentage points</strong> (<code>78% → 83% Free → 100% Pro</code>, matching frontier Opus 5.5),
-            cut latency <strong>−44%</strong> (<code>46.1s → 26.0s/task</code>; <strong>3.8× faster</strong> on Hard Data Science),
-            and cut output tokens in half (<strong>−50%</strong>) — with local Recursive Data Memory trimming repeat schema tokens another <strong>−47%</strong>.
+            Thinking Machines <strong>Inkling 2 Mini</strong> went from <strong>78% to 100%</strong>, matching Claude Opus 5.5 on this suite,
+            while getting <strong>44% faster</strong> and using <strong>half the output tokens</strong>, at no cloud cost.
           </p>
         </div>
 
-        <TrustBenchmarkChart />
-        <TrustBenchmarkTable />
+        <p class="wp-howto">
+          <strong>How to read the chart:</strong> each group is one model, ordered from the smallest (running on a laptop) on the left
+          to the largest cloud model on the right; the last group combines all five. Inside every group the bars are always in the same
+          order: Baseline, then Free, then Pro. The figure above a group is Pro’s gain over Baseline.
+          The other tabs show speed and results by type of task.
+        </p>
 
-        <div class="wp-findings">
-          <article class="wp-finding">
-            <h3 class="mono">
-              1. Local &amp; open-weights models hit 100% — 39%–44% faster
-            </h3>
-            <p>
-              On DGX Spark (<code>DeepSeek V4.1 Flash 1017</code>), <strong>TinyPivot Pro</strong> hit <strong>18/18 (100%)</strong> while cutting latency
-              <strong>−39%</strong> (25.7s → 15.6s; <strong>3.4× faster</strong> on Hard DS), turns <strong>−30%</strong> (4.94 → 3.44), output tokens <strong>−48%</strong>, and imputed DeepSeek-Flash API cost <strong>−7%</strong> ($0.055 vs. $0.059†; $0 local).
-            </p>
-          </article>
-          <article class="wp-finding">
-            <h3 class="mono">
-              2. Claude Haiku 5.5 climbs 83% → 89% Free → 100% Pro for pennies
-            </h3>
-            <p>
-              Unhinted vanilla <code>Claude Haiku 5.5</code> missed whale outliers, subtle 20-segment SRM, and
-              right-censored cohorts (<strong>15/18, 83%</strong>). Adding <strong>TinyPivot Free</strong> lifted it to
-              <strong>16/18 (89%)</strong>, and <strong>TinyPivot Pro</strong> (MCP-only, no Bash) hit <strong>18/18 (100%)</strong>,
-              5% faster overall (23% faster Hard DS) for <strong>$0.083 API-equiv</strong> across all 18 tasks.
-            </p>
-          </article>
-          <article class="wp-finding">
-            <h3 class="mono">
-              3. Frontier Sonnet 5.5 &amp; Opus 5.5 stay at 100% — faster &amp; cheaper
-            </h3>
-            <p>
-              <code>Claude Sonnet 5.5</code> hit <strong>18/18 (100%)</strong> on both Free (<strong>−28% warm API*</strong> at $0.88) and Pro (<strong>−17% warm API*</strong> at $1.01, 21% faster Hard DS) plus live Studio lineage.
-              <code>Claude Opus 5.5</code> hit <strong>18/18 (100%)</strong> on both tiers, <strong>19% faster on Hard DS</strong> (2.8× faster OLS) at <strong>−39% warm API*</strong> ($1.41 vs. $2.32).
-            </p>
-          </article>
-          <article class="wp-finding">
-            <h3 class="mono">
-              4. Zero regressions on Free — verified monotonically across all 5 models
-            </h3>
-            <p>
-              Across all 90 model-tasks per arm, accuracy rises strictly monotonically: <strong>91% (82/90) Baseline → 93% (84/90) TinyPivot Free → 100% (90/90) TinyPivot Pro</strong>,
-              with Hard Data Science climbing <strong>80% → 87% Free → 100% Pro</strong> at <strong>2.1× faster</strong> average wall clock (39.7s → 19.3s).
-            </p>
-          </article>
+        <TrustBenchmarkChart />
+
+        <div class="wp-takeaways">
+          <p class="label">
+            What the results show
+          </p>
+          <ul class="wp-list">
+            <li v-for="t in takeaways" :key="t">
+              {{ t }}
+            </li>
+          </ul>
         </div>
+
+        <details class="wp-more">
+          <summary class="mono">
+            <span>Full per-model table, timings, costs and all 18 prompts</span>
+            <span class="wp-more-ico" aria-hidden="true">+</span>
+          </summary>
+          <div class="wp-more-body">
+            <TrustBenchmarkTable />
+          </div>
+        </details>
       </div>
     </section>
 
-    <!-- 03: External Public Benchmarks & How We Rank -->
+    <!-- 05: External benchmarks -->
     <section id="external" class="block">
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            03 · Track B — External Public Benchmarks &amp; Leaderboard Comparisons
+            05 · Results · independent public benchmarks
           </p>
           <h2 class="heading">
-            How TinyPivot ranks on <em>independent public benchmarks.</em>
+            It holds up on problems <em>we didn’t write.</em>
           </h2>
           <p class="lede">
-            To avoid grading only our own tests, we evaluated TinyPivot on two demanding public benchmarks —
-            showing our <strong>same-model Vanilla baselines</strong> right alongside <strong>published leaderboard leaders</strong>
-            so base-model strength and TinyPivot’s direct lift are both crystal clear. Expand the drawers to inspect real questions from each benchmark.
+            Two public benchmarks, each with its own data and scoring. On MIT’s KramaBench we ran the same models with and without
+            TinyPivot, so you can see the direct gain. On Adyen’s DABstep, Adyen scored our answers blind, and we show them next to the
+            leaderboard’s top entries. Most of those are large research systems built for the benchmark; TinyPivot is a single add-on.
           </p>
         </header>
 
@@ -189,69 +311,84 @@ import { architecturePillars, TRUST_BENCH_DATE, whitepaperHeroStats } from '../s
       </div>
     </section>
 
-    <!-- 04: Architecture -->
-    <section class="block wp-arch-section">
+    <!-- 06: Architecture -->
+    <section id="architecture" class="block wp-arch-section">
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            04 · Architecture
+            06 · How it works
           </p>
           <h2 class="heading">
-            Neuro-symbolic analytics in <em>under 2,500 schema tokens.</em>
+            Four small pieces, <em>all on your machine.</em>
           </h2>
           <p class="lede">
-            TinyPivot stays fast, local, and dependency-light by pairing an LLM’s reasoning with deterministic DuckDB &amp; TypeScript
-            verification — zero Jupyter servers, zero VLM judges, and raw rows never leave your machine.
+            The AI does the reasoning; TinyPivot does the arithmetic and the checking with DuckDB, a fast local database. No notebook servers or extra services,
+            and your raw files never leave your computer.
           </p>
         </header>
         <ol class="wp-pillars">
           <li v-for="p in architecturePillars" :key="p.n" class="wp-pillar">
             <span class="mono wp-pillar-n">{{ p.n }}</span>
             <h3>{{ p.title }}</h3>
-            <p>{{ p.body }}</p>
+            <p>{{ p.summary }}</p>
+            <details class="wp-pillar-more">
+              <summary class="mono">
+                Technical detail
+              </summary>
+              <p>{{ p.body }}</p>
+            </details>
           </li>
         </ol>
       </div>
     </section>
 
-    <!-- 05: Free vs Pro + CTA -->
-    <section class="block">
-      <div class="wrap wp-prose">
-        <p class="label">
-          05 · Why TinyPivot Free Includes Unlimited Local Rows
-        </p>
-        <h2 class="heading">
-          Never truncate <em>a trust tool.</em>
-        </h2>
-        <p>
-          An analyst evaluating a trust layer on a 22 MB CSV or multi-sheet Excel workbook should never see partial totals.
-          <strong>TinyPivot Free includes unlimited local rows</strong> (up to DuckDB’s safe memory cap), charts,
-          pivots, DuckDB SQL, smart <code>.xlsx</code> reading, 1-call folder schema scanning, Studio IDE + Proof-of-Work Lineage,
-          headless <code>--no-studio</code> mode, offline HTML export, basic SQL guardrails, and <code>analyze(explain_change, ab_test)</code> — with no signup or trial clock.
-        </p>
-        <p>
-          <strong>TinyPivot Pro</strong> unlocks the full enterprise trust &amp; data science engine: deep relational and
-          statistical audits (join fan-out, chasm traps, partial trailing periods, silent NULL drops, extreme
-          outliers), the full <code>analyze</code> shelf (SRM + Holm-Bonferroni, controlled multivariate regression,
-          right-censored cohorts, seasonal change-points), cross-file join discovery, Recursive Data Memory,
-          closed-loop claim verification, 10 editorial themes, white-label HTML &amp; Excel exports, and direct PostgreSQL.
-        </p>
+    <!-- 07: Free vs Pro + CTA -->
+    <section id="tiers" class="block">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            07 · Free vs Pro
+          </p>
+          <h2 class="heading">
+            Free never cuts off your data. <em>Pro adds the deep checks.</em>
+          </h2>
+          <p class="lede">
+            A tool meant to check your numbers shouldn’t truncate them, so Free has no row limit, no signup and no trial clock.
+          </p>
+        </header>
+        <div class="wp-two">
+          <article class="wp-product">
+            <span class="proc-badge mono">TINYPIVOT FREE</span>
+            <p>
+              Unlimited local rows; SQL over CSV, Parquet, JSON and Excel; charts and pivots; whole-folder scanning; the Studio with
+              links from every number to its SQL; offline HTML export; basic checks; and two analysis tools (explain a change, A/B test).
+            </p>
+          </article>
+          <article class="wp-product wp-product-tested">
+            <span class="proc-badge mono">TINYPIVOT PRO · FROM $149/YR</span>
+            <p>
+              Everything in Free, plus the deep checks (double-counting joins, half-finished periods, dropped missing values, outliers),
+              the full statistics shelf, cross-file join discovery, memory between sessions, answer verification, 10 themes,
+              white-label HTML and Excel export, and direct PostgreSQL.
+            </p>
+          </article>
+        </div>
         <div class="wp-cta">
           <InstallBox
             source="whitepaper"
             prominent
-            action-label="Try TinyPivot Free · unlimited local rows"
+            action-label="Try TinyPivot Free"
             action-meta="10s setup"
           />
           <div class="wp-cta-links">
             <a href="/TinyPivot-Trust-Layer-Whitepaper.pdf" target="_blank" rel="noopener" class="btn btn-solid">
-              Download Official PDF White Paper ↓
+              Download the PDF ↓
             </a>
             <router-link to="/pricing" class="btn">
-              Compare Free vs. Pro
+              Compare plans
             </router-link>
             <router-link to="/docs" class="btn">
-              Read MCP Docs
+              MCP docs
             </router-link>
           </div>
         </div>
@@ -433,38 +570,6 @@ import { architecturePillars, TRUST_BENCH_DATE, whitepaperHeroStats } from '../s
   border-bottom: var(--line);
 }
 
-.wp-findings {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  margin-top: 24px;
-}
-
-@media (min-width: 720px) {
-  .wp-findings {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.wp-finding {
-  padding: 18px;
-  border: var(--line);
-  background: var(--paper);
-}
-
-.wp-finding h3 {
-  font-size: 0.84rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
-}
-
-.wp-finding p {
-  font-size: 0.94rem;
-  line-height: 1.55;
-  color: var(--ink-muted);
-}
-
 .wp-arch-section {
   background: var(--ledger);
   border-top: var(--line);
@@ -518,5 +623,280 @@ import { architecturePillars, TRUST_BENCH_DATE, whitepaperHeroStats } from '../s
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+.wp-stats-cap {
+  margin-top: 26px;
+}
+
+a.wp-stat {
+  text-decoration: none;
+  color: inherit;
+}
+
+a.wp-stat:hover {
+  background: var(--paper);
+}
+
+.wp-stats {
+  margin-top: 10px;
+}
+
+.wp-toc-section {
+  border-top: var(--line);
+  border-bottom: var(--line);
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+.wp-toc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.wp-toc-intro {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.wp-toc-intro p:not(.label) {
+  color: var(--ink-muted);
+  line-height: 1.55;
+}
+
+.wp-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.wp-toc-list a {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr);
+  gap: 0 8px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--rule);
+  color: inherit;
+  text-decoration: none;
+}
+
+.wp-toc-list a:hover {
+  background: var(--ledger);
+}
+
+.wp-toc-n {
+  grid-row: span 2;
+  padding-top: 2px;
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.wp-toc-title {
+  font-weight: 600;
+}
+
+.wp-toc-why {
+  font-size: 0.86rem;
+  color: var(--ink-muted);
+}
+
+@media (min-width: 860px) {
+  .wp-toc {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 40px;
+  }
+}
+
+.wp-section + .wp-section {
+  border-top: var(--line);
+}
+
+.wp-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 720px) {
+  .wp-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.wp-product {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 20px;
+  border: var(--line);
+  background: var(--paper);
+}
+
+.wp-product-tested {
+  border-left: 4px solid #1d7a4f;
+}
+
+.wp-product h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.wp-product p {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: var(--ink-muted);
+}
+
+.text-link {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-underline-offset: 4px;
+}
+
+.wp-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.wp-list li {
+  position: relative;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+
+.wp-list li::before {
+  content: '›';
+  position: absolute;
+  left: 2px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.wp-process-card .text-link {
+  margin-top: 2px;
+}
+
+.wp-arms {
+  margin-top: 24px;
+  display: grid;
+  gap: 10px;
+}
+
+.wp-arms-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+}
+
+@media (min-width: 860px) {
+  .wp-arms-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.wp-arm {
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.wp-arm dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wp-arm dd {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.wp-howto {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--ink);
+  background: var(--paper);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.wp-howto strong {
+  color: var(--ink);
+}
+
+.wp-takeaways {
+  margin-top: 24px;
+  padding: 18px 20px;
+  border: var(--line);
+  background: var(--paper);
+}
+
+.wp-takeaways .wp-list {
+  margin-bottom: 0;
+}
+
+.wp-more {
+  margin-top: 18px;
+  border: var(--line);
+  background: var(--paper);
+}
+
+.wp-more summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.wp-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.wp-more[open] .wp-more-ico {
+  transform: rotate(45deg);
+}
+
+.wp-more-ico {
+  font-size: 1.1rem;
+  transition: transform 0.15s ease;
+}
+
+.wp-more-body {
+  padding: 0 12px 12px;
+}
+
+.wp-pillar-more {
+  margin-top: 10px;
+}
+
+.wp-pillar-more summary {
+  cursor: pointer;
+  font-size: 0.74rem;
+  color: var(--accent);
+}
+
+.wp-pillar-more p {
+  margin-top: 8px;
+  font-size: 0.85rem;
 }
 </style>

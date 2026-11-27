@@ -43,7 +43,7 @@ const columns = [
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <span class="footer-mark"><SiteMark /> tinypivot</span>
-        <p>Analytics inside your agent. Rows stay local; the model gets the summary.</p>
+        <p>The data-analysis sidecar for AI agents. Rows stay local; the model gets the summary.</p>
       </div>
       <div v-for="col in columns" :key="col.title" class="footer-col">
         <p class="label">

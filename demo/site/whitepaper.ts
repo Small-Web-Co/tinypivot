@@ -197,7 +197,7 @@ export const TRUST_BENCH_TOTALS = {
   hardDsSpeedupPct: 51,
 } as const
 
-/** Visual before -> after performance gain cards for the Homepage (clean benefits, no benchmark jargon). */
+/** Visual before -> after gain cards for the Homepage: plain language, each linked to its evidence. */
 export interface HomeGainCard {
   id: string
   kicker: string
@@ -207,53 +207,80 @@ export interface HomeGainCard {
   beforePct: number
   afterPct: number
   detail: string
+  /** Where the evidence for this card lives. */
+  to: string
   lowerIsBetter?: boolean
 }
 
 export const homeGainCards: readonly HomeGainCard[] = [
   {
     id: 'accuracy',
-    kicker: 'Accuracy · Zero Silent Traps',
+    kicker: 'Accuracy',
     headline: '91% → 100%',
-    beforeLabel: 'Baseline agents (91%)',
-    afterLabel: 'TinyPivot Pro (100% · 90/90)',
+    beforeLabel: 'AI agent alone · 91%',
+    afterLabel: 'With TinyPivot Pro · 100% (90/90)',
     beforePct: 91,
     afterPct: 100,
-    detail: 'Catches join fan-out, whale outliers, partial months, NULL drops, and broken A/B splits before the model answers.',
+    detail: 'Across 5 models and 18 tasks with hidden traps: double-counting joins, outliers, half-finished months, uneven A/B splits.',
+    to: '/whitepaper#internal',
   },
   {
     id: 'speed',
-    kicker: 'Speed · Hard Data Science',
+    kicker: 'Speed on hard statistics',
     headline: '2.1× faster',
-    beforeLabel: '39.7s/task baseline',
-    afterLabel: '19.3s/task with TinyPivot (−51%)',
+    beforeLabel: 'Agent alone · 39.7s per task',
+    afterLabel: 'With TinyPivot · 19.3s per task',
     beforePct: 100,
     afterPct: 49,
     lowerIsBetter: true,
-    detail: 'Deterministic 1-call stats & local DuckDB SQL replace slow multi-turn Python debugging loops.',
+    detail: 'One tested tool call replaces rounds of trial-and-error Python — and it got the answer right more often.',
+    to: '/whitepaper#internal',
   },
   {
     id: 'local-boost',
-    kicker: 'Local Model Boost · Inkling 2 Mini',
-    headline: '+22 pts · −50% tokens',
-    beforeLabel: 'Thinking Machines Inkling (78% · 46.1s)',
-    afterLabel: 'With TinyPivot Pro (100% · 26.0s)',
+    kicker: 'Small local models',
+    headline: '78% → 100%',
+    beforeLabel: 'Inkling 2 Mini alone · 78%',
+    afterLabel: 'With TinyPivot Pro · 100%',
     beforePct: 78,
     afterPct: 100,
-    detail: 'Turns a Mac-local model into a 100%-accurate analyst — 44% faster overall (3.8× on Hard DS) with half the output tokens.',
+    detail: 'A model running on a Mac matched the flagship cloud model on this suite, 44% faster and with half the output tokens.',
+    to: '/whitepaper#internal',
   },
   {
-    id: 'cost-tokens',
-    kicker: 'Cost & Context Spend',
-    headline: '−17% to −39% API*',
-    beforeLabel: 'Raw rows / Python baseline',
-    afterLabel: 'Local DuckDB + Recursive Memory',
-    beforePct: 100,
-    afterPct: 61,
-    lowerIsBetter: true,
-    detail: '92.9% fewer context tokens vs. pasting rows, −47% repeat schema tokens via local memory, and < 2,500 Free schema tokens.',
+    id: 'independent',
+    kicker: 'Independent benchmark · MIT',
+    headline: '72.5% → 75.2%',
+    beforeLabel: 'Same 3 models alone · 72.5%',
+    afterLabel: 'With TinyPivot Pro · 75.2%',
+    beforePct: 72.5,
+    afterPct: 75.2,
+    detail: 'On MIT KramaBench, a public benchmark we didn\'t write, every model we tested improved. Claude Haiku gained the most (+6.1 pts).',
+    to: '/whitepaper#kramabench',
   },
 ]
+
+/** Home page: the measured case for running data work on smaller, local or cheaper models. */
+export const smallModelCards = [
+  {
+    model: 'Inkling 2 Mini',
+    where: 'Small model on a Mac',
+    headline: '78% → 100%',
+    detail: '44% faster, 17% fewer turns, half the output tokens. $0 cloud spend.',
+  },
+  {
+    model: 'DeepSeek V4.1',
+    where: 'Open weights on a DGX Spark',
+    headline: '94% → 100%',
+    detail: '39% faster, 30% fewer turns, 48% fewer output tokens. $0 cloud spend.',
+  },
+  {
+    model: 'Claude Haiku 5.5',
+    where: 'Fast, low-cost cloud model',
+    headline: '83% → 100%',
+    detail: 'Matched Opus on all 18 tasks for about 8¢ in total, under 4% of what Opus cost on its own.*',
+  },
+] as const
 
 export interface CategoryBenchRow {
   id: string
@@ -604,19 +631,23 @@ export const dabstepOfficialRows: readonly DabstepOfficialRow[] = [
 export const whitepaperHeroStats = [
   {
     value: '91% → 100%',
-    label: 'Internal 5-model unhinted BI/DS suite (90/90 on Pro · 2.1× faster Hard DS)',
+    label: 'Correct answers across 5 AI models on our 18 trap-laden analysis tasks (90/90 with TinyPivot Pro)',
+    to: '#internal',
   },
   {
-    value: '+22 pts · −50%',
-    label: 'Thinking Machines Inkling 2 Mini local boost (78% → 100% · −44% faster · −50% output tokens)',
+    value: '2.1× faster',
+    label: 'On the hardest statistics questions, averaged across all 5 models — while also getting them right',
+    to: '#internal',
   },
   {
     value: '72.5% → 75.2%',
-    label: 'External MIT KramaBench 3-model A/B (372 runs: Haiku +6.1, Sonnet +1.1, local DeepSeek +1.1 & +10.7 vs #2 TalkTask)',
+    label: 'MIT KramaBench, an independent benchmark: all 3 models improved, Claude Haiku the most (+6.1 pts)',
+    to: '#kramabench',
   },
   {
-    value: '97.2% / 68.8%',
-    label: 'External 450-task blind Adyen DABstep (Sonnet 5.5 + Pro #1 Easy / #3-equiv Hard; local DeepSeek 90.3% Easy)',
+    value: '97.2% Easy',
+    label: '#1 on the Easy tier of Adyen’s blind-scored DABstep leaderboard (Claude Sonnet 5.5; 68.8% on Hard)',
+    to: '#dabstep',
   },
 ] as const
 
@@ -901,22 +932,26 @@ export const dabstepSampleTasks: readonly ExternalSampleTask[] = [
 export const architecturePillars = [
   {
     n: '01',
-    title: 'Silent-When-Clean SQL Audit Oracle',
+    title: 'Checks every query',
+    summary: 'Small, fast probes run after each query and speak up only when they find a real problem, so clean work is never slowed down or cluttered.',
     body: 'Runs lightweight DuckDB probes (~5–15 ms) after each query. Completely silent when SQL is clean; emits actionable [AUDIT] blocks (unweighted AVG of rates/positions, fan-out multipliers, partial-period daily run-rates, excluded NULL totals, zero-row filter suggestions, duplicate event IDs, mixed currencies, extreme outliers, and 1-call analyze routing hints) only when a real trap triggers.',
   },
   {
     n: '02',
-    title: '1-Call Data-Lake Profiling + Direct .xlsx into DuckDB',
+    title: 'Reads whole folders and Excel files in one step',
+    summary: 'Point it at a folder and it maps every file, including messy multi-sheet workbooks, without pasting raw rows into the conversation.',
     body: 'profile({ dirPath }) collapses partitioned file series (e.g. 22 yearly CSVs) into DuckDB glob hints and inspects multi-sheet .xlsx workbooks (auto-detecting headers below preamble title/note rows!) without pasting raw rows into context. Named queries persist as DuckDB views across turns, while TinyPivot Free stays strictly under 2,500 schema tokens.',
   },
   {
     n: '03',
-    title: '1-Call Data Science Shelf & Recursive Memory',
+    title: 'Tested statistics, plus memory',
+    summary: 'Five statistical tools return an answer in one call, and Pro remembers what it learned about your data, cutting repeat schema tokens by 47%.',
     body: 'Five deterministic statistical engines (explain_change, ab_test with χ² SRM + Holm-Bonferroni + whale trim, controlled OLS regression, right-censored cohorts, seasonal anomalies) run in 10–40 ms. Local Recursive Data Memory (~/.local/share/tinypivot/memory.json) learns traps and Studio edits to cut repeat schema tokens by 47%.',
   },
   {
     n: '04',
-    title: 'Proof-of-Work Studio & Headless CI Mode',
+    title: 'Shows its work',
+    summary: 'Every chart links to its SQL and source rows and can be exported as an offline report, or it can run with no window at all in automated pipelines.',
     body: 'Every chart and pivot links back to editable SQL (with lossless revision history), clickable Underlying Source Rows, order-independent SHA-256 Data Hashes, claim-checked prose, and zero-CDN Offline HTML Notebooks — or pass --no-studio (TINYPIVOT_NO_STUDIO=1) for zero-popup headless CI and benchmarks.',
   },
 ] as const

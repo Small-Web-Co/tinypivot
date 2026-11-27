@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Framework } from '../site/ui'
 import { DataGrid } from 'tinypivot'
-import { computed, ref } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import ChartGlyphs from '../components/site/ChartGlyphs.vue'
 import CodeBlock from '../components/site/CodeBlock.vue'
 import RetroWindow from '../components/site/RetroWindow.vue'
@@ -9,6 +9,10 @@ import SegmentedControl from '../components/site/SegmentedControl.vue'
 import { galleryCharts, generateAcmeBookings, generateRunningLog } from '../site/chartGallery'
 import { aiAnalystCode, analystPoints, features, frameworks, quickstartCode, testimonials } from '../site/ui'
 import { aiAnalystConfig, dateFormats, demoChartConfig, demoPivotConfig, numberFormats, themeChoices, useLiveDemo } from '../site/useLiveDemo'
+
+// The showcase loads the real grid and chart library, so it is fetched in the
+// browser only and kept out of the prerendered HTML and the first bundle.
+const ThemeShowcase = defineAsyncComponent(() => import('../components/site/ThemeShowcase.vue'))
 
 const framework = ref<Framework>('vue')
 const quickstart = computed(() => quickstartCode(framework.value))
@@ -40,11 +44,11 @@ const galleryConfig = computed(() => ({
                 TinyPivot UI · React &amp; Vue 3
               </p>
               <h1 class="display">
-                The grid, pivots and charts, <em>inside your app.</em>
+                Give your users <em>Excel-style analysis</em> inside your app.
               </h1>
               <p class="lede">
-                The same engine as the MCP server, as a component. Excel-like grid, free pivot tables and charts,
-                and an optional AI analyst. One-time licenses, no per-seat pricing.
+                A data grid, pivot tables and charts your users can explore themselves, plus an optional AI analyst.
+                Drop it into React or Vue 3 in minutes. Free to ship; one-time licenses, no per-seat fees.
               </p>
             </div>
             <div class="ui-hero-actions">
@@ -182,6 +186,26 @@ const galleryConfig = computed(() => ({
       </div>
     </section>
 
+    <section id="themes" class="block themes" aria-labelledby="themes-title">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="label">
+            Live · themes
+          </p>
+          <h2 id="themes-title" class="heading">
+            One theme, <em>every surface.</em>
+          </h2>
+          <p class="lede">
+            Pick a theme. The grid, pivot and chart restyle together, and the MCP server’s terminal output prints the same data in the same colours.
+          </p>
+        </header>
+        <ThemeShowcase v-if="isMounted" />
+        <p v-else class="themes-loading mono">
+          Loading the live grid…
+        </p>
+      </div>
+    </section>
+
     <section id="quickstart" class="block" aria-labelledby="qs-title">
       <div class="wrap two-col">
         <header class="section-head">
@@ -277,6 +301,10 @@ const galleryConfig = computed(() => ({
         </h2>
         <router-link to="/pricing?product=ui" class="btn btn-solid">
           See licenses
+        </router-link>
+        <router-link to="/" class="sidecar-link">
+          <span class="label">Analysing data yourself, with an AI agent?</span>
+          <span class="sidecar-title">TinyPivot’s agent sidecar brings the same engine to Claude, Cursor and Codex, with checks on every query →</span>
         </router-link>
       </div>
     </section>
@@ -520,5 +548,33 @@ const galleryConfig = computed(() => ({
   .quote-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+.themes {
+  border-top: var(--line);
+}
+
+.themes-loading {
+  min-height: 420px;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.sidecar-link {
+  display: grid;
+  gap: 6px;
+  max-width: 40rem;
+  margin-top: 12px;
+  padding: 16px 18px;
+  border: 1px dashed var(--ink);
+  color: inherit;
+  text-decoration: none;
+}
+
+.sidecar-link:hover {
+  background: var(--ledger);
+}
+
+.sidecar-title {
+  font-size: 1.02rem;
+  line-height: 1.4;
 }
 </style>

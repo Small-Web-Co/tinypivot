@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { testimonials } from '../../site/ui'
+import { NPM_DOWNLOADS, testimonials } from '../../site/ui'
 
 const HOLD_MS = 6500
 
@@ -52,7 +52,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <div class="tc-bar">
           <div class="tc-bar-left">
             <span class="tc-kicker">Trusted in production</span>
-            <span class="tc-stat">53,000+ npm downloads</span>
+            <span class="tc-stat">{{ NPM_DOWNLOADS }} npm downloads</span>
           </div>
           <div class="tc-controls">
             <span class="tc-count" aria-live="off">
