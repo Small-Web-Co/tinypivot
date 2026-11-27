@@ -19,6 +19,7 @@ import { createTinyPivotMcpServer } from '../../packages/mcp/src/index'
 import { warehousesFromEnv } from '../../packages/mcp/src/server'
 import { DatasetStore } from '../../packages/mcp/src/store'
 import { Studio } from '../../packages/mcp/src/studio'
+import { QueryRefused } from '../../packages/mcp/src/warehouse'
 import { installTestLicenseKeypair } from '../helpers/license'
 
 const CONFIG: BigQueryConfig = {
@@ -79,9 +80,15 @@ describe('bigQuery connector', () => {
   it('refuses anything but a single SELECT before running it', async () => {
     for (const statementType of ['INSERT', 'DELETE', 'CREATE_TABLE', 'SCRIPT']) {
       const { client, jobs } = fakeClient({ statementType })
-      await expect(bigQueryConnector(CONFIG, async () => client).query('…')).rejects.toThrow(`read this as ${statementType}`)
+      await expect(bigQueryConnector(CONFIG, async () => client).query('SELECT 1')).rejects.toThrow(`read this as ${statementType}`)
       expect(jobs).toHaveLength(1)
     }
+  })
+
+  it('refuses writes by their text before asking BigQuery for anything', async () => {
+    const { client, jobs } = fakeClient({ statementType: 'SELECT' })
+    await expect(bigQueryConnector(CONFIG, async () => client).query('DELETE FROM sales.orders WHERE true')).rejects.toBeInstanceOf(QueryRefused)
+    expect(jobs).toHaveLength(0)
   })
 
   it('refuses a query that would scan more than the limit', () => {
@@ -215,7 +222,7 @@ describe('query_bigquery tool', () => {
 
   it('reports BigQuery refusals as a tool error', async () => {
     const { client } = await connect(signer.signLicense('MCPP'), { statementType: 'DELETE' })
-    const result = await client.callTool({ name: 'query_bigquery', arguments: { sql: 'DELETE FROM sales.orders WHERE true', why: 'x' } })
+    const result = await client.callTool({ name: 'query_bigquery', arguments: { sql: 'SELECT 1', why: 'x' } })
     expect(result.isError).toBe(true)
     expect(text(result)).toContain('BigQuery query failed: Only a single read-only SELECT')
   })

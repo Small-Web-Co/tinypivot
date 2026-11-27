@@ -70,6 +70,7 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest",
     "test:unit": "vitest run",
+    "test:live": "TINYPIVOT_LIVE=1 vitest run tests/live",
     "test:smoke:mcp": "node scripts/smoke-test-mcp.mjs",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",

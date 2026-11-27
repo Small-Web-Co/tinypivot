@@ -2,7 +2,7 @@ import type { RuntimePackage } from './runtime-package.js'
 import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { listFromEnv, QueryRefused } from './warehouse.js'
+import { listFromEnv, QueryRefused, readOnlyStatementError } from './warehouse.js'
 
 /**
  * Read-only BigQuery, through Google's official client. Every query is dry-run first: BigQuery
@@ -161,6 +161,10 @@ async function runQuery(client: BigQueryClientLike, config: BigQueryConfig, sql:
     useLegacySql: false,
     ...(config.location ? { location: config.location } : {}),
   }
+  // The same first gate as every warehouse, so a write is refused plainly even where a dry run cannot plan it.
+  const textError = readOnlyStatementError(base.query)
+  if (textError)
+    throw new QueryRefused(textError)
   const [dryRun] = await client.createQueryJob({ ...base, dryRun: true })
   const bytes = checkDryRun(dryRun.metadata?.statistics, config)
 
