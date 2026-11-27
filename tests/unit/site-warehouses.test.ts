@@ -13,7 +13,7 @@ describe('home direct connections section', () => {
   })
 
   it('marks only the connectors that have not run against a live warehouse as preview', () => {
-    expect(WAREHOUSES.filter(w => !w.preview).map(w => w.name)).toEqual(['BigQuery', 'Postgres'])
+    expect(WAREHOUSES.filter(w => !w.preview).map(w => w.name)).toEqual(['BigQuery', 'Postgres', 'ClickHouse', 'MySQL & MariaDB'])
   })
 
   it('offers the init command that switches on existing sign-ins', () => {

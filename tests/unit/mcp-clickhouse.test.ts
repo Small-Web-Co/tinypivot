@@ -9,6 +9,7 @@ import {
   clickHouseConnector,
   clickHouseTextError,
   parseClickHouseClientConfig,
+  parseCompactLine,
   querySettings,
   readProfile,
   refusalFromError,
@@ -56,7 +57,7 @@ function fakeClient(options: { readonly?: number, overflow?: string, table?: Tab
         async* stream() {
           for (let i = 0; i < lines.length; i += 2) {
             read[index] = Math.min(i + 2, lines.length)
-            yield lines.slice(i, i + 2).map(line => ({ json: () => line }))
+            yield lines.slice(i, i + 2).map(line => ({ text: JSON.stringify(line) }))
           }
         },
         close() {},
@@ -134,6 +135,12 @@ describe('clickhouse values', () => {
     expect(toClickHouseValue('0042', 'String')).toBe('0042')
   })
 
+  it('keeps unquoted 64-bit integers exact, as ClickHouse 25.8 writes them by default', () => {
+    const line = parseCompactLine('[18446744073709551615, -9007199254740993, 5, 1.5e300, 0.38, "a \\"1234567890123456789\\" b", null, [9007199254740993]]')
+    expect(line).toEqual(['18446744073709551615', '-9007199254740993', 5, 1.5e300, 0.38, 'a "1234567890123456789" b', null, ['9007199254740993']])
+    expect(rowsFromCompact([['big', 'n'], ['UInt64', 'Int64'], line.slice(0, 2)])).toEqual([{ big: '18446744073709551615', n: '-9007199254740993' }])
+  })
+
   it('builds rows from the names and types lines', () => {
     expect(rowsFromCompact([['id', 'day'], ['UInt64', 'Date'], ['9', '2026-03-01']])).toEqual([{ id: 9, day: '2026-03-01' }])
   })
@@ -173,8 +180,18 @@ describe('clickhouse connector', () => {
     await expect(connector.query('INSERT INTO orders VALUES (1)')).rejects.toThrow('Only a read-only SELECT')
     await expect(connector.query('SELECT 1; DROP TABLE orders')).rejects.toThrow('one statement')
     await expect(connector.query('SELECT * FROM orders SETTINGS readonly = 0')).rejects.toThrow(QueryRefused)
+    await expect(connector.query('SELECT \'--\', 1; DROP TABLE orders')).rejects.toThrow('one statement')
+    await expect(connector.query('SELECT 1 # note\nFORMAT CSV')).rejects.toThrow('FORMAT clause')
     expect(fake.queries()).toEqual([])
     expect(fake.closed()).toBe(0)
+  })
+
+  it('reads # comments as ClickHouse does, so a write word in one is not refused', async () => {
+    const fake = fakeClient()
+    const connector = clickHouseConnector(CONFIG, async () => fake.client)
+    await connector.query('SELECT region FROM orders # not an insert into orders\n#! nor a drop')
+    expect(fake.queries().map(p => p.query)).toEqual(['SELECT region FROM orders # not an insert into orders\n#! nor a drop'])
+    await expect(connector.query('SELECT 1 #insert')).rejects.toThrow('INSERT is not allowed')
   })
 
   it('marks a cut result as truncated and stops reading the stream past the cap', async () => {
@@ -221,9 +238,10 @@ describe('clickhouse connector', () => {
     expect(fake.queries().at(-1)?.query).toContain('database NOT IN (\'system\', \'INFORMATION_SCHEMA\', \'information_schema\')')
   })
 
-  it('describes itself as a preview ClickHouse tool', () => {
+  it('describes itself as the ClickHouse tool, no longer a preview', () => {
     const connector = clickHouseConnector(CONFIG, async () => fakeClient().client)
-    expect(connector).toMatchObject({ id: 'clickhouse', label: 'ClickHouse', toolName: 'query_clickhouse', preview: true, maxRows: 3 })
+    expect(connector).toMatchObject({ id: 'clickhouse', label: 'ClickHouse', toolName: 'query_clickhouse', maxRows: 3 })
+    expect(connector.preview).toBeUndefined()
     expect(connector.sqlHint).toContain('resolve in acme')
   })
 })
@@ -245,9 +263,17 @@ describe('clickhouse configuration', () => {
   it('is configured by TINYPIVOT_CLICKHOUSE_URL, with the database from the URL path unless set', () => {
     expect(clickHouseConfigFromEnv({})).toBeUndefined()
     const base = { TINYPIVOT_CLICKHOUSE_URL: 'https://ch.example.test:8443/acme' }
-    expect(clickHouseConfigFromEnv(base)).toEqual({ url: base.TINYPIVOT_CLICKHOUSE_URL, username: undefined, password: undefined, passwordFile: undefined, database: 'acme', maxBytes: 50e9, maxRows: 5000 })
+    expect(clickHouseConfigFromEnv(base)).toEqual({ url: 'https://ch.example.test:8443', username: undefined, password: undefined, passwordFile: undefined, database: 'acme', maxBytes: 50e9, maxRows: 5000 })
     expect(clickHouseConfigFromEnv({ ...base, TINYPIVOT_CLICKHOUSE_USER: 'analyst', TINYPIVOT_CLICKHOUSE_PASSWORD: 'p', TINYPIVOT_CLICKHOUSE_DATABASE: 'sales', TINYPIVOT_CLICKHOUSE_MAX_GB: '2' }))
       .toMatchObject({ username: 'analyst', password: 'p', database: 'sales', maxBytes: 2e9 })
+  })
+
+  it('moves the URL\'s user, password and database out of the URL, so the client cannot let them win over the settings', () => {
+    const url = 'http://reader:p%40ss@127.0.0.1:8123/acme?compress=1'
+    expect(clickHouseConfigFromEnv({ TINYPIVOT_CLICKHOUSE_URL: url }))
+      .toMatchObject({ url: 'http://127.0.0.1:8123?compress=1', username: 'reader', password: 'p@ss', database: 'acme' })
+    expect(clickHouseConfigFromEnv({ TINYPIVOT_CLICKHOUSE_URL: url, TINYPIVOT_CLICKHOUSE_USER: 'analyst', TINYPIVOT_CLICKHOUSE_PASSWORD: 'q', TINYPIVOT_CLICKHOUSE_DATABASE: 'sales' }))
+      .toMatchObject({ url: 'http://127.0.0.1:8123?compress=1', username: 'analyst', password: 'q', database: 'sales' })
   })
 
   it('reuses clickhouse-client\'s config.xml only when asked, reading the password later', () => {
@@ -264,6 +290,13 @@ describe('clickhouse configuration', () => {
     expect(config).toMatchObject({ url: 'https://abc.eu-west-1.aws.clickhouse.cloud:8443', username: 'analyst', passwordFile: path.join(home, '.clickhouse-client', 'config.xml') })
     expect(config?.password).toBeUndefined()
     expect(clickHouseConfigFromEnv({ TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG: '1' }, os.tmpdir())).toBeUndefined()
+  })
+
+  it('reads the client config from CLICKHOUSE_CLIENT_CONFIG when set, as init detects it', () => {
+    const file = path.join(homeWithClientConfig('<config><host>db.internal</host></config>'), 'custom.xml')
+    fs.writeFileSync(file, '<config><host>other.internal</host><user>analyst</user></config>')
+    expect(clickHouseConfigFromEnv({ TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG: '1', CLICKHOUSE_CLIENT_CONFIG: file }, os.tmpdir()))
+      .toMatchObject({ url: 'http://other.internal:8123', username: 'analyst', passwordFile: file })
   })
 
   it('parses the client config tags, ignoring named connections', () => {

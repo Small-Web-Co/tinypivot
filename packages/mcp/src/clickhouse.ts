@@ -3,7 +3,7 @@ import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
 import crypto from 'node:crypto'
 import os from 'node:os'
 import { formatBytes } from './bigquery.js'
-import { expandHome, readTextFile } from './config-files.js'
+import { clickHouseClientConfigFile, readTextFile } from './config-files.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
 import { maskSql, QueryRefused, readOnlyStatementError } from './warehouse.js'
@@ -26,9 +26,6 @@ export const CLICKHOUSE_RUNTIME: RuntimePackage = {
   cacheName: 'clickhouse-client-1.25.0',
   purpose: 'ClickHouse queries',
 }
-
-/** clickhouse-client's own config file, reused with TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG=1. */
-export const CLICKHOUSE_CLIENT_CONFIG = '~/.clickhouse-client/config.xml'
 
 const GB = 1_000_000_000
 const DEFAULT_MAX_GB = 50
@@ -93,17 +90,30 @@ export function parseClickHouseClientConfig(xml: string): ClickHouseClientFile {
   }
 }
 
-function databaseFromUrl(url: string): string | undefined {
+type Endpoint = Pick<ClickHouseConfig, 'url' | 'username' | 'password' | 'database' | 'passwordFile'>
+
+/**
+ * The URL's user, password and database (its path) moved into their own settings, so that
+ * TINYPIVOT_CLICKHOUSE_USER, _PASSWORD and _DATABASE override them: the official client lets a URL
+ * part win over the matching option, and warns on the console when both are given.
+ */
+export function endpointFromUrl(raw: string): Endpoint {
+  let url: URL
   try {
-    const name = new URL(url).pathname.replace(/^\/+|\/+$/g, '')
-    return name ? decodeURIComponent(name) : undefined
+    url = new URL(raw)
   }
   catch {
-    return undefined
+    // Left for the client to reject, without echoing a URL that may hold the password.
+    return { url: raw }
+  }
+  const database = url.pathname.replace(/^\/+|\/+$/g, '')
+  return {
+    url: `${url.origin}${url.search}`,
+    username: decodeURIComponent(url.username) || undefined,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
+    database: database ? decodeURIComponent(database) : undefined,
   }
 }
-
-type Endpoint = Pick<ClickHouseConfig, 'url' | 'username' | 'database' | 'passwordFile'>
 
 /** clickhouse-client speaks the native protocol, so its `port` is not used: HTTPS is 8443, HTTP 8123. */
 function endpointFromClientConfig(file: string): Endpoint | undefined {
@@ -125,10 +135,10 @@ function endpointFromClientConfig(file: string): Endpoint | undefined {
 function endpointFromEnv(env: NodeJS.ProcessEnv, home: string): Endpoint | undefined {
   const url = env.TINYPIVOT_CLICKHOUSE_URL?.trim()
   if (url)
-    return { url, database: databaseFromUrl(url) }
+    return endpointFromUrl(url)
   if (env.TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG?.trim() !== '1')
     return undefined
-  return endpointFromClientConfig(expandHome(CLICKHOUSE_CLIENT_CONFIG, home))
+  return endpointFromClientConfig(clickHouseClientConfigFile(env, home))
 }
 
 /** ClickHouse settings from TINYPIVOT_CLICKHOUSE_*, or clickhouse-client's config when asked; undefined when neither is set. */
@@ -136,7 +146,7 @@ export function clickHouseConfigFromEnv(env: NodeJS.ProcessEnv = process.env, ho
   const endpoint = endpointFromEnv(env, home)
   if (!endpoint)
     return undefined
-  const password = env.TINYPIVOT_CLICKHOUSE_PASSWORD || undefined
+  const password = env.TINYPIVOT_CLICKHOUSE_PASSWORD || endpoint.password
   const maxGb = Number(env.TINYPIVOT_CLICKHOUSE_MAX_GB)
   return {
     url: endpoint.url,
@@ -161,8 +171,8 @@ export interface ClickHouseQueryParams {
 }
 
 export interface ClickHouseResultSetLike {
-  /** Batches of rows; each row's `json()` is one JSON array of the compact format. */
-  stream: () => AsyncIterable<Array<{ json: () => unknown }>>
+  /** Batches of rows; each row's `text` is one JSON array of the compact format. */
+  stream: () => AsyncIterable<Array<{ text: string }>>
   close: () => void
 }
 
@@ -226,6 +236,19 @@ export function toClickHouseValue(value: unknown, type: string): unknown {
   return value
 }
 
+/** A JSON string, or a whole JSON number: strings are matched first, so no number is found inside one. */
+const JSON_TOKEN = /"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi
+
+/**
+ * One line of the compact format, with integers too long for a JS number kept as exact text.
+ * ClickHouse 25.8 writes 64-bit integers unquoted by default (output_format_json_quote_64bit_integers
+ * = 0), which JSON.parse would round, and a readonly=1 user cannot change that setting.
+ */
+export function parseCompactLine(text: string): unknown[] {
+  const exact = text.replace(JSON_TOKEN, token => (/^-?\d+$/.test(token) && !Number.isSafeInteger(Number(token)) ? `"${token}"` : token))
+  return JSON.parse(exact) as unknown[]
+}
+
 /** Rows of the compact format: the first line names the columns, the second gives their types. */
 export function rowsFromCompact(lines: unknown[][]): Record<string, unknown>[] {
   const [names = [], types = [], ...data] = lines
@@ -275,9 +298,12 @@ export function refusalFromError(error: unknown, config: Pick<ClickHouseConfig, 
   return new QueryRefused(detail ? `${message} (ClickHouse: ${detail})` : message)
 }
 
+/** ClickHouse reads `# ` and `#!` to the end of the line as a comment (a `#` before anything else is a syntax error). */
+const HASH_COMMENT = /#[ !][^\n]*/
+
 /** ClickHouse syntax the shared read-only check does not cover. */
 export function clickHouseTextError(sql: string): string | undefined {
-  const masked = maskSql(sql).trim()
+  const masked = maskSql(sql, HASH_COMMENT).trim()
   if (/\bSETTINGS\s+[a-z_]\w*\s*=/i.test(masked))
     return 'A SETTINGS clause is not allowed: TinyPivot sets the read-only limits of each query.'
   if (/\bINTO\s+OUTFILE\b/i.test(masked))
@@ -300,7 +326,7 @@ async function fetchRows(client: ClickHouseClientLike, query: string, settings: 
   const lines: unknown[][] = []
   try {
     for await (const batch of result.stream()) {
-      lines.push(...batch.map(row => row.json() as unknown[]))
+      lines.push(...batch.map(row => parseCompactLine(row.text)))
       // Two header lines, then one row past the cap is enough to know the result was cut.
       if (lines.length > maxRows + 2)
         break
@@ -362,7 +388,7 @@ export function runNote(config: Pick<ClickHouseConfig, 'maxBytes'>, profile: Cli
 
 async function runQuery(session: ClickHouseSession, config: ClickHouseConfig, sql: string): Promise<WarehouseQueryResult> {
   const cleaned = sql.trim().replace(/;+\s*$/, '')
-  const textError = readOnlyStatementError(cleaned) ?? clickHouseTextError(cleaned)
+  const textError = readOnlyStatementError(cleaned, HASH_COMMENT) ?? clickHouseTextError(cleaned)
   if (textError)
     throw new QueryRefused(textError)
   const result = await fetchRows(session.client, cleaned, querySettings(config, session.profile.readonly), config.maxRows)
@@ -422,7 +448,6 @@ export function clickHouseConnector(config: ClickHouseConfig, createClient: Clic
     sqlHint: `ClickHouse SQL, one read-only SELECT without SETTINGS or FORMAT${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}. Names are case-sensitive.`,
     freeAlternative: 'export with `clickhouse client --query "SELECT …" --format CSVWithNames > result.csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
-    preview: true,
     listTables: () => withSession(s => listTables(s, config)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }

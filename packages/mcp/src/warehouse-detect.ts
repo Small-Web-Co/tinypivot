@@ -1,7 +1,6 @@
 import type { WarehouseConnector } from './warehouse.js'
 import os from 'node:os'
-import path from 'node:path'
-import { databricksConfigFile, detectGcloudProject, mysqlOptionFile, readIniFile, readSnowflakeConnections, readTextFile } from './config-files.js'
+import { clickHouseClientConfigFile, databricksConfigFile, detectGcloudProject, mysqlOptionFile, readIniFile, readSnowflakeConnections, readTextFile } from './config-files.js'
 
 /**
  * Warehouse sign-ins a person already has on this machine, found by `init` so it can offer to
@@ -51,7 +50,7 @@ function detectMysql(env: NodeJS.ProcessEnv, home: string): DetectedWarehouse | 
 }
 
 function detectClickHouse(env: NodeJS.ProcessEnv, home: string): DetectedWarehouse | undefined {
-  const file = env.CLICKHOUSE_CLIENT_CONFIG || path.join(home, '.clickhouse-client', 'config.xml')
+  const file = clickHouseClientConfigFile(env, home)
   const host = readTextFile(file)?.match(/<host>([^<]+)<\/host>/)?.[1]
   return host
     ? { id: 'clickhouse', label: 'ClickHouse', found: `host ${host} in ${file}`, env: { TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG: '1' } }

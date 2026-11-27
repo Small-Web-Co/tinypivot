@@ -89,8 +89,8 @@ export const tools = [
   { name: 'query_bigquery', role: 'Pro · BigQuery', desc: 'Read-only GoogleSQL run in BigQuery: dry-run checked, capped by bytes scanned, optionally limited to listed datasets.' },
   { name: 'query_snowflake', role: 'Pro · Snowflake', desc: 'Read-only SQL run in Snowflake after its query plan is checked for writes, capped by bytes scanned and a 60-second timeout. Preview.' },
   { name: 'query_databricks', role: 'Pro · Databricks', desc: 'Read-only Databricks SQL, refused if its EXPLAIN plan holds any write step, with a 60-second timeout. Preview.' },
-  { name: 'query_clickhouse', role: 'Pro · ClickHouse', desc: 'Read-only SQL with ClickHouse enforcing readonly mode, a read cap and a time limit on every query. Preview.' },
-  { name: 'query_mysql', role: 'Pro · MySQL & MariaDB', desc: 'One SELECT inside a server-enforced read-only transaction with a statement time limit. Preview.' },
+  { name: 'query_clickhouse', role: 'Pro · ClickHouse', desc: 'Read-only SQL with ClickHouse enforcing readonly mode, a read cap and a time limit on every query.' },
+  { name: 'query_mysql', role: 'Pro · MySQL & MariaDB', desc: 'One SELECT inside a server-enforced read-only transaction with a statement time limit.' },
   { name: 'query_postgres', role: 'Pro · Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
 ] as const
 

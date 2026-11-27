@@ -13,8 +13,8 @@ export const WAREHOUSES: Warehouse[] = [
   { name: 'Postgres', preview: false },
   { name: 'Snowflake', preview: true },
   { name: 'Databricks', preview: true },
-  { name: 'ClickHouse', preview: true },
-  { name: 'MySQL & MariaDB', preview: true },
+  { name: 'ClickHouse', preview: false },
+  { name: 'MySQL & MariaDB', preview: false },
 ]
 
 /** Per-warehouse sign-in and guard settings live in the MCP README. */

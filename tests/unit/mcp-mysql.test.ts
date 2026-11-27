@@ -108,7 +108,8 @@ describe('mysql connector', () => {
       'ROLLBACK',
     ])
     expect(result).toEqual({ rows: [{ region: 'EMEA', amount: 120 }], truncated: false, note: 'Ran in a read-only transaction on MySQL 8.4.2, 60-second limit.' })
-    expect(connector).toMatchObject({ id: 'mysql', toolName: 'query_mysql', label: 'MySQL', preview: true, maxRows: 3 })
+    expect(connector).toMatchObject({ id: 'mysql', toolName: 'query_mysql', label: 'MySQL', maxRows: 3 })
+    expect(connector.preview).toBeUndefined()
   })
 
   it('uses max_statement_time (seconds) on MariaDB', async () => {
@@ -143,6 +144,14 @@ describe('mysql connector', () => {
     await expect(connector.query('SELECT 1; DELETE FROM orders')).rejects.toThrow('one statement')
     expect(fake.ran).toEqual(SETUP)
     expect(fake.closed()).toBe(0)
+  })
+
+  it('runs a SELECT whose # comment mentions a write word', async () => {
+    const fake = fakeSession({ rows: [{ x: 1 }] })
+    const connector = mysqlConnector(CONFIG, async () => fake.session)
+    const result = await connector.query('SELECT 1 AS x # not an insert into orders\n')
+    expect(result.rows).toEqual([{ x: 1 }])
+    expect(fake.ran).toContain('SELECT 1 AS x # not an insert into orders')
   })
 
   it('marks a cut result as truncated and replaces the dropped connection', async () => {

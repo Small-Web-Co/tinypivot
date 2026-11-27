@@ -115,6 +115,12 @@ export function databricksConfigFile(env: NodeJS.ProcessEnv = process.env, home 
   return env.DATABRICKS_CONFIG_FILE || path.join(home, '.databrickscfg')
 }
 
+/* ClickHouse: clickhouse-client's own config file. */
+
+export function clickHouseClientConfigFile(env: NodeJS.ProcessEnv = process.env, home = os.homedir()): string {
+  return env.CLICKHOUSE_CLIENT_CONFIG || path.join(home, '.clickhouse-client', 'config.xml')
+}
+
 /* MySQL: the client option file. */
 
 export function mysqlOptionFile(env: NodeJS.ProcessEnv = process.env, home = os.homedir()): string {

@@ -698,7 +698,8 @@ function runNote(prepared: PreparedSession): string {
 
 async function runQuery(prepared: PreparedSession, config: MysqlConfig, sql: string): Promise<WarehouseQueryResult> {
   const cleaned = sql.trim().replace(/;+\s*$/, '')
-  const textError = readOnlyStatementError(cleaned) ?? mysqlStatementError(cleaned)
+  // Only MySQL's own reading: the shared check alone would take a `#` comment for code.
+  const textError = mysqlStatementError(cleaned)
   if (textError)
     throw new QueryRefused(textError)
   const { session } = prepared
@@ -760,7 +761,6 @@ export function mysqlConnector(config: MysqlConfig, createSession: MysqlSessionF
     sqlHint: `MySQL or MariaDB SQL, one read-only SELECT${config.database ? `; unqualified tables resolve in ${config.database}` : '; name tables database.table'}; quote names with backticks.`,
     freeAlternative: 'export with `mysql --batch -e "SELECT …" > result.tsv` and pass the file to `load_file`',
     maxRows: config.maxRows,
-    preview: true,
     listTables: () => withSession(prepared => listTables(prepared.session, config)),
     query: sql => withSession(async (prepared) => {
       const result = await runQuery(prepared, config, sql)

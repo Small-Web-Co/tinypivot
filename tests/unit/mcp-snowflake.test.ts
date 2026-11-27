@@ -67,6 +67,10 @@ describe('read-only statement check', () => {
     expect(readOnlyStatementError('SELECT 1; DROP TABLE orders')).toBe('Send one statement at a time.')
     expect(readOnlyStatementError('WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x')).toContain('INSERT is not allowed')
     expect(readOnlyStatementError('SELECT SYSTEM$CANCEL_ALL_QUERIES(1)')).toContain('System functions')
+    // A comment marker inside a string does not hide what follows the string.
+    expect(readOnlyStatementError('SELECT \'--\', 1; DELETE FROM t')).toBe('Send one statement at a time.')
+    expect(readOnlyStatementError('SELECT \'/*\' AS a; DELETE FROM t -- */')).toBe('Send one statement at a time.')
+    expect(maskSql('SELECT \'--\' AS a, "x--y" AS b -- c', /#[^\n]*/)).toBe('SELECT \'\' AS a, "" AS b  ')
     expect(readOnlyStatementError('  ')).toBe('The SQL is empty.')
   })
 })

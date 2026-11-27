@@ -43,23 +43,34 @@ export function truncationNote(connector: Pick<WarehouseConnector, 'label' | 'ma
 /** Statement words that change data, objects or access, refused anywhere in a query. */
 const WRITE_WORDS = ['INSERT', 'UPDATE', 'DELETE', 'MERGE', 'CREATE', 'DROP', 'ALTER', 'TRUNCATE', 'GRANT', 'REVOKE', 'CALL', 'COPY', 'UNDROP', 'EXECUTE', 'REPLACE INTO']
 
-/** The SQL with comments, string literals and quoted names blanked out, so only its keywords remain. */
-export function maskSql(sql: string): string {
-  return sql
-    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
-    .replace(/--[^\n]*/g, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/'(?:[^'\\]|\\.|'')*'/g, '\'\'')
-    .replace(/"(?:[^"]|"")*"/g, '""')
-    .replace(/`[^`]*`/g, '``')
+/** What each kind of token is blanked to: comments to a space, quotes to an empty pair of the same quote. */
+const MASK_TOKENS: Array<[pattern: RegExp, mask: string]> = [
+  [/\$\$[\s\S]*?\$\$/, ' '],
+  [/--[^\n]*/, ' '],
+  [/\/\*[\s\S]*?\*\//, ' '],
+  [/'(?:[^'\\]|\\.|'')*'/, '\'\''],
+  [/"(?:[^"]|"")*"/, '""'],
+  [/`[^`]*`/, '``'],
+]
+
+/**
+ * The SQL with comments, string literals and quoted names blanked out, so only its keywords remain.
+ * One left-to-right pass, as a database reads it, so a comment marker inside a string (`'--'`)
+ * cannot hide the code after the string. `lineComment` adds a dialect's own line comment, e.g. `#`.
+ */
+export function maskSql(sql: string, lineComment?: RegExp): string {
+  const tokens = lineComment ? [...MASK_TOKENS, [lineComment, ' '] as [RegExp, string]] : MASK_TOKENS
+  const any = new RegExp(tokens.map(([pattern]) => `(${pattern.source})`).join('|'), 'g')
+  return sql.replace(any, (...groups: string[]) => tokens[groups.slice(1, tokens.length + 1).findIndex(Boolean)][1])
 }
 
 /**
  * Why `sql` is not a single read-only SELECT, or undefined when it is. A first gate for databases
  * without a dry run of their own; each connector adds its database's own checks behind it.
+ * `lineComment` is the dialect's extra line comment, as for `maskSql`.
  */
-export function readOnlyStatementError(sql: string): string | undefined {
-  const masked = maskSql(sql).trim().replace(/;\s*$/, '')
+export function readOnlyStatementError(sql: string, lineComment?: RegExp): string | undefined {
+  const masked = maskSql(sql, lineComment).trim().replace(/;\s*$/, '')
   if (!masked)
     return 'The SQL is empty.'
   if (masked.includes(';'))
