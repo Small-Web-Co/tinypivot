@@ -29,45 +29,66 @@ const wp = await import(`file://${tmpModPath}?t=${Date.now()}`)
 
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-function renderColumnChart(items, refLine) {
+function renderColumnChart(items, refLine, groups, showStackLegend = false) {
   const cols = items.length
   return `
     <div class="col-wrap">
       <div class="col-legend mono">
-        <span><i class="sw" style="background:#1d7a4f;"></i> TinyPivot Pro</span>
-        <span><i class="sw" style="background:#b9b3a4;"></i> Same-Model / Reference Baseline</span>
-        <span><i class="sw" style="background:#33312d;"></i> Published Leaders</span>
+        ${showStackLegend
+          ? `<span><i class="sw" style="background:#c7c0b1;"></i> Same-Model Vanilla Base</span>
+             <span><i class="sw" style="background:#1d7a4f;"></i> TinyPivot Pro Lift (Stacked on Base)</span>
+             <span><i class="sw" style="background:#33312d;"></i> Heavy Published Leaders</span>`
+          : `<span><i class="sw" style="background:#1d7a4f;"></i> TinyPivot Pro (Lightweight MCP)</span>
+             <span><i class="sw" style="background:#c7c0b1;"></i> Official ReACT Baseline</span>
+             <span><i class="sw" style="background:#33312d;"></i> Heavy Benchmark Agents</span>`}
         ${refLine ? `<span><i class="sw-dash"></i> ${esc(refLine.label)}</span>` : ''}
       </div>
+      ${groups
+        ? `<div class="group-bar mono" style="grid-template-columns:repeat(${cols}, 1fr);">
+            ${groups.map(g => `<span class="group-pill" style="grid-column:span ${g.span};">${esc(g.label)}</span>`).join('')}
+           </div>`
+        : ''}
       <div class="col-plot-wrap">
         <div class="grid-line" style="bottom:100%;"><span class="y-tick mono">100%</span></div>
         <div class="grid-line" style="bottom:50%;"><span class="y-tick mono">50%</span></div>
         ${refLine ? `<div class="ref-line" style="bottom:${refLine.pct}%;"><span class="ref-axis mono">${refLine.pct.toFixed(1)}%</span></div>` : ''}
         <div class="col-bars-row" style="grid-template-columns:repeat(${cols}, 1fr);">
-          ${items.map((item) => {
-            const color = item.kind === 'tinypivot' ? '#1d7a4f' : item.kind === 'baseline' ? '#b9b3a4' : '#33312d'
+          ${items.map((item, idx) => {
+            const color = item.kind === 'tinypivot' ? '#1d7a4f' : item.kind === 'baseline' ? '#c7c0b1' : '#33312d'
             const bg = item.kind === 'tinypivot' ? 'background:#edf6f0;' : ''
+            const split = idx === 3 ? 'border-left:1px dashed #c9c3b6;' : ''
             const valStyle = item.kind === 'tinypivot' ? 'color:#145a39;font-weight:700;' : 'color:#222;font-weight:600;'
             const badgeStyle = item.kind === 'tinypivot' ? 'border-color:#1d7a4f;background:#dff0e6;color:#145a39;' : ''
+            const barHtml = item.baseScore !== undefined
+              ? `<div class="vcol-bar vcol-stacked" style="height:${item.score}%;">
+                   <div class="stack-lift" style="height:${Math.max(5, ((item.score - item.baseScore) / item.score) * 100)}%;"></div>
+                   <div class="stack-base" style="height:${(item.baseScore / item.score) * 100}%;"><span class="stack-base-lbl mono">${item.baseScore.toFixed(1)}%</span></div>
+                 </div>`
+              : `<div class="vcol-bar" style="height:${item.score}%;background:${color};"></div>`
             return `
-              <div class="vcol-bar-cell" style="${bg}">
+              <div class="vcol-bar-cell" style="${bg}${split}">
                 <div class="vcol-head" style="bottom:calc(${item.score}% + 3px);">
                   ${item.badge ? `<span class="vcol-badge mono" style="${badgeStyle}">${esc(item.badge)}</span>` : ''}
                   <span class="vcol-val mono" style="${valStyle}">${item.score.toFixed(1)}%</span>
                 </div>
-                <div class="vcol-bar" style="height:${item.score}%;background:${color};"></div>
+                ${barHtml}
               </div>`
           }).join('')}
         </div>
       </div>
       <div class="col-labels-row" style="grid-template-columns:repeat(${cols}, 1fr);">
-        ${items.map((item) => {
+        ${items.map((item, idx) => {
           const bg = item.kind === 'tinypivot' ? 'background:#edf6f0;' : ''
+          const split = idx === 3 ? 'border-left:1px dashed #c9c3b6;' : ''
           return `
-            <div class="vcol-foot" style="${bg}">
+            <div class="vcol-foot" style="${bg}${split}">
               <div class="vcol-name">${esc(item.shortLabel || item.label)}</div>
               <div class="vcol-mod mono">${esc(item.shortModel || item.model)}</div>
-              ${item.easyScore != null ? `<div class="vcol-sub mono">Easy ${item.easyScore.toFixed(1)}%</div>` : ''}
+              ${item.easyScore != null
+                ? `<div class="vcol-sub mono">Easy ${item.easyScore.toFixed(1)}%</div>`
+                : item.instrumentation
+                  ? `<div class="vcol-sub mono" style="${item.kind === 'tinypivot' ? 'color:#145a39;' : 'color:#5b554a;'}">${esc(item.instrumentation)}</div>`
+                  : ''}
             </div>`
         }).join('')}
       </div>
@@ -232,12 +253,14 @@ const html = `<!doctype html>
     font-size: 8pt;
     font-weight: 700;
   }
-  .col-wrap { padding: 8px 10px 10px 34px; }
-  .col-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 6.5pt; color: #5b554a; margin: 0 0 6px -24px; }
+  .col-wrap { padding: 7px 10px 8px 34px; }
+  .col-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 6.3pt; color: #5b554a; margin: 0 0 5px -24px; }
   .col-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .group-bar { display: grid; gap: 5px; margin-bottom: 4px; font-size: 5.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #5b554a; }
+  .group-pill { background: #f5f2ea; border-bottom: 1px solid #c9c3b6; padding: 2px 4px; text-align: center; }
   .sw { display: inline-block; width: 8px; height: 8px; border: 1px solid #161513; }
   .sw-dash { display: inline-block; width: 12px; height: 0; border-top: 1.5px dashed #c44a1d; }
-  .col-plot-wrap { position: relative; height: 148px; margin-top: 32px; border-bottom: 1.2px solid #161513; }
+  .col-plot-wrap { position: relative; height: 128px; margin-top: 28px; border-bottom: 1.2px solid #161513; }
   .grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(0,0,0,0.14); }
   .y-tick { position: absolute; left: -28px; top: -5px; font-size: 5.5pt; color: #7a7366; }
   .ref-line { position: absolute; left: 0; right: 0; border-top: 1.2px dashed #c44a1d; z-index: 2; }
@@ -248,11 +271,19 @@ const html = `<!doctype html>
   .vcol-head { position: absolute; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; z-index: 4; }
   .vcol-badge { font-size: 5.2pt; font-weight: 700; padding: 0 3px; border: 1px solid #c9c3b6; background: #f5f2ea; color: #5b554a; white-space: nowrap; }
   .vcol-val { font-size: 6.7pt; white-space: nowrap; }
-  .vcol-bar { width: 64%; max-width: 40px; min-height: 3px; border: 1px solid #161513; border-bottom: 0; }
-  .vcol-foot { padding: 5px 2px 3px; text-align: center; }
+  .vcol-bar { width: 62%; max-width: 46px; min-height: 3px; border: 1px solid #161513; border-bottom: 0; }
+  .vcol-stacked { display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  .stack-lift { width: 100%; min-height: 3px; background: #1d7a4f; border-bottom: 1px solid #161513; }
+  .stack-base { width: 100%; background: #c7c0b1; display: flex; align-items: center; justify-content: center; }
+  .stack-base-lbl { font-size: 5.4pt; font-weight: 600; color: #3a362e; }
+  .vcol-foot { padding: 4px 2px 3px; text-align: center; }
   .vcol-name { font-size: 6.7pt; font-weight: 700; line-height: 1.15; color: #161513; }
   .vcol-mod { font-size: 5.5pt; line-height: 1.15; color: #5b554a; margin-top: 1px; }
-  .vcol-sub { font-size: 5.3pt; color: #145a39; margin-top: 1px; }
+  .vcol-sub { font-size: 5.2pt; color: #145a39; margin-top: 1px; }
+  .weight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 8px; }
+  .weight-box { border: 1px solid #c9c3b6; padding: 6px 8px; font-size: 7.3pt; line-height: 1.38; }
+  .weight-us { border-left: 3.5px solid #1d7a4f; background: #edf6f0; }
+  .weight-them { border-left: 3.5px solid #33312d; background: #f5f2ea; }
   .pillars {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -379,14 +410,35 @@ const html = `<!doctype html>
     and published leaderboard leaders (charcoal) side-by-side.
   </p>
 
-  <div class="lb-box">
-    <div class="lb-head mono">EXTERNAL 01 · MIT KRAMABENCH (ICLR 2026) — 4 MULTI-FILE DATA LAKES (62 TASKS) · https://kramabench.org/</div>
-    ${renderColumnChart(wp.kramaLeaderboardBars, { pct: 71.2, label: 'Published #1 RADAR · 71.2%' })}
+  <div class="weight-grid">
+    <div class="weight-box weight-us">
+      <strong class="mono" style="color:#145a39;font-size:6.3pt;">TINYPIVOT MCP (v0.8.5) · LIGHTWEIGHT DROP-IN TOOL</strong><br/>
+      Single local MCP (&lt; 2,500 Free schema tokens): DuckDB SQL + smart <code>.xlsx</code> + 1-call profiling. Zero Jupyter, zero VLM judges, zero multi-agent loops, zero benchmark prompts.
+    </div>
+    <div class="weight-box weight-them">
+      <strong class="mono" style="font-size:6.3pt;">LEADERBOARD SYSTEMS · HEAVY RESEARCH INSTRUMENTATION</strong><br/>
+      RADAR, TalkTask, smolagents DR, NVIDIA KGMON &amp; Google DS-STAR use multi-agent planner/verifier loops, persistent Jupyter sandboxes, VLM checks, or benchmark-tuned workflows.
+    </div>
   </div>
 
   <div class="lb-box">
-    <div class="lb-head mono">EXTERNAL 02 · OFFICIAL 450-TASK BLIND ADYEN DABSTEP LEADERBOARD (HARD ACCURACY %) · huggingface.co/spaces/adyen/DABstep</div>
-    ${renderColumnChart(wp.dabstepLeaderboardBars, { pct: 19.8, label: 'Adyen ReACT Baseline · 19.8%' })}
+    <div class="lb-head mono">EXTERNAL 01 · MIT KRAMABENCH (ICLR 2026) — STACKED SAME-MODEL LIFT VS. HEAVY LEADERS · https://kramabench.org/</div>
+    ${renderColumnChart(
+      wp.kramaLeaderboardBars,
+      { pct: 71.2, label: 'Published #1 RADAR · 71.2%' },
+      [{ label: 'Claude Family · Like-for-Like', span: 3 }, { label: 'DeepSeek-V4 Family · Like-for-Like', span: 3 }],
+      true,
+    )}
+  </div>
+
+  <div class="lb-box">
+    <div class="lb-head mono">EXTERNAL 02 · OFFICIAL 450-TASK BLIND ADYEN DABSTEP (HARD ACCURACY %) · huggingface.co/spaces/adyen/DABstep</div>
+    ${renderColumnChart(
+      wp.dabstepLeaderboardBars,
+      { pct: 19.8, label: 'Adyen ReACT Baseline · 19.8%' },
+      [{ label: 'Lightweight TinyPivot MCP', span: 3 }, { label: 'Baseline & Heavy Benchmark Agents', span: 4 }],
+      false,
+    )}
   </div>
   <p class="footnote">
     <strong>Honest attribution:</strong> On <code>adyen/DABstep</code>, Sonnet 5.5’s 97.2% Easy / 68.8% Hard score is strongly driven by base-model reasoning paired with TinyPivot’s DuckDB workflow (our 10-task Dev A/B showed 90% parity on Sonnet, 80% parity on Opus, and +10 pts on Haiku, 60% → 70%). Our controlled same-model Internal Suite (91% → 100%) and 3-model MIT KramaBench A/B (72.5% → 75.2%, Haiku +6.1 pts, local DeepSeek +1.1 pts &amp; +10.7 pts above #2 TalkTask) isolate TinyPivot’s direct lift.
