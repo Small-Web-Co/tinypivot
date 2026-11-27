@@ -24,7 +24,7 @@ const contact = `Questions or requests: email ${LEGAL_CONTACT}.`
 
 export const privacyPolicy: LegalDocument = {
   title: 'Privacy policy',
-  updated: 'November 25, 2026',
+  updated: 'November 27, 2026',
   intro: 'Small Web, LLC ("we") makes TinyPivot: the TinyPivot MCP server and Studio, the TinyPivot React and Vue libraries, and the tiny-pivot.com website. This page says what data each of them sends to us or to others, and what stays on your computer.',
   sections: [
     {
@@ -63,7 +63,7 @@ export const privacyPolicy: LegalDocument = {
     {
       heading: 'Licenses and payments',
       paragraphs: [
-        'When you buy a license, payment is handled by Stripe, which receives your payment details and email address; we never see your card number. We receive your email address, the plan you bought and the payment status, and email your license key to you through our email provider, Resend. License keys are checked on your computer, without contacting us.',
+        'When you buy a license, payment is handled by Stripe, which receives your payment details and email address; we never see your card number. We receive your email address, the plan you bought and the payment status, and email your license key to you through our email provider, Resend. License keys are checked on your computer. Yearly MCP keys run to the end of the year you paid for: in a key\'s last month (daily for Team keys) the MCP server sends the key to tiny-pivot.com, which checks the subscription with Stripe and returns a renewed key. Team keys also send a one-way hash of the install, made from the license and a random ID on your computer, so we can tell the buyer when more people use a key than it covers; it cannot be traced to you, your machine or the usage statistics, and we keep only the last 30 days of them, on the Stripe subscription. Set TINYPIVOT_LICENSE_REFRESH=0 to turn this off; the key then works until its end date.',
       ],
     },
     {
@@ -99,7 +99,7 @@ export const privacyPolicy: LegalDocument = {
 
 export const termsOfService: LegalDocument = {
   title: 'Terms of service',
-  updated: 'November 25, 2026',
+  updated: 'November 27, 2026',
   intro: 'These terms apply when you use TinyPivot, made by Small Web, LLC ("we"): the TinyPivot MCP server and Studio, the TinyPivot React and Vue libraries, plugins and extensions that install them, and the tiny-pivot.com website.',
   sections: [
     {
@@ -111,7 +111,7 @@ export const termsOfService: LegalDocument = {
     {
       heading: 'Paid plans',
       paragraphs: [
-        'Pro and Team plans unlock the features described on the pricing page. Yearly plans renew until you cancel; a lifetime or one-time license does not renew. A license key is for the person or team that bought it: do not publish or resell it. We may revoke a key that was shared publicly or obtained by fraud. Payments are processed by Stripe. For a billing problem or a refund request, email us.',
+        'Pro and Team plans unlock the features described on the pricing page. Yearly plans renew until you cancel; a lifetime or one-time license does not renew. A license key is for the person or team that bought it: do not publish or resell it. A Team key covers up to five people; if more use it, we will ask you to add seats, but we will not switch it off for that. We may revoke a key that was shared publicly or obtained by fraud. Payments are processed by Stripe. For a billing problem or a refund request, email us.',
       ],
     },
     {

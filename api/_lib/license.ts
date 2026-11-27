@@ -7,6 +7,8 @@
  * embedded in `@smallwebco/tinypivot-core`.
  */
 
+import nodeCrypto from 'node:crypto'
+
 function concatBytes(prefix: number[], arr: Uint8Array): Uint8Array {
   const result = new Uint8Array(prefix.length + arr.length)
   result.set(prefix, 0)
@@ -105,4 +107,54 @@ export async function signLicensePayload(payload: string): Promise<string> {
   )
 
   return base64UrlEncode(rawToDer(new Uint8Array(rawSignature)))
+}
+
+/** Keys for one-time purchases never end. */
+export const PERPETUAL_EXPIRY = '20991231'
+
+/** Days a yearly key keeps working past the paid period, so a late renewal never switches Pro off. */
+const GRACE_DAYS = 14
+
+const LICENSE_ID = /^\w{1,64}$/
+
+/** YYYYMMDD, `graceDays` after a Stripe period end (seconds). */
+export function expiryAfter(periodEndSeconds: number, graceDays = GRACE_DAYS): string {
+  return new Date((periodEndSeconds + graceDays * 86_400) * 1000).toISOString().slice(0, 10).replace(/-/g, '')
+}
+
+/**
+ * A signed key: `TP-<type>[.<licenseId>]-<signature>-<expiry>`. The license id (a Stripe
+ * subscription or payment id) sits inside the signed segment, so it ties the key to one purchase.
+ */
+export async function mintLicenseKey(typeCode: string, expiry: string, licenseId?: string): Promise<string> {
+  if (licenseId !== undefined && !LICENSE_ID.test(licenseId))
+    throw new Error(`Invalid license id: ${licenseId}`)
+  const segment = licenseId ? `${typeCode}.${licenseId}` : typeCode
+  const signature = await signLicensePayload(`TP-${segment}-${expiry}`)
+  return `TP-${segment}-${signature}-${expiry}`
+}
+
+export interface IssuedLicense {
+  typeCode: string
+  licenseId?: string
+  expiry: string
+}
+
+/** The parts of a key this server signed, or null if it is malformed or the signature fails. */
+export function readLicenseKey(key: string, privateKeyPem = process.env.LICENSE_PRIVATE_KEY): IssuedLicense | null {
+  const match = /^TP-(\w+)(?:\.(\w{1,64}))?-([\w-]+)-(\d{8})$/.exec(key.trim())
+  if (!match || !privateKeyPem)
+    return null
+  const [, typeCode, licenseId, signature, expiry] = match
+  const segment = licenseId ? `${typeCode}.${licenseId}` : typeCode
+  try {
+    const publicKey = nodeCrypto.createPublicKey(privateKeyPem)
+    const der = Buffer.from(signature.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+    if (!nodeCrypto.verify('sha256', Buffer.from(`TP-${segment}-${expiry}`), publicKey, der))
+      return null
+  }
+  catch {
+    return null
+  }
+  return { typeCode, ...(licenseId ? { licenseId } : {}), expiry }
 }

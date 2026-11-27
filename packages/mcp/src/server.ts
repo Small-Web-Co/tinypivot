@@ -28,6 +28,7 @@ import { databricksConfigFromEnv, databricksConnector } from './databricks.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
 import { formatHistoryList, formatSessionList } from './history.js'
 import { refreshAgentExtension } from './init.js'
+import { effectiveLicenseKey } from './license-refresh.js'
 import { classifyMcpLicenseKey, isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { ROW_PAGE_SIZE } from './limits.js'
 import { extractSqlLineage } from './lineage.js'
@@ -480,7 +481,12 @@ function licenseKeyFromEnv(): string | undefined {
   return undefined
 }
 
+/** The configured key, or the renewed copy TinyPivot saved for it (see license-refresh.ts). */
 export function resolveLicenseKey(explicit?: string): string | undefined {
+  return effectiveLicenseKey(configuredLicenseKey(explicit))
+}
+
+function configuredLicenseKey(explicit?: string): string | undefined {
   if (explicit?.trim())
     return explicit.trim()
   const fromEnv = licenseKeyFromEnv()

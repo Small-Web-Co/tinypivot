@@ -8,11 +8,13 @@ import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { startCompanionServer, STUDIO_IDLE_STOP_MS } from './companion.js'
 import { formatSessionList, HistoryStore } from './history.js'
 import { runInitCommand } from './init.js'
+import { refreshLicense } from './license-refresh.js'
 import { isMcpLicenseKey, isValidDemoToken } from './license.js'
 import { createTinyPivotMcpServer, loadAppHtml, resolveLicenseKey } from './server.js'
 import { DatasetStore, FREE_TIER_ROW_LIMIT, getPreferencesPath, loadSavedVisualTheme, parseDelimitedText, saveVisualThemePreference } from './store.js'
 import { Studio } from './studio.js'
 import { formatDatasetSummary, formatPivotSummary } from './summary.js'
+import { getAnonymousId } from './telemetry.js'
 import { formatTerminalChart } from './terminal-chart.js'
 import { hasFeature } from './tiers.js'
 import { runTuiCommand } from './tui.js'
@@ -780,6 +782,8 @@ async function main() {
   if (eagerCompanion && !disableCompanion) {
     await ensureCompanionStarted()
   }
+
+  void refreshLicense(rawLicenseKey, { anonId: getAnonymousId() }).then(notices => notices.forEach(n => console.error(n)))
 
   const { server } = createTinyPivotMcpServer({
     store,

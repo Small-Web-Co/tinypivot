@@ -42,7 +42,7 @@ function getPreferencesPath(): string {
 
 let cachedAnonId: string | null = null
 
-function getAnonymousId(): string {
+export function getAnonymousId(): string {
   if (cachedAnonId)
     return cachedAnonId
   const prefPath = getPreferencesPath()

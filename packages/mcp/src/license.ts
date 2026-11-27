@@ -41,41 +41,47 @@ function verifyDerSignatureSync(payload: string, signatureBase64Url: string, pub
 
 export type LicenseKeyStatus = 'none' | 'mcp' | 'ui' | 'expired' | 'invalid'
 
+/** What the MCP server knows about a key, without ever holding on to its value. */
+export interface McpLicenseInfo {
+  status: LicenseKeyStatus
+  typeCode?: string
+  /** The purchase it belongs to: a Stripe subscription (`sub_…`) renews; anything else does not. */
+  licenseId?: string
+  /** YYYYMMDD; 20991231 never expires. */
+  expiry?: string
+}
+
 /**
- * Cryptographically classify a TinyPivot license key on the MCP server.
+ * Cryptographically check a TinyPivot license key on the MCP server.
  * Never returns or logs the key value itself.
  */
+export function inspectMcpLicenseKey(
+  key?: string | null,
+  options: { now?: Date, publicKeyPem?: string } = {},
+): McpLicenseInfo {
+  const trimmed = key?.trim()
+  if (!trimmed)
+    return { status: 'none' }
+
+  const parsed = parseLicenseKey(trimmed)
+  if (!parsed)
+    return { status: trimmed.startsWith('TP-PRO') ? 'ui' : 'invalid' }
+  if (UI_TYPE_CODES.has(parsed.typeCode))
+    return { status: 'ui' }
+  if (!MCP_TYPE_CODES.has(parsed.typeCode))
+    return { status: 'invalid' }
+  if (!verifyDerSignatureSync(parsed.payload, parsed.signature, options.publicKeyPem ?? activePublicKeyPem))
+    return { status: 'invalid' }
+
+  const { typeCode, licenseId, expiry } = parsed
+  return { status: isLicenseExpired(expiry, options.now) ? 'expired' : 'mcp', typeCode, licenseId, expiry }
+}
+
 export function classifyMcpLicenseKey(
   key?: string | null,
   options: { now?: Date, publicKeyPem?: string } = {},
 ): LicenseKeyStatus {
-  const trimmed = key?.trim()
-  if (!trimmed)
-    return 'none'
-
-  const parsed = parseLicenseKey(trimmed)
-  if (!parsed) {
-    return trimmed.startsWith('TP-PRO') ? 'ui' : 'invalid'
-  }
-
-  if (UI_TYPE_CODES.has(parsed.typeCode))
-    return 'ui'
-
-  if (!MCP_TYPE_CODES.has(parsed.typeCode))
-    return 'invalid'
-
-  const verified = verifyDerSignatureSync(
-    parsed.payload,
-    parsed.signature,
-    options.publicKeyPem ?? activePublicKeyPem,
-  )
-  if (!verified)
-    return 'invalid'
-
-  if (isLicenseExpired(parsed.expiry, options.now))
-    return 'expired'
-
-  return 'mcp'
+  return inspectMcpLicenseKey(key, options).status
 }
 
 /**

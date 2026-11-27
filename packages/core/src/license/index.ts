@@ -65,10 +65,15 @@ zLsikg2H9GMkL8hLGuOtnGMpVfLRlc7cD8FdkPBBRgiQ8UFnG8hm+nMIug==
 
 export interface ParsedLicenseKey {
   typeCode: string
+  /** Which purchase the key belongs to (a Stripe subscription or payment id), on keys issued since MCP 0.9.2. */
+  licenseId?: string
   signature: string
   expiry: string
   payload: string
 }
+
+/** A license id rides inside the signed type segment (`MCPT.sub_123`), so it cannot be changed. */
+const LICENSE_ID = /^\w{1,64}$/
 
 /**
  * Parse a TinyPivot license key (`TP-{TYPE}-{SIGNATURE}-{YYYYMMDD}`).
@@ -93,17 +98,19 @@ export function parseLicenseKey(key: string): ParsedLicenseKey | null {
   if (secondDashIdx === -1) {
     return null
   }
-  const typeCode = withoutPrefix.slice(0, secondDashIdx)
+  const typeSegment = withoutPrefix.slice(0, secondDashIdx)
   const signature = withoutPrefix.slice(secondDashIdx + 1, withoutPrefix.lastIndexOf('-'))
-  if (!typeCode || !signature) {
+  const [typeCode, licenseId, ...extra] = typeSegment.split('.')
+  if (!typeCode || !signature || extra.length > 0 || (licenseId !== undefined && !LICENSE_ID.test(licenseId))) {
     return null
   }
 
   return {
     typeCode,
+    ...(licenseId ? { licenseId } : {}),
     signature,
     expiry,
-    payload: `TP-${typeCode}-${expiry}`,
+    payload: `TP-${typeSegment}-${expiry}`,
   }
 }
 
@@ -383,14 +390,6 @@ async function verifyPayload(
   }
 }
 
-async function verifySignature(
-  typeCode: string,
-  signature: string,
-  expiry: string,
-): Promise<boolean> {
-  return verifyPayload(`TP-${typeCode}-${expiry}`, signature)
-}
-
 /**
  * Validate a license key and extract info
  *
@@ -409,7 +408,7 @@ export async function validateLicenseKey(key: string): Promise<LicenseInfo> {
   }
 
   // Verify cryptographic signature
-  const isValidSignature = await verifySignature(parsed.typeCode, parsed.signature, parsed.expiry)
+  const isValidSignature = await verifyPayload(parsed.payload, parsed.signature)
   if (!isValidSignature) {
     return INVALID_LICENSE
   }

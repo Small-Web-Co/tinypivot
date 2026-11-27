@@ -19,9 +19,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { SubscriptionLike } from './_lib/renewal.js'
 import Stripe from 'stripe'
 import { claimEvent } from './_lib/idempotency.js'
-import { signLicensePayload } from './_lib/license.js'
+import { expiryAfter, mintLicenseKey, PERPETUAL_EXPIRY } from './_lib/license.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
@@ -49,26 +50,28 @@ const PLAN_PRICES: Record<string, string | undefined> = {
   mcp_team_yearly: process.env.STRIPE_PRICE_MCP_TEAM_YEARLY || 'price_1UfR73BMwUz92tuiNd8bx6A7',
 }
 
+/** The purchase a key belongs to and when it ends: yearly keys run to the paid period's end plus grace. */
+async function licenseTerms(plan: string, session: Stripe.Checkout.Session): Promise<{ licenseId?: string, expiry: string }> {
+  if (!plan.startsWith('mcp_'))
+    return { expiry: PERPETUAL_EXPIRY }
+  const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id
+  if (!subscriptionId) {
+    const paymentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id
+    return { licenseId: paymentId ?? undefined, expiry: PERPETUAL_EXPIRY }
+  }
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as SubscriptionLike
+  const periodEnd = subscription.current_period_end ?? subscription.items.data[0]?.current_period_end
+  // If Stripe has no period yet, a year from now; the MCP server renews it from the subscription anyway.
+  return { licenseId: subscriptionId, expiry: expiryAfter(periodEnd ?? Math.floor(Date.now() / 1000) + 365 * 86_400) }
+}
+
 /**
- * Generate a cryptographically signed license key
- * Format: TP-{TYPE}-{SIGNATURE}-{EXPIRY}
- *
- * Uses ECDSA P-256 asymmetric cryptography:
- * - Private key (in env) signs licenses
- * - Public key (in library) verifies them
- *
- * Licenses are PERPETUAL
+ * A signed key (ECDSA P-256; the public key ships in the library). UI library keys are perpetual;
+ * MCP keys carry the Stripe subscription or payment they belong to, and yearly ones an end date.
  */
-async function generateLicenseKey(plan: string): Promise<string> {
-  const typeCode = PLAN_CODES[plan] || 'PRO1'
-
-  // Keep the key format stable while making the lifetime nature of the license explicit.
-  const expiry = '20991231'
-
-  const payload = `TP-${typeCode}-${expiry}`
-  const signature = await signLicensePayload(payload)
-
-  return `TP-${typeCode}-${signature}-${expiry}`
+async function generateLicenseKey(plan: string, session: Stripe.Checkout.Session): Promise<string> {
+  const { licenseId, expiry } = await licenseTerms(plan, session)
+  return mintLicenseKey(PLAN_CODES[plan] || 'PRO1', expiry, licenseId)
 }
 
 // Local development detection (only affects the email sender/subject)
@@ -133,7 +136,7 @@ async function sendLicenseEmail(email: string, licenseKey: string, plan: string)
 npx @smallwebco/tinypivot-mcp@latest init --license=${licenseKey}
           </pre>
           <p>Or set <code>TINYPIVOT_LICENSE_KEY</code> in your MCP config's <code>env</code> block and restart your AI harness (Antigravity, Claude Code, Claude Desktop, Cursor, OpenCode, Codex CLI, or pi).</p>
-          <p>This unlocks unlimited rows, all 10 visual themes, double-click drill-through, advanced aggregations, styled <code>.xlsx</code> exports, and read-only <code>query_postgres</code>.</p>
+          <p>This unlocks unlimited rows, all 10 visual themes, double-click drill-through, advanced aggregations, styled <code>.xlsx</code> exports, and direct read-only queries to Snowflake, BigQuery, Databricks, ClickHouse, MySQL and Postgres.</p>
     `
     : `
           <h2>How to use your license:</h2>
@@ -146,7 +149,7 @@ setLicenseKey('${licenseKey}')
 
   const footerNote = isPerpetual
     ? `<p>Your ${planNames[plan] || 'TinyPivot Pro'} license is perpetual. Add it once and you're set.</p>`
-    : `<p>Your ${planNames[plan] || 'TinyPivot MCP'} subscription is active. Manage billing or invoices anytime from your Stripe receipt link.</p>`
+    : `<p>Your ${planNames[plan] || 'TinyPivot MCP'} subscription is active. The key covers the year you paid for, and TinyPivot renews it automatically while the subscription stays active, so you never need to paste a new one. Manage billing or invoices anytime from your Stripe receipt link.</p>`
 
   try {
     console.log(`📧 Sending license email to ${maskEmail(email)}... (${isDev ? 'DEV MODE' : 'PRODUCTION'})`)
@@ -393,7 +396,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const email = session.customer_details?.email
 
     if (email) {
-      const licenseKey = await generateLicenseKey(plan)
+      const licenseKey = await generateLicenseKey(plan, session)
       const emailSent = await sendLicenseEmail(email, licenseKey, plan)
       console.log(`📋 License issued | Session: ${session.id} | Plan: ${plan} | Email: ${maskEmail(email)} | Sent: ${emailSent ? 'YES' : 'NO'}`)
     }
