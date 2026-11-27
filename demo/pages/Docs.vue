@@ -47,7 +47,8 @@ const { copiedKey, copy } = useCopy()
           </h1>
           <p class="lede">
             One command adds TinyPivot to every AI agent on your machine. From then on, ask a data question and your agent answers
-            with checked numbers, a chart, and the SQL behind it. Your files never leave your computer.
+            with checked numbers, a chart, and the SQL behind it. Use any data your agent can reach, from spreadsheets to
+            Snowflake; the model sees results, not your raw rows.
           </p>
         </header>
 

@@ -92,9 +92,9 @@ const capabilities = [
                 Ask your AI about your data. <em>Get answers you can <RotatingWord :words="heroWords" /></em>
               </h1>
               <p class="lede">
-                TinyPivot runs alongside Claude, Cursor, Codex and other AI agents as a sidecar for data work. It works with
-                spreadsheets, data files and warehouses like Snowflake, BigQuery and Postgres, catches the math mistakes AI quietly
-                makes, and shows the SQL behind every number.
+                TinyPivot runs alongside Claude, Cursor, Codex and other AI agents as a sidecar for data work. It works with any data
+                your agent can reach: spreadsheets and files, Snowflake, BigQuery, Postgres, APIs or another MCP server. It catches
+                the math mistakes AI quietly makes and shows the SQL behind every number.
               </p>
               <ul class="hero-proof">
                 <li v-for="point in heroProof" :key="point.claim">
@@ -303,8 +303,8 @@ const capabilities = [
               TinyPivot MCP + Studio
             </h3>
             <p class="product-body">
-              Install once and Claude Code, Cursor, Codex, Antigravity or pi can query your CSV, Excel, Parquet and JSON
-              files, plus data pulled from Postgres, Snowflake or BigQuery, with built-in checks, one-step statistics, and a Studio window that shows every chart and the SQL behind it.
+              Install once and Claude Code, Cursor, Codex, Antigravity or pi can analyze any data they can reach, from
+              spreadsheets and files to Snowflake, BigQuery and Postgres, with built-in checks, one-step statistics, and a Studio window that shows every chart and the SQL behind it.
             </p>
             <p class="product-price mono">
               Free to start · Pro from $149/yr

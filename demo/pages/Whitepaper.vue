@@ -131,7 +131,7 @@ const takeaways = [
             <h3>TinyPivot MCP + Studio</h3>
             <p>
               An add-on for AI agents such as Claude Code, Cursor, Codex, Antigravity and pi. It gives the agent fast SQL over
-              your local files, automatic checks, one-step statistics, and a Studio window showing every chart with the SQL behind it.
+              any data it can reach (files, spreadsheets, warehouses and APIs), automatic checks, one-step statistics, and a Studio window showing every chart with the SQL behind it.
               Every result in this paper measures this product.
             </p>
             <router-link to="/docs" class="text-link">

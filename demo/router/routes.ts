@@ -99,7 +99,7 @@ export const routeDefinitions = [
     component: () => import('../pages/Home.vue'),
     meta: {
       title: 'TinyPivot — The Data-Analysis Sidecar for AI Agents',
-      description: 'TinyPivot runs alongside Claude, Cursor, Codex and other AI agents as a sidecar for data work: it queries your files locally, catches the math mistakes AI quietly makes, and shows the SQL behind every number. 53,000+ npm downloads.',
+      description: 'TinyPivot runs alongside Claude, Cursor, Codex and other AI agents as a sidecar for data work: it works with any data your agent can reach, from spreadsheets to Snowflake, catches the math mistakes AI quietly makes, and shows the SQL behind every number. 53,000+ npm downloads.',
     },
   },
   {
