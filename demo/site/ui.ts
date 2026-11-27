@@ -99,9 +99,6 @@ export const analystPoints = [
   { title: 'Validated SQL', body: 'Questions become checked SQL, then a pivot or chart your users can keep exploring.' },
 ] as const
 
-/** Shown on the home hero and the testimonial band; update in one place. */
-export const NPM_DOWNLOADS = '53,000+'
-
 export const testimonials = [
   {
     quote: 'TinyPivot has been a great addition to our analytics platform, giving our customers intuitive, interactive data grid and pivot table capabilities without the overhead of building our own solution. Small Web Co has been incredibly responsive — actively listening to our use cases and shipping improvements quickly. It’s a high-quality, well-maintained library that delivers real value at a fraction of the cost of alternatives.',

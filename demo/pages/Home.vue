@@ -2,6 +2,7 @@
 import HarnessReel from '../components/HarnessReel.vue'
 import CopyCommand from '../components/site/CopyCommand.vue'
 import DirectConnections from '../components/site/DirectConnections.vue'
+import DownloadCount from '../components/site/DownloadCount.vue'
 import HeroCharts from '../components/site/HeroCharts.vue'
 import InstallBox from '../components/site/InstallBox.vue'
 import ModelComparisonChart from '../components/site/ModelComparisonChart.vue'
@@ -11,7 +12,6 @@ import StatHighlights from '../components/site/StatHighlights.vue'
 import TestimonialCarousel from '../components/site/TestimonialCarousel.vue'
 import { benchmarkHeadline } from '../site/benchmark'
 import { modelChartHighlights } from '../site/modelChart'
-import { NPM_DOWNLOADS } from '../site/ui'
 import { homeGainCards, TRUST_BENCH_TOTALS, trustBenchRows } from '../site/whitepaper'
 
 const facts = ['Free · unlimited rows', 'runs on your machine', 'no signup', 'no API key']
@@ -81,7 +81,7 @@ const capabilities = [
         <RetroWindow title="README — tinypivot">
           <template #corner>
             <p class="hero-npm mono">
-              <span class="hero-npm-num">{{ NPM_DOWNLOADS }}</span>
+              <DownloadCount class="hero-npm-num" />
               <span class="hero-npm-lbl">npm downloads</span>
             </p>
           </template>
