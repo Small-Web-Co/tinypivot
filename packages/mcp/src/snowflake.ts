@@ -256,14 +256,9 @@ function readRows(stmt: SdkStatement, count: number): Promise<Record<string, unk
   })
 }
 
-const officialSession: SnowflakeSessionFactory = async (config) => {
-  const sdk = await loadRuntimePackage<SdkModule>(SNOWFLAKE_RUNTIME)
-  // The MCP server talks over stdout, so the driver must never log to the console.
-  const logDir = runtimePackageDir(SNOWFLAKE_RUNTIME)
-  fs.mkdirSync(logDir, { recursive: true })
-  sdk.configure({ logLevel: 'ERROR', logFilePath: path.join(logDir, 'snowflake.log'), additionalLogToConsole: false })
-
-  const connection = sdk.createConnection({
+/** Options for the official driver's connection. */
+export function snowflakeConnectionOptions(config: SnowflakeConfig): Record<string, unknown> {
+  return {
     account: config.account,
     username: config.username,
     ...authOptions(config.auth),
@@ -274,7 +269,19 @@ const officialSession: SnowflakeSessionFactory = async (config) => {
     application: 'TinyPivot',
     queryTag: QUERY_TAG,
     clientSessionKeepAlive: true,
-  })
+    // Integers arrive as BigInt, so ids and counts past 2^53 stay exact (as text) instead of rounding.
+    jsTreatIntegerAsBigInt: true,
+  }
+}
+
+const officialSession: SnowflakeSessionFactory = async (config) => {
+  const sdk = await loadRuntimePackage<SdkModule>(SNOWFLAKE_RUNTIME)
+  // The MCP server talks over stdout, so the driver must never log to the console.
+  const logDir = runtimePackageDir(SNOWFLAKE_RUNTIME)
+  fs.mkdirSync(logDir, { recursive: true })
+  sdk.configure({ logLevel: 'ERROR', logFilePath: path.join(logDir, 'snowflake.log'), additionalLogToConsole: false })
+
+  const connection = sdk.createConnection(snowflakeConnectionOptions(config))
   // Browser sign-in needs connectAsync; the other methods use connect.
   const connected = config.auth.kind === 'browser'
     ? connection.connectAsync(() => {})
@@ -328,10 +335,19 @@ async function runQuery(session: SnowflakeSessionLike, config: SnowflakeConfig, 
 
   const { rows, totalRows } = await session.run(cleaned, config.maxRows)
   return {
-    rows: rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, toPlainValue(value)]))),
+    rows: rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, toSnowflakePlainValue(value)]))),
     truncated: totalRows > config.maxRows,
     note: `Snowflake planned to scan up to ${formatBytes(stats.bytes)} (limit ${formatBytes(config.maxBytes)}).`,
   }
+}
+
+/**
+ * A row value as plain JSON. With `jsTreatIntegerAsBigInt` the driver returns integers as
+ * big-integer objects (they have `toJSNumber`): safe ones become numbers, larger ones exact text.
+ */
+export function toSnowflakePlainValue(value: unknown): unknown {
+  const isBigInteger = typeof value === 'object' && value !== null && typeof (value as { toJSNumber?: unknown }).toJSNumber === 'function'
+  return toPlainValue(isBigInteger ? BigInt(String(value)) : value)
 }
 
 export function snowflakeConnector(config: SnowflakeConfig, createSession: SnowflakeSessionFactory = officialSession): WarehouseConnector {
@@ -366,7 +382,6 @@ export function snowflakeConnector(config: SnowflakeConfig, createSession: Snowf
     sqlHint: `Snowflake SQL, one read-only SELECT${where ? `; unqualified tables resolve in ${where}` : '; name tables database.schema.table'}.`,
     freeAlternative: 'export with `snowsql -o output_format=csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
-    preview: true,
     listTables: () => withSession(s => listTables(s, config)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }

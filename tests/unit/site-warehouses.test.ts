@@ -12,8 +12,8 @@ describe('home direct connections section', () => {
       expect(arm.correct).toBe(WAREHOUSE_BENCH.runs)
   })
 
-  it('marks only the connectors that have not run against a live warehouse as preview', () => {
-    expect(WAREHOUSES.filter(w => !w.preview).map(w => w.name)).toEqual(['BigQuery', 'Postgres', 'ClickHouse', 'MySQL & MariaDB'])
+  it('lists every warehouse TinyPivot queries directly', () => {
+    expect(WAREHOUSES).toEqual(['BigQuery', 'Snowflake', 'Databricks', 'ClickHouse', 'MySQL & MariaDB', 'Postgres'])
   })
 
   it('offers the init command that switches on existing sign-ins', () => {

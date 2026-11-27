@@ -11,7 +11,9 @@ import {
   parseExplain,
   readPrivateKey,
   snowflakeConfigFromEnv,
+  snowflakeConnectionOptions,
   snowflakeConnector,
+  toSnowflakePlainValue,
 } from '../../packages/mcp/src/snowflake'
 import { maskSql, readOnlyStatementError } from '../../packages/mcp/src/warehouse'
 
@@ -147,6 +149,19 @@ describe('snowflake connector', () => {
 })
 
 describe('snowflake configuration', () => {
+  it('turns the driver\'s big-integer objects into numbers when safe and exact text when not', () => {
+    const bigInteger = (text: string) => ({ toJSNumber: () => Number(text), toString: () => text })
+    expect(toSnowflakePlainValue(bigInteger('3000'))).toBe(3000)
+    expect(toSnowflakePlainValue(bigInteger('9007199254740993'))).toBe('9007199254740993')
+    expect(toSnowflakePlainValue(12.5)).toBe(12.5)
+    expect(toSnowflakePlainValue(null)).toBeNull()
+  })
+
+  it('asks the driver for integers as BigInt, so values past 2^53 are not rounded', () => {
+    const config = snowflakeConfigFromEnv({ TINYPIVOT_SNOWFLAKE_ACCOUNT: 'acme', TINYPIVOT_SNOWFLAKE_USER: 'ANALYST', TINYPIVOT_SNOWFLAKE_PASSWORD: 'p' })!
+    expect(snowflakeConnectionOptions(config)).toMatchObject({ jsTreatIntegerAsBigInt: true, application: 'TinyPivot', account: 'acme' })
+  })
+
   it('is configured only with an account and a user, picking key pair, token, password, then browser', () => {
     expect(snowflakeConfigFromEnv({ TINYPIVOT_SNOWFLAKE_ACCOUNT: 'acme' })).toBeUndefined()
     const base = { TINYPIVOT_SNOWFLAKE_ACCOUNT: 'acme', TINYPIVOT_SNOWFLAKE_USER: 'ANALYST' }

@@ -109,7 +109,6 @@ describe('mysql connector', () => {
     ])
     expect(result).toEqual({ rows: [{ region: 'EMEA', amount: 120 }], truncated: false, note: 'Ran in a read-only transaction on MySQL 8.4.2, 60-second limit.' })
     expect(connector).toMatchObject({ id: 'mysql', toolName: 'query_mysql', label: 'MySQL', maxRows: 3 })
-    expect(connector.preview).toBeUndefined()
   })
 
   it('uses max_statement_time (seconds) on MariaDB', async () => {

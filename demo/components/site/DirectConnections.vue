@@ -11,8 +11,8 @@ const highlights = warehouseHighlights()
 <template>
   <div class="direct">
     <ul class="wh-list mono" aria-label="Warehouses TinyPivot queries directly">
-      <li v-for="wh in WAREHOUSES" :key="wh.name" class="wh">
-        {{ wh.name }}<span v-if="wh.preview" class="wh-tag">preview</span>
+      <li v-for="name in WAREHOUSES" :key="name" class="wh">
+        {{ name }}
       </li>
     </ul>
 
@@ -39,8 +39,7 @@ const highlights = warehouseHighlights()
 
     <p class="foot">
       Measured with {{ WAREHOUSE_BENCH.model }} on {{ WAREHOUSE_BENCH.questions }} trap questions over BigQuery, two runs each.
-      Time is the average per question; cost is all {{ WAREHOUSE_BENCH.runs }} runs at API prices. Preview connectors pass
-      every automated test and have not yet run against a live warehouse.
+      Time is the average per question; cost is all {{ WAREHOUSE_BENCH.runs }} runs at API prices. Every connector is tested against a live warehouse.
       <a :href="WAREHOUSE_SETUP_URL" class="text-link" target="_blank" rel="noopener">
         Setup for each warehouse →
       </a>
@@ -70,14 +69,6 @@ const highlights = warehouseHighlights()
   background: var(--paper-raised);
   font-size: 0.82rem;
   font-weight: 700;
-}
-
-.wh-tag {
-  font-size: 0.64rem;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
 }
 
 .benefits {

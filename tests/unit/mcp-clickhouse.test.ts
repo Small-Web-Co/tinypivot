@@ -241,7 +241,6 @@ describe('clickhouse connector', () => {
   it('describes itself as the ClickHouse tool, no longer a preview', () => {
     const connector = clickHouseConnector(CONFIG, async () => fakeClient().client)
     expect(connector).toMatchObject({ id: 'clickhouse', label: 'ClickHouse', toolName: 'query_clickhouse', maxRows: 3 })
-    expect(connector.preview).toBeUndefined()
     expect(connector.sqlHint).toContain('resolve in acme')
   })
 })

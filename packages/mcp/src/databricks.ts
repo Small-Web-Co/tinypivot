@@ -466,7 +466,6 @@ export function databricksConnector(config: DatabricksConfig, createSession: Dat
     sqlHint: `Databricks SQL, one read-only SELECT${where ? `; unqualified tables resolve in ${where}` : '; name tables catalog.schema.table'}.`,
     freeAlternative: 'download the result as CSV from the Databricks SQL editor and pass the file to `load_file`',
     maxRows: config.maxRows,
-    preview: true,
     listTables: () => withSession(s => listTables(s, config)),
     query: sql => withSession(s => runQuery(s, config, sql)),
   }

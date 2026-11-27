@@ -178,7 +178,7 @@ describe('databricks connector', () => {
 
   it('describes itself as a preview Databricks connector', () => {
     const connector = databricksConnector(CONFIG, async () => fakeSession().session)
-    expect(connector).toMatchObject({ id: 'databricks', toolName: 'query_databricks', label: 'Databricks', preview: true, maxRows: 3 })
+    expect(connector).toMatchObject({ id: 'databricks', toolName: 'query_databricks', label: 'Databricks', maxRows: 3 })
     expect(connector.sqlHint).toContain('main.sales')
   })
 })

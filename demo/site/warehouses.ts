@@ -2,20 +2,7 @@ import { percentChange } from './modelChart'
 
 /** Direct warehouse connections (Pro): what they are for, and the measured gain behind the claim. */
 
-export interface Warehouse {
-  name: string
-  /** True until the connector has passed a test against a real warehouse. */
-  preview: boolean
-}
-
-export const WAREHOUSES: Warehouse[] = [
-  { name: 'BigQuery', preview: false },
-  { name: 'Postgres', preview: false },
-  { name: 'Snowflake', preview: true },
-  { name: 'Databricks', preview: true },
-  { name: 'ClickHouse', preview: false },
-  { name: 'MySQL & MariaDB', preview: false },
-]
+export const WAREHOUSES = ['BigQuery', 'Snowflake', 'Databricks', 'ClickHouse', 'MySQL & MariaDB', 'Postgres'] as const
 
 /** Per-warehouse sign-in and guard settings live in the MCP README. */
 export const WAREHOUSE_SETUP_URL = 'https://github.com/Small-Web-Co/tinypivot/tree/master/packages/mcp#direct-connections-pro'

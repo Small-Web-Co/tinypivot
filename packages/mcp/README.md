@@ -147,7 +147,7 @@ Each tool appears only when its settings are present.
 - Results return up to 5,000 rows. When a result is cut, TinyPivot tells the agent to aggregate in BigQuery instead, so totals cover the whole table.
 - Jobs are labelled `client: tinypivot`, so they are easy to find in BigQuery's job history and billing.
 
-**Snowflake** (`query_snowflake`, preview: please report problems on GitHub): the easiest setup is `TINYPIVOT_SNOWFLAKE_CONNECTION=<name>`, which reuses a connection from the `connections.toml` shared by the Snowflake CLI, the Python connector and Snowflake's MCP server (`default` follows that file's own default). Otherwise set `TINYPIVOT_SNOWFLAKE_ACCOUNT` and `TINYPIVOT_SNOWFLAKE_USER`; `TINYPIVOT_SNOWFLAKE_*` settings override a named connection's values. Sign-in uses the connection's `authenticator` when it names one, else, in this order:
+**Snowflake** (`query_snowflake`): the easiest setup is `TINYPIVOT_SNOWFLAKE_CONNECTION=<name>`, which reuses a connection from the `connections.toml` shared by the Snowflake CLI, the Python connector and Snowflake's MCP server (`default` follows that file's own default). Otherwise set `TINYPIVOT_SNOWFLAKE_ACCOUNT` and `TINYPIVOT_SNOWFLAKE_USER`; `TINYPIVOT_SNOWFLAKE_*` settings override a named connection's values. Sign-in uses the connection's `authenticator` when it names one, else, in this order:
 
 - Key pair (recommended): `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY` (the PEM text; `\n` escapes are fine) or `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY_PATH`, and `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE` if the key is encrypted.
 - A programmatic access token in `TINYPIVOT_SNOWFLAKE_TOKEN`.
@@ -165,7 +165,7 @@ Each tool appears only when its settings are present.
 - Queries carry the query tag `tinypivot` and the application name `TinyPivot`, so they are easy to find in query history and cost reports.
 - Results return up to 5,000 rows; Snowflake counts the rows first and only that many are fetched.
 
-**Databricks** (`query_databricks`, preview: please report problems on GitHub): the easiest setup is `TINYPIVOT_DATABRICKS_PROFILE=<name>`, which reuses a profile from the `~/.databrickscfg` kept by the Databricks CLI and SDKs (`DATABRICKS_CONFIG_FILE` points elsewhere). Otherwise set `TINYPIVOT_DATABRICKS_HOST`; with no credentials TinyPivot also reuses the first profile for that host. `TINYPIVOT_DATABRICKS_*` settings override a profile's values. Sign-in follows the profile's `auth_type` when it has one, else, in this order:
+**Databricks** (`query_databricks`): the easiest setup is `TINYPIVOT_DATABRICKS_PROFILE=<name>`, which reuses a profile from the `~/.databrickscfg` kept by the Databricks CLI and SDKs (`DATABRICKS_CONFIG_FILE` points elsewhere). Otherwise set `TINYPIVOT_DATABRICKS_HOST`; with no credentials TinyPivot also reuses the first profile for that host. `TINYPIVOT_DATABRICKS_*` settings override a profile's values. Sign-in follows the profile's `auth_type` when it has one, else, in this order:
 
 - A personal access token in `TINYPIVOT_DATABRICKS_TOKEN` (or the profile's `token`).
 - An OAuth service principal: `TINYPIVOT_DATABRICKS_CLIENT_ID` and `TINYPIVOT_DATABRICKS_CLIENT_SECRET` (or the profile's `client_id` / `client_secret`).
@@ -179,6 +179,7 @@ Each tool appears only when its settings are present.
   3. Running it with a 60-second statement timeout (`STATEMENT_TIMEOUT`).
 - Queries carry the user agent `TinyPivot` and the query tag `client:tinypivot`, so they are easy to find in query history.
 - Results return up to 5,000 rows. When a result is cut, TinyPivot tells the agent to aggregate in Databricks instead, so totals cover the whole table.
+- Databricks' Node driver returns `BIGINT` as a JavaScript number, so integers beyond 2^53 (about 9 quadrillion) arrive rounded. Cast very large ids to `STRING` in the query to keep them exact.
 
 **ClickHouse** (`query_clickhouse`): set `TINYPIVOT_CLICKHOUSE_URL` to the HTTP(S) endpoint (e.g. `https://abc.eu-west-1.aws.clickhouse.cloud:8443`), plus `TINYPIVOT_CLICKHOUSE_USER`, `_PASSWORD` and `_DATABASE` (or put them in the URL as `https://user:pass@host:8443/database`; the `TINYPIVOT_CLICKHOUSE_*` settings win over the URL's). If you already use `clickhouse client`, `TINYPIVOT_CLICKHOUSE_USE_CLIENT_CONFIG=1` reuses the host, user, password, database and `secure` flag from `~/.clickhouse-client/config.xml` (or the file in `CLICKHOUSE_CLIENT_CONFIG`; over HTTPS on 8443 when secure, else HTTP on 8123; set the URL for other ports). ClickHouse's official Node client downloads once into `~/.cache/tinypivot` on the first query and never logs to the console.
 
