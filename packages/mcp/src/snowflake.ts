@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { formatBytes } from './bigquery.js'
+import { expandHome, readSnowflakeConnections } from './config-files.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage, runtimePackageDir } from './runtime-package.js'
 import { listFromEnv, QueryRefused, readOnlyStatementError } from './warehouse.js'
@@ -34,6 +35,7 @@ const QUERY_TAG = 'tinypivot'
 export type SnowflakeAuth
   = | { kind: 'keypair', pem?: string, path?: string, passphrase?: string }
     | { kind: 'token', token: string }
+    | { kind: 'oauth', token: string }
     | { kind: 'password', password: string }
     | { kind: 'browser' }
 
@@ -58,8 +60,53 @@ export function readPrivateKey(options: { pem?: string, path?: string, passphras
   return key.export({ format: 'pem', type: 'pkcs8' }).toString()
 }
 
-/** Snowflake settings from TINYPIVOT_SNOWFLAKE_*, or undefined when no account is set. */
-export function snowflakeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): SnowflakeConfig | undefined {
+/** connections.toml keys, as the TINYPIVOT_SNOWFLAKE_* setting each one fills. */
+const CONNECTION_KEYS: Record<string, string> = {
+  account: 'ACCOUNT',
+  user: 'USER',
+  username: 'USER',
+  password: 'PASSWORD',
+  token: 'TOKEN',
+  authenticator: 'AUTHENTICATOR',
+  private_key_file: 'PRIVATE_KEY_PATH',
+  private_key_path: 'PRIVATE_KEY_PATH',
+  private_key_raw: 'PRIVATE_KEY',
+  private_key_file_pwd: 'PRIVATE_KEY_PASSPHRASE',
+  private_key_passphrase: 'PRIVATE_KEY_PASSPHRASE',
+  role: 'ROLE',
+  warehouse: 'WAREHOUSE',
+  database: 'DATABASE',
+  schema: 'SCHEMA',
+}
+
+/**
+ * The settings of the connection named by TINYPIVOT_SNOWFLAKE_CONNECTION, read from the
+ * connections.toml that the Snowflake CLI, Python connector and Snowflake's MCP server share, so an
+ * existing sign-in works as is. Empty when no connection is named; TINYPIVOT_SNOWFLAKE_* still win.
+ */
+export function snowflakeConnectionSettings(env: NodeJS.ProcessEnv = process.env, home?: string): Record<string, string> {
+  const wanted = env.TINYPIVOT_SNOWFLAKE_CONNECTION?.trim()
+  if (!wanted)
+    return {}
+  const file = readSnowflakeConnections(env, home)
+  const name = wanted === 'default' && file ? file.defaultName : wanted
+  const connection = file?.connections[name]
+  if (!connection) {
+    console.error(`[tinypivot-mcp] Snowflake connection "${name}" was not found${file ? ` in ${file.file}` : ' (no connections.toml)'}; query_snowflake is off.`)
+    return {}
+  }
+  const settings: Record<string, string> = {}
+  for (const [key, value] of Object.entries(connection)) {
+    const target = CONNECTION_KEYS[key.toLowerCase()]
+    if (target && (typeof value === 'string' || typeof value === 'number'))
+      settings[`TINYPIVOT_SNOWFLAKE_${target}`] = target === 'PRIVATE_KEY_PATH' ? expandHome(String(value), home) : String(value)
+  }
+  return settings
+}
+
+/** Snowflake settings from a named connection and TINYPIVOT_SNOWFLAKE_*, or undefined when no account is set. */
+export function snowflakeConfigFromEnv(processEnv: NodeJS.ProcessEnv = process.env, home?: string): SnowflakeConfig | undefined {
+  const env = { ...snowflakeConnectionSettings(processEnv, home), ...processEnv }
   const account = env.TINYPIVOT_SNOWFLAKE_ACCOUNT?.trim()
   const username = env.TINYPIVOT_SNOWFLAKE_USER?.trim()
   if (!account || !username)
@@ -79,8 +126,13 @@ export function snowflakeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Sn
   }
 }
 
-/** Key pair first, then a programmatic access token, then a password; browser sign-in when none is set. */
+/** An explicit authenticator first; else key pair, then a programmatic access token, then a password; browser sign-in when none is set. */
 function snowflakeAuthFromEnv(env: NodeJS.ProcessEnv): SnowflakeAuth {
+  const authenticator = env.TINYPIVOT_SNOWFLAKE_AUTHENTICATOR?.trim().toLowerCase()
+  if (authenticator === 'externalbrowser')
+    return { kind: 'browser' }
+  if (authenticator === 'oauth' && env.TINYPIVOT_SNOWFLAKE_TOKEN)
+    return { kind: 'oauth', token: env.TINYPIVOT_SNOWFLAKE_TOKEN }
   if (env.TINYPIVOT_SNOWFLAKE_PRIVATE_KEY || env.TINYPIVOT_SNOWFLAKE_PRIVATE_KEY_PATH) {
     // Read on first connect, so a bad key fails that query rather than the whole server.
     return {
@@ -167,6 +219,7 @@ function authOptions(auth: SnowflakeAuth): Record<string, unknown> {
   switch (auth.kind) {
     case 'keypair': return { authenticator: 'SNOWFLAKE_JWT', privateKey: readPrivateKey(auth) }
     case 'token': return { authenticator: 'PROGRAMMATIC_ACCESS_TOKEN', token: auth.token }
+    case 'oauth': return { authenticator: 'OAUTH', token: auth.token }
     case 'password': return { authenticator: 'SNOWFLAKE', password: auth.password }
     case 'browser': return { authenticator: 'EXTERNALBROWSER' }
   }

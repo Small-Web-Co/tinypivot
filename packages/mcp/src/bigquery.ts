@@ -194,7 +194,6 @@ export function bigQueryConnector(config: BigQueryConfig, createClient: BigQuery
     sqlHint: `GoogleSQL, one read-only SELECT; name tables \`dataset.table\` (project ${config.projectId}) or \`project.dataset.table\`.`,
     freeAlternative: 'export with `bq query --format=csv` and pass the file to `load_file`',
     maxRows: config.maxRows,
-    preview: true,
     listTables: async () => listTables(await getClient(), config),
     query: async sql => runQuery(await getClient(), config, sql),
   }

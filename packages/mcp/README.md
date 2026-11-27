@@ -44,6 +44,7 @@ Options:
 
 - `--targets=claude,claude-desktop,cursor,opencode,antigravity,antigravity-cli,pi,codex` — configure specific harnesses
 - `--license=TP-...` — include your `TINYPIVOT_LICENSE_KEY` in the generated MCP config
+- `--connect` (or `--connect=bigquery,snowflake,databricks`) — let your agent query warehouses you are already signed in to with their own CLIs (Pro). `init` always lists the sign-ins it finds; only this flag connects them, and only a project, connection or profile name is written, never a secret
 - `--local` — wire a local build (`node .../dist/cli.js`) for local development
 - `--no-rules` — skip adding the auto-use TinyPivot rule to `~/.claude/CLAUDE.md`
 - `--dry-run` — preview changes without modifying files
@@ -135,7 +136,9 @@ TinyPivot works with any data your agent can reach. Use whichever workflow match
 
 Each tool appears only when its settings are present.
 
-**BigQuery** (`query_bigquery`, preview: please report problems on GitHub): set `TINYPIVOT_BIGQUERY_PROJECT`. Credentials come from Google's usual sources: `gcloud auth application-default login`, or `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account key. Google's client library downloads once into `~/.cache/tinypivot` on the first query.
+**No new sign-in if you already use your warehouse's CLI.** TinyPivot reuses the sign-in your tools already keep: gcloud's application default credentials and project, the Snowflake CLI's `connections.toml`, the Databricks CLI's `~/.databrickscfg`. Run `npx @smallwebco/tinypivot-mcp@latest init`: it lists the sign-ins it finds and the `--connect` command that switches them on. Someone with no sign-in yet gets a browser sign-in on their first query (Google, Snowflake SSO, Databricks OAuth).
+
+**BigQuery** (`query_bigquery`): set `TINYPIVOT_BIGQUERY_PROJECT`. Credentials come from Google's usual sources: `gcloud auth application-default login`, or `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account key. Google's client library downloads once into `~/.cache/tinypivot` on the first query.
 
 - Every query is dry-run first. BigQuery itself reports what the SQL does, so anything other than one `SELECT` is refused before it runs, whatever the syntax.
 - `TINYPIVOT_BIGQUERY_MAX_GB` caps how much one query may scan (default 50 GB). The cap is checked on the dry run and also set as `maximumBytesBilled` on the job, so BigQuery will not bill past it.
@@ -144,7 +147,7 @@ Each tool appears only when its settings are present.
 - Results return up to 5,000 rows. When a result is cut, TinyPivot tells the agent to aggregate in BigQuery instead, so totals cover the whole table.
 - Jobs are labelled `client: tinypivot`, so they are easy to find in BigQuery's job history and billing.
 
-**Snowflake** (`query_snowflake`, preview: please report problems on GitHub): set `TINYPIVOT_SNOWFLAKE_ACCOUNT` and `TINYPIVOT_SNOWFLAKE_USER`, plus one way to sign in, tried in this order:
+**Snowflake** (`query_snowflake`, preview: please report problems on GitHub): the easiest setup is `TINYPIVOT_SNOWFLAKE_CONNECTION=<name>`, which reuses a connection from the `connections.toml` shared by the Snowflake CLI, the Python connector and Snowflake's MCP server (`default` follows that file's own default). Otherwise set `TINYPIVOT_SNOWFLAKE_ACCOUNT` and `TINYPIVOT_SNOWFLAKE_USER`; `TINYPIVOT_SNOWFLAKE_*` settings override a named connection's values. Sign-in uses the connection's `authenticator` when it names one, else, in this order:
 
 - Key pair (recommended): `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY` (the PEM text; `\n` escapes are fine) or `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY_PATH`, and `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE` if the key is encrypted.
 - A programmatic access token in `TINYPIVOT_SNOWFLAKE_TOKEN`.

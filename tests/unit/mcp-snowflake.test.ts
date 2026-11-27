@@ -1,5 +1,8 @@
 import type { SnowflakeConfig, SnowflakeSessionLike } from '../../packages/mcp/src/snowflake'
 import crypto from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { warehousesFromEnv } from '../../packages/mcp/src/server'
 import {
@@ -162,5 +165,49 @@ describe('snowflake configuration', () => {
     const pem = readPrivateKey({ pem: escaped, passphrase: 'secret' })
     expect(pem).toContain('-----BEGIN PRIVATE KEY-----')
     expect(() => readPrivateKey({ pem: escaped, passphrase: 'wrong' })).toThrow()
+  })
+})
+
+describe('reusing a Snowflake CLI connection', () => {
+  function withConnectionsFile(toml: string, config = '') {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tp-sf-home-'))
+    fs.mkdirSync(path.join(home, '.snowflake'))
+    fs.writeFileSync(path.join(home, '.snowflake', 'connections.toml'), toml)
+    if (config)
+      fs.writeFileSync(path.join(home, '.snowflake', 'config.toml'), config)
+    return home
+  }
+
+  const TOML = `
+[default]
+account = "acme-xy12345"
+user = "ANALYST"
+authenticator = "SNOWFLAKE_JWT"
+private_key_file = "~/keys/rsa.p8"
+warehouse = "ANALYTICS_WH"
+role = "READER"
+
+[sso]
+account = "acme-xy12345"
+user = "brice@example.com"
+authenticator = "externalbrowser"
+password = "unused"
+`
+
+  it('reads the named connection, with TINYPIVOT_SNOWFLAKE_* overriding it', () => {
+    const home = withConnectionsFile(TOML)
+    const config = snowflakeConfigFromEnv({ TINYPIVOT_SNOWFLAKE_CONNECTION: 'default', TINYPIVOT_SNOWFLAKE_ROLE: 'ANALYST_RO' }, home)
+    expect(config).toMatchObject({ account: 'acme-xy12345', username: 'ANALYST', warehouse: 'ANALYTICS_WH', role: 'ANALYST_RO' })
+    expect(config?.auth).toEqual({ kind: 'keypair', pem: undefined, path: path.join(home, 'keys/rsa.p8'), passphrase: undefined })
+  })
+
+  it('honours the connection\'s own authenticator, and config.toml\'s default connection', () => {
+    const home = withConnectionsFile(TOML, 'default_connection_name = "sso"\n')
+    expect(snowflakeConfigFromEnv({ TINYPIVOT_SNOWFLAKE_CONNECTION: 'default' }, home)?.auth).toEqual({ kind: 'browser' })
+  })
+
+  it('stays off when the named connection does not exist', () => {
+    const home = withConnectionsFile(TOML)
+    expect(snowflakeConfigFromEnv({ TINYPIVOT_SNOWFLAKE_CONNECTION: 'missing' }, home)).toBeUndefined()
   })
 })

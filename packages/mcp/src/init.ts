@@ -1,4 +1,5 @@
 import type { ChartThemePreset } from '@smallwebco/tinypivot-core'
+import type { DetectedWarehouse } from './warehouse-detect.js'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -8,6 +9,7 @@ import { EXTENSION_HEADER } from './agent-bridge.js'
 import { buildOpenCodePluginSource } from './opencode-plugin.js'
 import { buildPiExtensionSource, PI_ENTRY_EXTRAS } from './pi-extension.js'
 import { saveVisualThemePreference } from './store.js'
+import { CONNECTABLE_WAREHOUSES, detectWarehouses } from './warehouse-detect.js'
 
 export const VALID_INIT_TARGETS = [
   'claude',
@@ -31,6 +33,10 @@ interface InitOptions {
   targets: Set<string> | null
   licenseKey?: string
   theme?: ChartThemePreset
+  /** Warehouses to connect: `all` detected ones, a chosen set, or none. */
+  connect: Set<string> | 'all' | null
+  /** Settings for the warehouses being connected, written into each server entry. */
+  connectEnv?: Record<string, string>
 }
 
 export interface TargetResult {
@@ -42,6 +48,7 @@ export interface TargetResult {
 }
 
 export interface InitSummary {
+  warehouses?: { detected: Array<{ id: string, found: string }>, connected: string[] }
   ok: boolean
   exitCode: number
   dryRun: boolean
@@ -111,6 +118,9 @@ Options:
   --all                   Configure all supported harnesses even if not yet detected
   --license=<key>         Write TINYPIVOT_LICENSE_KEY into each configured server env
   --theme=<id>            Set default visual theme (${CHART_THEME_IDS.join(', ')})
+  --connect[=<list>]      Let your agent query warehouses you are already signed in to (Pro):
+                          ${CONNECTABLE_WAREHOUSES.join(', ')}. Bare --connect connects every one found.
+                          Only a project, connection or profile name is written, never a secret.
   --no-rules              Skip adding auto-use TinyPivot rules to CLAUDE.md / AGENTS.md
   --dry-run               Preview planned changes without writing files
   --json                  Print machine-readable JSON to stdout (no prompts, real exit codes)
@@ -135,6 +145,7 @@ function parseArgs(args: string[]): ParseArgsResult {
     noRules: false,
     json: args.includes('--json'),
     targets: null,
+    connect: null,
   }
 
   for (const arg of args) {
@@ -179,6 +190,22 @@ function parseArgs(args: string[]): ParseArgsResult {
         }
       }
       opts.targets = new Set(list)
+    }
+    else if (arg === '--connect') {
+      opts.connect = 'all'
+    }
+    else if (arg.startsWith('--connect=')) {
+      const list = arg.slice('--connect='.length).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      const unknown = list.filter(w => !(CONNECTABLE_WAREHOUSES as readonly string[]).includes(w))
+      if (unknown.length > 0 || list.length === 0) {
+        return {
+          kind: 'error',
+          json: opts.json,
+          error: unknown.length > 0 ? `Unknown warehouse(s): ${unknown.join(', ')}.` : 'No warehouses provided for --connect.',
+          hint: `Use one or more of: ${CONNECTABLE_WAREHOUSES.join(', ')}.`,
+        }
+      }
+      opts.connect = new Set(list)
     }
     else if (arg.startsWith('--license=')) {
       opts.licenseKey = arg.slice('--license='.length).trim()
@@ -259,6 +286,7 @@ function buildStdioServerEntry(opts: InitOptions, cliPath: string) {
     env.TINYPIVOT_LICENSE_KEY = opts.licenseKey
   if (opts.theme)
     env.TINYPIVOT_THEME = opts.theme
+  Object.assign(env, opts.connectEnv)
   if (Object.keys(env).length > 0)
     entry.env = env
   return entry
@@ -588,6 +616,31 @@ async function upsertAllAgentRules(opts: InitOptions): Promise<TargetResult[]> {
   return candidates.filter((r): r is TargetResult => r !== null)
 }
 
+/** The detected warehouses that `--connect` asked for. */
+export function chooseWarehouses(detected: DetectedWarehouse[], connect: InitOptions['connect']): DetectedWarehouse[] {
+  if (!connect)
+    return []
+  return connect === 'all' ? detected : detected.filter(w => connect.has(w.id))
+}
+
+function printWarehouses(detected: DetectedWarehouse[], connected: DetectedWarehouse[], connect: InitOptions['connect']): void {
+  if (connected.length > 0) {
+    console.log('\nConnected warehouses (queried directly, read-only, with TinyPivot Pro):')
+    for (const w of connected)
+      console.log(`  ✓ ${w.label.padEnd(18)} ${w.found}`)
+  }
+  const missing = connect instanceof Set ? [...connect].filter(id => !connected.some(w => w.id === id)) : []
+  if (missing.length > 0)
+    console.log(`\n  No existing sign-in found for: ${missing.join(', ')}. See https://tiny-pivot.com/docs for setting one up.`)
+  const offered = detected.filter(w => !connected.includes(w))
+  if (offered.length > 0) {
+    console.log('\nWarehouses you are already signed in to:')
+    for (const w of offered)
+      console.log(`  · ${w.label.padEnd(18)} ${w.found}`)
+    console.log(`  Let your agent query them directly with: init --connect=${offered.map(w => w.id).join(',')}`)
+  }
+}
+
 export async function runInitCommand(args: string[]): Promise<InitSummary | null> {
   const parsed = parseArgs(args)
   if (parsed.kind === 'help')
@@ -621,6 +674,9 @@ export async function runInitCommand(args: string[]): Promise<InitSummary | null
 
   const opts = parsed.opts
   const home = os.homedir()
+  const detected = detectWarehouses(process.env, home)
+  const connected = chooseWarehouses(detected, opts.connect)
+  opts.connectEnv = Object.assign({}, ...connected.map(w => w.env))
   const mode = opts.local ? 'local' as const : 'npx' as const
   const spec = opts.local ? cliPath : MCP_NPX_SPEC
 
@@ -706,6 +762,10 @@ export async function runInitCommand(args: string[]): Promise<InitSummary | null
     configuredCount,
     errorCount,
     results,
+    warehouses: {
+      detected: detected.map(({ id, found }) => ({ id, found })),
+      connected: connected.map(w => w.id),
+    },
     ...(hint ? { hint } : {}),
   }
 
@@ -726,6 +786,8 @@ export async function runInitCommand(args: string[]): Promise<InitSummary | null
       continue
     console.log(`  ${iconFor[r.status]} ${r.label.padEnd(18)} ${r.detail} (${r.configPath})`)
   }
+
+  printWarehouses(detected, connected, opts.connect)
 
   if (configuredCount === 0) {
     console.log(`\n  ${hint}`)
