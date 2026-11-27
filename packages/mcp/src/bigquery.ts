@@ -2,7 +2,7 @@ import type { RuntimePackage } from './runtime-package.js'
 import type { WarehouseConnector, WarehouseQueryResult } from './warehouse.js'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { listFromEnv } from './warehouse.js'
+import { listFromEnv, QueryRefused } from './warehouse.js'
 
 /**
  * Read-only BigQuery, through Google's official client. Every query is dry-run first: BigQuery
@@ -130,13 +130,13 @@ export function toBigQueryPlainValue(value: unknown): unknown {
 export function checkDryRun(stats: JobStatistics | undefined, config: BigQueryConfig): number {
   const statementType = stats?.query?.statementType
   if (statementType !== 'SELECT')
-    throw new Error(`Only a single read-only SELECT can run here; BigQuery read this as ${statementType ?? 'an unknown statement'}.`)
+    throw new QueryRefused(`Only a single read-only SELECT can run here; BigQuery read this as ${statementType ?? 'an unknown statement'}.`)
   const blocked = (stats?.query?.referencedTables ?? []).find(t => !isAllowedTable(t, config.allowed, config.projectId))
   if (blocked)
-    throw new Error(`Table \`${blocked.projectId}.${blocked.datasetId}.${blocked.tableId}\` is not in TINYPIVOT_BIGQUERY_ALLOWED.`)
+    throw new QueryRefused(`Table \`${blocked.projectId}.${blocked.datasetId}.${blocked.tableId}\` is not in TINYPIVOT_BIGQUERY_ALLOWED.`)
   const bytes = Number(stats?.query?.totalBytesProcessed ?? stats?.totalBytesProcessed ?? 0)
   if (bytes > config.maxBytes) {
-    throw new Error(`This query would scan ${formatBytes(bytes)}, over the ${formatBytes(config.maxBytes)} limit (TINYPIVOT_BIGQUERY_MAX_GB). Select fewer columns or filter on the partition column.`)
+    throw new QueryRefused(`This query would scan ${formatBytes(bytes)}, over the ${formatBytes(config.maxBytes)} limit (TINYPIVOT_BIGQUERY_MAX_GB). Select fewer columns or filter on the partition column.`)
   }
   return bytes
 }

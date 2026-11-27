@@ -83,6 +83,13 @@ export {
   TINYPIVOT_MCP_INSTRUCTIONS,
 } from './server.js'
 export {
+  type SnowflakeConfig,
+  snowflakeConfigFromEnv,
+  snowflakeConnector,
+  type SnowflakeSessionFactory,
+  type SnowflakeSessionLike,
+} from './snowflake.js'
+export {
   type ColumnSummary,
   type DatasetMetadata,
   DatasetStore,
@@ -114,4 +121,4 @@ export {
   resolveCompanionUrl,
   runTuiCommand,
 } from './tui.js'
-export { type WarehouseConnector, type WarehouseQueryResult } from './warehouse.js'
+export { QueryRefused, readOnlyStatementError, type WarehouseConnector, type WarehouseQueryResult } from './warehouse.js'

@@ -1,6 +1,7 @@
 import type { ChartConfig, PivotConfig } from '@smallwebco/tinypivot-core'
 import type { RowFilter, StoredDataset } from './store.js'
 import type { TraceStep } from './studio-protocol.js'
+import type { WarehouseConnector } from './warehouse.js'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -15,7 +16,7 @@ import { groupRuns } from './runs.js'
  * pulls (rows passed in, query results, database and warehouse results) are saved with their rows.
  */
 
-export type HistoryKind = 'file' | 'data' | 'query' | 'postgres' | 'bigquery'
+export type HistoryKind = 'file' | 'data' | 'query' | WarehouseConnector['id']
 
 export interface HistoryEntry {
   id: string

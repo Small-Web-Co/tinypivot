@@ -11,7 +11,9 @@ export type StudioRun = Run<StudioStep>
 
 export type Stage = 'source' | 'transform' | 'view' | 'answer' | 'message'
 
-const SOURCE_TOOLS = new Set(['load_file', 'load_data', 'query_postgres', 'query_bigquery', 'history', 'profile'])
+const SOURCE_TOOLS = new Set(['load_file', 'load_data', 'history', 'profile'])
+/** Direct database tools (`query_postgres`, `query_bigquery`, `query_snowflake`…) pull source data. */
+const DIRECT_QUERY_TOOL = /^query_/
 const VIEW_TOOLS = new Set(['configure_chart', 'configure_pivot'])
 
 /** Where a step sits in the path from question to answer. */
@@ -22,7 +24,7 @@ export function stageOf(step: StudioStep): Stage {
     return 'message'
   if (VIEW_TOOLS.has(step.tool))
     return 'view'
-  return SOURCE_TOOLS.has(step.tool) ? 'source' : 'transform'
+  return SOURCE_TOOLS.has(step.tool) || DIRECT_QUERY_TOOL.test(step.tool) ? 'source' : 'transform'
 }
 
 /** The run's last step that matches, e.g. its last SQL or its answer. */

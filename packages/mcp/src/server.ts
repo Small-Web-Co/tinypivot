@@ -32,6 +32,7 @@ import { extractSqlLineage } from './lineage.js'
 import { postgresConfigFromEnv, postgresConnector } from './postgres.js'
 import { MODEL_CATALOG, tokensToUsd } from './pricing.js'
 import { formatProfile, formatProLoadTraps, profileDirectory } from './profile.js'
+import { snowflakeConfigFromEnv, snowflakeConnector } from './snowflake.js'
 import { chartConfigFromPivot, DatasetStore, datasetView, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { agentLabel, Studio } from './studio.js'
 import { describeChartForText, formatDatasetSummary, formatPivotSummary } from './summary.js'
@@ -1673,8 +1674,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
 export function warehousesFromEnv(env: NodeJS.ProcessEnv = process.env): WarehouseConnector[] {
   const postgres = postgresConfigFromEnv(env)
   const bigquery = bigQueryConfigFromEnv(env)
+  const snowflake = snowflakeConfigFromEnv(env)
   return [
     ...(postgres ? [postgresConnector(postgres)] : []),
     ...(bigquery ? [bigQueryConnector(bigquery)] : []),
+    ...(snowflake ? [snowflakeConnector(snowflake)] : []),
   ]
 }

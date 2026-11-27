@@ -126,7 +126,7 @@ In terminal-first harnesses (**Claude Code, Ghostty, OpenCode, pi, Codex CLI**),
 
 TinyPivot works with any data your agent can reach. Use whichever workflow matches your stack:
 
-- **Direct BigQuery and PostgreSQL (Pro):** TinyPivot runs read-only SQL in the warehouse itself, so totals are computed where the data lives and only the result comes back. Every step's SQL shows in the Studio and can be re-checked there. See [Direct connections](#direct-connections-pro) below.
+- **Direct Snowflake, BigQuery and PostgreSQL (Pro):** TinyPivot runs read-only SQL in the warehouse itself, so totals are computed where the data lives and only the result comes back. Every step's SQL shows in the Studio and can be re-checked there. See [Direct connections](#direct-connections-pro) below.
 
 - **BigQuery, Snowflake, MySQL, DuckDB, Databricks, SQLite, ClickHouse, or Postgres (CLI / file handoff — 0 raw rows in LLM context):** Export query output to `.csv`, `.tsv`, `.json`, or `.jsonl` via `bq`, `snowsql`, `mysql`, `duckdb`, `databricks`, or `psql` and pass the path to `load_file` (or pipe stdout straight into `npx @smallwebco/tinypivot-mcp@latest --open`).
 - **Any MCP Server or API (Stripe, GitHub, BigQuery MCP, Snowflake MCP, REST APIs):** Pipe structured JSON rows (up to `~50` rows already in memory) directly into `load_data` with `chartConfig` / `pivotConfig` in a single call — no temp CSV required (for larger sets, write a file and use `load_file`).
@@ -143,6 +143,24 @@ Each tool appears only when its settings are present.
 - `TINYPIVOT_BIGQUERY_LOCATION` sets the dataset location (e.g. `EU`) when BigQuery cannot infer it.
 - Results return up to 5,000 rows. When a result is cut, TinyPivot tells the agent to aggregate in BigQuery instead, so totals cover the whole table.
 - Jobs are labelled `client: tinypivot`, so they are easy to find in BigQuery's job history and billing.
+
+**Snowflake** (`query_snowflake`, preview: please report problems on GitHub): set `TINYPIVOT_SNOWFLAKE_ACCOUNT` and `TINYPIVOT_SNOWFLAKE_USER`, plus one way to sign in, tried in this order:
+
+- Key pair (recommended): `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY` (the PEM text; `\n` escapes are fine) or `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY_PATH`, and `TINYPIVOT_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE` if the key is encrypted.
+- A programmatic access token in `TINYPIVOT_SNOWFLAKE_TOKEN`.
+- `TINYPIVOT_SNOWFLAKE_PASSWORD`.
+- None of these: browser sign-in (SSO) on first query, for local use.
+
+`TINYPIVOT_SNOWFLAKE_ROLE`, `_WAREHOUSE`, `_DATABASE` and `_SCHEMA` set the session. Snowflake's official Node driver downloads once into `~/.cache/tinypivot` on the first query and logs only to a file there, never to the console.
+
+- **Use a role with read-only grants.** That is the strongest guard. TinyPivot adds three more:
+  1. A text check that allows one `SELECT` and refuses write words and `SYSTEM$` functions.
+  2. `EXPLAIN`, which compiles the query without running it or using the warehouse: its plan must contain only read steps, on allowed tables, within the scan limit.
+  3. Running it as a single statement (`MULTI_STATEMENT_COUNT=1`) with a 60-second timeout.
+- `TINYPIVOT_SNOWFLAKE_MAX_GB` caps the bytes the plan may scan (default 50 GB; Snowflake's estimate is an upper bound).
+- `TINYPIVOT_SNOWFLAKE_ALLOWED` limits queries to listed `database`, `database.schema` or `database.schema.table` entries (comma-separated).
+- Queries carry the query tag `tinypivot` and the application name `TinyPivot`, so they are easy to find in query history and cost reports.
+- Results return up to 5,000 rows; Snowflake counts the rows first and only that many are fetched.
 
 **PostgreSQL** (`query_postgres`): set `DATABASE_URL`, and optionally `TINYPIVOT_ALLOWED_TABLES`. Queries are parsed and validated as a single read-only `SELECT`, then run in a read-only transaction with a 15-second timeout.
 
@@ -165,7 +183,7 @@ TinyPivot MCP ships with a generous **Free tier** out of the box — no account 
 | Visual themes | `Code` theme (Dark & Light) | All 10 themes (`Code`, `Phosphor`, `Nord`, `Thermal`, `Mono`, `Paper`, `Greenbar`, `1-Bit`, `Amber CRT`, `Green CRT`) |
 | Drill-Through modals | — | Included |
 | Formatted `.xlsx` Excel export | — | Included |
-| Direct BigQuery & PostgreSQL (`query_bigquery`, `query_postgres`) | — | Included |
+| Direct Snowflake, BigQuery & PostgreSQL (`query_snowflake`, `query_bigquery`, `query_postgres`) | — | Included |
 | Watermark-free UI, HTML & terminal cards | — | Included |
 
 > **Zero Truncation on Free:** TinyPivot never caps local Free datasets to a partial subset — every chart, pivot, and SQL query reflects 100% of your local file. Read the full Internal + External (MIT KramaBench & Adyen DABstep) benchmark white paper at [tiny-pivot.com/whitepaper](https://tiny-pivot.com/whitepaper) or download the [Official PDF White Paper](https://tiny-pivot.com/TinyPivot-Trust-Layer-Whitepaper.pdf).
@@ -183,6 +201,7 @@ Unlock Pro or Team at [tiny-pivot.com/pricing](https://tiny-pivot.com/pricing).
 | `configure_pivot` | Computes a deterministic pivot table via `@smallwebco/tinypivot-core` (zero LLM math errors). |
 | `configure_chart` | Configures and opens the interactive Chart Builder (`bar`, `stackedBar`, `line`, `area`, `pie`, `donut`, maps (`choropleth`), `bullet`, `radialBar`, `radialArea`, `slope`, `treemap`, `sunburst`, etc.; loose names like `map` work too). |
 | `analyze` | Deterministic 1-call Data Science shelf on `datasetId` or `filePath`: `explain_change` and `ab_test` on Free; full Pro SRM + Holm-Bonferroni, controlled `regression`, right-censored `cohort_retention`, and seasonal `anomalies`. |
+| `query_snowflake` | *(Optional Pro)* Runs one read-only Snowflake `SELECT` after a text check and an `EXPLAIN` plan check (read steps only, scan-capped) and opens the result in TinyPivot. Listed when `TINYPIVOT_SNOWFLAKE_ACCOUNT` and `TINYPIVOT_SNOWFLAKE_USER` are set. |
 | `query_bigquery` | *(Optional Pro)* Runs one read-only GoogleSQL `SELECT` in BigQuery (dry-run checked, scan-capped) and opens the result in TinyPivot. Listed when `TINYPIVOT_BIGQUERY_PROJECT` is set. |
 | `query_postgres` | *(Optional Pro)* Runs AST-validated read-only `SELECT` queries directly against `DATABASE_URL` and opens results in TinyPivot. |
 | `list_datasets` | Lists all loaded datasets, row counts, and inferred schemas. |
@@ -198,6 +217,7 @@ Data tools take an optional `why`: one sentence the agent writes about each step
 - `TINYPIVOT_LICENSE_KEY` — TinyPivot MCP Pro/Team license key (`TP-MCPP-...` or `TP-MCPT-...`; note that UI Library `TP-PRO*` keys apply to `@smallwebco/tinypivot-react`/`-vue` only)
 - `DATABASE_URL` — Optional PostgreSQL connection string for direct read-only `query_postgres` (Pro). The tool is only offered to the model when this is set
 - `TINYPIVOT_ALLOWED_TABLES` — Comma-separated table allowlist for `query_postgres`
+- `TINYPIVOT_SNOWFLAKE_ACCOUNT`, `TINYPIVOT_SNOWFLAKE_USER` — Optional Snowflake account for direct read-only `query_snowflake` (Pro); sign-in, session and limit settings are under [Direct connections](#direct-connections-pro)
 - `TINYPIVOT_BIGQUERY_PROJECT` — Optional Google Cloud project for direct read-only `query_bigquery` (Pro); `TINYPIVOT_BIGQUERY_MAX_GB`, `TINYPIVOT_BIGQUERY_ALLOWED` and `TINYPIVOT_BIGQUERY_LOCATION` tune it (see [Direct connections](#direct-connections-pro))
 - `TINYPIVOT_TELEMETRY=0` or `DO_NOT_TRACK=1` — Disable anonymous usage telemetry
 - `TINYPIVOT_PORT` — Localhost port for the Studio (default `47317`; when it is taken, the Studio uses a free port and the tool replies link to it)
