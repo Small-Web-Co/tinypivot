@@ -14,7 +14,9 @@ const MISSING_COL_PATTERNS = [
   /invalid\s+identifier\s+'([^']+)'/i,
   /Unknown\s+column\s+'([^']+)'/i,
   /Cannot\s+resolve\s+column\s+name\s+"([^"]+)"/i,
+  /with\s+name\s+[`'"]([^`'"]+)[`'"]\s+cannot\s+be\s+resolved/i,
   /Missing\s+columns:\s*'([^']+)'/i,
+  /Unknown\s+expression\s+(?:or\s+function\s+)?identifier\s+[`'"]([^`'"]+)[`'"]/i,
 ]
 
 function extractMissingColumn(errorMessage: string): string | undefined {
@@ -27,7 +29,17 @@ function extractMissingColumn(errorMessage: string): string | undefined {
 }
 
 function closestColumnsHint(badCol: string, schemas: WarehouseTableSchema[]): string | undefined {
-  const allCols = schemas.flatMap(s => s.columns.map(c => ({ table: s.name, col: c.name })))
+  const seen = new Set<string>()
+  const allCols: Array<{ table: string, col: string }> = []
+  for (const s of schemas) {
+    for (const c of s.columns) {
+      const key = `${s.name.toLowerCase()}\0${c.name.toLowerCase()}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        allCols.push({ table: s.name, col: c.name })
+      }
+    }
+  }
   if (allCols.length === 0)
     return undefined
   const lower = badCol.toLowerCase()

@@ -343,6 +343,50 @@ describe('databricks warehouse lookup', () => {
 })
 
 describe('databricks wiring', () => {
+  it('joins multi-row EXPLAIN planning errors instead of truncating at row 0', async () => {
+    const multiRowSession: DatabricksSessionLike = {
+      warehouse: '/sql/1.0/warehouses/abc123',
+      async run() {
+        return [
+          { plan: '== Physical Plan ==' },
+          { plan: 'Error occurred during query planning:' },
+          { plan: '[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `o_total_amt` cannot be resolved.' },
+        ]
+      },
+      async close() {},
+    }
+    await expect(
+      databricksConnector(CONFIG, async () => multiRowSession).query('SELECT o_total_amt FROM samples.tpch.orders'),
+    ).rejects.toThrow('UNRESOLVED_COLUMN.WITH_SUGGESTION')
+  })
+
+  it('describes tables in explicit external catalogs like samples.tpch.orders', async () => {
+    const ran: string[] = []
+    const session: DatabricksSessionLike = {
+      warehouse: '/sql/1.0/warehouses/abc123',
+      async run(sql) {
+        ran.push(sql)
+        return [
+          { tbl: 'samples.tpch.orders', col: 'o_orderkey', dtype: 'LONG' },
+          { tbl: 'samples.tpch.orders', col: 'o_totalprice', dtype: 'DECIMAL' },
+        ]
+      },
+      async close() {},
+    }
+    const noCatConfig: DatabricksConfig = { ...CONFIG, catalog: undefined, schema: undefined }
+    const schemas = await databricksConnector(noCatConfig, async () => session).describeTables!(['samples.tpch.orders'])
+    expect(ran[0]).toContain('`samples`.information_schema.columns')
+    expect(ran[0]).toContain('LOWER(table_schema) = \'tpch\'')
+    expect(ran[0]).toContain('LOWER(table_name) = \'orders\'')
+    expect(schemas).toEqual([{
+      name: 'samples.tpch.orders',
+      columns: [
+        { name: 'o_orderkey', type: 'LONG' },
+        { name: 'o_totalprice', type: 'DECIMAL' },
+      ],
+    }])
+  })
+
   it('is offered as query_databricks when a profile is named', async () => {
     const { warehousesFromEnv } = await import('../../packages/mcp/src/server')
     expect(warehousesFromEnv({ TINYPIVOT_DATABRICKS_PROFILE: 'DEFAULT' }).map(w => w.toolName)).toEqual(['query_databricks'])

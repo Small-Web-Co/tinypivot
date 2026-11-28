@@ -337,10 +337,27 @@ describe('warehouse SQL repair hints', () => {
     expect(col).toContain('`wh_bench.orders`')
   })
 
-  it('gives dialect hints for Snowflake, Postgres and MySQL', () => {
+  it('gives dialect hints for Snowflake, Postgres, MySQL, ClickHouse 24 and Databricks, deduplicating cached schemas', () => {
     expect(formatWarehouseSqlRepairHint('postgres', 'function countif does not exist', 'SELECT COUNTIF(x > 0) FROM t')).toContain('FILTER (WHERE')
     expect(formatWarehouseSqlRepairHint('snowflake', 'Unknown function SAFE_DIVIDE', 'SELECT SAFE_DIVIDE(a, b) FROM t')).toContain('DIV0NULL')
     expect(formatWarehouseSqlRepairHint('mysql', 'FUNCTION db.DATE_TRUNC does not exist', 'SELECT DATE_TRUNC(d, MONTH) FROM t')).toContain('DATE_FORMAT')
+
+    const ch = formatWarehouseSqlRepairHint(
+      'clickhouse',
+      'Unknown expression identifier `order_amount` in scope SELECT order_amount FROM wh_bench.orders',
+      'SELECT order_amount FROM wh_bench.orders',
+      [ACME_SCHEMAS[0], ACME_SCHEMAS[0]],
+    )
+    expect(ch).toContain('`amount`')
+    expect(ch.match(/`amount` \(in `wh_bench\.orders`\)/g)).toHaveLength(1)
+
+    const dbx = formatWarehouseSqlRepairHint(
+      'databricks',
+      'Databricks could not plan this query: [UNRESOLVED_COLUMN.WITH_SUGGESTION] A column with name `order_amount` cannot be resolved.',
+      'SELECT order_amount FROM wh_bench.orders',
+      [ACME_SCHEMAS[0]],
+    )
+    expect(dbx).toContain('`amount`')
   })
 })
 

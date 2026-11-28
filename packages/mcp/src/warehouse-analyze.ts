@@ -175,7 +175,7 @@ async function runWarehouseExplainChange(
   const dims = rawDims.filter(d => d.toLowerCase() !== periodCol.toLowerCase())
 
   const groupExprs = [periodExpr, ...dims.map(d => warehouse.dialect.quoteName(d))]
-  const selectParts = [`${periodExpr} AS ${qPeriod}`, ...dims.map(d => warehouse.dialect.quoteName(d))]
+  const selectParts = [`${periodExpr} AS _period`, ...dims.map(d => warehouse.dialect.quoteName(d))]
   if (numerator && denominator) {
     const qN = warehouse.dialect.quoteName(numerator)
     const qD = warehouse.dialect.quoteName(denominator)
@@ -188,8 +188,13 @@ async function runWarehouseExplainChange(
   const tRef = quoteTableRef(schema.name, warehouse.dialect)
   const sql = `SELECT ${selectParts.join(', ')} FROM ${tRef} WHERE ${qPeriod} IS NOT NULL GROUP BY ${groupExprs.join(', ')} ORDER BY 1`
   const res = await warehouse.query(sql)
-  const keepCols = [periodCol, ...dims, ...(numerator && denominator ? [numerator, denominator] : metric ? [metric] : [])]
-  const rows = normalizeRowsLower(res.rows, keepCols)
+  const valCols = [...dims, ...(numerator && denominator ? [numerator, denominator] : metric ? [metric] : [])]
+  const rows = res.rows.map((row) => {
+    const out: Record<string, unknown> = { [periodCol]: probeValue(row, '_period') }
+    for (const k of valCols)
+      out[k] = probeValue(row, k)
+    return out
+  })
   return runAnalysis(
     synthDataset(schema.name, rows),
     { ...input, method: 'explain_change', periodField: periodCol, dimensions: dims, metric, numerator, denominator },

@@ -145,10 +145,10 @@ describe('warehouse SQL-pushed analyze engine', () => {
 
   it('runs explain_change via 1 SQL GROUP BY and computes Kitagawa mix vs rate decomposition', async () => {
     const grouped = [
-      { date: '2026-01', channel: 'Organic', conversions: 800, sessions: 8000 },
-      { date: '2026-01', channel: 'Paid', conversions: 40, sessions: 2000 },
-      { date: '2026-02', channel: 'Organic', conversions: 210, sessions: 2000 },
-      { date: '2026-02', channel: 'Paid', conversions: 200, sessions: 8000 },
+      { _period: '2026-01', channel: 'Organic', conversions: 800, sessions: 8000 },
+      { _period: '2026-01', channel: 'Paid', conversions: 40, sessions: 2000 },
+      { _period: '2026-02', channel: 'Organic', conversions: 210, sessions: 2000 },
+      { _period: '2026-02', channel: 'Paid', conversions: 200, sessions: 8000 },
     ]
     const { connector, queries } = makeWarehouse(() => grouped)
     const res = await runWarehouseAnalysis({

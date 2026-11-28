@@ -3,7 +3,7 @@ import type { WarehouseConnector, WarehouseTableSchema } from './warehouse.js'
 import { validateSQL } from '@smallwebco/tinypivot-server'
 import { toPlainValue } from './duckdb.js'
 import { loadRuntimePackage } from './runtime-package.js'
-import { listFromEnv, plainName } from './warehouse.js'
+import { listFromEnv, plainName, QueryRefused, readOnlyStatementError } from './warehouse.js'
 
 export interface PostgresConfig {
   connectionString: string
@@ -81,17 +81,20 @@ export async function executeReadOnlyPostgresQuery(
   config: PostgresConfig,
   sql: string,
 ): Promise<PostgresQueryResult> {
+  const cleaned = sql.trim().replace(/;+\s*$/, '')
+  const textError = readOnlyStatementError(cleaned)
+  if (textError)
+    throw new QueryRefused(textError)
+
   const allowedTables = config.allowedTables && config.allowedTables.length > 0
     ? config.allowedTables
     : await listPostgresTables(config)
 
   const check = validateSQL(sql, allowedTables)
-  if (!check.valid) {
-    throw new Error(`SQL rejected by TinyPivot read-only validator: ${check.error}`)
-  }
+  if (!check.valid)
+    throw new QueryRefused(`SQL rejected by TinyPivot read-only validator: ${check.error}`)
 
   const maxRows = config.maxRows ?? DEFAULT_MAX_ROWS
-  const cleaned = sql.trim().replace(/;+\s*$/, '')
   const limitedSql = /\bLIMIT\s+\d+/i.test(cleaned)
     ? cleaned
     : `${cleaned} LIMIT ${maxRows + 1}`

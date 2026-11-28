@@ -1,0 +1,95 @@
+name: Warehouse Container Tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'packages/mcp/**'
+      - 'tests/live/**'
+      - scripts/seed-warehouse-fixtures.mjs
+      - .github/workflows/warehouse-containers.yml
+  pull_request:
+    branches: [master]
+    paths:
+      - 'packages/mcp/**'
+      - 'tests/live/**'
+      - scripts/seed-warehouse-fixtures.mjs
+      - .github/workflows/warehouse-containers.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  warehouse-containers:
+    name: Real Postgres, MySQL & ClickHouse
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: tp_test
+          POSTGRES_DB: acme
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d acme"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: tp_test
+          MYSQL_DATABASE: acme
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptp_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=15
+      clickhouse:
+        image: clickhouse/clickhouse-server:24-alpine
+        env:
+          CLICKHOUSE_DB: acme
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: tp_test
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd="wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Seed Acme fixtures into Postgres, MySQL & ClickHouse
+        env:
+          TINYPIVOT_LIVE_PG_URL: postgres://postgres:tp_test@127.0.0.1:5432/acme
+          TINYPIVOT_LIVE_MYSQL_URL: mysql://root:tp_test@127.0.0.1:3306/acme
+          TINYPIVOT_LIVE_CH_URL: http://default:tp_test@127.0.0.1:8123/acme
+        run: node scripts/seed-warehouse-fixtures.mjs
+
+      - name: Run live warehouse contract suite
+        env:
+          TINYPIVOT_LIVE: '1'
+          TINYPIVOT_LIVE_PG_URL: postgres://postgres:tp_test@127.0.0.1:5432/acme
+          TINYPIVOT_LIVE_MYSQL_URL: mysql://root:tp_test@127.0.0.1:3306/acme
+          TINYPIVOT_LIVE_CH_URL: http://default:tp_test@127.0.0.1:8123/acme
+        run: pnpm test:live

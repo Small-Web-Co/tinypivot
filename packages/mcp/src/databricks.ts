@@ -419,9 +419,9 @@ async function runQuery(session: DatabricksSessionLike, config: DatabricksConfig
   const textError = readOnlyStatementError(cleaned)
   if (textError)
     throw new QueryRefused(textError)
-  const explained = await session.run(`EXPLAIN EXTENDED ${cleaned}`, 1)
-  const plan = explained[0]?.plan
-  if (typeof plan !== 'string')
+  const explained = await session.run(`EXPLAIN EXTENDED ${cleaned}`, 20)
+  const plan = explained.map(row => row.plan).filter((p): p is string => typeof p === 'string').join('\n')
+  if (!plan)
     throw new QueryRefused('Databricks did not return a plan for this query, so it was not run.')
   checkPlan(plan)
 
@@ -434,16 +434,55 @@ async function runQuery(session: DatabricksSessionLike, config: DatabricksConfig
   return { rows, truncated, note: `Databricks planned it as a read and ran it on SQL warehouse ${warehouseId} (${config.timeoutS}s timeout).` }
 }
 
-async function describeDatabricksTables(session: DatabricksSessionLike, config: DatabricksConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
-  const source = config.catalog ? `${quoteName(config.catalog)}.information_schema.columns` : 'information_schema.columns'
-  const schemaFilter = config.schema ? ` AND table_schema = ${quoteString(config.schema.toLowerCase())}` : ''
-  const rows = await session.run(
+async function describeDatabricksCatalog(
+  session: DatabricksSessionLike,
+  catalog: string | undefined,
+  schema: string | undefined,
+  table: string | undefined,
+): Promise<Record<string, unknown>[]> {
+  const source = catalog ? `${quoteName(catalog)}.information_schema.columns` : 'information_schema.columns'
+  const filters = ['table_schema <> \'information_schema\'']
+  if (schema)
+    filters.push(`LOWER(table_schema) = ${quoteString(schema.toLowerCase())}`)
+  if (table)
+    filters.push(`LOWER(table_name) = ${quoteString(table.toLowerCase())}`)
+  return session.run(
     `SELECT concat_ws('.', table_catalog, table_schema, table_name) AS tbl, column_name AS col, data_type AS dtype
-     FROM ${source} WHERE table_schema <> 'information_schema'${schemaFilter}
+     FROM ${source} WHERE ${filters.join(' AND ')}
      ORDER BY 1, ordinal_position LIMIT 1000`,
     1000,
   )
-  const filters = requested?.map(t => t.replace(/`/g, '').toLowerCase())
+}
+
+async function describeDatabricksTables(session: DatabricksSessionLike, config: DatabricksConfig, requested?: string[]): Promise<WarehouseTableSchema[]> {
+  const filters = requested?.map(t => t.replace(/`/g, '').trim().toLowerCase()).filter(Boolean)
+  const scopes: Array<{ catalog?: string, schema?: string, table?: string }> = []
+  if (filters?.length) {
+    const seen = new Set<string>()
+    for (const f of filters) {
+      const parts = f.split('.')
+      const scope = parts.length >= 3
+        ? { catalog: parts[0], schema: parts[1], table: parts[2] }
+        : parts.length === 2
+          ? { catalog: config.catalog, schema: parts[0], table: parts[1] }
+          : { catalog: config.catalog, schema: config.schema }
+      const key = `${scope.catalog ?? ''}|${scope.schema ?? ''}|${scope.table ?? ''}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        scopes.push(scope)
+      }
+    }
+  }
+  else {
+    scopes.push({ catalog: config.catalog, schema: config.schema })
+  }
+
+  const rows: Record<string, unknown>[] = []
+  for (const scope of scopes.slice(0, 8)) {
+    const batch = await describeDatabricksCatalog(session, scope.catalog, scope.schema, scope.table).catch(() => [])
+    rows.push(...batch)
+  }
+
   const byTable = new Map<string, WarehouseTableSchema>()
   for (const row of rows) {
     const tbl = String(row.tbl ?? '')
