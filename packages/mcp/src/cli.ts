@@ -6,6 +6,7 @@ import { PassThrough } from 'node:stream'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CHART_THEME_IDS, TERMINAL_PALETTES } from '@smallwebco/tinypivot-core'
 import { startCompanionServer, STUDIO_IDLE_STOP_MS } from './companion.js'
+import { computeGainReport, formatGainReport } from './gain.js'
 import { formatSessionList, HistoryStore } from './history.js'
 import { runInitCommand } from './init.js'
 import { refreshLicense } from './license-refresh.js'
@@ -441,12 +442,38 @@ Options:
   return 0
 }
 
+function runGainCommand(args: string[]): number {
+  const jsonMode = args.includes('--json')
+  if (args.includes('-h') || args.includes('--help')) {
+    console.log(`
+TinyPivot Gain — Counted Local Savings & Trust-Layer Summary
+
+Usage:
+  tinypivot-mcp gain [--days=<n>] [--json]
+
+Options:
+  --days=<n>    Only include pulls and sessions from the last N days
+  --json        Machine-readable JSON output
+`.trim())
+    return 0
+  }
+  const daysArg = args.find(a => a.startsWith('--days='))
+  const days = daysArg ? Number(daysArg.slice('--days='.length)) : undefined
+  const report = computeGainReport({ days })
+  if (jsonMode)
+    console.log(JSON.stringify({ ok: true, ...report }, null, 2))
+  else
+    console.log(formatGainReport(report))
+  return 0
+}
+
 function printRootHelp(): void {
   console.log(`
 TinyPivot MCP — Data Analysis Studio & Terminal Charts for AI Agents
 
 Commands:
   tinypivot-mcp init [options]       Configure Claude Code, Claude Desktop, pi, Cursor, OpenCode, Codex & Antigravity
+  tinypivot-mcp gain [--days=N]      Show counted tokens saved, rows analyzed, and data traps caught from local history
   tinypivot-mcp studio [id|--list]   Reopen, list, or pin saved Studio sessions in full isolation
   tinypivot-mcp theme [id] [--json]  Interactive arrow-key theme picker (or set/list themes directly)
   tinypivot-mcp tui                  Attach a live truecolor split-pane TUI (Ghostty/tmux)
@@ -481,6 +508,12 @@ async function main() {
     const summary = await runInitCommand(args.slice(1))
     if (summary && summary.exitCode !== 0)
       process.exitCode = summary.exitCode
+    return
+  }
+  if (args[0] === 'gain' || args[0] === 'stats') {
+    const exitCode = runGainCommand(args.slice(1))
+    if (exitCode !== 0)
+      process.exitCode = exitCode
     return
   }
   if (args[0] === 'tui' || args[0] === 'attach') {

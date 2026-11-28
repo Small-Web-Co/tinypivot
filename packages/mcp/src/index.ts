@@ -48,6 +48,12 @@ export {
   type OutlierCheck,
 } from './explain.js'
 export { buildStandaloneHtmlReport } from './export-html.js'
+export {
+  computeGainReport,
+  formatGainReport,
+  type GainReport,
+  parseScannedBytes,
+} from './gain.js'
 export { formatHistoryList, formatSessionList, type HistoryEntry, HistoryStore, type SessionSummary } from './history.js'
 export {
   runInitCommand,
@@ -140,6 +146,11 @@ export {
   profileWarehouse,
   type WarehouseSessionCache,
 } from './warehouse-profile.js'
+export {
+  type RankedWarehouseSchema,
+  rankWarehouseSchemas,
+  tokenizeIdentifier,
+} from './warehouse-search.js'
 export {
   backtickName,
   mapWarehouseWork,

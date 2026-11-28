@@ -9,6 +9,7 @@ export type Tier = 'free' | 'pro'
 
 export type FeatureKey
   = | 'unlimited_rows'
+    | 'direct_warehouses'
     | 'audit_basic'
     | 'audit_deep'
     | 'sql_repair_hints'
@@ -21,16 +22,20 @@ export type FeatureKey
 
 /**
  * Current Free vs. Pro split:
- * - Free includes unlimited local rows (always accurate, never truncated), core SQL guardrails
- *   (non-additive warnings, zero-row case hints, SQL repair), `analyze` explain_change & basic
- *   ab_test, Studio IDE + Lineage, and offline HTML export (with a subtle TinyPivot footer).
- * - Pro unlocks enterprise-grade relational/statistical protection (join fan-out & chasm-trap
- *   audits, partial-period & outlier audits, Turn-1 relational profiler, Recursive Data Memory,
- *   SRM + Holm-Bonferroni guards, controlled multivariate regression, right-censored cohorts,
- *   seasonal anomaly/change-point detection, closed-loop claim verification, and white-label export).
+ * - Free includes unlimited local rows (always accurate, never truncated), direct read-only
+ *   warehouse connections (BigQuery, Snowflake, Databricks, ClickHouse, MySQL, Postgres) with
+ *   0-scan schema profiling + BM25 catalog search, core SQL guardrails (non-additive warnings,
+ *   zero-row case hints, dialect SQL repair), `analyze` explain_change & basic ab_test,
+ *   Studio IDE + Lineage, and offline HTML export (with a subtle TinyPivot footer).
+ * - Pro unlocks the Trust Layer across both local files and warehouses: 1-call deep trap
+ *   profiling, deep relational/statistical audits (join fan-out, partial-period, NULL exclusion,
+ *   mixed currency, duplicate IDs, outliers), Recursive Data Memory, SRM + Holm-Bonferroni guards,
+ *   controlled multivariate regression, right-censored cohorts, seasonal anomaly/change-point
+ *   detection, closed-loop claim verification, 10 themes, and white-label HTML / Excel exports.
  */
 export const FEATURE_TIERS: Record<FeatureKey, Tier> = {
   unlimited_rows: 'free',
+  direct_warehouses: 'free',
   audit_basic: 'free',
   sql_repair_hints: 'free',
   analyze_basic: 'free',

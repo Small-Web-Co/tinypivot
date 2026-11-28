@@ -118,7 +118,7 @@ Options:
   --all                   Configure all supported harnesses even if not yet detected
   --license=<key>         Write TINYPIVOT_LICENSE_KEY into each configured server env
   --theme=<id>            Set default visual theme (${CHART_THEME_IDS.join(', ')})
-  --connect[=<list>]      Let your agent query warehouses you are already signed in to (Pro):
+  --connect[=<list>]      Let your agent query warehouses you are already signed in to (read-only):
                           ${CONNECTABLE_WAREHOUSES.join(', ')}. Bare --connect connects every one found.
                           Only a project, connection or profile name is written, never a secret.
   --no-rules              Skip adding auto-use TinyPivot rules to CLAUDE.md / AGENTS.md
@@ -625,7 +625,7 @@ export function chooseWarehouses(detected: DetectedWarehouse[], connect: InitOpt
 
 function printWarehouses(detected: DetectedWarehouse[], connected: DetectedWarehouse[], connect: InitOptions['connect']): void {
   if (connected.length > 0) {
-    console.log('\nConnected warehouses (queried directly, read-only, with TinyPivot Pro):')
+    console.log('\nConnected warehouses (queried directly, read-only):')
     for (const w of connected)
       console.log(`  ✓ ${w.label.padEnd(18)} ${w.found}`)
   }

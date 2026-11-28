@@ -26,6 +26,7 @@ import { CHANNEL_NOTIFICATION, claudeChannelEnabled } from './claude-channel.js'
 import { clickHouseConfigFromEnv, clickHouseConnector } from './clickhouse.js'
 import { databricksConfigFromEnv, databricksConnector } from './databricks.js'
 import { QueryRejected, withinBudget } from './duckdb.js'
+import { parseScannedBytes } from './gain.js'
 import { formatHistoryList, formatSessionList } from './history.js'
 import { refreshAgentExtension } from './init.js'
 import { effectiveLicenseKey } from './license-refresh.js'
@@ -73,8 +74,8 @@ export function buildInstructions({
   const cards = reprintCards
     ? 'In a terminal, show the ```text card verbatim with the Studio link only when a chart/pivot was asked for (never in pi or inline views); else give concise findings and the Studio link.'
     : 'Do not reprint the ```text card: the user sees it in TinyPivot. Reply with the takeaways and the Studio link.'
-  const warehouseLine = warehouses.length > 0 && hasFeature(isPro, 'audit_deep')
-    ? `For ${warehouses.map(w => `${w.label} (\`${w.toolName}\`)`).join(', ')}: call \`profile(warehouse="${warehouses[0].id}", tables=["<dataset_or_table>"])\` ONCE first (pass the dataset/schema name from the question to get exact schemas, row counts, distinct values, date ranges, and NULL/fan-out/currency traps — skip INFORMATION_SCHEMA and SELECT * LIMIT probes), then answer in 1 call via \`${warehouses[0].toolName}\` (supports \`sql\` or \`queries[]\` up to 6 SELECTs) or \`analyze(method, warehouse="${warehouses[0].id}", table="...")\`. Fix any [AUDIT] warnings before answering.`
+  const warehouseLine = warehouses.length > 0 && hasFeature(isPro, 'direct_warehouses')
+    ? `For ${warehouses.map(w => `${w.label} (\`${w.toolName}\`)`).join(', ')}: call \`profile(warehouse="${warehouses[0].id}", tables=["<dataset_or_table>"] or query="<keywords>")\` ONCE first (get exact schemas, row counts${hasFeature(isPro, 'profile_relational') ? ', distinct values, date ranges, and NULL/fan-out/currency traps' : ''} — skip INFORMATION_SCHEMA and SELECT * LIMIT probes), then answer in 1 call via \`${warehouses[0].toolName}\` (supports \`sql\` or \`queries[]\` up to 6 SELECTs) or \`analyze(method, warehouse="${warehouses[0].id}", table="...")\`. Fix any [AUDIT] warnings before answering.`
     : ''
   return [
     'Show figures through TinyPivot: any ranking, breakdown, comparison, trend, map, chart or pivot, instead of Markdown tables, HTML, SVG or matplotlib, passing chartConfig or pivotConfig in the same call.',
@@ -561,7 +562,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
   const server = new McpServer(
     {
       name: 'tinypivot',
-      version: '0.9.4',
+      version: '0.9.5',
     },
     {
       capabilities: {
@@ -1141,7 +1142,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     server.registerTool(
       warehouse.toolName,
       {
-        title: `Query ${warehouse.label} Directly (Read-Only, Pro)`,
+        title: `Query ${warehouse.label} Directly (Read-Only)`,
         description: `Run a read-only SELECT in ${warehouse.label} (or queries[] up to 6) and chart or pivot the result. ${warehouse.sqlHint}`,
         inputSchema: {
           sql: z.string().optional(),
@@ -1158,7 +1159,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         _meta: INLINE_UI_META,
       },
       async ({ sql, queries, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
-        if (!isPro) {
+        if (!hasFeature(isPro, 'direct_warehouses')) {
           return {
             isError: true,
             content: [{
@@ -1188,8 +1189,6 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             sessionKey,
             keepExisting: shouldKeep,
           })
-          studio.remember(ds, { kind: warehouse.id, source: primarySql })
-          studio.recordDatasetStep(ds, { actor: 'agent', tool: warehouse.toolName, why, ask, sql: primarySql })
 
           const runBasicAudit = hasFeature(isPro, 'audit_basic')
           const runDeepAudit = hasFeature(isPro, 'audit_deep')
@@ -1209,6 +1208,13 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           if (runBasicAudit)
             allWarnings.push(...await auditWarehouseQuery({ sql: primarySql, dataset: ds, warehouse, deep: runDeepAudit, cache }))
           const dedupedWarnings = [...new Map(allWarnings.map(w => [`${w.kind}:${w.title}`, w])).values()]
+          studio.remember(ds, {
+            kind: warehouse.id,
+            source: primarySql,
+            trapsCaught: dedupedWarnings.length,
+            scannedBytes: parseScannedBytes(primaryRes.note),
+          })
+          studio.recordDatasetStep(ds, { actor: 'agent', tool: warehouse.toolName, why, ask, sql: primarySql })
           const batchNote = priorBlocks.length > 0 ? `\n${priorBlocks.join('\n')}` : ''
           const note = `${batchNote}${primaryRes.note ? `\n_${primaryRes.note}_` : ''}${primaryRes.truncated ? truncationNote(warehouse) : ''}${formatAuditWarnings(dedupedWarnings)}`
           const preferSmallTable = !viewMode && !chartConfig && !pivotConfig
@@ -1360,7 +1366,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     {
       title: 'Profile Dataset, Folder, or Warehouse',
       description: warehouses.length > 0
-        ? `Profile a dataset, folder (dirPath), or connected warehouse (warehouse="${warehouses[0].id}" + optional tables/dataset prefix for 1-call schemas, values, date ranges & traps).`
+        ? `Profile a dataset, folder (dirPath), or connected warehouse (warehouse="${warehouses[0].id}" + optional tables or query keywords for 1-call schemas, search & traps).`
         : 'Profile a dataset (nulls, ranges, top values) or scan a folder (dirPath) of file schemas.',
       inputSchema: {
         datasetId: z.string().optional(),
@@ -1369,15 +1375,16 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           ? {
               warehouse: z.string().optional(),
               tables: z.array(z.string()).optional(),
+              query: z.string().optional(),
             }
           : {}),
         why: whyParam,
       },
       annotations: READ_ONLY_LOCAL_ANNOTATIONS,
     },
-    async ({ datasetId, dirPath, warehouse: warehouseArg, tables, why }, extra) => {
+    async ({ datasetId, dirPath, warehouse: warehouseArg, tables, query, why }, extra) => {
       const useRelational = hasFeature(isPro, 'profile_relational')
-      if (warehouseArg || (tables?.length && warehouses.length === 1)) {
+      if (warehouseArg || ((tables?.length || query) && warehouses.length === 1)) {
         const target = warehouseArg
           ? warehouses.find(w => w.id === warehouseArg.toLowerCase() || w.toolName === warehouseArg.toLowerCase() || w.label.toLowerCase() === warehouseArg.toLowerCase())
           : warehouses[0]
@@ -1387,14 +1394,14 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             content: [{ type: 'text' as const, text: `Warehouse "${warehouseArg}" is not configured. Configured warehouses: ${warehouses.map(w => w.id).join(', ') || 'none'}.` }],
           }
         }
-        if (!isPro) {
+        if (!hasFeature(isPro, 'direct_warehouses')) {
           return {
             isError: true,
             content: [{ type: 'text' as const, text: `Profiling ${target.label} directly requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). On Free, ${target.freeAlternative}. Upgrade at https://tiny-pivot.com/pricing` }],
           }
         }
         try {
-          const text = await profileWarehouse(target, { tables, isPro: useRelational, cache: warehouseCaches.get(target.id)! })
+          const text = await profileWarehouse(target, { tables, query, isPro: useRelational, cache: warehouseCaches.get(target.id)! })
           return { content: [{ type: 'text' as const, text }] }
         }
         catch (err) {
@@ -1478,7 +1485,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             content: [{ type: 'text' as const, text: `Warehouse "${warehouseArg}" is not configured. Configured warehouses: ${warehouses.map(w => w.id).join(', ') || 'none'}.` }],
           }
         }
-        if (!isPro) {
+        if (!hasFeature(isPro, 'direct_warehouses')) {
           return {
             isError: true,
             content: [{ type: 'text' as const, text: `Running \`analyze\` directly on ${target.label} requires TinyPivot Pro (TINYPIVOT_LICENSE_KEY). On Free, ${target.freeAlternative}. Upgrade at https://tiny-pivot.com/pricing` }],

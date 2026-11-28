@@ -1001,7 +1001,7 @@ export const warehouseArms: readonly { id: WarehouseArmId, name: string, body: s
   {
     id: 'export',
     name: 'Export, then TinyPivot',
-    body: 'Shell plus TinyPivot Pro, told to export what it needs with bq and analyse the file in TinyPivot: the route TinyPivot Free has.',
+    body: 'Shell plus TinyPivot Pro, told to export what it needs with bq and analyse the exported file locally.',
   },
   {
     id: 'direct',

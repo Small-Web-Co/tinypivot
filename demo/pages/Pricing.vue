@@ -35,8 +35,8 @@ const { pendingPlan, error, startCheckout } = useCheckout()
           Free to start. <em>Pro when the numbers have to be right.</em>
         </h1>
         <p v-if="product === 'mcp'" class="lede">
-          Free is the full sidecar on your own files: no row limit, no signup, no trial clock.
-          Pro adds the deep checks and one-step statistics that took every model in our tests to 100% correct.
+          Free is the full sidecar on your files and warehouses: no row limit, no signup, no trial clock.
+          Pro adds the deep trap checks and one-step statistics that took every model in our tests to 100% correct.
           <router-link to="/whitepaper" class="wp-inline-link">
             See the results →
           </router-link>

@@ -221,7 +221,7 @@ const { copiedKey, copy } = useCopy()
             <li><strong>The answer will be acted on.</strong> Pro’s deep checks catch double-counting joins, half-finished periods, dropped missing values and outliers before the agent answers.</li>
             <li><strong>You need real statistics.</strong> Trustworthy A/B tests, regressions that control for other factors, cohort retention and seasonal anomalies, each in one step.</li>
             <li><strong>You come back to the same data.</strong> Pro remembers your data between sessions, cutting repeat schema tokens by 47%.</li>
-            <li><strong>You share the results or dig deeper.</strong> Formatted Excel and white-label HTML exports, drill-through to the rows behind any cell, and a read-only Postgres connection.</li>
+            <li><strong>You share the results or dig deeper.</strong> Formatted Excel and white-label HTML exports, drill-through to the rows behind any cell, and 1-call deep warehouse trap profiling.</li>
           </ul>
           <p class="docs-text">
             <router-link to="/pricing" class="btn btn-solid">

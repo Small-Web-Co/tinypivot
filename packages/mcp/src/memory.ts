@@ -192,6 +192,11 @@ export class DataMemoryStore {
       .slice(0, 4)
   }
 
+  /** Lists all stored schema memory entries. */
+  listSchemas(): SchemaMemoryEntry[] {
+    return Object.values(this.data.schemas)
+  }
+
   /** Formats recalled memory into a compact (~30-60 token) block. Empty when nothing is learned yet. */
   formatRecall(tableHints: string[], columns?: string[]): string {
     const lessons = this.recall(tableHints, columns)

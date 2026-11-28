@@ -285,13 +285,13 @@ const capabilities = [
       <div class="wrap">
         <header class="section-head">
           <p class="label">
-            Direct connections · Pro
+            Direct connections · Free
           </p>
           <h2 id="warehouses-title" class="heading">
             Ask the warehouse. <em>Skip the export.</em>
           </h2>
           <p class="lede">
-            TinyPivot Pro queries your warehouse where the data lives. The warehouse adds up every row, the agent sees only
+            TinyPivot queries your warehouse where the data lives — included in Free. The warehouse adds up every row, the agent sees only
             the answer, and every step in the Studio reruns against the same tables.
           </p>
         </header>

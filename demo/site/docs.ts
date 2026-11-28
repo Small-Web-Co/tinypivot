@@ -58,20 +58,19 @@ export const harnesses: HarnessSetup[] = [
   },
   {
     id: 'warehouses',
-    label: 'Direct warehouses (Pro)',
-    summary: 'Read-only SQL that runs in Snowflake, BigQuery, Databricks, ClickHouse, MySQL or Postgres, so totals cover every row. init --connect reuses the sign-ins your warehouse tools already keep (gcloud, the Snowflake and Databricks CLIs, ~/.my.cnf, clickhouse client) and saves only a pointer to them, never a password.',
+    label: 'Direct warehouses',
+    summary: 'Read-only SQL that runs in Snowflake, BigQuery, Databricks, ClickHouse, MySQL or Postgres (included in Free), so totals cover every row. init --connect reuses the sign-ins your warehouse tools already keep (gcloud, the Snowflake and Databricks CLIs, ~/.my.cnf, clickhouse client) and saves only a pointer to them, never a password.',
     filename: 'shell',
     code: `# Find warehouse sign-ins on this machine and switch them on:\n${INIT_COMMAND} --connect\n\n# Or choose which ones:\n${INIT_COMMAND} --connect=bigquery,snowflake`,
   },
   {
     id: 'postgres',
-    label: 'Direct Postgres (Pro)',
-    summary: 'Read-only connector with SQL validation and a table allowlist. Any other source works by handing TinyPivot an export or rows from its own MCP server.',
+    label: 'Direct Postgres',
+    summary: 'Read-only connector with SQL validation and a table allowlist (included in Free). Any other source works by handing TinyPivot an export or rows from its own MCP server.',
     filename: 'mcp config',
     code: npxServer({
       DATABASE_URL: 'postgresql://readonly:pass@localhost:5432/analytics',
       TINYPIVOT_ALLOWED_TABLES: 'orders,customers,products',
-      TINYPIVOT_LICENSE_KEY: 'TP-MCP…',
     }),
   },
 ]
@@ -83,15 +82,15 @@ export const tools = [
   { name: 'configure_pivot', role: 'Exact pivots', desc: 'Sums, averages, medians and totals computed by TinyPivot, not by the model.' },
   { name: 'configure_chart', role: 'Chart types', desc: 'Bar, stacked bar, line, area, pie, donut, scatter, bubble, heatmap and radar, plus maps of countries, US states or sales regions, bullet (actual against target), slope, treemap, sunburst and radial charts. Ask for a dashboard and it adds filter controls above every view.' },
   { name: 'query', role: 'SQL over files', desc: 'Read-only DuckDB SQL (single sql or queries[] batching up to 6 SELECTs) over CSV, Parquet and JSON files and loaded datasets. Named queries persist as DuckDB views across turns while keeping raw rows out of context.' },
-  { name: 'profile', role: 'Dataset or folder scan', desc: 'Profiles a loaded dataset (null share, ranges, top values, Pro relational grain), or pass dirPath to scan a local folder of CSV/JSON/Parquet/XLSX schemas, docs, and Pro cross-file join keys in 1 call.' },
-  { name: 'analyze', role: '1-call Data Science', desc: 'Deterministic statistical shelf on datasetId, filePath, or direct warehouse + table (SQL-pushed sufficient statistics on Pro): explain_change and ab_test on Free; SRM + Holm-Bonferroni, controlled regression, right-censored cohorts, and seasonal anomalies on Pro.' },
+  { name: 'profile', role: 'Dataset, folder or warehouse', desc: 'Profiles a loaded dataset, scans a local folder (dirPath), or profiles a connected warehouse in 1 call (0-scan schemas + BM25 query search on Free; 1-pass deep trap probes for join fan-out, NULLs, mixed currencies and partial months on Pro).' },
+  { name: 'analyze', role: '1-call Data Science', desc: 'Deterministic statistical shelf on datasetId, filePath, or direct warehouse + table (SQL-pushed sufficient statistics): explain_change and ab_test on Free; SRM + Holm-Bonferroni, controlled regression, right-censored cohorts, and seasonal anomalies on Pro.' },
   { name: 'history', role: 'Every pull, kept', desc: 'Lists earlier pulls and reopens any of them without re-querying. Saved locally for 30 days.' },
-  { name: 'query_bigquery', role: 'Pro · BigQuery', desc: 'Read-only GoogleSQL run in BigQuery: dry-run checked, capped by bytes scanned, optionally limited to listed datasets.' },
-  { name: 'query_snowflake', role: 'Pro · Snowflake', desc: 'Read-only SQL run in Snowflake after its query plan is checked for writes, capped by bytes scanned and a 60-second timeout.' },
-  { name: 'query_databricks', role: 'Pro · Databricks', desc: 'Read-only Databricks SQL, refused if its EXPLAIN plan holds any write step, with a 60-second timeout.' },
-  { name: 'query_clickhouse', role: 'Pro · ClickHouse', desc: 'Read-only SQL with ClickHouse enforcing readonly mode, a read cap and a time limit on every query.' },
-  { name: 'query_mysql', role: 'Pro · MySQL & MariaDB', desc: 'One SELECT inside a server-enforced read-only transaction with a statement time limit.' },
-  { name: 'query_postgres', role: 'Pro · Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
+  { name: 'query_bigquery', role: 'BigQuery', desc: 'Read-only GoogleSQL run in BigQuery: dry-run checked, capped by bytes scanned, optionally limited to listed datasets.' },
+  { name: 'query_snowflake', role: 'Snowflake', desc: 'Read-only SQL run in Snowflake after its query plan is checked for writes, capped by bytes scanned and a 60-second timeout.' },
+  { name: 'query_databricks', role: 'Databricks', desc: 'Read-only Databricks SQL, refused if its EXPLAIN plan holds any write step, with a 60-second timeout.' },
+  { name: 'query_clickhouse', role: 'ClickHouse', desc: 'Read-only SQL with ClickHouse enforcing readonly mode, a read cap and a time limit on every query.' },
+  { name: 'query_mysql', role: 'MySQL & MariaDB', desc: 'One SELECT inside a server-enforced read-only transaction with a statement time limit.' },
+  { name: 'query_postgres', role: 'Postgres', desc: 'Read-only, validated SQL against an allowlisted Postgres database.' },
 ] as const
 
 /** What TinyPivot does that a chat artifact or a pasted table cannot, each backed by the product or a measurement. */

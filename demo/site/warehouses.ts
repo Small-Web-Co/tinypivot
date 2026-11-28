@@ -2,12 +2,12 @@ import type { WarehouseArmId, WarehouseArmResult } from './whitepaper'
 import { percentChange } from './modelChart'
 import { WAREHOUSE_LOCAL_STUDY, warehouseLocalResults, warehouseResults } from './whitepaper'
 
-/** Direct warehouse connections (Pro): what they are for, and the measured gain behind the claim. */
+/** Direct warehouse connections: what they are for, and the measured gain behind the claim. */
 
 export const WAREHOUSES = ['BigQuery', 'Snowflake', 'Databricks', 'ClickHouse', 'MySQL & MariaDB', 'Postgres'] as const
 
 /** Per-warehouse sign-in and guard settings live in the MCP README. */
-export const WAREHOUSE_SETUP_URL = 'https://github.com/Small-Web-Co/tinypivot/tree/master/packages/mcp#direct-connections-pro'
+export const WAREHOUSE_SETUP_URL = 'https://github.com/Small-Web-Co/tinypivot/tree/master/packages/mcp#direct-connections'
 
 export const WAREHOUSE_BENEFITS = [
   {
@@ -50,7 +50,7 @@ export function warehouseHighlights() {
   const localTotal = WAREHOUSE_LOCAL_STUDY.runsPerArm * warehouseLocalResults.length
   return [
     { value: `${-percentChange(cli.avgSec, direct.avgSec)}% faster`, label: `per question than the bq command line on Claude (${Math.min(...costSavings)}–${Math.max(...costSavings)}% less API spend)` },
-    { value: `${-percentChange(exported.avgSec, direct.avgSec)}% faster`, label: 'than exporting to a file first and analysing that, the route TinyPivot Free has' },
+    { value: `${-percentChange(exported.avgSec, direct.avgSec)}% faster`, label: 'than exporting to a file first and analysing that locally' },
     {
       value: `${Math.round((localSql / localTotal) * 100)}% → ${Math.round((localDirect / localTotal) * 100)}%`,
       label: `on small local models (Inkling 2 Mini & DeepSeek V4.1 Flash, ${localDirect}/${localTotal} correct vs ${localSql}/${localTotal} bare SQL, turns cut in half)`,

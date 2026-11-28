@@ -194,12 +194,13 @@ describe('query_bigquery tool', () => {
     expect(warehousesFromEnv({})).toEqual([])
   })
 
-  it('tells Free users how to use the data without running anything', async () => {
-    const { client, jobs } = await connect(undefined)
-    const result = await client.callTool({ name: 'query_bigquery', arguments: { sql: 'SELECT 1', why: 'test' } })
-    expect(result.isError).toBe(true)
-    expect(text(result)).toContain('bq query --format=csv')
-    expect(jobs).toHaveLength(0)
+  it('runs read-only BigQuery queries on Free tier without requiring a Pro key', async () => {
+    const rows = [{ region: 'EMEA', mrr: 120 }]
+    const { client, jobs } = await connect(undefined, { rows })
+    const result = await client.callTool({ name: 'query_bigquery', arguments: { sql: 'SELECT region, SUM(mrr) AS mrr FROM sales.orders GROUP BY 1', why: 'test' } })
+    expect(result.isError).toBeFalsy()
+    expect(text(result)).toContain('BigQuery scanned 2.5 MB')
+    expect(jobs).toHaveLength(2)
   })
 
   it('charts the result for Pro and says what the query scanned', async () => {

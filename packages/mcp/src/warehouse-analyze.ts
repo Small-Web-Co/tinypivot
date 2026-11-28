@@ -153,6 +153,7 @@ async function runWarehouseExplainChange(
   warehouse: WarehouseConnector,
   schema: WarehouseTableSchema,
   input: AnalyzeInput,
+  proGuards: boolean,
 ): Promise<AnalyzeOutput> {
   const cols = schema.columns
   const periodCol = assertColumn(input.periodField ?? findCol(cols, /period|quarter|month|year|date|cohort|wave/i) ?? '', 'periodField')
@@ -198,7 +199,7 @@ async function runWarehouseExplainChange(
   return runAnalysis(
     synthDataset(schema.name, rows),
     { ...input, method: 'explain_change', periodField: periodCol, dimensions: dims, metric, numerator, denominator },
-    { proGuards: true },
+    { proGuards },
   )
 }
 
@@ -477,7 +478,7 @@ export async function runWarehouseAnalysis(options: {
   switch (input.method) {
     case 'anomalies': return runWarehouseAnomalies(warehouse, schema, input)
     case 'cohort_retention': return runWarehouseCohortRetention(warehouse, schema, input)
-    case 'explain_change': return runWarehouseExplainChange(warehouse, schema, input)
+    case 'explain_change': return runWarehouseExplainChange(warehouse, schema, input, proGuards)
     case 'ab_test': return runWarehouseAbTest(warehouse, schema, input, proGuards)
     case 'regression': return runWarehouseRegression(warehouse, schema, input)
     default: throw new Error(`Unknown analysis method "${String(input.method)}".`)

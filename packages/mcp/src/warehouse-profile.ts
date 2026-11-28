@@ -2,6 +2,7 @@ import type { SqlDialect, WarehouseColumnSchema, WarehouseConnector, WarehouseTa
 import { probeValue } from './audit.js'
 import { withinBudget } from './duckdb.js'
 import { isNonAdditiveMeasure } from './terminal-chart.js'
+import { rankWarehouseSchemas } from './warehouse-search.js'
 import { mapWarehouseWork } from './warehouse.js'
 
 /**
@@ -332,9 +333,9 @@ function datasetPrefix(tableName: string): string {
  */
 export async function profileWarehouse(
   warehouse: WarehouseConnector,
-  options: { tables?: string[], isPro: boolean, cache: WarehouseSessionCache, timeoutMs?: number },
+  options: { tables?: string[], query?: string, isPro: boolean, cache: WarehouseSessionCache, timeoutMs?: number },
 ): Promise<string> {
-  const { tables, isPro, cache, timeoutMs = WAREHOUSE_PROFILE_MS } = options
+  const { tables, query, isPro, cache, timeoutMs = WAREHOUSE_PROFILE_MS } = options
   const schemas = await loadWarehouseSchemas(warehouse, cache, tables)
   if (schemas.length === 0) {
     const listed = await warehouse.listTables().catch(() => [] as string[])
@@ -343,24 +344,37 @@ export async function profileWarehouse(
       : `No ${warehouse.label} tables found${tables?.length ? ` matching ${tables.join(', ')}` : ''}.`
   }
 
-  // When no filter was passed and multiple datasets exceed the probe budget, return the full 0-scan
+  const trimmedQuery = query?.trim()
+  let selectedSchemas = schemas
+  let searchHeader = ''
+  if (trimmedQuery) {
+    const ranked = rankWarehouseSchemas(schemas, trimmedQuery, MAX_PROFILED_TABLES)
+    if (ranked.length === 0) {
+      const sample = schemas.slice(0, 12).map(s => `\`${s.name}\``).join(', ')
+      return `No ${warehouse.label} tables matched "${trimmedQuery}" across ${schemas.length} catalog tables. Sample tables: ${sample}${schemas.length > 12 ? ', …' : ''}.`
+    }
+    selectedSchemas = ranked.map(r => r.schema)
+    searchHeader = `Matched ${ranked.length} of ${schemas.length} **${warehouse.label}** tables for "${trimmedQuery}" (BM25 catalog search; query via \`${warehouse.toolName}\`):`
+  }
+
+  // When no filter/query was passed and multiple datasets exceed the probe budget, return the full 0-scan
   // metadata catalog across all datasets so the model never misses its target dataset or wastes scans.
-  const distinctDatasets = [...new Set(schemas.map(s => datasetPrefix(s.name)).filter(Boolean))]
-  if (!tables?.length && schemas.length > MAX_PROFILED_TABLES && distinctDatasets.length > 1) {
+  const distinctDatasets = [...new Set(selectedSchemas.map(s => datasetPrefix(s.name)).filter(Boolean))]
+  if (!tables?.length && !trimmedQuery && selectedSchemas.length > MAX_PROFILED_TABLES && distinctDatasets.length > 1) {
     const lines = [
-      `Catalog of **${warehouse.label}** (${schemas.length} tables across ${distinctDatasets.length} datasets: ${distinctDatasets.map(d => `\`${d}\``).join(', ')}; query via \`${warehouse.toolName}\`):`,
-      ...schemas.map((s) => {
+      `Catalog of **${warehouse.label}** (${selectedSchemas.length} tables across ${distinctDatasets.length} datasets: ${distinctDatasets.map(d => `\`${d}\``).join(', ')}; query via \`${warehouse.toolName}\`):`,
+      ...selectedSchemas.map((s) => {
         const countStr = s.rowCount !== undefined ? `${s.rowCount.toLocaleString('en-US')} rows` : 'row count unknown'
         const colsStr = s.columns.map(c => `\`${c.name}\` ${c.type.toLowerCase()}`).join(', ')
         return `- \`${s.name}\` (${countStr}) · cols: ${colsStr}`
       }),
       '',
-      `Pass \`tables: ["<dataset>"]\` (for example \`profile(warehouse="${warehouse.id}", tables=["${distinctDatasets[distinctDatasets.length - 1]}"])\`) to run deep value, date-range, NULL, currency & join fan-out checks on the dataset you need.`,
+      `Pass \`tables: ["<dataset>"]\` (for example \`profile(warehouse="${warehouse.id}", tables=["${distinctDatasets[distinctDatasets.length - 1]}"])\`) or \`query: "<keywords>"\` to narrow to the tables you need${isPro ? ' with deep value, date-range, NULL, currency & join fan-out checks' : ''}.`,
     ]
     return lines.join('\n')
   }
 
-  const targetSchemas = schemas.slice(0, MAX_PROFILED_TABLES)
+  const targetSchemas = selectedSchemas.slice(0, MAX_PROFILED_TABLES)
   const plans = targetSchemas.map(s => buildTableProfileSql(s, warehouse.dialect))
 
   const probeRows = isPro
@@ -379,12 +393,13 @@ export async function profileWarehouse(
     : plans.map(() => undefined)
 
   const results = plans.map((plan, i) => parseTableProfile(plan, probeRows[i], cache))
+  const header = searchHeader || `Profile of **${warehouse.label}** (${results.length} table${results.length === 1 ? '' : 's'}${selectedSchemas.length > results.length ? ` of ${selectedSchemas.length}` : ''}; query via \`${warehouse.toolName}\`):`
   const lines = [
-    `Profile of **${warehouse.label}** (${results.length} table${results.length === 1 ? '' : 's'}${schemas.length > results.length ? ` of ${schemas.length}` : ''}; query via \`${warehouse.toolName}\`):`,
+    header,
     ...results.map(formatTableLine),
   ]
-  if (schemas.length > results.length) {
-    const rest = schemas.slice(results.length).map(s => `\`${s.name}\``).join(', ')
+  if (selectedSchemas.length > results.length) {
+    const rest = selectedSchemas.slice(results.length).map(s => `\`${s.name}\``).join(', ')
     lines.push(`- _Other matching tables not deep-probed: ${rest}_`)
   }
 

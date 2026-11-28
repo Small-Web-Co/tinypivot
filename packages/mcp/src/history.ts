@@ -32,12 +32,24 @@ export interface HistoryEntry {
   rowsFile?: string
   chartConfig?: Partial<ChartConfig>
   pivotConfig?: Partial<PivotConfig>
+  /** Counted source rows before filtering/aggregation when known. */
+  sourceRows?: number
+  /** Counted raw source bytes when known. */
+  rawBytes?: number
+  /** Counted tokens kept out of LLM context for this pull. */
+  tokensSaved?: number
+  /** Counted [AUDIT] traps flagged on this pull. */
+  trapsCaught?: number
+  /** Counted warehouse bytes scanned when reported by the warehouse. */
+  scannedBytes?: number
 }
 
 export interface RecordInput {
   kind: HistoryKind
   source: string
   where?: RowFilter[]
+  trapsCaught?: number
+  scannedBytes?: number
 }
 
 export interface SessionSummary {
@@ -113,6 +125,11 @@ export class HistoryStore {
         ...(saveRows ? { rowsFile: `${id}.jsonl.gz` } : {}),
         ...(dataset.chartConfig ? { chartConfig: dataset.chartConfig } : {}),
         ...(dataset.pivotConfig ? { pivotConfig: dataset.pivotConfig } : {}),
+        ...(dataset.sourceTotalRows > 0 ? { sourceRows: dataset.sourceTotalRows } : {}),
+        ...(dataset.rawBytes > 0 ? { rawBytes: dataset.rawBytes } : {}),
+        ...(dataset.estimatedDatasetTokens > 0 ? { tokensSaved: dataset.estimatedDatasetTokens } : {}),
+        ...(input.trapsCaught && input.trapsCaught > 0 ? { trapsCaught: input.trapsCaught } : {}),
+        ...(input.scannedBytes && input.scannedBytes > 0 ? { scannedBytes: input.scannedBytes } : {}),
       }
       if (entry.rowsFile) {
         const lines = dataset.rows.map(row => JSON.stringify(row)).join('\n')

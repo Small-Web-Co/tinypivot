@@ -266,15 +266,19 @@ describe('server analyze(warehouse, table) wiring & Pro gating', () => {
     cleanupKeys()
   })
 
-  it('runs analyze directly on a configured warehouse on Pro and blocks it on Free', async () => {
+  it('allows Free explain_change directly on a configured warehouse while gating Pro-only methods like cohort_retention', async () => {
     const counts = [
       { cohort: '2026-01', active_month: '2026-01', active_entities: 500 },
       { cohort: '2026-01', active_month: '2026-02', active_entities: 250 },
       { cohort: '2026-02', active_month: '2026-02', active_entities: 600 },
     ]
-    const { connector } = makeWarehouse(() => counts)
+    const grouped = [
+      { _period: '2026-01', channel: 'Organic', conversions: 800, sessions: 8000 },
+      { _period: '2026-02', channel: 'Organic', conversions: 900, sessions: 8000 },
+    ]
+    const { connector } = makeWarehouse(sql => (sql.includes('campaign_daily') ? grouped : counts))
 
-    // Pro succeeds
+    // Pro succeeds on Pro-only method (cohort_retention)
     const { server: proServer } = createTinyPivotMcpServer({
       licenseKey: signLicense('MCPP'),
       warehouses: [connector],
@@ -298,7 +302,7 @@ describe('server analyze(warehouse, table) wiring & Pro gating', () => {
     expect(proText).toContain('Cohort Retention')
     await proClient.close()
 
-    // Free is gated cleanly on warehouse analyze
+    // Free succeeds on Free methods (explain_change) directly on the warehouse, and gates Pro-only methods (cohort_retention)
     const { server: freeServer } = createTinyPivotMcpServer({
       warehouses: [connector],
     })
@@ -307,16 +311,27 @@ describe('server analyze(warehouse, table) wiring & Pro gating', () => {
     const freeClient = new Client({ name: 'test-free', version: '1.0.0' })
     await freeClient.connect(ct2)
 
-    const freeRes = await freeClient.callTool({
+    const freeExplain = await freeClient.callTool({
       name: 'analyze',
       arguments: {
         method: 'explain_change',
         warehouse: 'bigquery',
         table: 'acme.campaign_daily',
+        params: { periodField: 'date', numerator: 'conversions', denominator: 'sessions', dimensions: ['channel'] },
       },
     })
-    expect(freeRes.isError).toBe(true)
-    const freeText = (freeRes.content as Array<{ text?: string }>).map(c => c.text ?? '').join('\n')
+    expect(freeExplain.isError).toBeFalsy()
+
+    const freeCohort = await freeClient.callTool({
+      name: 'analyze',
+      arguments: {
+        method: 'cohort_retention',
+        warehouse: 'bigquery',
+        table: 'acme.daily_orders',
+      },
+    })
+    expect(freeCohort.isError).toBe(true)
+    const freeText = (freeCohort.content as Array<{ text?: string }>).map(c => c.text ?? '').join('\n')
     expect(freeText).toContain('requires TinyPivot Pro')
     await freeClient.close()
   })
