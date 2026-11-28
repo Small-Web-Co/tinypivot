@@ -3,6 +3,7 @@ import { enableDemoMode } from 'tinypivot'
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import { filterAnalyticsEvent } from './site/analytics'
 import './style.css'
 import './site.css'
 
@@ -41,8 +42,10 @@ async function initApp() {
     console.info('[TinyPivot] Demo token unavailable - running in free mode')
   }
 
-  // Initialize Vercel Analytics
-  inject()
+  // Initialize Vercel Analytics (drop known spoofed-referrer bot spam)
+  inject({
+    beforeSend: event => filterAnalyticsEvent(event),
+  })
 
   createApp(App).use(router).mount('#app')
 }

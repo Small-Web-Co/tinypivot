@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 const DEFAULT_TELEMETRY_URL = 'https://tiny-pivot.com/api/telemetry'
-const PACKAGE_VERSION = '0.9.5'
+const PACKAGE_VERSION = '0.9.6'
 
 export type TelemetryErrorCode
   = | 'duckdb_init'

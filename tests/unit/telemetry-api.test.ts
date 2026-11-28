@@ -4,6 +4,7 @@ import { buildPublishWindowMap, nextUtcDay } from '../../api/_lib/growth-snapsho
 import { parseTelemetryRecord, persistTelemetryEvent } from '../../api/_lib/telemetry-store'
 import cronGrowthHandler from '../../api/cron/growth'
 import handler from '../../api/telemetry'
+import { filterAnalyticsEvent, isBlockedReferrer } from '../../demo/site/analytics'
 import { classifyErrorCode } from '../../packages/mcp/src/telemetry'
 
 function mockRes() {
@@ -244,5 +245,19 @@ describe('api/telemetry handler', () => {
     expect(resOk.statusCode).toBe(204)
     expect(resOk.ended).toBe(true)
     expect(logSpy).toHaveBeenCalledWith('[tinypivot-telemetry]', expect.stringContaining('"event":"gate_hit"'))
+  })
+})
+
+describe('vercel analytics referrer filter', () => {
+  it('drops spoofed aocr.org referrer hits and allows normal traffic', () => {
+    expect(isBlockedReferrer('https://www.aocr.org/')).toBe(true)
+    expect(isBlockedReferrer('https://aocr.org/some-page')).toBe(true)
+    expect(isBlockedReferrer('https://github.com/Small-Web-Co/tinypivot')).toBe(false)
+    expect(isBlockedReferrer('')).toBe(false)
+    expect(isBlockedReferrer('not-a-url')).toBe(false)
+
+    const ev = { type: 'pageview', url: 'https://tiny-pivot.com/' }
+    expect(filterAnalyticsEvent(ev, 'https://www.aocr.org/')).toBeNull()
+    expect(filterAnalyticsEvent(ev, 'https://google.com/')).toEqual(ev)
   })
 })
