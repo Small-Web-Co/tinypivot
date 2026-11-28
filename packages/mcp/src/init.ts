@@ -9,6 +9,7 @@ import { EXTENSION_HEADER } from './agent-bridge.js'
 import { buildOpenCodePluginSource } from './opencode-plugin.js'
 import { buildPiExtensionSource, PI_ENTRY_EXTRAS } from './pi-extension.js'
 import { saveVisualThemePreference } from './store.js'
+import { recordTelemetry } from './telemetry.js'
 import { CONNECTABLE_WAREHOUSES, detectWarehouses } from './warehouse-detect.js'
 
 export const VALID_INIT_TARGETS = [
@@ -749,6 +750,19 @@ export async function runInitCommand(args: string[]): Promise<InitSummary | null
   const configuredCount = results.filter(r => r.status === 'updated' || r.status === 'unchanged').length
   const errorCount = results.filter(r => r.status === 'error').length
   const ok = errorCount === 0 && configuredCount > 0
+
+  if (!opts.dryRun) {
+    const configuredTargets = results
+      .filter(r => (r.status === 'updated' || r.status === 'unchanged') && VALID_INIT_TARGET_SET.has(r.id))
+      .map(r => r.id)
+    recordTelemetry({
+      event: 'init',
+      tier: opts.licenseKey ? 'pro' : 'free',
+      outcome: ok ? 'ok' : 'error',
+      client: configuredTargets.length > 0 ? configuredTargets.join(',').slice(0, 48) : undefined,
+      feature: connected.length > 0 ? connected.map(w => w.id).join(',').slice(0, 40) : undefined,
+    })
+  }
   const hint = configuredCount === 0
     ? 'No supported AI harness configs were detected. Re-run with --all or --targets=claude,cursor,opencode.'
     : undefined

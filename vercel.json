@@ -7,6 +7,9 @@
   "redirects": [
     { "source": "/mcp", "destination": "/docs", "permanent": true }
   ],
+  "crons": [
+    { "path": "/api/cron/growth", "schedule": "0 6 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

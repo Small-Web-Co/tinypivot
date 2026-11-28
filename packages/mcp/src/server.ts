@@ -10,6 +10,7 @@ import type { TerminalFormatOptions } from './card.js'
 import type { AgentExtension } from './init.js'
 import type { StoredDataset } from './store.js'
 import type { AgentHint } from './studio-protocol.js'
+import type { TelemetryErrorCode } from './telemetry.js'
 import type { WarehouseConnector } from './warehouse.js'
 import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
@@ -41,7 +42,7 @@ import { snowflakeConfigFromEnv, snowflakeConnector } from './snowflake.js'
 import { chartConfigFromPivot, DatasetStore, datasetView, DEFAULT_SESSION_KEY, FREE_TIER_ROW_LIMIT } from './store.js'
 import { agentLabel, Studio } from './studio.js'
 import { describeChartForText, formatDatasetSummary, formatPivotSummary } from './summary.js'
-import { bucketRowCount, recordTelemetry } from './telemetry.js'
+import { bucketRowCount, classifyErrorCode, recordTelemetry } from './telemetry.js'
 import { detectNonAdditiveSumWarning, formatTerminalChart } from './terminal-chart.js'
 import { hasFeature } from './tiers.js'
 import { runWarehouseAnalysis } from './warehouse-analyze.js'
@@ -623,9 +624,43 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       client: getClientName(),
       tier,
       truncated: ds.truncatedForFreeTier,
+      outcome: 'ok',
     })
     notifyCompanion()
     return dataToolResult(summaryText, payload, liveCompanionUrl)
+  }
+
+  const recordToolOk = (tool: string, extra: { rowBucket?: ReturnType<typeof bucketRowCount>, feature?: string } = {}) => {
+    recordTelemetry({
+      event: 'tool_call',
+      tool,
+      client: getClientName(),
+      tier,
+      outcome: 'ok',
+      ...extra,
+    })
+  }
+
+  const recordToolError = (tool: string, err: unknown, fallback: TelemetryErrorCode, feature?: string) => {
+    recordTelemetry({
+      event: 'tool_call',
+      tool,
+      client: getClientName(),
+      tier,
+      outcome: 'error',
+      errorCode: classifyErrorCode(err, fallback),
+      feature,
+    })
+  }
+
+  const recordGateHit = (feature: string, tool?: string) => {
+    recordTelemetry({
+      event: 'gate_hit',
+      tool,
+      feature,
+      client: getClientName(),
+      tier,
+    })
   }
 
   const studio = options.studio ?? new Studio(store)
@@ -683,6 +718,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
       async ({ text }) => {
         const step = studio.reply(text)
+        recordToolOk('studio_reply')
         if (hasFeature(isPro, 'claim_gate') && step.claims?.length) {
           const missing = step.claims.filter(c => c.status === 'not-found')
           const checked = step.claims.filter(c => c.status !== 'unchecked')
@@ -908,6 +944,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         return replyWithDataset(ds, sessionKey, 'load_file', proLoadNote)
       }
       catch (err) {
+        recordToolError('load_file', err, 'file_parse')
         return {
           isError: true,
           content: [{ type: 'text', text: formatLoadFileError(filePath, err) }],
@@ -1050,6 +1087,9 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       if (chartTheme && (isPro || chartTheme === 'code')) {
         store.setVisualTheme(chartTheme as ChartThemePreset)
       }
+      else if (chartTheme && !isPro) {
+        recordGateHit('theme', 'configure_chart')
+      }
       const chartConfig = toCoreChartConfig(chartInput, ds.name)
       const type = chartConfig.type!
       const columnNames = new Set(ds.columns.map(column => column.name))
@@ -1160,6 +1200,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       },
       async ({ sql, queries, why, ask, name, viewMode, pivotConfig, chartConfig, keepExisting }, extra) => {
         if (!hasFeature(isPro, 'direct_warehouses')) {
+          recordGateHit('direct_warehouses', warehouse.toolName)
           return {
             isError: true,
             content: [{
@@ -1221,6 +1262,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           return replyWithDataset(ds, sessionKey, warehouse.toolName, note, { preferSmallTable })
         }
         catch (err) {
+          recordToolError(warehouse.toolName, err, 'warehouse_query')
           const msg = err instanceof Error ? err.message : String(err)
           if (!cache.schemasLoaded && warehouse.describeTables)
             await withinBudget(loadWarehouseSchemas(warehouse, cache), 2_500).catch(() => {})
@@ -1334,8 +1376,10 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
               duck: studio.duck,
               views: studio.queryViews(sessionKey),
             })
-            if (proFlagCount > 0)
+            if (proFlagCount > 0) {
+              recordGateHit('audit_deep', 'query')
               auditBlock += formatProGuardTeaser(proFlagCount)
+            }
           }
           if (hasFeature(isPro, 'recursive_memory') && dedupedWarnings.length > 0 && sqlSources.length > 0) {
             const targetSource = sqlSources[0]
@@ -1355,6 +1399,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         return replyWithDataset(dataset, sessionKey, 'query', note, { preferSmallTable })
       }
       catch (error) {
+        recordToolError('query', error, 'query_error')
         return { isError: true, content: [{ type: 'text' as const, text: formatQueryError(error, store, sessionKey, primarySql, isPro) }] }
       }
     },
@@ -1395,6 +1440,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           }
         }
         if (!hasFeature(isPro, 'direct_warehouses')) {
+          recordGateHit('direct_warehouses', 'profile')
           return {
             isError: true,
             content: [{ type: 'text' as const, text: `Profiling ${target.label} directly requires a TinyPivot Pro license (TINYPIVOT_LICENSE_KEY). On Free, ${target.freeAlternative}. Upgrade at https://tiny-pivot.com/pricing` }],
@@ -1402,9 +1448,11 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         }
         try {
           const text = await profileWarehouse(target, { tables, query, isPro: useRelational, cache: warehouseCaches.get(target.id)! })
+          recordToolOk('profile', { feature: target.id })
           return { content: [{ type: 'text' as const, text }] }
         }
         catch (err) {
+          recordToolError('profile', err, 'warehouse_query', target.id)
           return { isError: true, content: [{ type: 'text' as const, text: `${target.label} profile failed: ${err instanceof Error ? err.message : String(err)}` }] }
         }
       }
@@ -1412,9 +1460,11 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
         try {
           await withinBudget(studio.duck.prepare(), DUCKDB_WAIT_MS)
           const text = await profileDirectory(dirPath, { duck: studio.duck, isPro: useRelational })
+          recordToolOk('profile', { feature: 'directory' })
           return { content: [{ type: 'text' as const, text }] }
         }
         catch (err) {
+          recordToolError('profile', err, 'file_parse', 'directory')
           return { isError: true, content: [{ type: 'text' as const, text: err instanceof Error ? err.message : String(err) }] }
         }
       }
@@ -1431,6 +1481,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           })
         : []
       studio.recordDatasetStep(ds, { actor: 'agent', tool: 'profile', why })
+      recordToolOk('profile', { rowBucket: bucketRowCount(ds.sourceTotalRows) })
       return { content: [{ type: 'text' as const, text: formatProfile(ds, { isPro: useRelational, peerDatasets }) }] }
     },
   )
@@ -1465,6 +1516,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     async ({ method, datasetId, filePath, warehouse: warehouseArg, table, params, why }, extra) => {
       const hasProAnalyze = hasFeature(isPro, 'analyze_pro')
       if (PRO_ONLY_METHODS.has(method) && !hasProAnalyze) {
+        recordGateHit('analyze_pro', 'analyze')
         return {
           isError: true,
           content: [{
@@ -1486,6 +1538,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           }
         }
         if (!hasFeature(isPro, 'direct_warehouses')) {
+          recordGateHit('direct_warehouses', 'analyze')
           return {
             isError: true,
             content: [{ type: 'text' as const, text: `Running \`analyze\` directly on ${target.label} requires TinyPivot Pro (TINYPIVOT_LICENSE_KEY). On Free, ${target.freeAlternative}. Upgrade at https://tiny-pivot.com/pricing` }],
@@ -1520,9 +1573,11 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
             studio.recordDatasetStep(outDs, { actor: 'agent', tool: 'analyze', why: why ?? output.title })
             return replyWithDataset(outDs, sessionKey, 'analyze', `\n\n${output.summaryText}`)
           }
+          recordToolOk('analyze', { feature: method })
           return { content: [{ type: 'text' as const, text: output.summaryText }] }
         }
         catch (error) {
+          recordToolError('analyze', error, 'warehouse_query', method)
           return {
             isError: true,
             content: [{ type: 'text' as const, text: `${target.label} analyze failed: ${error instanceof Error ? error.message : String(error)}` }],
@@ -1537,6 +1592,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           studio.remember(ds, { kind: 'file', source: filePath })
         }
         catch (err) {
+          recordToolError('analyze', err, 'file_parse', method)
           return { isError: true, content: [{ type: 'text' as const, text: formatLoadFileError(filePath, err) }] }
         }
       }
@@ -1559,9 +1615,11 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           studio.recordDatasetStep(outDs, { actor: 'agent', tool: 'analyze', why: why ?? output.title })
           return replyWithDataset(outDs, sessionKey, 'analyze', `\n\n${output.summaryText}`)
         }
+        recordToolOk('analyze', { rowBucket: bucketRowCount(ds.sourceTotalRows), feature: method })
         return { content: [{ type: 'text' as const, text: output.summaryText }] }
       }
       catch (error) {
+        recordToolError('analyze', error, 'analyze_error', method)
         return {
           isError: true,
           content: [{ type: 'text' as const, text: error instanceof Error ? error.message : String(error) }],
@@ -1589,16 +1647,21 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
       const { history } = studio
       if (!history.enabled)
         return { content: [{ type: 'text' as const, text: 'History is off (TINYPIVOT_HISTORY=0).' }] }
-      if (sessions && !open)
+      if (sessions && !open) {
+        recordToolOk('history', { feature: 'sessions' })
         return { content: [{ type: 'text' as const, text: formatSessionList(history.listSessions(limit ?? 20)) }] }
-      if (!open)
+      }
+      if (!open) {
+        recordToolOk('history', { feature: 'list' })
         return { content: [{ type: 'text' as const, text: formatHistoryList(history.list(limit ?? 15)) }] }
+      }
       const { sessionKey } = resolveSessionContext(extra, true)
       try {
         const ds = await studio.reopen(open, { actor: 'agent', why, sessionKey })
         return replyWithDataset(ds, sessionKey, 'history')
       }
       catch (error) {
+        recordToolError('history', error, 'dataset_not_found', 'reopen')
         const message = error instanceof Error ? error.message : String(error)
         return { isError: true, content: [{ type: 'text' as const, text: `Could not reopen "${open}": ${message}. Try one of the saved pull IDs below, or call history with no arguments to list more.\n${formatHistoryList(history.list(5))}` }] }
       }
@@ -1629,6 +1692,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
           lines.push('', `${warehouse.label} tables available via \`${warehouse.toolName}\`: ${tables.map(t => `\`${t}\``).join(', ')} (call \`profile(warehouse="${warehouse.id}")\` for schemas, distinct values, date ranges & data traps)`)
       }
 
+      recordToolOk('list_datasets')
       return {
         content: [{ type: 'text', text: lines.join('\n') || 'No datasets loaded.' }],
         structuredContent: {
@@ -1652,6 +1716,7 @@ export function createTinyPivotMcpServer(options: CreateTinyPivotMcpServerOption
     async (_args, extra) => {
       const sessionKey = extractSessionKey(extra) ?? DEFAULT_SESSION_KEY
       const cleared = store.clearSession(sessionKey)
+      recordToolOk('clear_datasets')
       notifyCompanion()
       return {
         content: [{

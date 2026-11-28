@@ -8,13 +8,49 @@
 
 import { neon } from '@neondatabase/serverless'
 
-const ALLOWED_EVENTS = new Set(['server_start', 'tool_call'] as const)
+const ALLOWED_EVENTS = new Set([
+  'server_start',
+  'tool_call',
+  'gate_hit',
+  'init',
+  'studio_open',
+] as const)
+
 const ALLOWED_TIERS = new Set(['free', 'pro'] as const)
 const ALLOWED_BUCKETS = new Set(['<100', '100-1k', '1k-2.5k', '2.5k-10k', '10k+'] as const)
+const ALLOWED_OUTCOMES = new Set(['ok', 'error'] as const)
+const ALLOWED_ERROR_CODES = new Set([
+  'duckdb_init',
+  'file_not_found',
+  'file_parse',
+  'dataset_not_found',
+  'warehouse_auth',
+  'warehouse_timeout',
+  'warehouse_query',
+  'query_syntax',
+  'query_error',
+  'analyze_error',
+  'invalid_input',
+  'unknown',
+] as const)
 
-export type TelemetryEventName = 'server_start' | 'tool_call'
+export type TelemetryEventName = 'server_start' | 'tool_call' | 'gate_hit' | 'init' | 'studio_open'
 export type TelemetryTier = 'free' | 'pro'
 export type TelemetryRowBucket = '<100' | '100-1k' | '1k-2.5k' | '2.5k-10k' | '10k+'
+export type TelemetryOutcome = 'ok' | 'error'
+export type TelemetryErrorCode
+  = | 'duckdb_init'
+    | 'file_not_found'
+    | 'file_parse'
+    | 'dataset_not_found'
+    | 'warehouse_auth'
+    | 'warehouse_timeout'
+    | 'warehouse_query'
+    | 'query_syntax'
+    | 'query_error'
+    | 'analyze_error'
+    | 'invalid_input'
+    | 'unknown'
 
 export interface TelemetryRecord {
   event: TelemetryEventName
@@ -23,6 +59,9 @@ export interface TelemetryRecord {
   rowBucket?: TelemetryRowBucket
   client?: string
   truncated?: boolean
+  outcome?: TelemetryOutcome
+  errorCode?: TelemetryErrorCode
+  feature?: string
   version?: string
   os?: string
   anonId?: string
@@ -40,19 +79,26 @@ export const TELEMETRY_SCHEMA_STATEMENTS = [
     row_bucket TEXT,
     client     TEXT,
     truncated  BOOLEAN,
+    outcome    TEXT,
+    error_code TEXT,
+    feature    TEXT,
     version    TEXT,
     os         TEXT,
     anon_id    TEXT,
     country    TEXT
   )`,
+  `ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS outcome TEXT`,
+  `ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS error_code TEXT`,
+  `ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS feature TEXT`,
   `CREATE INDEX IF NOT EXISTS idx_telemetry_events_ts ON telemetry_events (ts DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_telemetry_events_anon_ts ON telemetry_events (anon_id, ts DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_telemetry_events_event_ts ON telemetry_events (event, ts DESC)`,
 ] as const
 
 export function cleanToken(val: unknown, maxLen = 48): string | undefined {
   if (typeof val !== 'string')
     return undefined
-  const cleaned = val.trim().replace(/[^\w.:/ -]/g, '').slice(0, maxLen)
+  const cleaned = val.trim().replace(/[^\w.:,/ -]/g, '').slice(0, maxLen)
   return cleaned || undefined
 }
 
@@ -77,6 +123,14 @@ export function parseTelemetryRecord(
     ? body.rowBucket as TelemetryRowBucket
     : undefined
 
+  const outcome = typeof body.outcome === 'string' && ALLOWED_OUTCOMES.has(body.outcome as TelemetryOutcome)
+    ? body.outcome as TelemetryOutcome
+    : undefined
+
+  const errorCode = typeof body.errorCode === 'string' && ALLOWED_ERROR_CODES.has(body.errorCode as TelemetryErrorCode)
+    ? body.errorCode as TelemetryErrorCode
+    : undefined
+
   return {
     event,
     tier,
@@ -84,6 +138,9 @@ export function parseTelemetryRecord(
     rowBucket,
     client: cleanToken(body.client, 48),
     truncated: typeof body.truncated === 'boolean' ? body.truncated : undefined,
+    outcome,
+    errorCode,
+    feature: cleanToken(body.feature, 40),
     version: cleanToken(body.version, 20),
     os: cleanToken(body.os, 20),
     anonId: cleanToken(body.anonId, 48),
@@ -97,12 +154,12 @@ type NeonClient = ReturnType<typeof neon>
 let cachedUrl: string | undefined
 let cachedClient: NeonClient | null = null
 
-function getDatabaseUrl(): string | undefined {
+export function getDatabaseUrl(): string | undefined {
   return process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim() || undefined
 }
 
-function getSqlClient(): NeonClient | null {
-  const url = getDatabaseUrl()
+export function getSqlClient(urlOverride?: string): NeonClient | null {
+  const url = urlOverride?.trim() || getDatabaseUrl()
   if (!url)
     return null
   if (cachedClient && cachedUrl === url)
@@ -124,7 +181,7 @@ async function defaultInsert(record: TelemetryRecord): Promise<boolean> {
 
   await sql`
     INSERT INTO telemetry_events (
-      ts, event, tier, tool, row_bucket, client, truncated, version, os, anon_id, country
+      ts, event, tier, tool, row_bucket, client, truncated, outcome, error_code, feature, version, os, anon_id, country
     ) VALUES (
       ${record.ts},
       ${record.event},
@@ -133,6 +190,9 @@ async function defaultInsert(record: TelemetryRecord): Promise<boolean> {
       ${record.rowBucket ?? null},
       ${record.client ?? null},
       ${record.truncated ?? null},
+      ${record.outcome ?? null},
+      ${record.errorCode ?? null},
+      ${record.feature ?? null},
       ${record.version ?? null},
       ${record.os ?? null},
       ${record.anonId ?? null},

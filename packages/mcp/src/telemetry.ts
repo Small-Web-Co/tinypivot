@@ -6,13 +6,65 @@ import path from 'node:path'
 const DEFAULT_TELEMETRY_URL = 'https://tiny-pivot.com/api/telemetry'
 const PACKAGE_VERSION = '0.9.5'
 
+export type TelemetryErrorCode
+  = | 'duckdb_init'
+    | 'file_not_found'
+    | 'file_parse'
+    | 'dataset_not_found'
+    | 'warehouse_auth'
+    | 'warehouse_timeout'
+    | 'warehouse_query'
+    | 'query_syntax'
+    | 'query_error'
+    | 'analyze_error'
+    | 'invalid_input'
+    | 'unknown'
+
 export interface TelemetryEvent {
-  event: 'server_start' | 'tool_call'
+  event: 'server_start' | 'tool_call' | 'gate_hit' | 'init' | 'studio_open'
   tool?: string
   rowBucket?: '<100' | '100-1k' | '1k-2.5k' | '2.5k-10k' | '10k+'
   client?: string
   tier: 'free' | 'pro'
   truncated?: boolean
+  outcome?: 'ok' | 'error'
+  errorCode?: TelemetryErrorCode
+  feature?: string
+}
+
+/**
+ * Map an error locally to a fixed, zero-PII error category.
+ * Never transmits error messages, stack traces, file paths, SQL, or values.
+ */
+export function classifyErrorCode(err: unknown, fallback: TelemetryErrorCode = 'unknown'): TelemetryErrorCode {
+  const code = (err && typeof err === 'object' && 'code' in err && typeof err.code === 'string')
+    ? err.code.toUpperCase()
+    : ''
+  const msg = (err instanceof Error ? err.message : String(err ?? '')).toLowerCase()
+
+  if (code === 'ENOENT' || msg.includes('enoent') || msg.includes('no such file') || msg.includes('file not found'))
+    return 'file_not_found'
+  if (code === 'ETIMEDOUT' || msg.includes('timeout') || msg.includes('timed out') || msg.includes('aborted'))
+    return 'warehouse_timeout'
+  if (
+    msg.includes('unauthorized')
+    || msg.includes('authentication')
+    || msg.includes('invalid_grant')
+    || msg.includes('access denied')
+    || msg.includes('permission denied')
+    || msg.includes('credentials')
+    || msg.includes('password authentication')
+  ) {
+    return 'warehouse_auth'
+  }
+  if (msg.includes('duckdb'))
+    return 'duckdb_init'
+  if (msg.includes('syntax error') || msg.includes('parser error') || msg.includes('parse error'))
+    return 'query_syntax'
+  if (msg.includes('csv') || msg.includes('json') || msg.includes('xlsx') || msg.includes('workbook') || msg.includes('sheet'))
+    return 'file_parse'
+
+  return fallback
 }
 
 export function isTelemetryEnabled(): boolean {

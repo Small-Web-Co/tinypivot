@@ -37,10 +37,10 @@ export const privacyPolicy: LegalDocument = {
     {
       heading: 'Anonymous usage statistics from the MCP server',
       paragraphs: [
-        'Unless you turn it off, the MCP server sends a small usage event to tiny-pivot.com when it starts and when a tool is used. Events are stored in a Postgres database hosted by Neon. Each event holds only:',
+        'Unless you turn it off, the MCP server sends a small usage event to tiny-pivot.com when it is set up, when it starts, when a tool is used, or when a Pro-gated feature is hit. Events are stored in a Postgres database hosted by Neon. Each event holds only:',
       ],
       items: [
-        'the event (server start or tool call) and the tool\'s name',
+        'the event type (init, server start, tool call, or feature gate), the tool or feature name, and whether it succeeded or hit a fixed error category (such as "file_parse" — never raw error text or stack traces)',
         'the number of rows, as a range such as "100-1k"',
         'the name of the AI agent that runs TinyPivot (for example "claude-code" or "opencode")',
         'your plan (free or pro), whether the result was cut to the free-tier limit, the TinyPivot version and your operating system',
