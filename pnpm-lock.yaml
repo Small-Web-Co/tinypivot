@@ -46,6 +46,9 @@ importers:
       '@duckdb/duckdb-wasm':
         specifier: 1.33.1-dev13.0
         version: 1.33.1-dev13.0
+      '@neondatabase/serverless':
+        specifier: ^1.2.2
+        version: 1.2.2
       '@tanstack/vue-table':
         specifier: ^8.21.3
         version: 8.21.3(vue@3.5.44(typescript@5.3.3))
@@ -1098,6 +1101,10 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@neondatabase/serverless@1.2.2':
+    resolution: {integrity: sha512-Zkq+/V9o34IKntqe8c0JMjxQ+MLF/t695x4IXHMKchHk/rn8rqpC1oZ3qouh1UFMDr/nRlrCtSlcsaxTmeclJg==}
+    engines: {node: '>=19.0.0'}
 
   '@noble/curves@1.9.7':
     resolution: {integrity: sha512-gbKGcRUYIjA3/zCCNaWDciTMFI0dCkvou3TL8Zmy5Nc7sJ47a0jtOeZoTaMxkuqRo9cRhjOdZJXegxYE5FN/xw==}
@@ -5592,6 +5599,8 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@4.6.7)
     transitivePeerDependencies:
       - supports-color
+
+  '@neondatabase/serverless@1.2.2': {}
 
   '@noble/curves@1.9.7':
     dependencies:

@@ -37,7 +37,7 @@ export const privacyPolicy: LegalDocument = {
     {
       heading: 'Anonymous usage statistics from the MCP server',
       paragraphs: [
-        'Unless you turn it off, the MCP server sends a small usage event to tiny-pivot.com when it starts and when a tool is used. Each event holds only:',
+        'Unless you turn it off, the MCP server sends a small usage event to tiny-pivot.com when it starts and when a tool is used. Events are stored in a Postgres database hosted by Neon. Each event holds only:',
       ],
       items: [
         'the event (server start or tool call) and the tool\'s name',

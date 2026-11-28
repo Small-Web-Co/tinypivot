@@ -87,6 +87,7 @@
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.33.1-dev13.0",
+    "@neondatabase/serverless": "^1.2.2",
     "@tanstack/vue-table": "^8.21.3",
     "@vercel/analytics": "^1.6.1",
     "vue-router": "^4.6.4"
