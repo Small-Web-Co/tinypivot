@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { buildDailyDigestEmail, sendDailyDigestEmail } from '../../api/_lib/daily-digest'
 import { buildPublishWindowMap, nextUtcDay } from '../../api/_lib/growth-snapshot'
 import { parseTelemetryRecord, persistTelemetryEvent } from '../../api/_lib/telemetry-store'
 import cronGrowthHandler from '../../api/cron/growth'
@@ -259,5 +260,56 @@ describe('vercel analytics referrer filter', () => {
     const ev = { type: 'pageview', url: 'https://tiny-pivot.com/' }
     expect(filterAnalyticsEvent(ev, 'https://www.aocr.org/')).toBeNull()
     expect(filterAnalyticsEvent(ev, 'https://google.com/')).toEqual(ev)
+  })
+})
+
+describe('daily usage digest email', () => {
+  const sampleDigest = {
+    generatedAt: '2026-11-28T12:00:00.000Z',
+    mcp24h: { uniqueAnons: 1, proAnons: 0, events: 2, inits: 1, starts: 1, toolCalls: 0, toolErrors: 0, gateHits: 0 },
+    mcp7d: { uniqueAnons: 2, proAnons: 1, events: 9, inits: 1, starts: 3, toolCalls: 5, toolErrors: 1, gateHits: 2 },
+    crawlerHits24h: 1,
+    recentExternalUsers24h: [
+      { anonPrefix: 'b30ba0bc', client: 'claude,cursor,codex', os: 'linux', country: 'DE', tier: 'free', events: 1, toolCalls: 0 },
+    ],
+    topTools7d: [{ tool: 'query', calls: 4, errors: 1 }],
+    topGates7d: [{ feature: 'analyze_pro', anons: 1, hits: 2 }],
+    topErrors7d: [{ errorCode: 'query_syntax', tool: 'query', hits: 1 }],
+    npm: [
+      { pkg: '@smallwebco/tinypivot-react', shortName: 'react', latestDay: '2026-11-27', latestDownloads: 53, latestIsPublishWindow: false, curWkdayAvg: 90.9, prevWkdayAvg: 54.4, raw30d: 3347 },
+    ],
+    github: [
+      { repo: 'Small-Web-Co/tinypivot', stars: 19, starDelta: 2, forks: 2, day: '2026-11-28' },
+    ],
+  }
+
+  it('builds a concise mobile-friendly subject, HTML, and plain text summary', () => {
+    const { subject, html, text } = buildDailyDigestEmail(sampleDigest)
+    expect(subject).toBe('TinyPivot Daily: React 90.9/wkday (+67%) · 1 MCP ext (24h) · 19★ (+2)')
+    expect(html).toContain('b30ba0bc')
+    expect(html).toContain('analyze_pro')
+    expect(html).toContain('Excluded 1 automated registry probe hit')
+    expect(text).toContain('MCP External (24h): 1 anons')
+  })
+
+  it('skips sending when unconfigured and posts to Resend when configured', async () => {
+    vi.stubEnv('RESEND_API_KEY', '')
+    vi.stubEnv('REPORT_EMAIL', '')
+    const skipped = await sendDailyDigestEmail(sampleDigest)
+    expect(skipped.sent).toBe(false)
+
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 'email_123' }),
+    })) as unknown as typeof fetch
+
+    const sent = await sendDailyDigestEmail(sampleDigest, {
+      apiKey: 're_test',
+      to: 'brice@thesmallweb.co',
+      fetchImpl,
+    })
+    expect(sent).toMatchObject({ sent: true, id: 'email_123' })
+    expect(fetchImpl).toHaveBeenCalledOnce()
   })
 })
