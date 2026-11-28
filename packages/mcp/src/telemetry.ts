@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 const DEFAULT_TELEMETRY_URL = 'https://tiny-pivot.com/api/telemetry'
-const PACKAGE_VERSION = '0.9.3'
+const PACKAGE_VERSION = '0.9.4'
 
 export interface TelemetryEvent {
   event: 'server_start' | 'tool_call'
