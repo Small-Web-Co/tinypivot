@@ -470,7 +470,7 @@ export function buildDailyDigestEmail(data: DailyDigestData): {
     </div>
 
     <div style="font-size:11px;color:#777064;text-align:center;padding-top:6px;">
-      Sent automatically by tiny-pivot.com/api/cron/growth · Neon Postgres
+      TinyPivot Daily · tiny-pivot.com
     </div>
   </div>
 </body>
@@ -519,6 +519,7 @@ export async function sendDailyDigestEmail(
     },
     body: JSON.stringify({
       from: 'TinyPivot <license@tiny-pivot.com>',
+      reply_to: 'support@tiny-pivot.com',
       to,
       subject,
       html,
